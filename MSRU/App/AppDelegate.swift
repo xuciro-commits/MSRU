@@ -13,36 +13,70 @@ final class AppDelegate:
     NSObject,
     NSApplicationDelegate {
 
-    private let appState =
-        AppState()
+    // MARK: - Application Scope
+
+    private let application =
+        ApplicationModel()
+
+
+    // MARK: - Window
 
     private var mainWindowController:
         MainWindowController?
 
 
+    // MARK: - Launch
+
     func applicationDidFinishLaunching(
-        _ notification: Notification
+        _ notification:
+            Notification
     ) {
 
         guard
             !isRunningForPreviews
         else {
+
             return
         }
 
 
+        application
+            .start()
+
+
+        /*
+         当前仍然只有一个主 Window。
+
+         但 SceneModel 已经与 ApplicationModel
+         分离。
+
+         未来增加第二个 Window 时，
+         只需要再创建一个新的 SceneModel。
+         */
+
+        let scene =
+            SceneModel(
+                application:
+                    application
+            )
+
+
         let windowController =
             MainWindowController(
-                appState:
-                    appState
+                scene:
+                    scene
             )
+
 
         mainWindowController =
             windowController
 
 
         windowController
-            .showWindow(nil)
+            .showWindow(
+                nil
+            )
+
 
         windowController
             .window?
@@ -52,22 +86,31 @@ final class AppDelegate:
     }
 
 
+    // MARK: - Reopen
+
     func applicationShouldHandleReopen(
-        _ sender: NSApplication,
-        hasVisibleWindows flag: Bool
+        _ sender:
+            NSApplication,
+        hasVisibleWindows flag:
+            Bool
     ) -> Bool {
 
         guard
             !isRunningForPreviews
         else {
-            return false
+
+            return
+                false
         }
 
 
         if !flag {
 
             mainWindowController?
-                .showWindow(nil)
+                .showWindow(
+                    nil
+                )
+
 
             mainWindowController?
                 .window?
@@ -77,17 +120,23 @@ final class AppDelegate:
         }
 
 
-        return true
+        return
+            true
     }
 
 
+    // MARK: - Termination
+
     func applicationShouldTerminateAfterLastWindowClosed(
-        _ sender: NSApplication
+        _ sender:
+            NSApplication
     ) -> Bool {
 
         !isRunningForPreviews
     }
 
+
+    // MARK: - Preview
 
     private var isRunningForPreviews:
         Bool {

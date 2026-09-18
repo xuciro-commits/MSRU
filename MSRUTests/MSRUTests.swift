@@ -8,7 +8,7 @@ import Testing
 @testable import MSRU
 
 
-// MARK: - Test Dependency
+// MARK: - Runtime Probe Dependency
 
 @MainActor
 private enum RuntimeProbeDependencyKey:
@@ -17,8 +17,10 @@ private enum RuntimeProbeDependencyKey:
     static let liveValue =
         0
 
+
     static let previewValue =
         1
+
 
     static let testValue =
         2
@@ -242,12 +244,90 @@ private enum CancellationFeature:
 }
 
 
+// MARK: - Scope Test Library Repository
+
+@MainActor
+private final class ScopeTestLibraryRepository:
+    LibraryRepository {
+
+    private var tracks:
+        [LibraryTrack]
+
+
+    init(
+        tracks:
+            [LibraryTrack] = []
+    ) {
+
+        self.tracks =
+            tracks
+    }
+
+
+    func loadTracks()
+        async throws
+        -> [LibraryTrack] {
+
+        tracks
+    }
+
+
+    func saveTracks(
+        _ tracks:
+            [LibraryTrack]
+    ) async throws {
+
+        self.tracks =
+            tracks
+    }
+}
+
+
+// MARK: - Test Application Factory
+
+@MainActor
+private func makeTestApplication(
+    openverseResults:
+        [OpenverseAudio] = []
+) -> ApplicationModel {
+
+    let library =
+        LibraryStore(
+            repository:
+                ScopeTestLibraryRepository()
+        )
+
+
+    return ApplicationModel(
+        musicCatalog:
+            MusicCatalogStore(),
+        localLibrary:
+            LocalLibraryStore(),
+        library:
+            library,
+        musicLibrary:
+            AppleMusicLibraryStore(),
+        playback:
+            PlaybackController(),
+        providerManager:
+            ProviderManagerStore(),
+        openverseSearch:
+            .preview(
+                results:
+                    openverseResults
+            )
+    )
+}
+
+
 // MARK: - Tests
 
 @MainActor
 struct MSRUTests {
 
-    // MARK: Dependency Environments
+    // =========================================================
+    // MARK: Dependency Environment
+    // =========================================================
 
     @Test
     func dependencyEnvironmentDefaultsAreSeparated()
@@ -278,7 +358,9 @@ struct MSRUTests {
     }
 
 
-    // MARK: Override Isolation
+    // =========================================================
+    // MARK: Dependency Override Isolation
+    // =========================================================
 
     @Test
     func dependencyOverridesAreScoped() {
@@ -340,8 +422,8 @@ struct MSRUTests {
 
 
         /*
-         TaskLocal scope 退出以后，
-         外部环境没有被污染。
+         Scope 退出以后，
+         外部 DependencyValues 不允许被污染。
          */
 
         #expect(
@@ -353,7 +435,9 @@ struct MSRUTests {
     }
 
 
+    // =========================================================
     // MARK: FeatureHost Dependency Capture
+    // =========================================================
 
     @Test
     func featureHostCapturesDependencyScope() {
@@ -383,9 +467,10 @@ struct MSRUTests {
 
 
         /*
-         Host 创建完成后，
-         外部 Dependency context 再变化，
-         不应该改变这个 Feature runtime。
+         FeatureHost 创建以后，
+         外面的 dependency context 即使变化，
+         已创建的 Feature Runtime
+         也应该继续使用原 snapshot。
          */
 
         var differentDependencies =
@@ -416,18 +501,13 @@ struct MSRUTests {
     }
 
 
-    // MARK: Safe Test Environment
+    // =========================================================
+    // MARK: Safe Test Dependency
+    // =========================================================
 
     @Test
     func testOpenverseDependencyDoesNotUseLiveNetwork()
         async throws {
-
-        /*
-         testValue 是本地空实现。
-
-         如果这里未来被错误地改回 .live，
-         这个测试就失去了 deterministic 特性。
-         */
 
         let results =
             try await DependencyValues
@@ -444,7 +524,9 @@ struct MSRUTests {
     }
 
 
-    // MARK: Browse Test Runtime
+    // =========================================================
+    // MARK: Browse Runtime
+    // =========================================================
 
     @Test
     func browseRunsInsideTestDependencyEnvironment()
@@ -470,9 +552,10 @@ struct MSRUTests {
 
 
         /*
-         Test Openverse client 返回空结果，
-         所以 Browse 应该快速结束 loading，
-         而且没有网络错误。
+         Test Openverse implementation
+         是 deterministic 空结果。
+
+         等异步 request 完成。
          */
 
         for _ in 0..<100 {
@@ -516,7 +599,9 @@ struct MSRUTests {
     }
 
 
-    // MARK: Task Replacement
+    // =========================================================
+    // MARK: FeatureTask Cancellation
+    // =========================================================
 
     @Test
     func cancelInFlightReplacesPreviousTask()
@@ -552,7 +637,7 @@ struct MSRUTests {
 
 
         /*
-         第一项应该被第二项替换。
+         第一条 work 已被第二条替换。
          */
 
         #expect(
@@ -564,8 +649,6 @@ struct MSRUTests {
             ]
         )
 
-
-        // MARK: cancelAll
 
         host.send(
             .start(
@@ -585,7 +668,8 @@ struct MSRUTests {
 
 
         /*
-         cancelAll 后 3 不允许完成。
+         cancelAll 后第三条 work
+         不允许完成。
          */
 
         #expect(
@@ -595,6 +679,352 @@ struct MSRUTests {
             == [
                 2
             ]
+        )
+    }
+
+
+    // =========================================================
+    // MARK: Application Scope
+    // =========================================================
+
+    @Test
+    func scenesShareTheSameApplicationScope() {
+
+        let application =
+            makeTestApplication()
+
+
+        let sceneA =
+            SceneModel(
+                application:
+                    application
+            )
+
+
+        let sceneB =
+            SceneModel(
+                application:
+                    application
+            )
+
+
+        /*
+         两个 Scene 必须指向同一个
+         ApplicationModel。
+         */
+
+        #expect(
+            sceneA.application
+            ===
+            sceneB.application
+        )
+
+
+        /*
+         Application-scoped services
+         也必须天然共享。
+         */
+
+        #expect(
+            sceneA
+                .application
+                .library
+            ===
+            sceneB
+                .application
+                .library
+        )
+
+
+        #expect(
+            sceneA
+                .application
+                .playback
+            ===
+            sceneB
+                .application
+                .playback
+        )
+
+
+        #expect(
+            sceneA
+                .application
+                .musicCatalog
+            ===
+            sceneB
+                .application
+                .musicCatalog
+        )
+    }
+
+
+    // =========================================================
+    // MARK: Scene Scope
+    // =========================================================
+
+    @Test
+    func scenesOwnIndependentFeatureHosts() {
+
+        let application =
+            makeTestApplication()
+
+
+        let sceneA =
+            SceneModel(
+                application:
+                    application
+            )
+
+
+        let sceneB =
+            SceneModel(
+                application:
+                    application
+            )
+
+
+        /*
+         Feature runtime 属于 Scene Scope。
+
+         即使两个 Scene 共用同一个 Application，
+         Browse / Library FeatureHost
+         也不能是同一个实例。
+         */
+
+        #expect(
+            sceneA.browse
+            !==
+            sceneB.browse
+        )
+
+
+        #expect(
+            sceneA.libraryFeature
+            !==
+            sceneB.libraryFeature
+        )
+
+
+        #expect(
+            sceneA.browse.state
+            !==
+            sceneB.browse.state
+        )
+
+
+        #expect(
+            sceneA.libraryFeature.state
+            !==
+            sceneB.libraryFeature.state
+        )
+    }
+
+
+    // =========================================================
+    // MARK: Scene Selection Isolation
+    // =========================================================
+
+    @Test
+    func sceneSelectionDoesNotLeakBetweenWindows() {
+
+        let application =
+            makeTestApplication()
+
+
+        let sceneA =
+            SceneModel(
+                application:
+                    application
+            )
+
+
+        let sceneB =
+            SceneModel(
+                application:
+                    application
+            )
+
+
+        #expect(
+            sceneA.selectedSection
+            == .listenNow
+        )
+
+
+        #expect(
+            sceneB.selectedSection
+            == .listenNow
+        )
+
+
+        sceneA.selectedSection =
+            .browse
+
+
+        #expect(
+            sceneA.selectedSection
+            == .browse
+        )
+
+
+        /*
+         Scene B 不应该跟着 Scene A
+         一起切换页面。
+         */
+
+        #expect(
+            sceneB.selectedSection
+            == .listenNow
+        )
+
+
+        /*
+         Feature State 同样独立。
+         */
+
+        sceneA.browse.send(
+            .queryChanged(
+                "scene-a-query"
+            )
+        )
+
+
+        #expect(
+            sceneA
+                .browse
+                .state
+                .query
+            == "scene-a-query"
+        )
+
+
+        #expect(
+            sceneB
+                .browse
+                .state
+                .query
+            == "mozart"
+        )
+
+
+        /*
+         queryChanged 会创建 debounce task。
+         测试结束前明确清理。
+         */
+
+        sceneA
+            .browse
+            .cancelAll()
+    }
+
+
+    // =========================================================
+    // MARK: Shared Application Data Through Independent Features
+    // =========================================================
+
+    @Test
+    func sceneFeaturesObserveSharedApplicationLibrary()
+        async throws {
+
+        let item =
+            MSRUPreviewData
+                .openverseOne
+
+
+        let application =
+            makeTestApplication(
+                openverseResults: [
+                    item
+                ]
+            )
+
+
+        let sceneA =
+            SceneModel(
+                application:
+                    application
+            )
+
+
+        let sceneB =
+            SceneModel(
+                application:
+                    application
+            )
+
+
+        /*
+         FeatureHosts 本身彼此独立。
+         */
+
+        #expect(
+            sceneA.browse
+            !==
+            sceneB.browse
+        )
+
+
+        /*
+         开始时共享 Library 为空。
+         */
+
+        #expect(
+            !sceneA
+                .browse
+                .isSaved(
+                    item
+                )
+        )
+
+
+        #expect(
+            !sceneB
+                .browse
+                .isSaved(
+                    item
+                )
+        )
+
+
+        /*
+         直接修改 Application Scope
+         中唯一的 LibraryStore。
+         */
+
+        await application
+            .library
+            .add(
+                openverse:
+                    item
+            )
+
+
+        /*
+         两个不同 Scene 的 Browse Service
+         应该同时看到这个变化。
+
+         这验证：
+
+         Scene FeatureHost 独立，
+         Application dependency shared。
+         */
+
+        #expect(
+            sceneA
+                .browse
+                .isSaved(
+                    item
+                )
+        )
+
+
+        #expect(
+            sceneB
+                .browse
+                .isSaved(
+                    item
+                )
         )
     }
 }

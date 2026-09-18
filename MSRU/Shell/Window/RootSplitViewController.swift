@@ -8,30 +8,40 @@ import SwiftUI
 final class RootSplitViewController:
     NSSplitViewController {
 
-    let appState:
-        AppState
+    // MARK: - Scene
+
+    let scene:
+        SceneModel
 
 
     private(set) var sidebarItem:
         NSSplitViewItem!
 
+
     private(set) var contentItem:
         NSSplitViewItem!
+
 
     private(set) var queueItem:
         NSSplitViewItem!
 
 
+    // MARK: - Init
+
     init(
-        appState: AppState
+        scene:
+            SceneModel
     ) {
 
-        self.appState =
-            appState
+        self.scene =
+            scene
+
 
         super.init(
-            nibName: nil,
-            bundle: nil
+            nibName:
+                nil,
+            bundle:
+                nil
         )
     }
 
@@ -41,7 +51,8 @@ final class RootSplitViewController:
         unavailable
     )
     required init?(
-        coder: NSCoder
+        coder:
+            NSCoder
     ) {
 
         fatalError(
@@ -50,13 +61,19 @@ final class RootSplitViewController:
     }
 
 
+    // MARK: - Lifecycle
+
     override func viewDidLoad() {
 
         super.viewDidLoad()
 
+
         configureSplitView()
+
         configureSidebar()
+
         configureContent()
+
         configureQueue()
     }
 
@@ -68,6 +85,7 @@ final class RootSplitViewController:
         splitView.isVertical =
             true
 
+
         splitView.autosaveName =
             "MSRU.MainSplitView"
 
@@ -75,30 +93,22 @@ final class RootSplitViewController:
         /*
          整个 MSRU Window 内部的永久 Ambient Backdrop。
 
-         重点：
          它不是 Sidebar 背景，
          也不是 Main Content 背景。
 
-         它位于：
-
-             App Sidebar
-             Main Content
-             Settings Sidebar
-             Queue Inspector
-
-         所有这些 Pane 的共同底层。
-
-         因此系统 Glass 即使没有可以继续采样的
-         Main Content，也会先落到这里，而不是一路
-         穿透到 Desktop / 后面的 App。
+         它是所有 Pane 的共同底层。
          */
+
         splitView.wantsLayer =
             true
 
+
         splitView.layer?
             .backgroundColor =
-            NSColor.windowBackgroundColor
+            NSColor
+                .windowBackgroundColor
                 .cgColor
+
 
         splitView.layer?
             .isOpaque =
@@ -109,9 +119,11 @@ final class RootSplitViewController:
     // MARK: - Hosting
 
     private func makeHostingController<
-        Content: View
+        Content:
+            View
     >(
-        rootView: Content
+        rootView:
+            Content
     ) -> NSHostingController<Content> {
 
         let controller =
@@ -122,16 +134,18 @@ final class RootSplitViewController:
 
 
         /*
-         AppKit 决定 Pane / Window geometry。
+         Geometry 由 AppKit SplitView 管理。
 
-         不允许 SwiftUI intrinsic size
-         再反向修改 SplitView 尺寸。
+         不允许 SwiftUI intrinsic content size
+         反向修改 Pane 尺寸。
          */
+
         controller.sizingOptions =
             []
 
 
-        return controller
+        return
+            controller
     }
 
 
@@ -143,8 +157,8 @@ final class RootSplitViewController:
             makeHostingController(
                 rootView:
                     SidebarPaneView(
-                        appState:
-                            appState
+                        scene:
+                            scene
                     )
             )
 
@@ -159,34 +173,29 @@ final class RootSplitViewController:
         item.canCollapse =
             true
 
+
         item.allowsFullHeightLayout =
             true
 
+
         item.minimumThickness =
             180
+
 
         item.maximumThickness =
             280
 
 
-        /*
-         Sidebar 自己不画实色背景。
-
-         继续让 sidebarWithViewController
-         提供系统原生 Sidebar Glass。
-
-         Bottom accessory 也不再承担
-         Sidebar Toggle。
-         */
         let bottomAccessory =
             SplitAccessoryHostingController(
                 rootView:
                     SidebarBottomAccessoryView(
                         onOpenSettings: {
-                            [weak self] in
+                            [weak self]
+                            in
 
                             self?
-                                .appState
+                                .scene
                                 .selectedSection =
                                 .settings
                         }
@@ -202,6 +211,7 @@ final class RootSplitViewController:
         sidebarItem =
             item
 
+
         addSplitViewItem(
             item
         )
@@ -216,8 +226,8 @@ final class RootSplitViewController:
             makeHostingController(
                 rootView:
                     MainContentView(
-                        appState:
-                            appState
+                        scene:
+                            scene
                     )
             )
 
@@ -232,8 +242,10 @@ final class RootSplitViewController:
         item.canCollapse =
             false
 
+
         item.minimumThickness =
             500
+
 
         item.automaticallyAdjustsSafeAreaInsets =
             true
@@ -244,14 +256,15 @@ final class RootSplitViewController:
                 rootView:
                     MiniPlayerAccessoryView(
                         playback:
-                            appState.playback,
+                            scene
+                                .application
+                                .playback,
                         onToggleQueue: {
-                            [weak self] in
+                            [weak self]
+                            in
 
                             self?
-                                .toggleInspector(
-                                    nil
-                                )
+                                .toggleQueueInspector()
                         }
                     )
             )
@@ -265,6 +278,7 @@ final class RootSplitViewController:
         contentItem =
             item
 
+
         addSplitViewItem(
             item
         )
@@ -275,19 +289,12 @@ final class RootSplitViewController:
 
     private func configureQueue() {
 
-        /*
-         Queue Pane 自己不再提供第二层实色 Surface。
-
-         List / ScrollView 背景隐藏，
-         让原生 Inspector Glass 真正露出来。
-
-         这是保持 Apple Inspector 语义的情况下，
-         能做到的最干净、最透明状态。
-         */
         let queueView =
             QueuePaneView(
                 playback:
-                    appState.playback
+                    scene
+                        .application
+                        .playback
             )
             .scrollContentBackground(
                 .hidden
@@ -314,17 +321,21 @@ final class RootSplitViewController:
         item.canCollapse =
             true
 
+
         item.allowsFullHeightLayout =
             true
+
 
         item.minimumThickness =
             280
 
+
         item.maximumThickness =
             420
 
+
         item.isCollapsed =
-            !appState
+            !scene
                 .isQueuePresented
 
 
@@ -333,10 +344,12 @@ final class RootSplitViewController:
                 rootView:
                     QueueHeaderView(
                         onClear: {
-                            [weak self] in
+                            [weak self]
+                            in
 
                             self?
-                                .appState
+                                .scene
+                                .application
                                 .playback
                                 .clearUpcoming()
                         }
@@ -355,9 +368,33 @@ final class RootSplitViewController:
         queueItem =
             item
 
+
         addSplitViewItem(
             item
         )
+    }
+
+
+    // MARK: - Presentation
+
+    private func toggleQueueInspector() {
+
+        toggleInspector(
+            nil
+        )
+
+
+        /*
+         SplitView 是实际 presentation owner。
+
+         SceneModel 保存 restoration-friendly
+         presentation state。
+         */
+
+        scene.isQueuePresented =
+            !(queueItem?
+                .isCollapsed
+                ?? true)
     }
 }
 

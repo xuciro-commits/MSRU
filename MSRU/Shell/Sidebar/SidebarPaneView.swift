@@ -7,22 +7,27 @@ import SwiftUI
 import Observation
 
 
-struct SidebarPaneView: View {
+struct SidebarPaneView:
+    View {
 
-    @Bindable var appState:
-        AppState
+    @Bindable
+    var scene:
+        SceneModel
 
 
-    var body: some View {
+    var body:
+        some View {
+
         SidebarView(
             selection:
-                $appState
+                $scene
                     .selectedSection
         )
         .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity
+            maxWidth:
+                .infinity,
+            maxHeight:
+                .infinity
         )
     }
 }
-

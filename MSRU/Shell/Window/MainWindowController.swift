@@ -8,11 +8,15 @@ final class MainWindowController:
     NSWindowController,
     NSToolbarDelegate {
 
-    private let appState:
-        AppState
+    // MARK: - Scene
+
+    private let scene:
+        SceneModel
+
 
     private let rootSplitViewController:
         RootSplitViewController
+
 
     private let mainToolbar =
         NSToolbar(
@@ -21,17 +25,21 @@ final class MainWindowController:
         )
 
 
+    // MARK: - Init
+
     init(
-        appState: AppState
+        scene:
+            SceneModel
     ) {
 
-        self.appState =
-            appState
+        self.scene =
+            scene
+
 
         self.rootSplitViewController =
             RootSplitViewController(
-                appState:
-                    appState
+                scene:
+                    scene
             )
 
 
@@ -65,6 +73,7 @@ final class MainWindowController:
          Tracking Separator 要求它跟踪的 splitView
          已经存在于同一个 Window 中。
          */
+
         window.contentViewController =
             rootSplitViewController
 
@@ -76,6 +85,8 @@ final class MainWindowController:
 
 
         configureToolbar()
+
+
         configureWindow(
             window
         )
@@ -87,7 +98,8 @@ final class MainWindowController:
         unavailable
     )
     required init?(
-        coder: NSCoder
+        coder:
+            NSCoder
     ) {
 
         fatalError(
@@ -99,17 +111,21 @@ final class MainWindowController:
     // MARK: - Window
 
     private func configureWindow(
-        _ window: NSWindow
+        _ window:
+            NSWindow
     ) {
 
         window.title =
             "MSRU"
 
+
         window.titleVisibility =
             .hidden
 
+
         window.titlebarAppearsTransparent =
             true
+
 
         window.titlebarSeparatorStyle =
             .none
@@ -121,36 +137,46 @@ final class MainWindowController:
          Sidebar Toggle 会存在于 Window Chrome 层，
          而不是 Sidebar 内容层。
          */
+
         window.toolbarStyle =
             .unified
 
+
         window.toolbar =
             mainToolbar
+
 
         mainToolbar.isVisible =
             true
 
 
-        window.collectionBehavior.insert(
-            .fullScreenPrimary
-        )
+        window.collectionBehavior
+            .insert(
+                .fullScreenPrimary
+            )
 
 
         window.minSize =
             NSSize(
-                width: 900,
-                height: 600
+                width:
+                    900,
+                height:
+                    600
             )
+
 
         window.contentMinSize =
             NSSize(
-                width: 900,
-                height: 600
+                width:
+                    900,
+                height:
+                    600
             )
 
 
         window.isReleasedWhenClosed =
             false
+
 
         window.center()
     }
@@ -163,11 +189,14 @@ final class MainWindowController:
         mainToolbar.delegate =
             self
 
+
         mainToolbar.displayMode =
             .iconOnly
 
+
         mainToolbar.allowsUserCustomization =
             false
+
 
         mainToolbar.autosavesConfiguration =
             false
@@ -177,8 +206,11 @@ final class MainWindowController:
     // MARK: - NSToolbarDelegate
 
     func toolbarDefaultItemIdentifiers(
-        _ toolbar: NSToolbar
-    ) -> [NSToolbarItem.Identifier] {
+        _ toolbar:
+            NSToolbar
+    ) -> [
+        NSToolbarItem.Identifier
+    ] {
 
         [
             .toggleSidebar,
@@ -188,8 +220,11 @@ final class MainWindowController:
 
 
     func toolbarAllowedItemIdentifiers(
-        _ toolbar: NSToolbar
-    ) -> [NSToolbarItem.Identifier] {
+        _ toolbar:
+            NSToolbar
+    ) -> [
+        NSToolbarItem.Identifier
+    ] {
 
         [
             .toggleSidebar,
@@ -204,11 +239,14 @@ final class MainWindowController:
      这里使用的两个都是 AppKit 标准 Identifier；
      AppKit 会自动创建标准 item，因此这里没有自定义 item。
      */
+
     func toolbar(
-        _ toolbar: NSToolbar,
+        _ toolbar:
+            NSToolbar,
         itemForItemIdentifier itemIdentifier:
             NSToolbarItem.Identifier,
-        willBeInsertedIntoToolbar flag: Bool
+        willBeInsertedIntoToolbar flag:
+            Bool
     ) -> NSToolbarItem? {
 
         nil

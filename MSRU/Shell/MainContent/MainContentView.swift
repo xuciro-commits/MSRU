@@ -7,19 +7,37 @@ import SwiftUI
 import Observation
 
 #if os(macOS)
+
 import AppKit
+
 #elseif os(iOS)
+
 import UIKit
+
 #endif
 
 
 struct MainContentView:
     View {
 
-    @Bindable
-    var appState:
-        AppState
+    // MARK: - Scene
 
+    @Bindable
+    var scene:
+        SceneModel
+
+
+    // MARK: - Application
+
+    private var application:
+        ApplicationModel {
+
+        scene
+            .application
+    }
+
+
+    // MARK: - Body
 
     var body:
         some View {
@@ -77,7 +95,7 @@ struct MainContentView:
         some View {
 
         switch
-            appState.selectedSection
+            scene.selectedSection
             ?? .listenNow {
 
         // MARK: Listen Now
@@ -86,11 +104,12 @@ struct MainContentView:
 
             ListenNowView(
                 store:
-                    appState.musicCatalog,
+                    application
+                        .musicCatalog,
                 onSelect: {
                     item in
 
-                    appState
+                    scene
                         .selectedMusicContent =
                         item
                 }
@@ -103,7 +122,8 @@ struct MainContentView:
 
             BrowseView(
                 feature:
-                    appState.browse
+                    scene
+                        .browse
             )
 
 
@@ -127,16 +147,20 @@ struct MainContentView:
 
             LibraryView(
                 feature:
-                    appState.libraryFeature,
+                    scene
+                        .libraryFeature,
                 localStore:
-                    appState.localLibrary,
+                    application
+                        .localLibrary,
                 playback:
-                    appState.playback,
+                    application
+                        .playback,
                 selectedLocalTrack:
-                    $appState.selectedLocalTrack,
+                    $scene
+                        .selectedLocalTrack,
                 onAddMusic: {
 
-                    appState
+                    scene
                         .selectedSection =
                         .addMusic
                 }
@@ -149,12 +173,14 @@ struct MainContentView:
 
             AddMusicView(
                 localStore:
-                    appState.localLibrary,
+                    application
+                        .localLibrary,
                 appleMusicStore:
-                    appState.musicLibrary,
+                    application
+                        .musicLibrary,
                 onOpenLibrary: {
 
-                    appState
+                    scene
                         .selectedSection =
                         .library
                 }
@@ -167,9 +193,11 @@ struct MainContentView:
 
             SettingsView(
                 playback:
-                    appState.playback,
+                    application
+                        .playback,
                 providerManager:
-                    appState.providerManager
+                    application
+                        .providerManager
             )
         }
     }
@@ -210,8 +238,11 @@ struct MainContentView:
 #Preview {
 
     MainContentView(
-        appState:
-            AppState()
+        scene:
+            SceneModel(
+                application:
+                    ApplicationModel()
+            )
     )
     .frame(
         width:

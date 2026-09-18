@@ -2,7 +2,9 @@ import SwiftUI
 
 
 @main
-struct MSRUApp: App {
+@MainActor
+struct MSRUApp:
+    App {
 
     #if os(macOS)
 
@@ -11,21 +13,40 @@ struct MSRUApp: App {
     )
     private var appDelegate
 
+
+    #else
+
+    @State
+    private var application =
+        ApplicationModel()
+
     #endif
 
 
-    var body: some Scene {
+    var body:
+        some Scene {
 
         #if os(macOS)
 
         Settings {
+
             EmptyView()
         }
+
 
         #else
 
         WindowGroup {
-            iPadRootView()
+
+            iPadRootView(
+                application:
+                    application
+            )
+            .task {
+
+                application
+                    .start()
+            }
         }
 
         #endif

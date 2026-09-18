@@ -3,25 +3,51 @@
 import SwiftUI
 
 
-struct iPadRootView: View {
+struct iPadRootView:
+    View {
 
-    var body: some View {
+    // MARK: - Scene Scope
+
+    @State
+    private var scene:
+        SceneModel
+
+
+    // MARK: - Init
+
+    init(
+        application:
+            ApplicationModel
+    ) {
+
+        _scene =
+            State(
+                initialValue:
+                    SceneModel(
+                        application:
+                            application
+                    )
+            )
+    }
+
+
+    // MARK: - Body
+
+    var body:
+        some View {
 
         NavigationSplitView {
 
-            List {
-
-                Label(
-                    "Listen Now",
-                    systemImage:
-                        "play.circle"
-                )
-            }
+            SidebarPaneView(
+                scene:
+                    scene
+            )
 
         } detail: {
 
-            Text(
-                "MSRU iPad"
+            MainContentView(
+                scene:
+                    scene
             )
         }
     }

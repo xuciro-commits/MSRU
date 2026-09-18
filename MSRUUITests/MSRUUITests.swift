@@ -18,7 +18,7 @@ final class MSRUUITests:
 
 
     @MainActor
-    func testApplicationLaunches()
+    func testApplicationCanBecomeForeground()
         throws {
 
         let app =
@@ -26,19 +26,22 @@ final class MSRUUITests:
 
 
         /*
-         UI Test 不恢复上一次窗口状态。
+         Smoke test 只验证：
 
-         避免测试结果受到开发时
-         上一次 App session 的影响。
+         MSRU 可以进入前台运行状态。
+
+         不测试坐标，
+         不点击 UI，
+         不依赖具体页面结构。
+
+         activate() 允许测试附着到
+         已经运行的 MSRU。
+
+         如果 App 尚未运行，
+         XCTest 会启动它。
          */
 
-        app.launchArguments += [
-            "-ApplePersistenceIgnoreState",
-            "YES"
-        ]
-
-
-        app.launch()
+        app.activate()
 
 
         let becameActive =
@@ -52,7 +55,7 @@ final class MSRUUITests:
 
         XCTAssertTrue(
             becameActive,
-            "MSRU should reach the foreground after launch."
+            "MSRU should be able to enter the foreground."
         )
     }
 }
