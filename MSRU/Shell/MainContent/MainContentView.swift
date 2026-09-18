@@ -13,13 +13,16 @@ import UIKit
 #endif
 
 
-struct MainContentView: View {
+struct MainContentView:
+    View {
 
-    @Bindable var appState:
+    @Bindable
+    var appState:
         AppState
 
 
-    var body: some View {
+    var body:
+        some View {
 
         ZStack {
 
@@ -50,12 +53,14 @@ struct MainContentView: View {
                 .windowBackgroundColor
         )
 
+
         #elseif os(iOS)
 
         Color(
             uiColor:
                 .systemBackground
         )
+
 
         #else
 
@@ -75,6 +80,8 @@ struct MainContentView: View {
             appState.selectedSection
             ?? .listenNow {
 
+        // MARK: Listen Now
+
         case .listenNow:
 
             ListenNowView(
@@ -90,6 +97,8 @@ struct MainContentView: View {
             )
 
 
+        // MARK: Browse
+
         case .browse:
 
             BrowseView(
@@ -97,6 +106,8 @@ struct MainContentView: View {
                     appState.browse
             )
 
+
+        // MARK: Radio
 
         case .radio:
 
@@ -110,11 +121,13 @@ struct MainContentView: View {
             )
 
 
+        // MARK: Library
+
         case .library:
 
             LibraryView(
-                library:
-                    appState.library,
+                feature:
+                    appState.libraryFeature,
                 localStore:
                     appState.localLibrary,
                 playback:
@@ -129,6 +142,8 @@ struct MainContentView: View {
                 }
             )
 
+
+        // MARK: Add Music
 
         case .addMusic:
 
@@ -145,6 +160,8 @@ struct MainContentView: View {
                 }
             )
 
+
+        // MARK: Settings
 
         case .settings:
 
@@ -188,6 +205,8 @@ struct MainContentView: View {
 }
 
 
+// MARK: - Preview
+
 #Preview {
 
     MainContentView(
@@ -195,7 +214,9 @@ struct MainContentView: View {
             AppState()
     )
     .frame(
-        width: 1100,
-        height: 760
+        width:
+            1100,
+        height:
+            760
     )
 }

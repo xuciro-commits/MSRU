@@ -9,7 +9,8 @@ import Observation
 
 // MARK: - Feature Definition
 
-enum BrowseFeature {
+enum BrowseFeature:
+    Feature {
 
     // MARK: State
 
@@ -106,49 +107,70 @@ enum BrowseFeature {
     }
 
 
+    // MARK: Initial State
+
+    @MainActor
+    static func makeInitialState()
+        -> State {
+
+        State()
+    }
+
+
     // MARK: Service
 
     @MainActor
-    struct Service {
+    struct Service:
+        FeatureService {
+
+        // MARK: Task IDs
 
         private enum TaskID {
 
-            static let debounce =
-                "browse.search.debounce"
+            static let debounce:
+                FeatureTaskID =
+                    "browse.search.debounce"
 
-            static let request =
-                "browse.search.request"
+
+            static let request:
+                FeatureTaskID =
+                    "browse.search.request"
         }
 
 
-        private let searchClient:
+        // MARK: Dependencies
+
+        @Dependency(
+            \.openverseSearch
+        )
+        private var searchClient:
             OpenverseSearchClient
 
-        private let playback:
+
+        @Dependency(
+            \.playback
+        )
+        private var playback:
             PlaybackController
 
-        private let library:
+
+        @Dependency(
+            \.library
+        )
+        private var library:
             LibraryStore
 
 
-        init(
-            searchClient:
-                OpenverseSearchClient,
-            playback:
-                PlaybackController,
-            library:
-                LibraryStore
-        ) {
+        // MARK: Init
 
-            self.searchClient =
-                searchClient
+        /*
+         正式 Runtime。
 
-            self.playback =
-                playback
+         Dependencies 来自创建 Service 时
+         所处的 DependencyValues scope。
+         */
 
-            self.library =
-                library
-        }
+        init() {}
 
 
         // MARK: Derived UI State
@@ -205,6 +227,7 @@ enum BrowseFeature {
                 guard
                     !state.hasAppeared
                 else {
+
                     return []
                 }
 
@@ -238,6 +261,7 @@ enum BrowseFeature {
                 guard
                     state.results.isEmpty
                 else {
+
                     return []
                 }
 
@@ -251,6 +275,7 @@ enum BrowseFeature {
                 guard
                     !query.isEmpty
                 else {
+
                     return []
                 }
 
@@ -258,11 +283,13 @@ enum BrowseFeature {
                 state.isLoading =
                     true
 
+
                 state.errorMessage =
                     nil
 
 
                 return [
+
                     requestTask(
                         query:
                             query
@@ -279,8 +306,10 @@ enum BrowseFeature {
                 state.query =
                     value
 
+
                 state.errorMessage =
                     nil
+
 
                 state.isLoading =
                     false
@@ -296,13 +325,17 @@ enum BrowseFeature {
                     !query.isEmpty
                 else {
 
-                    state.results = []
+                    state.results =
+                        []
+
 
                     return [
+
                         .cancel(
                             id:
                                 TaskID.debounce
                         ),
+
                         .cancel(
                             id:
                                 TaskID.request
@@ -313,10 +346,20 @@ enum BrowseFeature {
 
                 return [
 
+                    /*
+                     新输入意味着当前 request 已经过期。
+                     */
+
                     .cancel(
                         id:
                             TaskID.request
                     ),
+
+
+                    /*
+                     debounce 本身使用同一个 ID，
+                     cancelInFlight 会替换旧 debounce。
+                     */
 
                     .run(
                         id:
@@ -343,6 +386,7 @@ enum BrowseFeature {
                         guard
                             !Task.isCancelled
                         else {
+
                             return
                         }
 
@@ -369,12 +413,14 @@ enum BrowseFeature {
                 guard
                     !query.isEmpty
                 else {
+
                     return []
                 }
 
 
                 state.isLoading =
                     true
+
 
                 state.errorMessage =
                     nil
@@ -400,12 +446,20 @@ enum BrowseFeature {
                 let query
             ):
 
+                /*
+                 debounce 完成时 query 可能已经改变。
+
+                 只有它仍然对应当前输入，
+                 才允许真正发起 request。
+                 */
+
                 guard
                     normalizedQuery(
                         state.query
                     )
                     == query
                 else {
+
                     return []
                 }
 
@@ -413,11 +467,13 @@ enum BrowseFeature {
                 state.isLoading =
                     true
 
+
                 state.errorMessage =
                     nil
 
 
                 return [
+
                     requestTask(
                         query:
                             query
@@ -432,12 +488,18 @@ enum BrowseFeature {
                 let results
             ):
 
+                /*
+                 防止已经过期的网络响应
+                 覆盖更新后的搜索结果。
+                 */
+
                 guard
                     normalizedQuery(
                         state.query
                     )
                     == query
                 else {
+
                     return []
                 }
 
@@ -445,8 +507,10 @@ enum BrowseFeature {
                 state.results =
                     results
 
+
                 state.isLoading =
                     false
+
 
                 state.errorMessage =
                     nil
@@ -468,14 +532,18 @@ enum BrowseFeature {
                     )
                     == query
                 else {
+
                     return []
                 }
 
 
-                state.results = []
+                state.results =
+                    []
+
 
                 state.isLoading =
                     false
+
 
                 state.errorMessage =
                     message
@@ -572,6 +640,14 @@ enum BrowseFeature {
                         }
 
 
+                        guard
+                            !Task.isCancelled
+                        else {
+
+                            return
+                        }
+
+
                         send(
                             .libraryMutationFinished
                         )
@@ -584,10 +660,11 @@ enum BrowseFeature {
                 /*
                  LibraryStore 自身是 Observable。
 
-                 View 对 isSaved 的读取会跟踪
-                 LibraryStore.tracks。
+                 View 对 isSaved 的读取
+                 会观察同一个 application-scoped
+                 LibraryStore。
 
-                 所以这里不复制一份 saved IDs。
+                 所以 Browse State 不复制 saved IDs。
                  */
 
                 return []
@@ -622,6 +699,7 @@ enum BrowseFeature {
                     guard
                         !Task.isCancelled
                     else {
+
                         return
                     }
 
@@ -644,6 +722,7 @@ enum BrowseFeature {
                     guard
                         !Task.isCancelled
                     else {
+
                         return
                     }
 
@@ -678,89 +757,27 @@ enum BrowseFeature {
 }
 
 
-// MARK: - Runtime Host
+// MARK: - Browse Runtime Projection
+
+/*
+ Generic FeatureHost 不知道任何 Browse 业务。
+
+ FeatureHost 只负责：
+
+ State
+ Service
+ Action dispatch
+ FeatureTask runtime
+ cancellation
+ dependencies
+
+ Browse 自己需要的 UI projection
+ 留在 BrowseFeature 所在文件中。
+ */
 
 @MainActor
-final class BrowseFeatureHost {
-
-    private struct RunningTask {
-
-        let token:
-            UUID
-
-        let task:
-            Task<Void, Never>
-    }
-
-
-    let state:
-        BrowseFeature.State
-
-
-    private let service:
-        BrowseFeature.Service
-
-
-    private var runningTasks:
-        [String: RunningTask] = [:]
-
-
-    // MARK: - Init
-
-    init(
-        state:
-            BrowseFeature.State,
-        service:
-            BrowseFeature.Service
-    ) {
-
-        self.state =
-            state
-
-        self.service =
-            service
-    }
-
-
-    convenience init(
-        service:
-            BrowseFeature.Service
-    ) {
-
-        self.init(
-            state:
-                BrowseFeature.State(),
-            service:
-                service
-        )
-    }
-
-
-    // MARK: - Send
-
-    func send(
-        _ action:
-            BrowseFeature.Action
-    ) {
-
-        let tasks =
-            service.handle(
-                action,
-                state:
-                    state
-            )
-
-
-        for task in tasks {
-
-            execute(
-                task
-            )
-        }
-    }
-
-
-    // MARK: - Derived State
+extension FeatureHost
+where F == BrowseFeature {
 
     var isPlaying:
         Bool {
@@ -791,158 +808,5 @@ final class BrowseFeatureHost {
             .isSaved(
                 item
             )
-    }
-
-
-    // MARK: - Tasks
-
-    func cancelAll() {
-
-        for runningTask
-            in runningTasks.values {
-
-            runningTask
-                .task
-                .cancel()
-        }
-
-
-        runningTasks
-            .removeAll()
-    }
-
-
-    private func execute(
-        _ featureTask:
-            FeatureTask<
-                BrowseFeature.Action
-            >
-    ) {
-
-        switch featureTask.kind {
-
-        case .cancel(
-            let id
-        ):
-
-            runningTasks[
-                id
-            ]?
-            .task
-            .cancel()
-
-
-            runningTasks[
-                id
-            ] = nil
-
-
-        case .run(
-            let id,
-            let cancelInFlight,
-            let priority,
-            let operation
-        ):
-
-            if
-                let id,
-                cancelInFlight {
-
-                runningTasks[
-                    id
-                ]?
-                .task
-                .cancel()
-
-
-                runningTasks[
-                    id
-                ] = nil
-            }
-
-
-            let token =
-                UUID()
-
-
-            let task =
-                Task(
-                    priority:
-                        priority
-                ) {
-                    [weak self]
-                    in
-
-                    guard
-                        let self
-                    else {
-                        return
-                    }
-
-
-                    await operation {
-                        [weak self]
-                        action in
-
-                        self?
-                            .send(
-                                action
-                            )
-                    }
-
-
-                    guard
-                        let id
-                    else {
-                        return
-                    }
-
-
-                    finishTask(
-                        id:
-                            id,
-                        token:
-                            token
-                    )
-                }
-
-
-            if let id {
-
-                runningTasks[
-                    id
-                ] =
-                    RunningTask(
-                        token:
-                            token,
-                        task:
-                            task
-                    )
-            }
-        }
-    }
-
-
-    private func finishTask(
-        id:
-            String,
-        token:
-            UUID
-    ) {
-
-        guard
-            runningTasks[
-                id
-            ]?
-            .token
-            == token
-        else {
-            return
-        }
-
-
-        runningTasks[
-            id
-        ] = nil
     }
 }

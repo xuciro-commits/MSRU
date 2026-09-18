@@ -13,7 +13,8 @@ import UIKit
 #endif
 
 
-struct LibraryView: View {
+struct LibraryView:
+    View {
 
     enum Scope:
         String,
@@ -21,6 +22,7 @@ struct LibraryView: View {
         Identifiable {
 
         case saved
+
         case local
 
 
@@ -37,26 +39,42 @@ struct LibraryView: View {
             switch self {
 
             case .saved:
-                return "Library"
+
+                return
+                    "Library"
+
 
             case .local:
-                return "Local Files"
+
+                return
+                    "Local Files"
             }
         }
     }
 
 
-    @Bindable var library:
-        LibraryStore
+    // MARK: - Feature
 
-    @Bindable var localStore:
+    let feature:
+        FeatureHost<LibraryFeature>
+
+
+    // MARK: - Shared Dependencies
+
+    @Bindable
+    var localStore:
         LocalLibraryStore
 
-    @Bindable var playback:
+
+    @Bindable
+    var playback:
         PlaybackController
 
 
-    @Binding var selectedLocalTrack:
+    // MARK: - Scene State
+
+    @Binding
+    var selectedLocalTrack:
         LocalTrack?
 
 
@@ -64,21 +82,28 @@ struct LibraryView: View {
         () -> Void
 
 
-    @State private var scope:
+    // MARK: - Local UI State
+
+    @State
+    private var scope:
         Scope = .saved
 
 
     // MARK: - Body
 
-    var body: some View {
+    var body:
+        some View {
 
         VStack(
-            spacing: 0
+            spacing:
+                0
         ) {
 
             header
 
+
             Divider()
+
 
             content
         }
@@ -114,7 +139,8 @@ struct LibraryView: View {
                     "Library"
                 )
                 .font(
-                    .largeTitle.bold()
+                    .largeTitle
+                        .bold()
                 )
 
 
@@ -156,7 +182,8 @@ struct LibraryView: View {
                 .segmented
             )
             .frame(
-                width: 220
+                width:
+                    220
             )
 
 
@@ -192,7 +219,8 @@ struct LibraryView: View {
         case .saved:
 
             return
-                "\(library.tracks.count) saved tracks"
+                "\(feature.tracks.count) saved tracks"
+
 
         case .local:
 
@@ -221,7 +249,8 @@ struct LibraryView: View {
                 store:
                     localStore,
                 library:
-                    library,
+                    feature
+                        .libraryStore,
                 playback:
                     playback,
                 selectedTrack:
@@ -239,13 +268,15 @@ struct LibraryView: View {
     private var savedLibrary:
         some View {
 
-        if library.isLoading {
+        if feature.isLoading {
 
             VStack(
-                spacing: 12
+                spacing:
+                    12
             ) {
 
                 ProgressView()
+
 
                 Text(
                     "Loading Library…"
@@ -261,7 +292,11 @@ struct LibraryView: View {
                     .infinity
             )
 
-        } else if library.tracks.isEmpty {
+
+        } else if
+            feature
+                .tracks
+                .isEmpty {
 
             ContentUnavailableView {
 
@@ -293,6 +328,7 @@ struct LibraryView: View {
                     .infinity
             )
 
+
         } else {
 
             savedGrid
@@ -309,6 +345,7 @@ struct LibraryView: View {
 
             LazyVGrid(
                 columns: [
+
                     GridItem(
                         .adaptive(
                             minimum:
@@ -327,7 +364,7 @@ struct LibraryView: View {
             ) {
 
                 ForEach(
-                    library.tracks
+                    feature.tracks
                 ) {
                     track in
 
@@ -336,7 +373,9 @@ struct LibraryView: View {
                     )
                 }
             }
-            .padding(28)
+            .padding(
+                28
+            )
         }
     }
 
@@ -348,7 +387,14 @@ struct LibraryView: View {
             LibraryTrack
     ) -> some View {
 
-        VStack(
+        let isRemoving =
+            feature
+                .isRemoving(
+                    track
+                )
+
+
+        return VStack(
             alignment:
                 .leading,
             spacing:
@@ -369,11 +415,14 @@ struct LibraryView: View {
                 track.title
             )
             .font(
-                .callout.weight(
-                    .semibold
-                )
+                .callout
+                    .weight(
+                        .semibold
+                    )
             )
-            .lineLimit(1)
+            .lineLimit(
+                1
+            )
 
 
             Text(
@@ -385,11 +434,14 @@ struct LibraryView: View {
             .foregroundStyle(
                 .secondary
             )
-            .lineLimit(1)
+            .lineLimit(
+                1
+            )
 
 
             HStack(
-                spacing: 6
+                spacing:
+                    6
             ) {
 
                 sourceLabels(
@@ -400,72 +452,80 @@ struct LibraryView: View {
                 Spacer()
 
 
-                Menu {
+                if isRemoving {
 
-                    Button(
-                        role:
-                            .destructive
-                    ) {
+                    ProgressView()
+                        .controlSize(
+                            .small
+                        )
 
-                        Task {
+                } else {
 
-                            await library
-                                .remove(
-                                    id:
-                                        track.id
-                                )
-                        }
+                    Menu {
+
+                        removeButton(
+                            track
+                        )
 
                     } label: {
 
-                        Label(
-                            "Remove from Library",
-                            systemImage:
-                                "trash"
+                        Image(
+                            systemName:
+                                "ellipsis"
+                        )
+                        .frame(
+                            width:
+                                24,
+                            height:
+                                20
                         )
                     }
-
-                } label: {
-
-                    Image(
-                        systemName:
-                            "ellipsis"
+                    .menuStyle(
+                        .borderlessButton
                     )
-                    .frame(
-                        width: 24,
-                        height: 20
-                    )
+                    .fixedSize()
                 }
-                .menuStyle(
-                    .borderlessButton
-                )
-                .fixedSize()
             }
         }
         .contextMenu {
 
-            Button(
-                role:
-                    .destructive
-            ) {
+            if !isRemoving {
 
-                Task {
-
-                    await library
-                        .remove(
-                            id:
-                                track.id
-                        )
-                }
-
-            } label: {
-
-                Label(
-                    "Remove from Library",
-                    systemImage:
-                        "trash"
+                removeButton(
+                    track
                 )
             }
+        }
+    }
+
+
+    // MARK: - Remove
+
+    private func removeButton(
+        _ track:
+            LibraryTrack
+    ) -> some View {
+
+        Button(
+            role:
+                .destructive
+        ) {
+
+            feature
+                .send(
+                    .removeRequested(
+                        id:
+                            track.id
+                    )
+                )
+
+        } label: {
+
+            Label(
+                "Remove from Library",
+                systemImage:
+                    "trash"
+            )
         }
     }
 
@@ -488,13 +548,17 @@ struct LibraryView: View {
                 )
             )
             .sorted {
-                $0.rawValue
-                    < $1.rawValue
+                lhs,
+                rhs in
+
+                lhs.rawValue
+                    < rhs.rawValue
             }
 
 
         HStack(
-            spacing: 4
+            spacing:
+                4
         ) {
 
             ForEach(
@@ -510,9 +574,10 @@ struct LibraryView: View {
                     )
                 )
                 .font(
-                    .caption2.weight(
-                        .medium
-                    )
+                    .caption2
+                        .weight(
+                            .medium
+                        )
                 )
                 .foregroundStyle(
                     .secondary
@@ -543,19 +608,33 @@ struct LibraryView: View {
         switch kind {
 
         case .local:
-            return "LOCAL"
+
+            return
+                "LOCAL"
+
 
         case .openverse:
-            return "OPENVERSE"
+
+            return
+                "OPENVERSE"
+
 
         case .jamendo:
-            return "JAMENDO"
+
+            return
+                "JAMENDO"
+
 
         case .appleMusic:
-            return "APPLE"
+
+            return
+                "APPLE"
+
 
         case .openSubsonic:
-            return "SUBSONIC"
+
+            return
+                "SUBSONIC"
         }
     }
 
@@ -568,15 +647,18 @@ struct LibraryView: View {
             LibraryTrack
     ) -> some View {
 
-        if let data =
+        if
+            let data =
                 track.artworkData {
 
             localArtwork(
                 data
             )
 
-        } else if let url =
-                    track.artworkURL {
+
+        } else if
+            let url =
+                track.artworkURL {
 
             AsyncImage(
                 url:
@@ -609,6 +691,7 @@ struct LibraryView: View {
                 )
             )
 
+
         } else {
 
             artworkPlaceholder
@@ -624,7 +707,8 @@ struct LibraryView: View {
 
         #if os(macOS)
 
-        if let image =
+        if
+            let image =
                 NSImage(
                     data:
                         data
@@ -645,14 +729,17 @@ struct LibraryView: View {
                 )
             )
 
+
         } else {
 
             artworkPlaceholder
         }
 
+
         #elseif os(iOS)
 
-        if let image =
+        if
+            let image =
                 UIImage(
                     data:
                         data
@@ -672,6 +759,7 @@ struct LibraryView: View {
                         .continuous
                 )
             )
+
 
         } else {
 

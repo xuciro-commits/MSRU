@@ -10,7 +10,7 @@ import Observation
 struct BrowseView: View {
 
     let feature:
-        BrowseFeatureHost
+        FeatureHost<BrowseFeature>
 
 
     @Bindable
@@ -37,7 +37,7 @@ struct BrowseView: View {
 
     init(
         feature:
-            BrowseFeatureHost
+            FeatureHost<BrowseFeature>
     ) {
 
         self.feature =

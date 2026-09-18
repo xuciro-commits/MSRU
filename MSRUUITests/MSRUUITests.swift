@@ -2,42 +2,57 @@
 //  MSRUUITests.swift
 //  MSRUUITests
 //
-//  Created by 许强 on 9/14/26.
-//
 
 import XCTest
 
-final class MSRUUITests: XCTestCase {
 
-    override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
+final class MSRUUITests:
+    XCTestCase {
 
-        // In UI tests it is usually best to stop immediately when a failure occurs.
-        continueAfterFailure = false
+    override func setUpWithError()
+        throws {
 
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
+        continueAfterFailure =
+            false
     }
 
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
-    }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
-        let app = XCUIApplication()
+    func testApplicationLaunches()
+        throws {
+
+        let app =
+            XCUIApplication()
+
+
+        /*
+         UI Test 不恢复上一次窗口状态。
+
+         避免测试结果受到开发时
+         上一次 App session 的影响。
+         */
+
+        app.launchArguments += [
+            "-ApplePersistenceIgnoreState",
+            "YES"
+        ]
+
+
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // XCUIAutomation Documentation
-        // https://developer.apple.com/documentation/xcuiautomation
-    }
 
-    @MainActor
-    func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
-        measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
-        }
+        let becameActive =
+            app.wait(
+                for:
+                    .runningForeground,
+                timeout:
+                    10
+            )
+
+
+        XCTAssertTrue(
+            becameActive,
+            "MSRU should reach the foreground after launch."
+        )
     }
 }

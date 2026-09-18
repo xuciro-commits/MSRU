@@ -2,34 +2,21 @@
 //  MSRUUITestsLaunchTests.swift
 //  MSRUUITests
 //
-//  Created by 许强 on 9/14/26.
-//
 
 import XCTest
 
-final class MSRUUITestsLaunchTests: XCTestCase {
 
-    override class var runsForEachTargetApplicationUIConfiguration: Bool {
-        true
-    }
+/*
+ Launch smoke coverage 已集中到：
 
-    override func setUpWithError() throws {
-        continueAfterFailure = false
-    }
+ MSRUUITests.testApplicationLaunches()
 
-    @MainActor
-    func testLaunch() throws {
-        let app = XCUIApplication()
-        app.launch()
+ 这里暂时不重复运行启动测试。
 
-        // Insert steps here to perform after app launch but before taking a screenshot,
-        // such as logging into a test account or navigating somewhere in the app
-        // XCUIAutomation Documentation
-        // https://developer.apple.com/documentation/xcuiautomation
+ 后续真正开始做端到端 UI flows 时，
+ 再根据需要扩展 UI Test Suite。
+ */
 
-        let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = "Launch Screen"
-        attachment.lifetime = .keepAlways
-        add(attachment)
-    }
+final class MSRUUITestsLaunchTests:
+    XCTestCase {
 }

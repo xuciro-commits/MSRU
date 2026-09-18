@@ -514,7 +514,12 @@ extension MSRUPreviewData {
 
     @MainActor
     static func makeBrowseFeature()
-        -> BrowseFeatureHost {
+        -> FeatureHost<BrowseFeature> {
+
+        /*
+         Preview dependencies 是一整个环境，
+         而不是 Service initializer 参数。
+         */
 
         let library =
             LibraryStore(
@@ -536,26 +541,38 @@ extension MSRUPreviewData {
             )
 
 
-        let service =
-            BrowseFeature.Service(
-                searchClient:
-                    .preview(
-                        results:
-                            openverseResults
-                    ),
-                playback:
-                    playback,
-                library:
-                    library
+        var dependencies =
+            DependencyValues
+                .preview
+
+
+        dependencies.openverseSearch =
+            .preview(
+                results:
+                    openverseResults
             )
 
 
-        return BrowseFeatureHost(
-            state:
-                state,
-            service:
-                service
-        )
+        dependencies.playback =
+            playback
+
+
+        dependencies.library =
+            library
+
+
+        return withDependencies(
+            dependencies
+        ) {
+
+            FeatureHost<BrowseFeature>(
+                state:
+                    state,
+                service:
+                    BrowseFeature
+                        .Service()
+            )
+        }
     }
 }
 

@@ -38,7 +38,7 @@ final class AppState {
         LocalLibraryStore()
 
 
-    // MARK: - MSRU Library
+    // MARK: - Application Library
 
     let library:
         LibraryStore
@@ -56,10 +56,28 @@ final class AppState {
         PlaybackController
 
 
-    // MARK: - Browse Feature
+    // MARK: - Dependencies
+
+    /*
+     Application Dependency Snapshot。
+
+     Application-scoped references
+     在这里被创建一次，然后交给
+     Scene / Feature runtime。
+     */
+
+    let dependencies:
+        DependencyValues
+
+
+    // MARK: - Features
 
     let browse:
-        BrowseFeatureHost
+        FeatureHost<BrowseFeature>
+
+
+    let libraryFeature:
+        FeatureHost<LibraryFeature>
 
 
     // MARK: - Provider Management
@@ -78,6 +96,8 @@ final class AppState {
 
     init() {
 
+        // MARK: Application Scope
+
         let library =
             LibraryStore()
 
@@ -85,6 +105,27 @@ final class AppState {
         let playback =
             PlaybackController()
 
+
+        // MARK: Dependency Composition
+
+        var dependencies =
+            DependencyValues
+                .live
+
+
+        dependencies.library =
+            library
+
+
+        dependencies.playback =
+            playback
+
+
+        dependencies.openverseSearch =
+            .live
+
+
+        // MARK: Store Application Scope
 
         self.library =
             library
@@ -94,26 +135,45 @@ final class AppState {
             playback
 
 
-        self.browse =
-            BrowseFeatureHost(
-                service:
-                    BrowseFeature.Service(
-                        searchClient:
-                            .live,
-                        playback:
-                            playback,
-                        library:
-                            library
-                    )
-            )
+        self.dependencies =
+            dependencies
 
+
+        // MARK: Feature Scope
+
+        self.browse =
+            withDependencies(
+                dependencies
+            ) {
+
+                FeatureHost<BrowseFeature>(
+                    service:
+                        BrowseFeature
+                            .Service()
+                )
+            }
+
+
+        self.libraryFeature =
+            withDependencies(
+                dependencies
+            ) {
+
+                FeatureHost<LibraryFeature>(
+                    service:
+                        LibraryFeature
+                            .Service()
+                )
+            }
+
+
+        // MARK: Restore Library
 
         /*
-         恢复 MSRU 自己的持久化 Library。
+         LibraryStore 属于 Application Scope。
 
-         Repository 的具体文件位置
-         仍由 LibraryStore /
-         JSONLibraryRepository 管理。
+         因此恢复工作不挂在 Library Feature
+         或某个具体 View 的 appeared 生命周期上。
          */
 
         Task {
@@ -123,6 +183,7 @@ final class AppState {
             guard
                 let self
             else {
+
                 return
             }
 
