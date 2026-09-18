@@ -17,7 +17,7 @@ enum SidebarSection:
     case radio
 
     case library
-    case importAppleMusic
+    case addMusic
 
     case settings
 
@@ -42,8 +42,8 @@ enum SidebarSection:
         case .library:
             "Library"
 
-        case .importAppleMusic:
-            "Import Apple Music"
+        case .addMusic:
+            "Add Music"
 
         case .settings:
             "Settings"
@@ -66,11 +66,11 @@ enum SidebarSection:
         case .library:
             "music.note.house"
 
-        case .importAppleMusic:
-            "square.and.arrow.down"
+        case .addMusic:
+            "plus.square.on.square"
 
         case .settings:
-            "gear"
+            "gearshape"
         }
     }
 
@@ -86,7 +86,6 @@ enum SidebarSection:
 
     static let librarySections: [SidebarSection] = [
         .library,
-        .importAppleMusic,
-        .settings
+        .addMusic
     ]
 }

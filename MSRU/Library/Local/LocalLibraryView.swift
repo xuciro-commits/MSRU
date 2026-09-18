@@ -16,22 +16,23 @@ import UIKit
 
 struct LocalLibraryView: View {
 
-    // MARK: - Dependencies
-
     @Bindable var store:
         LocalLibraryStore
 
+    @Bindable var library:
+        LibraryStore
+
     @Bindable var playback:
         PlaybackController
+
 
     @Binding var selectedTrack:
         LocalTrack?
 
 
-    // MARK: - State
+    let onAddMusic:
+        () -> Void
 
-    @State private var isImporterPresented =
-        false
 
     @State private var isDropTargeted =
         false
@@ -45,59 +46,22 @@ struct LocalLibraryView: View {
             spacing: 0
         ) {
 
-            header
-
-            Divider()
-
             content
         }
         .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity
+            maxWidth:
+                .infinity,
+            maxHeight:
+                .infinity
         )
         .task {
 
             await store
                 .loadIfNeeded()
         }
-        .fileImporter(
-            isPresented:
-                $isImporterPresented,
-            allowedContentTypes: [
-                .audio
-            ],
-            allowsMultipleSelection:
-                true
-        ) {
-            result in
-
-            switch result {
-
-            case .success(
-                let urls
-            ):
-
-                Task {
-
-                    await store
-                        .importFiles(
-                            urls
-                        )
-                }
-
-
-            case .failure(
-                let error
-            ):
-
-                print(
-                    "File importer failed:",
-                    error
-                )
-            }
-        }
         .dropDestination(
-            for: URL.self
+            for:
+                URL.self
         ) {
             urls,
             _ in
@@ -114,79 +78,11 @@ struct LocalLibraryView: View {
             return true
 
         } isTargeted: {
-            isTargeted in
+            targeted in
 
             isDropTargeted =
-                isTargeted
+                targeted
         }
-    }
-
-
-    // MARK: - Header
-
-    private var header:
-        some View {
-
-        HStack {
-
-            VStack(
-                alignment: .leading,
-                spacing: 4
-            ) {
-
-                Text(
-                    "Local Library"
-                )
-                .font(
-                    .largeTitle.bold()
-                )
-
-
-                Text(
-                    "\(store.tracks.count) local tracks"
-                )
-                .font(
-                    .callout
-                )
-                .foregroundStyle(
-                    .secondary
-                )
-            }
-
-
-            Spacer()
-
-
-            if store.isImporting {
-
-                ProgressView()
-                    .controlSize(
-                        .small
-                    )
-            }
-
-
-            Button {
-
-                isImporterPresented =
-                    true
-
-            } label: {
-
-                Label(
-                    "Import Audio",
-                    systemImage: "plus"
-                )
-            }
-        }
-        .padding(
-            .horizontal,
-            28
-        )
-        .padding(
-            .vertical,
-            20
-        )
     }
 
 
@@ -207,7 +103,7 @@ struct LocalLibraryView: View {
     }
 
 
-    // MARK: - Empty State
+    // MARK: - Empty
 
     private var emptyState:
         some View {
@@ -220,7 +116,7 @@ struct LocalLibraryView: View {
                 systemName:
                     isDropTargeted
                     ? "arrow.down.circle.fill"
-                    : "music.note"
+                    : "externaldrive"
             )
             .font(
                 .system(
@@ -232,7 +128,7 @@ struct LocalLibraryView: View {
             Text(
                 isDropTargeted
                 ? "Drop to Import"
-                : "Drop Music Here"
+                : "No Local Music"
             )
             .font(
                 .title2.bold()
@@ -240,7 +136,7 @@ struct LocalLibraryView: View {
 
 
             Text(
-                "Drag MP3, M4A, FLAC, WAV, or other audio files into MSRU."
+                "Import audio files or drag them into MSRU."
             )
             .foregroundStyle(
                 .secondary
@@ -249,13 +145,14 @@ struct LocalLibraryView: View {
 
             Button {
 
-                isImporterPresented =
-                    true
+                onAddMusic()
 
             } label: {
 
-                Text(
-                    "Choose Audio Files…"
+                Label(
+                    "Add Music",
+                    systemImage:
+                        "plus"
                 )
             }
             .buttonStyle(
@@ -263,35 +160,15 @@ struct LocalLibraryView: View {
             )
         }
         .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity
+            maxWidth:
+                .infinity,
+            maxHeight:
+                .infinity
         )
-        .background {
-
-            if isDropTargeted {
-
-                RoundedRectangle(
-                    cornerRadius: 18,
-                    style: .continuous
-                )
-                .strokeBorder(
-                    .secondary,
-                    style:
-                        StrokeStyle(
-                            lineWidth: 2,
-                            dash: [
-                                8,
-                                6
-                            ]
-                        )
-                )
-                .padding(20)
-            }
-        }
     }
 
 
-    // MARK: - Track Grid
+    // MARK: - Grid
 
     private var trackGrid:
         some View {
@@ -302,14 +179,19 @@ struct LocalLibraryView: View {
                 columns: [
                     GridItem(
                         .adaptive(
-                            minimum: 160,
-                            maximum: 200
+                            minimum:
+                                160,
+                            maximum:
+                                200
                         ),
-                        spacing: 18
+                        spacing:
+                            18
                     )
                 ],
-                alignment: .leading,
-                spacing: 24
+                alignment:
+                    .leading,
+                spacing:
+                    24
             ) {
 
                 ForEach(
@@ -329,8 +211,10 @@ struct LocalLibraryView: View {
             if isDropTargeted {
 
                 RoundedRectangle(
-                    cornerRadius: 18,
-                    style: .continuous
+                    cornerRadius:
+                        18,
+                    style:
+                        .continuous
                 )
                 .fill(
                     .ultraThinMaterial
@@ -355,16 +239,20 @@ struct LocalLibraryView: View {
     // MARK: - Track Card
 
     private func trackCard(
-        _ track: LocalTrack
+        _ track:
+            LocalTrack
     ) -> some View {
 
         VStack(
-            alignment: .leading,
-            spacing: 8
+            alignment:
+                .leading,
+            spacing:
+                8
         ) {
 
             ZStack(
-                alignment: .bottomTrailing
+                alignment:
+                    .bottomTrailing
             ) {
 
                 artwork(
@@ -372,12 +260,41 @@ struct LocalLibraryView: View {
                 )
                 .aspectRatio(
                     1,
-                    contentMode: .fit
+                    contentMode:
+                        .fit
                 )
 
 
-                playButton(
-                    track
+                Button {
+
+                    playback
+                        .toggle(
+                            track:
+                                track,
+                            queue:
+                                store.tracks
+                        )
+
+                } label: {
+
+                    Image(
+                        systemName:
+                            isPlaying(
+                                track
+                            )
+                            ? "pause.fill"
+                            : "play.fill"
+                    )
+                    .font(
+                        .headline
+                    )
+                    .frame(
+                        width: 38,
+                        height: 38
+                    )
+                }
+                .buttonStyle(
+                    .glass
                 )
                 .padding(10)
             }
@@ -406,7 +323,9 @@ struct LocalLibraryView: View {
             .lineLimit(1)
 
 
-            HStack {
+            HStack(
+                spacing: 8
+            ) {
 
                 if let album =
                     track.album {
@@ -419,6 +338,44 @@ struct LocalLibraryView: View {
 
 
                 Spacer()
+
+
+                if library.contains(
+                    local:
+                        track
+                ) {
+
+                    Image(
+                        systemName:
+                            "checkmark.circle.fill"
+                    )
+                    .foregroundStyle(
+                        Color.accentColor
+                    )
+                }
+
+
+                Menu {
+
+                    trackActions(
+                        track
+                    )
+
+                } label: {
+
+                    Image(
+                        systemName:
+                            "ellipsis"
+                    )
+                    .frame(
+                        width: 22,
+                        height: 18
+                    )
+                }
+                .menuStyle(
+                    .borderlessButton
+                )
+                .fixedSize()
 
 
                 Text(
@@ -434,106 +391,115 @@ struct LocalLibraryView: View {
                 .tertiary
             )
         }
-        .padding(8)
         .contentShape(
-            RoundedRectangle(
-                cornerRadius: 14,
-                style: .continuous
-            )
+            Rectangle()
         )
-        .background {
-
-            RoundedRectangle(
-                cornerRadius: 14,
-                style: .continuous
-            )
-            .fill(
-                isSelected(
-                    track
-                )
-                ? Color.accentColor
-                    .opacity(0.10)
-                : Color.clear
-            )
-        }
-        .overlay {
-
-            RoundedRectangle(
-                cornerRadius: 14,
-                style: .continuous
-            )
-            .stroke(
-                isSelected(
-                    track
-                )
-                ? Color.accentColor
-                    .opacity(0.65)
-                : Color.clear,
-                lineWidth:
-                    2
-            )
-        }
         .onTapGesture {
 
             selectedTrack =
                 track
         }
+        .contextMenu {
+
+            trackActions(
+                track
+            )
+        }
     }
 
 
-    // MARK: - Play Button
+    // MARK: - Actions
 
-    private func playButton(
-        _ track: LocalTrack
+    @ViewBuilder
+    private func trackActions(
+        _ track:
+            LocalTrack
     ) -> some View {
 
         Button {
 
-            /*
-             播放同时选中 Card。
-             */
-
-            selectedTrack =
-                track
-
-
-            /*
-             当前 Local Library 的排序
-             同时成为 Playback Queue。
-
-             这样上一首 / 下一首
-             才知道应该播放谁。
-             */
-
             playback
-                .toggle(
-                    track:
-                        track,
-                    queue:
-                        store.tracks
+                .playNext(
+                    track
                 )
 
         } label: {
 
-            Image(
-                systemName:
-                    isPlaying(
-                        track
-                    )
-                    ? "pause.fill"
-                    : "play.fill"
-            )
-            .font(
-                .headline
-            )
-            .frame(
-                width: 38,
-                height: 38
+            Label(
+                "Play Next",
+                systemImage:
+                    "text.line.first.and.arrowtriangle.forward"
             )
         }
-        .buttonStyle(
-            .glass
-        )
+
+
+        Button {
+
+            playback
+                .addToQueue(
+                    track
+                )
+
+        } label: {
+
+            Label(
+                "Add to Queue",
+                systemImage:
+                    "text.badge.plus"
+            )
+        }
+
+
+        Divider()
+
+
+        if library.contains(
+            local:
+                track
+        ) {
+
+            Button {
+
+                Task {
+
+                    await library
+                        .remove(
+                            local:
+                                track
+                        )
+                }
+
+            } label: {
+
+                Label(
+                    "Remove from Library",
+                    systemImage:
+                        "minus.circle"
+                )
+            }
+
+        } else {
+
+            Button {
+
+                Task {
+
+                    await library
+                        .add(
+                            local:
+                                track
+                        )
+                }
+
+            } label: {
+
+                Label(
+                    "Add to Library",
+                    systemImage:
+                        "plus.circle"
+                )
+            }
+        }
     }
 
 
@@ -541,7 +507,8 @@ struct LocalLibraryView: View {
 
     @ViewBuilder
     private func artwork(
-        _ track: LocalTrack
+        _ track:
+            LocalTrack
     ) -> some View {
 
         if let data =
@@ -551,18 +518,22 @@ struct LocalLibraryView: View {
 
             if let image =
                 NSImage(
-                    data: data
+                    data:
+                        data
                 ) {
 
                 Image(
-                    nsImage: image
+                    nsImage:
+                        image
                 )
                 .resizable()
                 .scaledToFill()
                 .clipShape(
                     RoundedRectangle(
-                        cornerRadius: 12,
-                        style: .continuous
+                        cornerRadius:
+                            12,
+                        style:
+                            .continuous
                     )
                 )
 
@@ -575,18 +546,22 @@ struct LocalLibraryView: View {
 
             if let image =
                 UIImage(
-                    data: data
+                    data:
+                        data
                 ) {
 
                 Image(
-                    uiImage: image
+                    uiImage:
+                        image
                 )
                 .resizable()
                 .scaledToFill()
                 .clipShape(
                     RoundedRectangle(
-                        cornerRadius: 12,
-                        style: .continuous
+                        cornerRadius:
+                            12,
+                        style:
+                            .continuous
                     )
                 )
 
@@ -608,8 +583,10 @@ struct LocalLibraryView: View {
         some View {
 
         RoundedRectangle(
-            cornerRadius: 12,
-            style: .continuous
+            cornerRadius:
+                12,
+            style:
+                .continuous
         )
         .fill(
             .quaternary
@@ -630,22 +607,11 @@ struct LocalLibraryView: View {
     }
 
 
-    // MARK: - Selection
-
-    private func isSelected(
-        _ track: LocalTrack
-    ) -> Bool {
-
-        selectedTrack?
-            .id
-        == track.id
-    }
-
-
-    // MARK: - Playback State
+    // MARK: - Helpers
 
     private func isPlaying(
-        _ track: LocalTrack
+        _ track:
+            LocalTrack
     ) -> Bool {
 
         playback
@@ -657,14 +623,12 @@ struct LocalLibraryView: View {
     }
 
 
-    // MARK: - Duration
-
     private func durationText(
         _ duration:
             TimeInterval
     ) -> String {
 
-        let totalSeconds =
+        let seconds =
             max(
                 0,
                 Int(
@@ -674,18 +638,11 @@ struct LocalLibraryView: View {
             )
 
 
-        let minutes =
-            totalSeconds / 60
-
-        let seconds =
-            totalSeconds % 60
-
-
         return String(
             format:
                 "%d:%02d",
-            minutes,
-            seconds
+            seconds / 60,
+            seconds % 60
         )
     }
 }

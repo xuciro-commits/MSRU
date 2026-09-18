@@ -1,64 +1,30 @@
-//
-//  MiniPlayerAccessoryView.swift
-//  MSRU
-//
-
 import SwiftUI
 import Observation
 
 
-struct MiniPlayerAccessoryView: View {
+struct MiniPlayerAccessoryView:
+    View {
 
     @Bindable var playback:
         PlaybackController
+
+    let onToggleQueue:
+        () -> Void
 
 
     var body: some View {
 
         MiniPlayerBar(
-            track:
-                playback.currentTrack,
-
-            isPlaying:
-                playback.isPlaying,
-
-            progress:
-                playback.progress,
-
-            canGoPrevious:
-                playback.canGoPrevious,
-
-            canGoNext:
-                playback.canGoNext,
-
-            onPrevious: {
-
-                playback
-                    .previous()
-            },
-
-            onToggle: {
-
-                playback
-                    .toggle()
-            },
-
-            onNext: {
-
-                playback
-                    .next()
-            },
-
-            onSeek: {
-                progress in
-
-                playback
-                    .seek(
-                        toProgress:
-                            progress
-                    )
-            }
+            playback:
+                playback,
+            onToggleQueue:
+                onToggleQueue
         )
+        /*
+         这是 Capsule 外部 breathing room。
+
+         不参与 MiniPlayer 自己的内部宽度计算。
+         */
         .padding(
             .horizontal,
             20
@@ -68,4 +34,14 @@ struct MiniPlayerAccessoryView: View {
             8
         )
     }
+}
+
+
+#Preview {
+
+    MiniPlayerAccessoryView(
+        playback:
+            PlaybackController(),
+        onToggleQueue: {}
+    )
 }

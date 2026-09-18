@@ -70,6 +70,68 @@ final class RootSplitViewController:
 
         splitView.autosaveName =
             "MSRU.MainSplitView"
+
+
+        /*
+         整个 MSRU Window 内部的永久 Ambient Backdrop。
+
+         重点：
+         它不是 Sidebar 背景，
+         也不是 Main Content 背景。
+
+         它位于：
+
+             App Sidebar
+             Main Content
+             Settings Sidebar
+             Queue Inspector
+
+         所有这些 Pane 的共同底层。
+
+         因此系统 Glass 即使没有可以继续采样的
+         Main Content，也会先落到这里，而不是一路
+         穿透到 Desktop / 后面的 App。
+         */
+        splitView.wantsLayer =
+            true
+
+        splitView.layer?
+            .backgroundColor =
+            NSColor.windowBackgroundColor
+                .cgColor
+
+        splitView.layer?
+            .isOpaque =
+            true
+    }
+
+
+    // MARK: - Hosting
+
+    private func makeHostingController<
+        Content: View
+    >(
+        rootView: Content
+    ) -> NSHostingController<Content> {
+
+        let controller =
+            NSHostingController(
+                rootView:
+                    rootView
+            )
+
+
+        /*
+         AppKit 决定 Pane / Window geometry。
+
+         不允许 SwiftUI intrinsic size
+         再反向修改 SplitView 尺寸。
+         */
+        controller.sizingOptions =
+            []
+
+
+        return controller
     }
 
 
@@ -78,7 +140,7 @@ final class RootSplitViewController:
     private func configureSidebar() {
 
         let hostingController =
-            NSHostingController(
+            makeHostingController(
                 rootView:
                     SidebarPaneView(
                         appState:
@@ -107,17 +169,26 @@ final class RootSplitViewController:
             280
 
 
+        /*
+         Sidebar 自己不画实色背景。
+
+         继续让 sidebarWithViewController
+         提供系统原生 Sidebar Glass。
+
+         Bottom accessory 也不再承担
+         Sidebar Toggle。
+         */
         let bottomAccessory =
             SplitAccessoryHostingController(
                 rootView:
                     SidebarBottomAccessoryView(
-                        onToggleSidebar: {
+                        onOpenSettings: {
                             [weak self] in
 
                             self?
-                                .toggleSidebar(
-                                    nil
-                                )
+                                .appState
+                                .selectedSection =
+                                .settings
                         }
                     )
             )
@@ -137,12 +208,12 @@ final class RootSplitViewController:
     }
 
 
-    // MARK: - Content
+    // MARK: - Main Content
 
     private func configureContent() {
 
         let hostingController =
-            NSHostingController(
+            makeHostingController(
                 rootView:
                     MainContentView(
                         appState:
@@ -173,9 +244,18 @@ final class RootSplitViewController:
                 rootView:
                     MiniPlayerAccessoryView(
                         playback:
-                            appState.playback
+                            appState.playback,
+                        onToggleQueue: {
+                            [weak self] in
+
+                            self?
+                                .toggleInspector(
+                                    nil
+                                )
+                        }
                     )
             )
+
 
         item.addBottomAlignedAccessoryViewController(
             playerAccessory
@@ -191,17 +271,36 @@ final class RootSplitViewController:
     }
 
 
-    // MARK: - Queue
+    // MARK: - Queue Inspector
 
     private func configureQueue() {
 
+        /*
+         Queue Pane 自己不再提供第二层实色 Surface。
+
+         List / ScrollView 背景隐藏，
+         让原生 Inspector Glass 真正露出来。
+
+         这是保持 Apple Inspector 语义的情况下，
+         能做到的最干净、最透明状态。
+         */
+        let queueView =
+            QueuePaneView(
+                playback:
+                    appState.playback
+            )
+            .scrollContentBackground(
+                .hidden
+            )
+            .background(
+                Color.clear
+            )
+
+
         let hostingController =
-            NSHostingController(
+            makeHostingController(
                 rootView:
-                    QueuePaneView(
-                        playback:
-                            appState.playback
-                    )
+                    queueView
             )
 
 
@@ -241,6 +340,9 @@ final class RootSplitViewController:
                                 .playback
                                 .clearUpcoming()
                         }
+                    )
+                    .background(
+                        Color.clear
                     )
             )
 

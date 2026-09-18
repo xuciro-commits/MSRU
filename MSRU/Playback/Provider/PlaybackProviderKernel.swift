@@ -6,17 +6,30 @@
 import Foundation
 
 
-nonisolated struct PlaybackProviderKernel:
+final class PlaybackProviderKernel:
     Sendable {
 
     let registry:
         ProviderRegistry
 
-    let diagnostics:
-        PlaybackDiagnostics
-
     let resolver:
         PlaybackResolver
+
+
+    init(
+        registry:
+            ProviderRegistry
+    ) {
+
+        self.registry =
+            registry
+
+        self.resolver =
+            PlaybackResolver(
+                registry:
+                    registry
+            )
+    }
 
 
     // MARK: - Standard Kernel
@@ -24,34 +37,23 @@ nonisolated struct PlaybackProviderKernel:
     static func standard()
         -> PlaybackProviderKernel {
 
-        let diagnostics =
-            PlaybackDiagnostics()
-
-
         let registry =
-            ProviderRegistry(
-                providers: [
-                    LocalPlaybackProvider()
-                ]
-            )
+            ProviderRegistry()
 
 
-        let resolver =
-            PlaybackResolver(
-                registry:
-                    registry,
-                diagnostics:
-                    diagnostics
-            )
+        registry.register(
+            LocalPlaybackProvider()
+        )
+
+
+        registry.register(
+            OpenversePlaybackProvider()
+        )
 
 
         return PlaybackProviderKernel(
             registry:
-                registry,
-            diagnostics:
-                diagnostics,
-            resolver:
-                resolver
+                registry
         )
     }
 }

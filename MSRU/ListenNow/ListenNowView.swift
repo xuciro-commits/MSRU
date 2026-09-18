@@ -103,9 +103,13 @@ struct ListenNowView: View {
 
         Menu {
 
-            ForEach(
-                MusicProviderID.allCases
-            ) { provider in
+            Section(
+                "Catalog Source"
+            ) {
+
+                ForEach(
+                    MusicProviderID.allCases
+                ) { provider in
 
                 if provider.isAvailable {
 
@@ -154,13 +158,12 @@ struct ListenNowView: View {
                     .disabled(true)
                 }
             }
+        }
 
         } label: {
 
             Label(
-                store
-                    .selectedProvider
-                    .title,
+                "Catalog: \(store.selectedProvider.title)",
                 systemImage:
                     store
                         .selectedProvider

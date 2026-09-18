@@ -18,10 +18,13 @@ final class PlaybackController {
         PlaybackProviderKernel
 
 
-    // MARK: - Current Playback
+    // MARK: - Queue
 
-    private(set) var currentTrack:
-        LocalTrack?
+    let playbackQueue:
+        PlaybackQueueController
+
+
+    // MARK: - Playback Resource
 
     private(set) var currentResource:
         PlaybackResource?
@@ -29,6 +32,8 @@ final class PlaybackController {
     private(set) var currentProviderID:
         PlaybackProviderID?
 
+
+    // MARK: - Playback State
 
     private(set) var isPlaying =
         false
@@ -48,16 +53,23 @@ final class PlaybackController {
         String?
 
 
-    // MARK: - Queue
+    // MARK: - Resolution State
 
-    private(set) var queue:
-        [LocalTrack] = []
+    private var resolvingItem:
+        PlaybackItem?
 
-    private(set) var currentIndex:
-        Int?
+    private var failedItem:
+        PlaybackItem?
 
 
-    // MARK: - Player
+    private var resolutionTask:
+        Task<Void, Never>?
+
+    private var activeResolutionID:
+        UUID?
+
+
+    // MARK: - AVPlayer
 
     private var player:
         AVPlayer?
@@ -69,24 +81,212 @@ final class PlaybackController {
         NSObjectProtocol?
 
 
-    // MARK: - Resolution
-
-    private var resolutionTask:
-        Task<Void, Never>?
-
-    private var activeResolutionID:
-        UUID?
-
-
     // MARK: - Init
 
     init(
         providerKernel:
-            PlaybackProviderKernel = .standard()
+            PlaybackProviderKernel? = nil
     ) {
 
         self.providerKernel =
             providerKernel
+            ?? PlaybackProviderKernel
+                .standard()
+
+
+        self.playbackQueue =
+            PlaybackQueueController()
+    }
+
+
+    // MARK: - Current Item
+
+    var currentItem:
+        PlaybackItem? {
+
+        playbackQueue
+            .current?
+            .item
+    }
+
+
+    private var displayItem:
+        PlaybackItem? {
+
+        currentItem
+        ?? resolvingItem
+        ?? failedItem
+    }
+
+
+    // MARK: - Compatibility: Active Source
+
+    var activeSource:
+        PlaybackActiveSource {
+
+        guard
+            let source =
+                displayItem?
+                    .source
+        else {
+
+            return .local
+        }
+
+
+        switch source {
+
+        case .local:
+            return .local
+
+        case .openverse:
+            return .openverse
+        }
+    }
+
+
+    // MARK: - Compatibility: Local
+
+    var currentTrack:
+        LocalTrack? {
+
+        currentItem?
+            .localTrack
+    }
+
+
+    var resolvingTrack:
+        LocalTrack? {
+
+        resolvingItem?
+            .localTrack
+    }
+
+
+    var failedTrack:
+        LocalTrack? {
+
+        failedItem?
+            .localTrack
+    }
+
+
+    /*
+     旧 UI 仍然可以读取 playback.queue。
+
+     但真正的数据源已经变成：
+     PlaybackQueueController。
+     */
+    var queue:
+        [LocalTrack] {
+
+        playbackQueue
+            .allItems
+            .compactMap {
+                queueItem in
+
+                queueItem
+                    .item
+                    .localTrack
+            }
+    }
+
+
+    var currentIndex:
+        Int? {
+
+        guard
+            let currentTrack
+        else {
+
+            return nil
+        }
+
+
+        return queue
+            .firstIndex {
+                track in
+
+                track.id
+                    == currentTrack.id
+            }
+    }
+
+
+    var upNextTracks:
+        [LocalTrack] {
+
+        playbackQueue
+            .upcoming
+            .compactMap {
+                queueItem in
+
+                queueItem
+                    .item
+                    .localTrack
+            }
+    }
+
+
+    // MARK: - Compatibility: Openverse
+
+    var openverseCurrentTrack:
+        OpenverseAudio? {
+
+        currentItem?
+            .openverseTrack
+    }
+
+
+    var openverseQueue:
+        [OpenverseAudio] {
+
+        playbackQueue
+            .allItems
+            .compactMap {
+                queueItem in
+
+                queueItem
+                    .item
+                    .openverseTrack
+            }
+    }
+
+
+    var openverseCurrentIndex:
+        Int? {
+
+        guard
+            let current =
+                openverseCurrentTrack
+        else {
+
+            return nil
+        }
+
+
+        return openverseQueue
+            .firstIndex {
+                track in
+
+                track.id
+                    == current.id
+            }
+    }
+
+
+    var openverseUpNextTracks:
+        [OpenverseAudio] {
+
+        playbackQueue
+            .upcoming
+            .compactMap {
+                queueItem in
+
+                queueItem
+                    .item
+                    .openverseTrack
+            }
     }
 
 
@@ -95,59 +295,84 @@ final class PlaybackController {
     var canGoPrevious:
         Bool {
 
-        guard
-            let currentIndex
-        else {
-            return false
-        }
-
-
-        return currentIndex > 0
+        playbackQueue
+            .canPrevious
     }
 
 
     var canGoNext:
         Bool {
 
-        guard
-            let currentIndex
-        else {
-            return false
-        }
-
-
-        return currentIndex
-            < queue.count - 1
+        playbackQueue
+            .canNext
     }
 
 
-    var upNextTracks:
-        [LocalTrack] {
+    var unifiedCanPrevious:
+        Bool {
 
-        guard
-            let currentIndex
-        else {
-            return []
-        }
+        playbackQueue
+            .canPrevious
+    }
 
 
-        let nextIndex =
-            currentIndex + 1
+    var unifiedCanNext:
+        Bool {
+
+        playbackQueue
+            .canNext
+    }
 
 
-        guard
-            nextIndex
-            < queue.count
-        else {
-            return []
-        }
+    // MARK: - Unified Metadata
+
+    var unifiedTitle:
+        String {
+
+        displayItem?
+            .title
+        ?? "Nothing Playing"
+    }
 
 
-        return Array(
-            queue[
-                nextIndex...
-            ]
-        )
+    var unifiedSubtitle:
+        String {
+
+        displayItem?
+            .subtitle
+        ?? "Choose a track from your library"
+    }
+
+
+    var unifiedArtworkURL:
+        URL? {
+
+        displayItem?
+            .artworkURL
+    }
+
+
+    var unifiedArtworkData:
+        Data? {
+
+        displayItem?
+            .artworkData
+    }
+
+
+    var unifiedProviderLabel:
+        String {
+
+        displayItem?
+            .providerLabel
+        ?? "LOCAL"
+    }
+
+
+    var unifiedHasTrack:
+        Bool {
+
+        displayItem != nil
     }
 
 
@@ -156,7 +381,10 @@ final class PlaybackController {
     var progress:
         Double {
 
-        guard duration > 0 else {
+        guard
+            duration > 0
+        else {
+
             return 0
         }
 
@@ -164,7 +392,7 @@ final class PlaybackController {
         return min(
             max(
                 currentTime
-                / duration,
+                    / duration,
                 0
             ),
             1
@@ -172,48 +400,159 @@ final class PlaybackController {
     }
 
 
-    // MARK: - Play
+    // MARK: - Local UI State
+
+    var displayTrack:
+        LocalTrack? {
+
+        currentTrack
+        ?? resolvingTrack
+        ?? failedTrack
+    }
+
+
+    var displayState:
+        TrackPlaybackState {
+
+        guard
+            let displayTrack
+        else {
+
+            return .idle
+        }
+
+
+        return state(
+            for:
+                displayTrack
+        )
+    }
+
+
+    func state(
+        for track:
+            LocalTrack
+    ) -> TrackPlaybackState {
+
+        if resolvingTrack?
+            .id
+            == track.id {
+
+            return .resolving
+        }
+
+
+        if failedTrack?
+            .id
+            == track.id,
+           let playbackErrorMessage {
+
+            return .failed(
+                playbackErrorMessage
+            )
+        }
+
+
+        guard
+            currentTrack?
+                .id
+                == track.id
+        else {
+
+            return .idle
+        }
+
+
+        return isPlaying
+            ? .playing
+            : .paused
+    }
+
+
+    func state(
+        for openverse:
+            OpenverseAudio
+    ) -> TrackPlaybackState {
+
+        if resolvingItem?
+            .openverseTrack?
+            .id
+            == openverse.id {
+
+            return .resolving
+        }
+
+
+        if failedItem?
+            .openverseTrack?
+            .id
+            == openverse.id,
+           let playbackErrorMessage {
+
+            return .failed(
+                playbackErrorMessage
+            )
+        }
+
+
+        guard
+            openverseCurrentTrack?
+                .id
+                == openverse.id
+        else {
+
+            return .idle
+        }
+
+
+        return isPlaying
+            ? .playing
+            : .paused
+    }
+
+
+    // MARK: - Generic Play
 
     func play(
-        _ track:
-            LocalTrack,
-        queue newQueue:
-            [LocalTrack]? = nil
+        _ item:
+            PlaybackItem,
+        context:
+            [PlaybackItem]? = nil
     ) {
 
-        let targetIndex =
-            prepareQueue(
-                for:
-                    track,
-                newQueue:
-                    newQueue
+        let isAlreadyCurrent =
+            currentItem?
+                .id
+            == item.id
+            &&
+            currentResource
+                != nil
+
+
+        playbackQueue
+            .start(
+                item,
+                context:
+                    context
             )
 
 
-        /*
-         已经是当前歌曲。
-
-         不需要重新 Resolve。
-         */
-
-        if currentTrack?.id
-            == track.id {
-
-            currentIndex =
-                targetIndex
-
+        if isAlreadyCurrent {
 
             if duration > 0,
                currentTime
                 >= duration - 0.25 {
 
                 seek(
-                    toProgress: 0
+                    toProgress:
+                        0
                 )
             }
 
 
-            player?.play()
+            player?
+                .play()
+
 
             isPlaying =
                 true
@@ -224,9 +563,79 @@ final class PlaybackController {
 
 
         resolveAndStart(
-            track,
-            targetIndex:
-                targetIndex
+            item
+        )
+    }
+
+
+    // MARK: - Local Play
+
+    func play(
+        _ track:
+            LocalTrack,
+        queue:
+            [LocalTrack]? = nil
+    ) {
+
+        let item =
+            PlaybackItem(
+                local:
+                    track
+            )
+
+
+        let context =
+            queue?
+                .map {
+                    track in
+
+                    PlaybackItem(
+                        local:
+                            track
+                    )
+                }
+
+
+        play(
+            item,
+            context:
+                context
+        )
+    }
+
+
+    // MARK: - Openverse Play
+
+    func play(
+        openverse track:
+            OpenverseAudio,
+        queue:
+            [OpenverseAudio]? = nil
+    ) {
+
+        let item =
+            PlaybackItem(
+                openverse:
+                    track
+            )
+
+
+        let context =
+            queue?
+                .map {
+                    track in
+
+                    PlaybackItem(
+                        openverse:
+                            track
+                    )
+                }
+
+
+        play(
+            item,
+            context:
+                context
         )
     }
 
@@ -235,9 +644,24 @@ final class PlaybackController {
 
     func toggle() {
 
+        if isResolving {
+
+            return
+        }
+
+
         guard
             let player
         else {
+
+            if let currentItem {
+
+                resolveAndStart(
+                    currentItem
+                )
+            }
+
+
             return
         }
 
@@ -255,62 +679,66 @@ final class PlaybackController {
             >= duration - 0.25 {
 
             seek(
-                toProgress: 0
+                toProgress:
+                    0
             )
         }
 
 
         player.play()
 
+
         isPlaying =
             true
     }
 
 
-    // MARK: - Toggle Track
+    // MARK: - Toggle Local
 
     func toggle(
         track:
             LocalTrack,
-        queue newQueue:
+        queue:
             [LocalTrack]
     ) {
 
-        let targetIndex =
-            prepareQueue(
-                for:
-                    track,
-                newQueue:
-                    newQueue
+        let item =
+            PlaybackItem(
+                local:
+                    track
             )
 
 
-        if currentTrack?.id
-            == track.id {
+        if currentItem?
+            .id
+            == item.id {
 
-            currentIndex =
-                targetIndex
+            playbackQueue
+                .start(
+                    item,
+                    context:
+                        queue.map {
+                            PlaybackItem(
+                                local:
+                                    $0
+                            )
+                        }
+                )
+
 
             toggle()
 
-        } else {
-
-            resolveAndStart(
-                track,
-                targetIndex:
-                    targetIndex
-            )
+            return
         }
+
+
+        play(
+            track,
+            queue:
+                queue
+        )
     }
 
-
-    /*
-     保留旧接口兼容性。
-
-     如果其他页面暂时仍然调用：
-     toggle(track:)
-     不会直接编译炸掉。
-     */
 
     func toggle(
         track:
@@ -319,7 +747,9 @@ final class PlaybackController {
 
         let effectiveQueue =
             queue.isEmpty
-            ? [track]
+            ? [
+                track
+            ]
             : queue
 
 
@@ -332,14 +762,211 @@ final class PlaybackController {
     }
 
 
-    // MARK: - Pause
+    // MARK: - Toggle Openverse
 
-    func pause() {
+    func toggle(
+        openverse track:
+            OpenverseAudio,
+        queue:
+            [OpenverseAudio]
+    ) {
 
-        player?.pause()
+        let item =
+            PlaybackItem(
+                openverse:
+                    track
+            )
 
-        isPlaying =
-            false
+
+        if currentItem?
+            .id
+            == item.id {
+
+            playbackQueue
+                .start(
+                    item,
+                    context:
+                        queue.map {
+                            PlaybackItem(
+                                openverse:
+                                    $0
+                            )
+                        }
+                )
+
+
+            toggle()
+
+            return
+        }
+
+
+        play(
+            openverse:
+                track,
+            queue:
+                queue
+        )
+    }
+
+
+    func toggle(
+        openverse track:
+            OpenverseAudio
+    ) {
+
+        let effectiveQueue =
+            openverseQueue.isEmpty
+            ? [
+                track
+            ]
+            : openverseQueue
+
+
+        toggle(
+            openverse:
+                track,
+            queue:
+                effectiveQueue
+        )
+    }
+
+
+    // MARK: - Queue Actions
+
+    func playNext(
+        _ item:
+            PlaybackItem
+    ) {
+
+        playbackQueue
+            .playNext(
+                item
+            )
+    }
+
+
+    func addToQueue(
+        _ item:
+            PlaybackItem
+    ) {
+
+        playbackQueue
+            .addToQueue(
+                item
+            )
+    }
+
+
+    // MARK: Local Queue Actions
+
+    func playNext(
+        _ track:
+            LocalTrack
+    ) {
+
+        playNext(
+            PlaybackItem(
+                local:
+                    track
+            )
+        )
+    }
+
+
+    func addToQueue(
+        _ track:
+            LocalTrack
+    ) {
+
+        addToQueue(
+            PlaybackItem(
+                local:
+                    track
+            )
+        )
+    }
+
+
+    // MARK: Openverse Queue Actions
+
+    func playNext(
+        openverse track:
+            OpenverseAudio
+    ) {
+
+        playNext(
+            PlaybackItem(
+                openverse:
+                    track
+            )
+        )
+    }
+
+
+    func addToQueue(
+        openverse track:
+            OpenverseAudio
+    ) {
+
+        addToQueue(
+            PlaybackItem(
+                openverse:
+                    track
+            )
+        )
+    }
+
+
+    // MARK: - Remove / Move Queue
+
+    func removeUpcoming(
+        id:
+            UUID
+    ) {
+
+        playbackQueue
+            .removeUpcoming(
+                id:
+                    id
+            )
+    }
+
+
+    func removeUpcoming(
+        at offsets:
+            IndexSet
+    ) {
+
+        playbackQueue
+            .removeUpcoming(
+                at:
+                    offsets
+            )
+    }
+
+
+    func moveUpcoming(
+        fromOffsets:
+            IndexSet,
+        toOffset:
+            Int
+    ) {
+
+        playbackQueue
+            .moveUpcoming(
+                fromOffsets:
+                    fromOffsets,
+                toOffset:
+                    toOffset
+            )
+    }
+
+
+    func clearUpcoming() {
+
+        playbackQueue
+            .clearUpcoming()
     }
 
 
@@ -347,28 +974,34 @@ final class PlaybackController {
 
     func previous() {
 
-        guard
-            let currentIndex,
-            currentIndex > 0
-        else {
+        /*
+         常见播放器行为：
+
+         已经播放超过 3 秒，
+         Previous = 回到当前歌曲开头。
+         */
+        if currentTime > 3 {
+
+            restart()
+
             return
         }
 
 
-        let targetIndex =
-            currentIndex - 1
+        guard
+            let previous =
+                playbackQueue
+                    .movePrevious()
+        else {
 
+            restart()
 
-        let track =
-            queue[
-                targetIndex
-            ]
+            return
+        }
 
 
         resolveAndStart(
-            track,
-            targetIndex:
-                targetIndex
+            previous.item
         )
     }
 
@@ -378,29 +1011,31 @@ final class PlaybackController {
     func next() {
 
         guard
-            let currentIndex,
-            currentIndex
-                < queue.count - 1
+            let next =
+                playbackQueue
+                    .advanceNext()
         else {
+
             return
         }
 
 
-        let targetIndex =
-            currentIndex + 1
-
-
-        let track =
-            queue[
-                targetIndex
-            ]
-
-
         resolveAndStart(
-            track,
-            targetIndex:
-                targetIndex
+            next.item
         )
+    }
+
+
+    // MARK: - Pause
+
+    func pause() {
+
+        player?
+            .pause()
+
+
+        isPlaying =
+            false
     }
 
 
@@ -411,7 +1046,10 @@ final class PlaybackController {
             Double
     ) {
 
-        guard duration > 0 else {
+        guard
+            duration > 0
+        else {
+
             return
         }
 
@@ -426,32 +1064,68 @@ final class PlaybackController {
             )
 
 
-        let seconds =
-            duration
-            * clamped
+        seek(
+            to:
+                duration
+                * clamped
+        )
+    }
+
+
+    func seek(
+        to seconds:
+            TimeInterval
+    ) {
+
+        guard
+            player != nil
+        else {
+
+            return
+        }
+
+
+        let upperBound =
+            duration > 0
+            ? duration
+            : seconds
+
+
+        let clamped =
+            min(
+                max(
+                    seconds,
+                    0
+                ),
+                max(
+                    0,
+                    upperBound
+                )
+            )
 
 
         currentTime =
-            seconds
+            clamped
 
 
         let time =
             CMTime(
                 seconds:
-                    seconds,
+                    clamped,
                 preferredTimescale:
                     600
             )
 
 
-        player?.seek(
-            to:
-                time,
-            toleranceBefore:
-                .zero,
-            toleranceAfter:
-                .zero
-        )
+        player?
+            .seek(
+                to:
+                    time,
+                toleranceBefore:
+                    .zero,
+                toleranceAfter:
+                    .zero
+            )
     }
 
 
@@ -459,7 +1133,10 @@ final class PlaybackController {
 
     func restart() {
 
-        guard player != nil else {
+        guard
+            player != nil
+        else {
+
             return
         }
 
@@ -468,45 +1145,18 @@ final class PlaybackController {
             0
 
 
-        player?.seek(
-            to:
-                .zero
-        )
+        player?
+            .seek(
+                to:
+                    .zero
+            )
 
 
         if isPlaying {
 
-            player?.play()
+            player?
+                .play()
         }
-    }
-
-
-    // MARK: - Clear Upcoming
-
-    func clearUpcoming() {
-
-        guard
-            let currentTrack
-        else {
-
-            queue =
-                []
-
-            currentIndex =
-                nil
-
-            return
-        }
-
-
-        queue =
-            [
-                currentTrack
-            ]
-
-
-        currentIndex =
-            0
     }
 
 
@@ -517,88 +1167,100 @@ final class PlaybackController {
         cancelActiveResolution()
 
 
-        player?.pause()
+        player?
+            .pause()
 
-        player?.seek(
-            to:
-                .zero
-        )
+
+        player?
+            .seek(
+                to:
+                    .zero
+            )
 
 
         currentTime =
             0
+
 
         isPlaying =
             false
     }
 
 
-    // MARK: - Queue Preparation
+    // MARK: - Retry
 
-    private func prepareQueue(
-        for track:
-            LocalTrack,
-        newQueue:
-            [LocalTrack]?
-    ) -> Int {
+    func retryLastFailedResolution() {
 
-        /*
-         外部给了新的 Queue：
+        guard
+            let failedItem
+        else {
 
-         例如 LocalLibraryView
-         把 store.tracks 整体交进来。
-         */
-
-        if let newQueue {
-
-            queue =
-                newQueue
+            return
         }
 
 
-        /*
-         当前 Queue 里找到这首。
-         */
-
-        if let index =
-            queue.firstIndex(
-                where: {
-                    $0.id
-                        == track.id
-                }
-            ) {
-
-            return index
-        }
-
-
-        /*
-         Queue 中不存在这首：
-
-         将当前 Queue 收敛成单曲。
-         */
-
-        queue =
-            [
-                track
-            ]
-
-
-        return 0
+        resolveAndStart(
+            failedItem
+        )
     }
 
 
     // MARK: - Resolve
 
     private func resolveAndStart(
-        _ track:
-            LocalTrack,
-        targetIndex:
-            Int
+        _ item:
+            PlaybackItem
     ) {
 
-        resolutionTask?
-            .cancel()
+        cancelActiveResolution()
+
+
+        removeObservers()
+
+
+        player?
+            .pause()
+
+
+        player =
+            nil
+
+
+        currentResource =
+            nil
+
+
+        currentProviderID =
+            nil
+
+
+        currentTime =
+            0
+
+
+        duration =
+            item.duration
+            ?? 0
+
+
+        isPlaying =
+            false
+
+
+        isResolving =
+            true
+
+
+        resolvingItem =
+            item
+
+
+        failedItem =
+            nil
+
+
+        playbackErrorMessage =
+            nil
 
 
         let resolutionID =
@@ -608,29 +1270,19 @@ final class PlaybackController {
         activeResolutionID =
             resolutionID
 
-        isResolving =
-            true
-
-        playbackErrorMessage =
-            nil
-
 
         let request =
-            PlaybackRequest(
-                trackID:
-                    track.id,
-                preferredQuality:
-                    .automatic,
-                localFileURL:
-                    track.fileURL
-            )
+            item.playbackRequest
 
 
         resolutionTask =
             Task {
                 [weak self] in
 
-                guard let self else {
+                guard
+                    let self
+                else {
+
                     return
                 }
 
@@ -646,11 +1298,15 @@ final class PlaybackController {
                             )
 
 
+                    try Task
+                        .checkCancellation()
+
+
                     guard
-                        !Task.isCancelled,
                         self.activeResolutionID
                             == resolutionID
                     else {
+
                         return
                     }
 
@@ -659,18 +1315,30 @@ final class PlaybackController {
                         .activate(
                             resource:
                                 resource,
-                            track:
-                                track,
-                            targetIndex:
-                                targetIndex
+                            item:
+                                item
                         )
 
 
                     self.isResolving =
                         false
 
+
+                    self.resolvingItem =
+                        nil
+
+
+                    self.failedItem =
+                        nil
+
+
                     self.activeResolutionID =
                         nil
+
+
+                    self.resolutionTask =
+                        nil
+
 
                 } catch is CancellationError {
 
@@ -678,6 +1346,7 @@ final class PlaybackController {
                         self.activeResolutionID
                             == resolutionID
                     else {
+
                         return
                     }
 
@@ -685,8 +1354,18 @@ final class PlaybackController {
                     self.isResolving =
                         false
 
+
+                    self.resolvingItem =
+                        nil
+
+
                     self.activeResolutionID =
                         nil
+
+
+                    self.resolutionTask =
+                        nil
+
 
                 } catch {
 
@@ -694,6 +1373,7 @@ final class PlaybackController {
                         self.activeResolutionID
                             == resolutionID
                     else {
+
                         return
                     }
 
@@ -701,7 +1381,20 @@ final class PlaybackController {
                     self.isResolving =
                         false
 
+
+                    self.resolvingItem =
+                        nil
+
+
+                    self.failedItem =
+                        item
+
+
                     self.activeResolutionID =
+                        nil
+
+
+                    self.resolutionTask =
                         nil
 
 
@@ -719,15 +1412,13 @@ final class PlaybackController {
     }
 
 
-    // MARK: - Activate Resource
+    // MARK: - Activate
 
     private func activate(
         resource:
             PlaybackResource,
-        track:
-            LocalTrack,
-        targetIndex:
-            Int
+        item:
+            PlaybackItem
     ) throws {
 
         let url:
@@ -757,8 +1448,6 @@ final class PlaybackController {
         }
 
 
-        // MARK: Replace Player
-
         removeObservers()
 
 
@@ -773,16 +1462,9 @@ final class PlaybackController {
             newPlayer
 
 
-        // MARK: Commit State
-
-        currentTrack =
-            track
-
-        currentIndex =
-            targetIndex
-
         currentResource =
             resource
+
 
         currentProviderID =
             resource.providerID
@@ -791,11 +1473,12 @@ final class PlaybackController {
         currentTime =
             0
 
+
         duration =
-            track.duration
+            resource.duration
+            ?? item.duration
+            ?? 0
 
-
-        // MARK: Observe
 
         installObservers(
             for:
@@ -803,9 +1486,9 @@ final class PlaybackController {
         )
 
 
-        // MARK: Start
+        newPlayer
+            .play()
 
-        newPlayer.play()
 
         isPlaying =
             true
@@ -814,7 +1497,7 @@ final class PlaybackController {
         print(
             "Playback ▶︎",
             "[\(resource.providerID.rawValue)]",
-            track.title
+            item.title
         )
     }
 
@@ -830,15 +1513,21 @@ final class PlaybackController {
         resolutionTask =
             nil
 
+
         activeResolutionID =
             nil
+
+
+        resolvingItem =
+            nil
+
 
         isResolving =
             false
     }
 
 
-    // MARK: - Observers
+    // MARK: - AVPlayer Observers
 
     private func installObservers(
         for player:
@@ -862,7 +1551,8 @@ final class PlaybackController {
                     queue:
                         .main
                 ) {
-                    [weak self] time in
+                    [weak self, weak player]
+                    time in
 
                     let seconds =
                         CMTimeGetSeconds(
@@ -873,7 +1563,31 @@ final class PlaybackController {
                     guard
                         seconds.isFinite
                     else {
+
                         return
+                    }
+
+
+                    var resolvedDuration:
+                        TimeInterval?
+
+
+                    if let item =
+                        player?
+                            .currentItem {
+
+                        let value =
+                            CMTimeGetSeconds(
+                                item.duration
+                            )
+
+
+                        if value.isFinite,
+                           value > 0 {
+
+                            resolvedDuration =
+                                value
+                        }
                     }
 
 
@@ -881,9 +1595,23 @@ final class PlaybackController {
                         @MainActor
                         [weak self] in
 
-                        self?
-                            .currentTime =
+                        guard
+                            let self
+                        else {
+
+                            return
+                        }
+
+
+                        self.currentTime =
                             seconds
+
+
+                        if let resolvedDuration {
+
+                            self.duration =
+                                resolvedDuration
+                        }
                     }
                 }
 
@@ -902,7 +1630,8 @@ final class PlaybackController {
                         queue:
                             .main
                     ) {
-                        [weak self] _ in
+                        [weak self]
+                        _ in
 
                         Task {
                             @MainActor
@@ -947,27 +1676,30 @@ final class PlaybackController {
     }
 
 
-    // MARK: - End
+    // MARK: - Playback End
 
     private func handlePlaybackEnded() {
 
-        if canGoNext {
+        if playbackQueue
+            .canNext {
 
             next()
 
-        } else {
-
-            isPlaying =
-                false
-
-            currentTime =
-                duration
+            return
         }
+
+
+        isPlaying =
+            false
+
+
+        currentTime =
+            duration
     }
 }
 
 
-// MARK: - Controller Errors
+// MARK: - Errors
 
 private enum PlaybackControllerError:
     LocalizedError {

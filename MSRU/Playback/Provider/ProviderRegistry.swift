@@ -6,48 +6,17 @@
 import Foundation
 
 
-actor ProviderRegistry {
+final class ProviderRegistry:
+    @unchecked Sendable {
 
-    // MARK: - Storage
+    private let lock =
+        NSLock()
 
-    private var providers:
+    private var storage:
         [
             PlaybackProviderID:
-            any PlaybackProvider
+                any PlaybackProvider
         ] = [:]
-
-
-    private var providerOrder:
-        [PlaybackProviderID] = []
-
-
-    // MARK: - Init
-
-    init(
-        providers:
-            [any PlaybackProvider] = []
-    ) {
-
-        for provider in providers {
-
-            let id =
-                provider
-                    .descriptor
-                    .id
-
-
-            self.providers[id] =
-                provider
-
-
-            if !providerOrder
-                .contains(id) {
-
-                providerOrder
-                    .append(id)
-            }
-        }
-    }
 
 
     // MARK: - Register
@@ -57,167 +26,94 @@ actor ProviderRegistry {
             any PlaybackProvider
     ) {
 
-        let id =
-            provider
-                .descriptor
-                .id
+        lock.lock()
 
-
-        providers[id] =
-            provider
-
-
-        if !providerOrder
-            .contains(id) {
-
-            providerOrder
-                .append(id)
+        defer {
+            lock.unlock()
         }
+
+
+        storage[
+            provider.id
+        ] =
+            provider
     }
 
 
-    // MARK: - Unregister
+    // MARK: - Remove
 
-    func unregister(
+    func remove(
         _ id:
             PlaybackProviderID
     ) {
 
-        providers[id] =
-            nil
+        lock.lock()
+
+        defer {
+            lock.unlock()
+        }
 
 
-        providerOrder
-            .removeAll {
-                $0 == id
-            }
+        storage.removeValue(
+            forKey:
+                id
+        )
     }
 
 
     // MARK: - Provider
 
     func provider(
-        _ id:
+        for id:
             PlaybackProviderID
-    ) -> (any PlaybackProvider)? {
+    ) -> (
+        any PlaybackProvider
+    )? {
 
-        providers[id]
-    }
+        lock.lock()
 
-
-    // MARK: - Descriptors
-
-    func descriptors()
-        -> [PlaybackProviderDescriptor] {
-
-        providerOrder
-            .compactMap {
-                providers[$0]?
-                    .descriptor
-            }
-    }
-
-
-    // MARK: - Order
-
-    func setProviderOrder(
-        _ order:
-            [PlaybackProviderID]
-    ) {
-
-        var normalized:
-            [PlaybackProviderID] = []
-
-
-        for id in order {
-
-            guard
-                providers[id] != nil
-            else {
-                continue
-            }
-
-
-            guard
-                !normalized
-                    .contains(id)
-            else {
-                continue
-            }
-
-
-            normalized.append(
-                id
-            )
+        defer {
+            lock.unlock()
         }
 
 
-        /*
-         没写进 order 的 Provider
-         自动放到后面。
-         */
-
-        for id in providerOrder {
-
-            guard
-                providers[id] != nil
-            else {
-                continue
-            }
-
-
-            guard
-                !normalized
-                    .contains(id)
-            else {
-                continue
-            }
-
-
-            normalized.append(
-                id
-            )
-        }
-
-
-        providerOrder =
-            normalized
+        return storage[
+            id
+        ]
     }
 
 
-    // MARK: - Resolution Order
+    // MARK: - Candidates
 
-    func orderedProviders(
-        preferred:
-            PlaybackProviderID?
-    ) -> [any PlaybackProvider] {
+    func candidates(
+        for request:
+            PlaybackRequest
+    ) -> [
+        any PlaybackProvider
+    ] {
 
-        var ids =
-            providerOrder
+        lock.lock()
 
-
-        /*
-         用户明确指定的 Provider
-         放到最前。
-         */
-
-        if let preferred,
-           providers[preferred] != nil {
-
-            ids.removeAll {
-                $0 == preferred
-            }
-
-            ids.insert(
-                preferred,
-                at: 0
+        let providers =
+            Array(
+                storage.values
             )
-        }
+
+        lock.unlock()
 
 
-        return ids
-            .compactMap {
-                providers[$0]
+        return providers
+            .filter {
+                $0.canResolve(
+                    request
+                )
+            }
+            .sorted {
+                lhs,
+                rhs in
+
+                lhs.priority
+                    > rhs.priority
             }
     }
 }

@@ -25,19 +25,20 @@ struct MainContentView: View {
 
             platformBackground
                 .ignoresSafeArea()
-                .backgroundExtensionEffect()
 
 
             page
         }
         .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity
+            maxWidth:
+                .infinity,
+            maxHeight:
+                .infinity
         )
     }
 
 
-    // MARK: - Platform Background
+    // MARK: - Background
 
     private var platformBackground:
         Color {
@@ -91,13 +92,15 @@ struct MainContentView: View {
 
         case .browse:
 
-            placeholder(
-                title:
-                    "Browse",
-                systemImage:
-                    "sparkles",
-                description:
-                    "Browse music content."
+            BrowseView(
+                openverse:
+                    appState.openverse,
+                playback:
+                    appState.playback,
+                library:
+                    appState.library,
+                searchText:
+                    $appState.searchText
             )
 
 
@@ -109,28 +112,38 @@ struct MainContentView: View {
                 systemImage:
                     "dot.radiowaves.left.and.right",
                 description:
-                    "Radio content."
+                    "Radio providers and continuous playback will land in a later milestone."
             )
 
 
         case .library:
 
-            LocalLibraryView(
-                store:
+            LibraryView(
+                library:
+                    appState.library,
+                localStore:
                     appState.localLibrary,
                 playback:
                     appState.playback,
-                selectedTrack:
-                    $appState.selectedLocalTrack
+                selectedLocalTrack:
+                    $appState.selectedLocalTrack,
+                onAddMusic: {
+
+                    appState
+                        .selectedSection =
+                        .addMusic
+                }
             )
 
 
-        case .importAppleMusic:
+        case .addMusic:
 
-            AppleMusicImportView(
-                store:
+            AddMusicView(
+                localStore:
+                    appState.localLibrary,
+                appleMusicStore:
                     appState.musicLibrary,
-                onImportCompleted: {
+                onOpenLibrary: {
 
                     appState
                         .selectedSection =
@@ -141,13 +154,11 @@ struct MainContentView: View {
 
         case .settings:
 
-            placeholder(
-                title:
-                    "Settings",
-                systemImage:
-                    "gear",
-                description:
-                    "Application settings."
+            SettingsView(
+                playback:
+                    appState.playback,
+                providerManager:
+                    appState.providerManager
             )
         }
     }
@@ -156,9 +167,12 @@ struct MainContentView: View {
     // MARK: - Placeholder
 
     private func placeholder(
-        title: String,
-        systemImage: String,
-        description: String
+        title:
+            String,
+        systemImage:
+            String,
+        description:
+            String
     ) -> some View {
 
         ContentUnavailableView(
@@ -171,8 +185,10 @@ struct MainContentView: View {
                 )
         )
         .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity
+            maxWidth:
+                .infinity,
+            maxHeight:
+                .infinity
         )
     }
 }
@@ -185,7 +201,7 @@ struct MainContentView: View {
             AppState()
     )
     .frame(
-        width: 1000,
-        height: 700
+        width: 1100,
+        height: 760
     )
 }

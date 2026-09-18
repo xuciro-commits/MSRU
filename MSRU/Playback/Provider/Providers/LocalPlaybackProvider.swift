@@ -6,58 +6,30 @@
 import Foundation
 
 
-nonisolated struct LocalPlaybackProvider:
+struct LocalPlaybackProvider:
     PlaybackProvider {
 
-    // MARK: - Descriptor
-
-    let descriptor =
-        PlaybackProviderDescriptor(
-            id:
-                .local,
-            displayName:
-                "Local",
-            capabilities: [
-                .playback,
-                .localFile
-            ],
-            supportedQualities: [
-                .original
-            ]
-        )
+    let id:
+        PlaybackProviderID =
+        .local
 
 
-    // MARK: - Health
+    let priority =
+        1_000
 
-    func healthCheck()
-        async
-        -> ProviderHealth {
-
-        await .available
-    }
-
-
-    // MARK: - Capability
 
     func canResolve(
         _ request:
             PlaybackRequest
-    ) async -> Bool {
+    ) -> Bool {
 
-        guard
-            let url =
-                request
-                    .localFileURL
-        else {
-            return false
-        }
-
-
-        return url.isFileURL
+        request.source
+            == .local
+        &&
+        request.localFileURL
+            != nil
     }
 
-
-    // MARK: - Resolve
 
     func resolve(
         _ request:
@@ -65,66 +37,92 @@ nonisolated struct LocalPlaybackProvider:
     ) async throws
         -> PlaybackResource {
 
+        try Task
+            .checkCancellation()
+
+
         guard
             let url =
-                request
-                    .localFileURL
+                request.localFileURL
         else {
 
-            throw PlaybackProviderError
-                .unsupportedRequest(
-                    providerID:
-                        .local
-                )
+            throw LocalPlaybackProviderError
+                .missingFileURL
         }
 
 
-        guard url.isFileURL else {
+        guard
+            url.isFileURL
+        else {
 
-            throw PlaybackProviderError
-                .unsupportedRequest(
-                    providerID:
-                        .local
-                )
+            throw LocalPlaybackProviderError
+                .invalidFileURL
         }
 
 
-        var isDirectory:
-            ObjCBool = false
-
-
-        let exists =
+        guard
             FileManager
                 .default
                 .fileExists(
                     atPath:
-                        url.path,
-                    isDirectory:
-                        &isDirectory
+                        url.path
                 )
-
-
-        guard
-            exists,
-            !isDirectory.boolValue
         else {
 
-            throw PlaybackProviderError
-                .fileMissing(
+            throw LocalPlaybackProviderError
+                .fileNotFound(
                     url
                 )
         }
 
 
-        return await PlaybackResource(
+        return PlaybackResource(
             providerID:
                 .local,
             transport:
                 .avPlayerURL(
                     url
-                ),
-            quality:
-                .original
+                )
         )
+    }
+}
+
+
+// MARK: - Errors
+
+private enum LocalPlaybackProviderError:
+    LocalizedError {
+
+    case missingFileURL
+    case invalidFileURL
+    case fileNotFound(
+        URL
+    )
+
+
+    var errorDescription:
+        String? {
+
+        switch self {
+
+        case .missingFileURL:
+
+            return
+                "The local track has no file URL."
+
+
+        case .invalidFileURL:
+
+            return
+                "The local playback URL is not a file URL."
+
+
+        case .fileNotFound(
+            let url
+        ):
+
+            return
+                "Local audio file was not found: \(url.lastPathComponent)"
+        }
     }
 }

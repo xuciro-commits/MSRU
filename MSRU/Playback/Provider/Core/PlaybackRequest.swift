@@ -6,62 +6,181 @@
 import Foundation
 
 
+enum PlaybackQuality:
+    String,
+    Sendable {
+
+    case automatic
+    case low
+    case standard
+    case high
+    case lossless
+}
+
+
 struct PlaybackRequest:
     Sendable {
 
-    // MARK: - Request Identity
+    enum Source:
+        String,
+        Sendable {
 
-    let requestID:
-        UUID
+        case local
+        case openverse
+    }
 
 
-    // MARK: - Track Identity
-
-    let trackID:
+    let itemID:
         String
 
-
-    // MARK: - Preferences
+    let source:
+        Source
 
     let preferredQuality:
         PlaybackQuality
 
-    let preferredProviderID:
-        PlaybackProviderID?
-
-
-    // MARK: - Source Hints
-
     let localFileURL:
         URL?
 
+    let remoteURL:
+        URL?
+
+    let providerHint:
+        PlaybackProviderID?
+
+
+    // MARK: - Unified Init
 
     init(
-        requestID:
-            UUID = UUID(),
-        trackID:
+        itemID:
             String,
+        source:
+            Source,
         preferredQuality:
             PlaybackQuality = .automatic,
-        preferredProviderID:
-            PlaybackProviderID? = nil,
         localFileURL:
-            URL? = nil
+            URL? = nil,
+        remoteURL:
+            URL? = nil,
+        providerHint:
+            PlaybackProviderID? = nil
     ) {
 
-        self.requestID =
-            requestID
+        self.itemID =
+            itemID
 
-        self.trackID =
-            trackID
+        self.source =
+            source
 
         self.preferredQuality =
             preferredQuality
 
-        self.preferredProviderID =
-            preferredProviderID
-
         self.localFileURL =
             localFileURL
+
+        self.remoteURL =
+            remoteURL
+
+        self.providerHint =
+            providerHint
+    }
+
+
+    // MARK: - Legacy Local UUID Compatibility
+
+    /*
+     兼容旧 LocalTrack API：
+
+     PlaybackRequest(
+         trackID: UUID,
+         ...
+     )
+     */
+    init(
+        trackID:
+            UUID,
+        preferredQuality:
+            PlaybackQuality = .automatic,
+        localFileURL:
+            URL?
+    ) {
+
+        self.init(
+            itemID:
+                "local:\(trackID.uuidString)",
+            source:
+                .local,
+            preferredQuality:
+                preferredQuality,
+            localFileURL:
+                localFileURL,
+            remoteURL:
+                nil,
+            providerHint:
+                .local
+        )
+    }
+
+
+    // MARK: - String ID Compatibility
+
+    /*
+     新 PlaybackItem 使用 String identity：
+
+         local:<uuid>
+         openverse:<id>
+
+     部分过渡代码仍可能写：
+
+         PlaybackRequest(
+             trackID: item.id,
+             ...
+         )
+
+     因此这里允许 String，
+     让迁移期间旧代码继续编译。
+     */
+    init(
+        trackID:
+            String,
+        preferredQuality:
+            PlaybackQuality = .automatic,
+        localFileURL:
+            URL?
+    ) {
+
+        let normalizedID:
+
+            String
+
+
+        if trackID.hasPrefix(
+            "local:"
+        ) {
+
+            normalizedID =
+                trackID
+
+        } else {
+
+            normalizedID =
+                "local:\(trackID)"
+        }
+
+
+        self.init(
+            itemID:
+                normalizedID,
+            source:
+                .local,
+            preferredQuality:
+                preferredQuality,
+            localFileURL:
+                localFileURL,
+            remoteURL:
+                nil,
+            providerHint:
+                .local
+        )
     }
 }

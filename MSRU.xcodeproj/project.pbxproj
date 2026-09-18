@@ -6,10 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		406D8B0B305AEC37005D80DB /* probe.md in Resources */ = {isa = PBXBuildFile; fileRef = 406D8B0A305AEC2F005D80DB /* probe.md */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXContainerItemProxy section */
 		40F5DE083057009F00CA46B2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -28,7 +24,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		406D8B0A305AEC2F005D80DB /* probe.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = probe.md; sourceTree = "<group>"; };
 		40F5DDF83057009E00CA46B2 /* MSRU.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MSRU.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		40F5DE073057009F00CA46B2 /* MSRUTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MSRUTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		40F5DE113057009F00CA46B2 /* MSRUUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MSRUUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -96,7 +91,6 @@
 				40F5DDFA3057009E00CA46B2 /* MSRU */,
 				40F5DE0A3057009F00CA46B2 /* MSRUTests */,
 				40F5DE143057009F00CA46B2 /* MSRUUITests */,
-				406D8B0A305AEC2F005D80DB /* probe.md */,
 				40F5DDF93057009E00CA46B2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -231,7 +225,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				406D8B0B305AEC37005D80DB /* probe.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -413,7 +406,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -473,7 +466,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;

@@ -17,7 +17,7 @@ struct QueueHeaderView: View {
         HStack {
 
             Text(
-                "Up Next"
+                "下一首"
             )
             .font(
                 .headline
@@ -34,7 +34,7 @@ struct QueueHeaderView: View {
             } label: {
 
                 Text(
-                    "Clear"
+                    "清除"
                 )
             }
             .buttonStyle(
