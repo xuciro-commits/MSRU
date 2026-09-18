@@ -45,9 +45,9 @@ struct AddMusicView: View {
         .fileImporter(
             isPresented:
                 $isFileImporterPresented,
-            allowedContentTypes: [
-                .audio
-            ],
+            allowedContentTypes:
+                LocalAudioFormatSupport
+                    .importContentTypes,
             allowsMultipleSelection:
                 true
         ) { result in
@@ -67,6 +67,7 @@ struct AddMusicView: View {
 
                     onOpenLibrary()
                 }
+
 
             case .failure(
                 let error

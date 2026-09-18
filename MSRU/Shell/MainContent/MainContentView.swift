@@ -93,14 +93,8 @@ struct MainContentView: View {
         case .browse:
 
             BrowseView(
-                openverse:
-                    appState.openverse,
-                playback:
-                    appState.playback,
-                library:
-                    appState.library,
-                searchText:
-                    $appState.searchText
+                feature:
+                    appState.browse
             )
 
 

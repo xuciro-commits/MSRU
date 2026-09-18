@@ -6,12 +6,29 @@
 import Foundation
 
 
+struct PCMPlaybackResource:
+    Sendable {
+
+    let format:
+        PCMStreamFormat
+
+    let session:
+        any PCMDecodeSession
+}
+
+
 enum PlaybackTransport:
     Sendable {
 
     case avPlayerURL(
         URL
     )
+
+
+    case decodedPCM(
+        PCMPlaybackResource
+    )
+
 
     case providerNative(
         providerID:
@@ -66,8 +83,10 @@ struct PlaybackResource:
     var isExpired:
         Bool {
 
-        guard let expiresAt
+        guard
+            let expiresAt
         else {
+
             return false
         }
 

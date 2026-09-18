@@ -14,7 +14,11 @@ final class MusicCatalogStore {
     // MARK: - Provider
 
     private(set) var selectedProvider:
-        MusicProviderID = .musicBrainz
+        MusicProviderID
+
+
+    private let providers:
+        [MusicProviderID: any MusicCatalogProvider]
 
 
     // MARK: - Content
@@ -40,11 +44,73 @@ final class MusicCatalogStore {
 
     // MARK: - Infrastructure
 
-    private let musicBrainz =
-        MusicBrainzCatalogProvider()
+    private let cache:
+        any MusicCatalogCaching
 
-    private let cache =
-        MusicCatalogCache()
+
+    // MARK: - Init
+
+    init(
+        selectedProvider:
+            MusicProviderID = .musicBrainz,
+        providers:
+            [MusicProviderID: any MusicCatalogProvider]? = nil,
+        cache:
+            any MusicCatalogCaching = MusicCatalogCache()
+    ) {
+
+        let resolvedProviders =
+            providers
+            ?? [
+                .musicBrainz:
+                    MusicBrainzCatalogProvider()
+            ]
+
+
+        precondition(
+            resolvedProviders[
+                selectedProvider
+            ] != nil,
+            """
+            MusicCatalogStore requires a registered provider \
+            for \(selectedProvider.rawValue).
+            """
+        )
+
+
+        self.selectedProvider =
+            selectedProvider
+
+        self.providers =
+            resolvedProviders
+
+        self.cache =
+            cache
+    }
+
+
+    // MARK: - Availability
+
+    var availableProviderIDs:
+        [MusicProviderID] {
+
+        MusicProviderID
+            .allCases
+            .filter {
+                providers[$0] != nil
+            }
+    }
+
+
+    func isProviderAvailable(
+        _ providerID:
+            MusicProviderID
+    ) -> Bool {
+
+        providers[
+            providerID
+        ] != nil
+    }
 
 
     // MARK: - Provider Selection
@@ -55,8 +121,9 @@ final class MusicCatalogStore {
     ) async {
 
         guard
-            providerID
-                .isAvailable
+            isProviderAvailable(
+                providerID
+            )
         else {
             return
         }
@@ -109,9 +176,13 @@ final class MusicCatalogStore {
 
 
         /*
-         先读磁盘。
+         优先读取 Cache。
 
-         这一部分完全不访问网络。
+         Live 环境：
+         → Application Support
+
+         Preview / Test：
+         → 可以替换成纯内存 Cache。
          */
 
         if let snapshot =
@@ -132,27 +203,21 @@ final class MusicCatalogStore {
 
 
             /*
-             24 小时以内的数据直接使用。
+             新鲜 Cache 直接使用。
 
-             不请求 MusicBrainz。
+             Preview Cache 默认也是 fresh，
+             所以 Preview 不会继续访问网络。
              */
 
             if snapshot.isFresh {
 
                 print(
-                    "Catalog Cache → fresh, skip network"
+                    "Catalog Cache → fresh, skip provider refresh"
                 )
 
                 return
             }
 
-
-            /*
-             缓存虽然旧了，
-             但是先保留在 UI 上。
-
-             网络刷新失败也不会白屏。
-             */
 
             print(
                 "Catalog Cache → stale, refreshing"
@@ -176,7 +241,7 @@ final class MusicCatalogStore {
     }
 
 
-    // MARK: - Network Refresh
+    // MARK: - Provider Refresh
 
     private func refreshHome()
         async {
@@ -188,6 +253,18 @@ final class MusicCatalogStore {
             print(
                 "Catalog Home → request already running"
             )
+
+            return
+        }
+
+
+        guard
+            let provider =
+                currentProvider
+        else {
+
+            errorMessage =
+                "Catalog provider \(selectedProvider.title) is unavailable."
 
             return
         }
@@ -208,7 +285,7 @@ final class MusicCatalogStore {
         do {
 
             let newSections =
-                try await currentProvider
+                try await provider
                     .homeSections()
 
 
@@ -219,20 +296,9 @@ final class MusicCatalogStore {
             }
 
 
-            /*
-             网络成功以后，
-             一次性替换内存内容。
-             */
-
             sections =
                 newSections
 
-
-            /*
-             然后持久化。
-
-             下次 App 重启无需请求网络。
-             */
 
             await cache.save(
                 sections:
@@ -255,11 +321,8 @@ final class MusicCatalogStore {
 
 
             /*
-             注意：
-             这里绝对不清空 sections。
-
-             如果已经存在旧缓存，
-             UI 继续正常显示。
+             如果已有 Cache，
+             不清空原来的 sections。
              */
 
             print(
@@ -301,6 +364,20 @@ final class MusicCatalogStore {
         }
 
 
+        guard
+            let provider =
+                currentProvider
+        else {
+
+            searchResults = []
+
+            errorMessage =
+                "Catalog provider \(selectedProvider.title) is unavailable."
+
+            return
+        }
+
+
         isLoading =
             true
 
@@ -316,7 +393,7 @@ final class MusicCatalogStore {
         do {
 
             searchResults =
-                try await currentProvider
+                try await provider
                     .search(
                         trimmed
                     )
@@ -334,27 +411,10 @@ final class MusicCatalogStore {
     // MARK: - Provider
 
     private var currentProvider:
-        any MusicCatalogProvider {
+        (any MusicCatalogProvider)? {
 
-        switch selectedProvider {
-
-        case .musicBrainz:
-
-            musicBrainz
-
-
-        case .appleMusic:
-
-            fatalError(
-                "Apple Music provider is not available."
-            )
-
-
-        case .jamendo:
-
-            fatalError(
-                "Jamendo provider is not available."
-            )
-        }
+        providers[
+            selectedProvider
+        ]
     }
 }

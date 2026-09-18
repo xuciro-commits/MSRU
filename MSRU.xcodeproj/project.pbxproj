@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		404E9F84305D9AEF003BA949 /* MSRUCodecFFmpeg in Frameworks */ = {isa = PBXBuildFile; productRef = 404E9F83305D9AEF003BA949 /* MSRUCodecFFmpeg */; };
+		404E9F95305DA24F003BA949 /* MSRUCodecFFmpeg in Frameworks */ = {isa = PBXBuildFile; productRef = 404E9F94305DA24F003BA949 /* MSRUCodecFFmpeg */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		40F5DE083057009F00CA46B2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -65,6 +70,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				404E9F84305D9AEF003BA949 /* MSRUCodecFFmpeg in Frameworks */,
+				404E9F95305DA24F003BA949 /* MSRUCodecFFmpeg in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -125,6 +132,8 @@
 			);
 			name = MSRU;
 			packageProductDependencies = (
+				404E9F83305D9AEF003BA949 /* MSRUCodecFFmpeg */,
+				404E9F94305DA24F003BA949 /* MSRUCodecFFmpeg */,
 			);
 			productName = MSRU;
 			productReference = 40F5DDF83057009E00CA46B2 /* MSRU.app */;
@@ -208,6 +217,9 @@
 			);
 			mainGroup = 40F5DDEF3057009E00CA46B2;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				404E9F93305DA24F003BA949 /* XCLocalSwiftPackageReference "Packages/MSRUCodecFFmpeg" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 40F5DDF93057009E00CA46B2 /* Products */;
 			projectDirPath = "";
@@ -668,6 +680,24 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		404E9F93305DA24F003BA949 /* XCLocalSwiftPackageReference "Packages/MSRUCodecFFmpeg" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/MSRUCodecFFmpeg;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		404E9F83305D9AEF003BA949 /* MSRUCodecFFmpeg */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MSRUCodecFFmpeg;
+		};
+		404E9F94305DA24F003BA949 /* MSRUCodecFFmpeg */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MSRUCodecFFmpeg;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 40F5DDF03057009E00CA46B2 /* Project object */;
 }

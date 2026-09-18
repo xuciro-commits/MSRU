@@ -28,17 +28,12 @@ struct MusicCardView: View {
         switch style {
 
         case .featured:
-
             featuredCard
 
-
         case .standard:
-
             standardCard
 
-
         case .compact:
-
             compactCard
         }
     }
@@ -63,11 +58,6 @@ struct MusicCardView: View {
                     16
             )
 
-
-            /*
-             让文字在任何 artwork 上
-             都能稳定可读。
-             */
 
             LinearGradient(
                 colors: [
@@ -136,7 +126,8 @@ struct MusicCardView: View {
             .padding(18)
         }
         .frame(
-            width: 360
+            width:
+                360
         )
         .clipShape(
             RoundedRectangle(
@@ -196,7 +187,8 @@ struct MusicCardView: View {
             }
         }
         .frame(
-            width: 180,
+            width:
+                180,
             alignment:
                 .topLeading
         )
@@ -235,7 +227,7 @@ struct MusicCardView: View {
 
 
             if let subtitle =
-                item.subtitle {
+                    item.subtitle {
 
                 Text(
                     subtitle
@@ -250,9 +242,77 @@ struct MusicCardView: View {
             }
         }
         .frame(
-            width: 140,
+            width:
+                140,
             alignment:
                 .topLeading
         )
     }
+}
+
+
+// MARK: - Previews
+
+#Preview("Music Cards") {
+
+    ScrollView {
+
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                32
+        ) {
+
+            MusicCardView(
+                item:
+                    MSRUPreviewData
+                        .featuredAlbum,
+                style:
+                    .featured
+            )
+
+
+            HStack(
+                alignment:
+                    .top,
+                spacing:
+                    28
+            ) {
+
+                MusicCardView(
+                    item:
+                        MSRUPreviewData
+                            .albumOne,
+                    style:
+                        .standard
+                )
+
+
+                MusicCardView(
+                    item:
+                        MSRUPreviewData
+                            .albumFive,
+                    style:
+                        .standard
+                )
+
+
+                MusicCardView(
+                    item:
+                        MSRUPreviewData
+                            .albumWithoutSubtitle,
+                    style:
+                        .compact
+                )
+            }
+        }
+        .padding(32)
+    }
+    .frame(
+        width:
+            760,
+        height:
+            650
+    )
 }

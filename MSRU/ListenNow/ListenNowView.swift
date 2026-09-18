@@ -21,8 +21,10 @@ struct ListenNowView: View {
         ScrollView {
 
             LazyVStack(
-                alignment: .leading,
-                spacing: 38
+                alignment:
+                    .leading,
+                spacing:
+                    38
             ) {
 
                 header
@@ -38,10 +40,12 @@ struct ListenNowView: View {
             .automatic
         )
         .task {
+
             await store
                 .loadHomeIfNeeded()
         }
         .refreshable {
+
             await store
                 .reloadHome()
         }
@@ -54,12 +58,15 @@ struct ListenNowView: View {
         some View {
 
         HStack(
-            alignment: .bottom
+            alignment:
+                .bottom
         ) {
 
             VStack(
-                alignment: .leading,
-                spacing: 4
+                alignment:
+                    .leading,
+                spacing:
+                    4
             ) {
 
                 Text(
@@ -73,7 +80,9 @@ struct ListenNowView: View {
                 Text(
                     "Discover music from \(store.selectedProvider.title)"
                 )
-                .font(.callout)
+                .font(
+                    .callout
+                )
                 .foregroundStyle(
                     .secondary
                 )
@@ -108,57 +117,67 @@ struct ListenNowView: View {
             ) {
 
                 ForEach(
-                    MusicProviderID.allCases
+                    MusicProviderID
+                        .allCases
                 ) { provider in
 
-                if provider.isAvailable {
-
-                    Button {
-                        Task {
-
-                            await store
-                                .selectProvider(
-                                    provider
-                                )
-                        }
-                    } label: {
-
-                        Label(
-                            provider.title,
-                            systemImage:
-                                provider
-                                    .systemImage
-                        )
-                    }
-
-                } else {
-
-                    Button {
-
-                    } label: {
-
-                        VStack(
-                            alignment: .leading
+                    if store
+                        .isProviderAvailable(
+                            provider
                         ) {
 
-                            Text(
-                                provider.title
-                            )
+                        Button {
 
-                            if let description =
-                                provider
-                                    .availabilityDescription {
+                            Task {
+
+                                await store
+                                    .selectProvider(
+                                        provider
+                                    )
+                            }
+
+                        } label: {
+
+                            Label(
+                                provider.title,
+                                systemImage:
+                                    provider
+                                        .systemImage
+                            )
+                        }
+
+                    } else {
+
+                        Button {
+
+                        } label: {
+
+                            VStack(
+                                alignment:
+                                    .leading
+                            ) {
 
                                 Text(
-                                    description
+                                    provider.title
                                 )
+
+
+                                if let description =
+                                    provider
+                                        .availabilityDescription {
+
+                                    Text(
+                                        description
+                                    )
+                                }
                             }
                         }
+                        .disabled(
+                            true
+                        )
                     }
-                    .disabled(true)
                 }
             }
-        }
 
         } label: {
 
@@ -187,9 +206,10 @@ struct ListenNowView: View {
 
             loading
 
-        } else if let error =
-                    store.errorMessage,
-                  store.sections.isEmpty {
+        } else if
+            let error =
+                store.errorMessage,
+            store.sections.isEmpty {
 
             errorView(
                 error
@@ -223,7 +243,8 @@ struct ListenNowView: View {
         some View {
 
         VStack(
-            spacing: 12
+            spacing:
+                12
         ) {
 
             ProgressView()
@@ -237,7 +258,8 @@ struct ListenNowView: View {
             )
         }
         .frame(
-            maxWidth: .infinity
+            maxWidth:
+                .infinity
         )
         .padding(
             .vertical,
@@ -249,15 +271,18 @@ struct ListenNowView: View {
     // MARK: - Error
 
     private func errorView(
-        _ message: String
+        _ message:
+            String
     ) -> some View {
 
         ContentUnavailableView {
+
             Label(
                 "Unable to Load Music",
                 systemImage:
                     "wifi.exclamationmark"
             )
+
         } description: {
 
             Text(
@@ -267,10 +292,13 @@ struct ListenNowView: View {
         } actions: {
 
             Button {
+
                 Task {
+
                     await store
                         .reloadHome()
                 }
+
             } label: {
 
                 Text(
@@ -279,7 +307,8 @@ struct ListenNowView: View {
             }
         }
         .frame(
-            maxWidth: .infinity
+            maxWidth:
+                .infinity
         )
         .padding(
             .vertical,
@@ -289,16 +318,22 @@ struct ListenNowView: View {
 }
 
 
-#Preview {
+// MARK: - Preview
+
+#Preview("Listen Now") {
+
     ListenNowView(
         store:
-            MusicCatalogStore(),
+            MSRUPreviewData
+                .makeCatalogStore(),
         onSelect: {
             _ in
         }
     )
     .frame(
-        width: 1100,
-        height: 800
+        width:
+            1100,
+        height:
+            800
     )
 }

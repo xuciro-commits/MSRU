@@ -18,8 +18,10 @@ struct MusicSectionView: View {
     var body: some View {
 
         VStack(
-            alignment: .leading,
-            spacing: 14
+            alignment:
+                .leading,
+            spacing:
+                14
         ) {
 
             header
@@ -35,8 +37,10 @@ struct MusicSectionView: View {
         some View {
 
         VStack(
-            alignment: .leading,
-            spacing: 3
+            alignment:
+                .leading,
+            spacing:
+                3
         ) {
 
             Text(
@@ -50,11 +54,15 @@ struct MusicSectionView: View {
             if let subtitle =
                 section.subtitle {
 
-                Text(subtitle)
-                    .font(.callout)
-                    .foregroundStyle(
-                        .secondary
-                    )
+                Text(
+                    subtitle
+                )
+                .font(
+                    .callout
+                )
+                .foregroundStyle(
+                    .secondary
+                )
             }
         }
         .padding(
@@ -75,24 +83,30 @@ struct MusicSectionView: View {
         case .featured:
 
             horizontalShelf(
-                style: .featured,
-                spacing: 18
+                style:
+                    .featured,
+                spacing:
+                    18
             )
 
 
         case .shelf:
 
             horizontalShelf(
-                style: .standard,
-                spacing: 16
+                style:
+                    .standard,
+                spacing:
+                    16
             )
 
 
         case .compactShelf:
 
             horizontalShelf(
-                style: .compact,
-                spacing: 14
+                style:
+                    .compact,
+                spacing:
+                    14
             )
 
 
@@ -106,8 +120,10 @@ struct MusicSectionView: View {
     // MARK: - Shelf
 
     private func horizontalShelf(
-        style: MusicCardStyle,
-        spacing: CGFloat
+        style:
+            MusicCardStyle,
+        spacing:
+            CGFloat
     ) -> some View {
 
         ScrollView(
@@ -115,8 +131,10 @@ struct MusicSectionView: View {
         ) {
 
             LazyHStack(
-                alignment: .top,
-                spacing: spacing
+                alignment:
+                    .top,
+                spacing:
+                    spacing
             ) {
 
                 ForEach(
@@ -124,9 +142,11 @@ struct MusicSectionView: View {
                 ) { item in
 
                     Button {
+
                         onSelect(
                             item
                         )
+
                     } label: {
 
                         MusicCardView(
@@ -161,14 +181,19 @@ struct MusicSectionView: View {
             columns: [
                 GridItem(
                     .adaptive(
-                        minimum: 160,
-                        maximum: 200
+                        minimum:
+                            160,
+                        maximum:
+                            200
                     ),
-                    spacing: 18
+                    spacing:
+                        18
                 )
             ],
-            alignment: .leading,
-            spacing: 24
+            alignment:
+                .leading,
+            spacing:
+                24
         ) {
 
             ForEach(
@@ -176,9 +201,11 @@ struct MusicSectionView: View {
             ) { item in
 
                 Button {
+
                     onSelect(
                         item
                     )
+
                 } label: {
 
                     MusicCardView(
@@ -198,4 +225,70 @@ struct MusicSectionView: View {
             28
         )
     }
+}
+
+
+// MARK: - Previews
+
+#Preview("Section Presentations") {
+
+    ScrollView {
+
+        LazyVStack(
+            alignment:
+                .leading,
+            spacing:
+                40
+        ) {
+
+            MusicSectionView(
+                section:
+                    MSRUPreviewData
+                        .featuredSection,
+                onSelect: {
+                    _ in
+                }
+            )
+
+
+            MusicSectionView(
+                section:
+                    MSRUPreviewData
+                        .shelfSection,
+                onSelect: {
+                    _ in
+                }
+            )
+
+
+            MusicSectionView(
+                section:
+                    MSRUPreviewData
+                        .compactSection,
+                onSelect: {
+                    _ in
+                }
+            )
+
+
+            MusicSectionView(
+                section:
+                    MSRUPreviewData
+                        .gridSection,
+                onSelect: {
+                    _ in
+                }
+            )
+        }
+        .padding(
+            .vertical,
+            28
+        )
+    }
+    .frame(
+        width:
+            1100,
+        height:
+            900
+    )
 }

@@ -9,18 +9,13 @@ import Observation
 
 struct BrowseView: View {
 
-    @Bindable var openverse:
-        OpenverseProviderStore
-
-    @Bindable var playback:
-        PlaybackController
-
-    @Bindable var library:
-        LibraryStore
+    let feature:
+        BrowseFeatureHost
 
 
-    @Binding var searchText:
-        String
+    @Bindable
+    private var state:
+        BrowseFeature.State
 
 
     private let columns = [
@@ -36,6 +31,25 @@ struct BrowseView: View {
                 18
         )
     ]
+
+
+    // MARK: - Init
+
+    init(
+        feature:
+            BrowseFeatureHost
+    ) {
+
+        self.feature =
+            feature
+
+
+        self._state =
+            Bindable(
+                wrappedValue:
+                    feature.state
+            )
+    }
 
 
     // MARK: - Body
@@ -63,60 +77,9 @@ struct BrowseView: View {
         }
         .task {
 
-            if searchText
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
-                .isEmpty {
-
-                searchText =
-                    "mozart"
-            }
-        }
-        .task(
-            id:
-                searchText
-        ) {
-
-            let query =
-                searchText
-                    .trimmingCharacters(
-                        in:
-                            .whitespacesAndNewlines
-                    )
-
-
-            guard
-                !query.isEmpty
-            else {
-
-                await openverse
-                    .search(
-                        ""
-                    )
-
-                return
-            }
-
-
-            do {
-
-                try await Task
-                    .sleep(
-                        nanoseconds:
-                            350_000_000
-                    )
-
-            } catch {
-
-                return
-            }
-
-
-            await openverse
-                .search(
-                    query
+            feature
+                .send(
+                    .appeared
                 )
         }
     }
@@ -178,6 +141,28 @@ struct BrowseView: View {
 
     // MARK: - Search
 
+    private var queryBinding:
+        Binding<String> {
+
+        Binding(
+            get: {
+
+                state.query
+            },
+            set: {
+                value in
+
+                feature
+                    .send(
+                        .queryChanged(
+                            value
+                        )
+                    )
+            }
+        )
+    }
+
+
     private var searchBar:
         some View {
 
@@ -198,7 +183,7 @@ struct BrowseView: View {
             TextField(
                 "Search songs, artists, recordings…",
                 text:
-                    $searchText
+                    queryBinding
             )
             .textFieldStyle(
                 .plain
@@ -208,7 +193,7 @@ struct BrowseView: View {
             )
 
 
-            if openverse.isLoading {
+            if state.isLoading {
 
                 ProgressView()
                     .controlSize(
@@ -322,20 +307,21 @@ struct BrowseView: View {
     private var content:
         some View {
 
-        if openverse.isLoading
-            && openverse.results.isEmpty {
+        if state.isLoading
+            && state.results.isEmpty {
 
             loadingState
 
-        } else if let error =
-                    openverse.errorMessage,
-                  openverse.results.isEmpty {
+        } else if
+            let error =
+                state.errorMessage,
+            state.results.isEmpty {
 
             errorState(
                 error
             )
 
-        } else if openverse.results.isEmpty {
+        } else if state.results.isEmpty {
 
             ContentUnavailableView(
                 "No Audio Found",
@@ -416,13 +402,10 @@ struct BrowseView: View {
                 "Try Again"
             ) {
 
-                Task {
-
-                    await openverse
-                        .search(
-                            searchText
-                        )
-                }
+                feature
+                    .send(
+                        .retryRequested
+                    )
             }
         }
         .frame(
@@ -460,7 +443,7 @@ struct BrowseView: View {
 
 
                 Text(
-                    "\(openverse.results.count) items"
+                    "\(state.results.count) items"
                 )
                 .font(
                     .caption
@@ -481,7 +464,7 @@ struct BrowseView: View {
             ) {
 
                 ForEach(
-                    openverse.results
+                    state.results
                 ) {
                     item in
 
@@ -502,17 +485,16 @@ struct BrowseView: View {
     ) -> some View {
 
         let isCurrent =
-            playback
-                .openverseCurrentTrack?
-                .id
-            == item.id
+            feature
+                .isCurrent(
+                    item
+                )
 
 
         let isSaved =
-            library
-                .contains(
-                    openverse:
-                        item
+            feature
+                .isSaved(
+                    item
                 )
 
 
@@ -581,24 +563,23 @@ struct BrowseView: View {
 
                 Button {
 
-                    playback
-                        .toggle(
-                            openverse:
-                                item,
-                            queue:
-                                openverse.results
+                    feature
+                        .send(
+                            .playPauseRequested(
+                                item
+                            )
                         )
 
                 } label: {
 
                     Label(
                         isCurrent
-                            && playback.isPlaying
+                            && feature.isPlaying
                             ? "Pause"
                             : "Play",
                         systemImage:
                             isCurrent
-                            && playback.isPlaying
+                            && feature.isPlaying
                             ? "pause.fill"
                             : "play.fill"
                     )
@@ -698,10 +679,11 @@ struct BrowseView: View {
 
         Button {
 
-            playback
-                .playNext(
-                    openverse:
+            feature
+                .send(
+                    .playNextRequested(
                         item
+                    )
                 )
 
         } label: {
@@ -716,10 +698,11 @@ struct BrowseView: View {
 
         Button {
 
-            playback
-                .addToQueue(
-                    openverse:
+            feature
+                .send(
+                    .addToQueueRequested(
                         item
+                    )
                 )
 
         } label: {
@@ -735,21 +718,18 @@ struct BrowseView: View {
         Divider()
 
 
-        if library.contains(
-            openverse:
-                item
+        if feature.isSaved(
+            item
         ) {
 
             Button {
 
-                Task {
-
-                    await library
-                        .remove(
-                            openverse:
-                                item
+                feature
+                    .send(
+                        .libraryToggleRequested(
+                            item
                         )
-                }
+                    )
 
             } label: {
 
@@ -764,14 +744,12 @@ struct BrowseView: View {
 
             Button {
 
-                Task {
-
-                    await library
-                        .add(
-                            openverse:
-                                item
+                feature
+                    .send(
+                        .libraryToggleRequested(
+                            item
                         )
-                }
+                    )
 
             } label: {
 
@@ -814,8 +792,9 @@ struct BrowseView: View {
             .lineLimit(1)
 
 
-            if let duration =
-                item.durationText {
+            if
+                let duration =
+                    item.durationText {
 
                 Text(
                     "·"
@@ -913,19 +892,14 @@ struct BrowseView: View {
 }
 
 
-#Preview {
+// MARK: - Preview
+
+#Preview("Browse") {
 
     BrowseView(
-        openverse:
-            OpenverseProviderStore(),
-        playback:
-            PlaybackController(),
-        library:
-            LibraryStore(),
-        searchText:
-            .constant(
-                "mozart"
-            )
+        feature:
+            MSRUPreviewData
+                .makeBrowseFeature()
     )
     .frame(
         width:

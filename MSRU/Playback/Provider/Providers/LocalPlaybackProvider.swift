@@ -11,7 +11,7 @@ struct LocalPlaybackProvider:
 
     let id:
         PlaybackProviderID =
-        .local
+            .local
 
 
     let priority =
@@ -23,11 +23,34 @@ struct LocalPlaybackProvider:
             PlaybackRequest
     ) -> Bool {
 
-        request.source
-            == .local
-        &&
-        request.localFileURL
-            != nil
+        guard
+            request.source
+                == .local,
+            let url =
+                request.localFileURL
+        else {
+
+            return false
+        }
+
+
+        /*
+         Apple 原生不支持的格式
+         不应该继续冒充 Native Local。
+         */
+
+        guard
+            !ExtendedAudioFormatSupport
+                .supports(
+                    url
+                )
+        else {
+
+            return false
+        }
+
+
+        return true
     }
 
 
@@ -77,8 +100,10 @@ struct LocalPlaybackProvider:
 
 
         return PlaybackResource(
+
             providerID:
                 .local,
+
             transport:
                 .avPlayerURL(
                     url
@@ -88,13 +113,13 @@ struct LocalPlaybackProvider:
 }
 
 
-// MARK: - Errors
-
 private enum LocalPlaybackProviderError:
     LocalizedError {
 
     case missingFileURL
+
     case invalidFileURL
+
     case fileNotFound(
         URL
     )

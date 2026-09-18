@@ -24,6 +24,7 @@ final class PlaybackProviderKernel:
         self.registry =
             registry
 
+
         self.resolver =
             PlaybackResolver(
                 registry:
@@ -32,8 +33,6 @@ final class PlaybackProviderKernel:
     }
 
 
-    // MARK: - Standard Kernel
-
     static func standard()
         -> PlaybackProviderKernel {
 
@@ -41,10 +40,29 @@ final class PlaybackProviderKernel:
             ProviderRegistry()
 
 
+        /*
+         Extended codecs first.
+
+         DTS currently enters here.
+         */
+
+        registry.register(
+            ExtendedAudioPlaybackProvider()
+        )
+
+
+        /*
+         Apple-native local media.
+         */
+
         registry.register(
             LocalPlaybackProvider()
         )
 
+
+        /*
+         Remote media.
+         */
 
         registry.register(
             OpenversePlaybackProvider()

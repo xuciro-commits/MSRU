@@ -6,23 +6,48 @@
 import Foundation
 
 
-actor MusicCatalogCache {
+// MARK: - Snapshot
 
-    // MARK: - Snapshot
+struct MusicCatalogCacheSnapshot:
+    Sendable {
 
-    struct Snapshot:
-        Sendable {
+    let sections:
+        [MusicSection]
 
-        let sections:
-            [MusicSection]
+    let fetchedAt:
+        Date
 
-        let fetchedAt:
-            Date
+    let isFresh:
+        Bool
+}
 
-        let isFresh:
-            Bool
-    }
 
+// MARK: - Contract
+
+protocol MusicCatalogCaching:
+    Sendable {
+
+    func load(
+        provider: MusicProviderID
+    ) async -> MusicCatalogCacheSnapshot?
+
+
+    func save(
+        sections: [MusicSection],
+        provider: MusicProviderID
+    ) async
+
+
+    func clear(
+        provider: MusicProviderID
+    ) async
+}
+
+
+// MARK: - Live Cache
+
+actor MusicCatalogCache:
+    MusicCatalogCaching {
 
     private struct CacheFile:
         Codable {
@@ -56,25 +81,21 @@ actor MusicCatalogCache {
     // MARK: - Load
 
     func load(
-        provider:
-            MusicProviderID
-    ) -> Snapshot? {
+        provider: MusicProviderID
+    ) async -> MusicCatalogCacheSnapshot? {
 
         do {
 
             let url =
                 try cacheURL(
-                    provider:
-                        provider
+                    provider: provider
                 )
 
 
             guard
-                FileManager
-                    .default
+                FileManager.default
                     .fileExists(
-                        atPath:
-                            url.path
+                        atPath: url.path
                     )
             else {
                 return nil
@@ -83,8 +104,7 @@ actor MusicCatalogCache {
 
             let data =
                 try Data(
-                    contentsOf:
-                        url
+                    contentsOf: url
                 )
 
 
@@ -92,8 +112,7 @@ actor MusicCatalogCache {
                 try JSONDecoder()
                     .decode(
                         CacheFile.self,
-                        from:
-                            data
+                        from: data
                     )
 
 
@@ -108,12 +127,11 @@ actor MusicCatalogCache {
             let age =
                 Date()
                     .timeIntervalSince(
-                        cacheFile
-                            .fetchedAt
+                        cacheFile.fetchedAt
                     )
 
 
-            return Snapshot(
+            return MusicCatalogCacheSnapshot(
                 sections:
                     cacheFile.sections,
                 fetchedAt:
@@ -137,13 +155,13 @@ actor MusicCatalogCache {
     // MARK: - Save
 
     func save(
-        sections:
-            [MusicSection],
-        provider:
-            MusicProviderID
-    ) {
+        sections: [MusicSection],
+        provider: MusicProviderID
+    ) async {
 
-        guard !sections.isEmpty else {
+        guard
+            !sections.isEmpty
+        else {
             return
         }
 
@@ -152,19 +170,15 @@ actor MusicCatalogCache {
 
             let url =
                 try cacheURL(
-                    provider:
-                        provider
+                    provider: provider
                 )
 
 
             let cacheFile =
                 CacheFile(
-                    provider:
-                        provider,
-                    fetchedAt:
-                        Date(),
-                    sections:
-                        sections
+                    provider: provider,
+                    fetchedAt: Date(),
+                    sections: sections
                 )
 
 
@@ -178,17 +192,14 @@ actor MusicCatalogCache {
 
 
             let data =
-                try encoder
-                    .encode(
-                        cacheFile
-                    )
+                try encoder.encode(
+                    cacheFile
+                )
 
 
             try data.write(
-                to:
-                    url,
-                options:
-                    .atomic
+                to: url,
+                options: .atomic
             )
 
 
@@ -211,36 +222,30 @@ actor MusicCatalogCache {
     // MARK: - Clear
 
     func clear(
-        provider:
-            MusicProviderID
-    ) {
+        provider: MusicProviderID
+    ) async {
 
         do {
 
             let url =
                 try cacheURL(
-                    provider:
-                        provider
+                    provider: provider
                 )
 
 
             guard
-                FileManager
-                    .default
+                FileManager.default
                     .fileExists(
-                        atPath:
-                            url.path
+                        atPath: url.path
                     )
             else {
                 return
             }
 
 
-            try FileManager
-                .default
+            try FileManager.default
                 .removeItem(
-                    at:
-                        url
+                    at: url
                 )
 
         } catch {
@@ -256,15 +261,15 @@ actor MusicCatalogCache {
     // MARK: - URL
 
     private func cacheURL(
-        provider:
-            MusicProviderID
+        provider: MusicProviderID
     ) throws -> URL {
 
         let fileManager =
             FileManager.default
 
 
-        guard let applicationSupport =
+        guard
+            let applicationSupport =
                 fileManager.urls(
                     for:
                         .applicationSupportDirectory,
@@ -282,22 +287,18 @@ actor MusicCatalogCache {
             applicationSupport
                 .appendingPathComponent(
                     "MSRU",
-                    isDirectory:
-                        true
+                    isDirectory: true
                 )
                 .appendingPathComponent(
                     "CatalogCache",
-                    isDirectory:
-                        true
+                    isDirectory: true
                 )
 
 
         try fileManager
             .createDirectory(
-                at:
-                    directory,
-                withIntermediateDirectories:
-                    true
+                at: directory,
+                withIntermediateDirectories: true
             )
 
 

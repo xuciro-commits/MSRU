@@ -41,13 +41,11 @@ final class PlaybackController {
     private(set) var isResolving =
         false
 
-
     private(set) var currentTime:
         TimeInterval = 0
 
     private(set) var duration:
         TimeInterval = 0
-
 
     private(set) var playbackErrorMessage:
         String?
@@ -60,7 +58,6 @@ final class PlaybackController {
 
     private var failedItem:
         PlaybackItem?
-
 
     private var resolutionTask:
         Task<Void, Never>?
@@ -81,6 +78,15 @@ final class PlaybackController {
         NSObjectProtocol?
 
 
+    // MARK: - Extended PCM Engine
+
+    private var pcmEngine:
+        PCMPlaybackEngine?
+
+    private var pcmTimeTask:
+        Task<Void, Never>?
+
+
     // MARK: - Init
 
     init(
@@ -92,7 +98,6 @@ final class PlaybackController {
             providerKernel
             ?? PlaybackProviderKernel
                 .standard()
-
 
         self.playbackQueue =
             PlaybackQueueController()
@@ -132,7 +137,6 @@ final class PlaybackController {
 
             return .local
         }
-
 
         switch source {
 
@@ -177,6 +181,7 @@ final class PlaybackController {
      但真正的数据源已经变成：
      PlaybackQueueController。
      */
+
     var queue:
         [LocalTrack] {
 
@@ -201,7 +206,6 @@ final class PlaybackController {
 
             return nil
         }
-
 
         return queue
             .firstIndex {
@@ -263,7 +267,6 @@ final class PlaybackController {
 
             return nil
         }
-
 
         return openverseQueue
             .firstIndex {
@@ -388,7 +391,6 @@ final class PlaybackController {
             return 0
         }
 
-
         return min(
             max(
                 currentTime
@@ -421,7 +423,6 @@ final class PlaybackController {
             return .idle
         }
 
-
         return state(
             for:
                 displayTrack
@@ -441,7 +442,6 @@ final class PlaybackController {
             return .resolving
         }
 
-
         if failedTrack?
             .id
             == track.id,
@@ -452,7 +452,6 @@ final class PlaybackController {
             )
         }
 
-
         guard
             currentTrack?
                 .id
@@ -461,7 +460,6 @@ final class PlaybackController {
 
             return .idle
         }
-
 
         return isPlaying
             ? .playing
@@ -482,7 +480,6 @@ final class PlaybackController {
             return .resolving
         }
 
-
         if failedItem?
             .openverseTrack?
             .id
@@ -494,7 +491,6 @@ final class PlaybackController {
             )
         }
 
-
         guard
             openverseCurrentTrack?
                 .id
@@ -503,7 +499,6 @@ final class PlaybackController {
 
             return .idle
         }
-
 
         return isPlaying
             ? .playing
@@ -549,14 +544,10 @@ final class PlaybackController {
                 )
             }
 
-
-            player?
-                .play()
-
+            resumeActiveTransport()
 
             isPlaying =
                 true
-
 
             return
         }
@@ -645,13 +636,12 @@ final class PlaybackController {
     func toggle() {
 
         if isResolving {
-
             return
         }
 
 
         guard
-            let player
+            hasActiveTransport
         else {
 
             if let currentItem {
@@ -660,7 +650,6 @@ final class PlaybackController {
                     currentItem
                 )
             }
-
 
             return
         }
@@ -685,8 +674,7 @@ final class PlaybackController {
         }
 
 
-        player.play()
-
+        resumeActiveTransport()
 
         isPlaying =
             true
@@ -718,13 +706,13 @@ final class PlaybackController {
                     item,
                     context:
                         queue.map {
+
                             PlaybackItem(
                                 local:
                                     $0
                             )
                         }
                 )
-
 
             toggle()
 
@@ -787,13 +775,13 @@ final class PlaybackController {
                     item,
                     context:
                         queue.map {
+
                             PlaybackItem(
                                 openverse:
                                     $0
                             )
                         }
                 )
-
 
             toggle()
 
@@ -858,7 +846,7 @@ final class PlaybackController {
     }
 
 
-    // MARK: Local Queue Actions
+    // MARK: - Local Queue Actions
 
     func playNext(
         _ track:
@@ -888,7 +876,7 @@ final class PlaybackController {
     }
 
 
-    // MARK: Openverse Queue Actions
+    // MARK: - Openverse Queue Actions
 
     func playNext(
         openverse track:
@@ -980,6 +968,7 @@ final class PlaybackController {
          已经播放超过 3 秒，
          Previous = 回到当前歌曲开头。
          */
+
         if currentTime > 3 {
 
             restart()
@@ -1033,6 +1022,8 @@ final class PlaybackController {
         player?
             .pause()
 
+        pcmEngine?
+            .pause()
 
         isPlaying =
             false
@@ -1078,7 +1069,7 @@ final class PlaybackController {
     ) {
 
         guard
-            player != nil
+            hasActiveTransport
         else {
 
             return
@@ -1108,17 +1099,19 @@ final class PlaybackController {
             clamped
 
 
-        let time =
-            CMTime(
-                seconds:
-                    clamped,
-                preferredTimescale:
-                    600
-            )
+        // AVPlayer transport
+        if let player {
+
+            let time =
+                CMTime(
+                    seconds:
+                        clamped,
+                    preferredTimescale:
+                        600
+                )
 
 
-        player?
-            .seek(
+            player.seek(
                 to:
                     time,
                 toleranceBefore:
@@ -1126,6 +1119,55 @@ final class PlaybackController {
                 toleranceAfter:
                     .zero
             )
+
+            return
+        }
+
+
+        // Extended PCM transport
+        if let pcmEngine {
+
+            Task {
+                [weak self] in
+
+                guard
+                    let self,
+                    self.pcmEngine === pcmEngine
+                else {
+
+                    return
+                }
+
+                do {
+
+                    try await pcmEngine
+                        .seek(
+                            to:
+                                clamped
+                        )
+
+                } catch {
+
+                    guard
+                        self.pcmEngine === pcmEngine
+                    else {
+
+                        return
+                    }
+
+                    self.playbackErrorMessage =
+                        error.localizedDescription
+
+                    self.isPlaying =
+                        false
+
+                    print(
+                        "PCM Seek ✕",
+                        error.localizedDescription
+                    )
+                }
+            }
+        }
     }
 
 
@@ -1134,29 +1176,17 @@ final class PlaybackController {
     func restart() {
 
         guard
-            player != nil
+            hasActiveTransport
         else {
 
             return
         }
 
 
-        currentTime =
-            0
-
-
-        player?
-            .seek(
-                to:
-                    .zero
-            )
-
-
-        if isPlaying {
-
-            player?
-                .play()
-        }
+        seek(
+            to:
+                0
+        )
     }
 
 
@@ -1171,16 +1201,53 @@ final class PlaybackController {
             .pause()
 
 
-        player?
-            .seek(
+        if let player {
+
+            player.seek(
                 to:
                     .zero
             )
+        }
+
+
+        pcmEngine?
+            .pause()
+
+
+        if let pcmEngine {
+
+            Task {
+                [weak self] in
+
+                guard
+                    let self,
+                    self.pcmEngine === pcmEngine
+                else {
+
+                    return
+                }
+
+                do {
+
+                    try await pcmEngine
+                        .seek(
+                            to:
+                                0
+                        )
+
+                } catch {
+
+                    print(
+                        "PCM Stop Seek △",
+                        error.localizedDescription
+                    )
+                }
+            }
+        }
 
 
         currentTime =
             0
-
 
         isPlaying =
             false
@@ -1214,50 +1281,33 @@ final class PlaybackController {
 
         cancelActiveResolution()
 
-
-        removeObservers()
-
-
-        player?
-            .pause()
-
-
-        player =
-            nil
+        tearDownActiveTransport()
 
 
         currentResource =
             nil
 
-
         currentProviderID =
             nil
 
-
         currentTime =
             0
-
 
         duration =
             item.duration
             ?? 0
 
-
         isPlaying =
             false
-
 
         isResolving =
             true
 
-
         resolvingItem =
             item
 
-
         failedItem =
             nil
-
 
         playbackErrorMessage =
             nil
@@ -1286,7 +1336,6 @@ final class PlaybackController {
                     return
                 }
 
-
                 do {
 
                     let resource =
@@ -1307,6 +1356,11 @@ final class PlaybackController {
                             == resolutionID
                     else {
 
+                        /*
+                         如果这个 Resource 已经建立了
+                         PCM Decode Session，而请求已经过期，
+                         生命周期最终会随 Resource 释放。
+                         */
                         return
                     }
 
@@ -1323,22 +1377,17 @@ final class PlaybackController {
                     self.isResolving =
                         false
 
-
                     self.resolvingItem =
                         nil
-
 
                     self.failedItem =
                         nil
 
-
                     self.activeResolutionID =
                         nil
 
-
                     self.resolutionTask =
                         nil
-
 
                 } catch is CancellationError {
 
@@ -1354,18 +1403,14 @@ final class PlaybackController {
                     self.isResolving =
                         false
 
-
                     self.resolvingItem =
                         nil
-
 
                     self.activeResolutionID =
                         nil
 
-
                     self.resolutionTask =
                         nil
-
 
                 } catch {
 
@@ -1381,22 +1426,17 @@ final class PlaybackController {
                     self.isResolving =
                         false
 
-
                     self.resolvingItem =
                         nil
-
 
                     self.failedItem =
                         item
 
-
                     self.activeResolutionID =
                         nil
 
-
                     self.resolutionTask =
                         nil
-
 
                     self.playbackErrorMessage =
                         error
@@ -1421,19 +1461,142 @@ final class PlaybackController {
             PlaybackItem
     ) throws {
 
-        let url:
-            URL
+        /*
+         无论上一个 Transport 是 AVPlayer
+         还是 PCM，都只通过这一处退出。
+         */
+
+        tearDownActiveTransport()
 
 
         switch resource.transport {
+
+        // MARK: Apple-native AVPlayer
 
         case .avPlayerURL(
             let resolvedURL
         ):
 
-            url =
-                resolvedURL
+            let newPlayer =
+                AVPlayer(
+                    url:
+                        resolvedURL
+                )
 
+
+            player =
+                newPlayer
+
+            currentResource =
+                resource
+
+            currentProviderID =
+                resource.providerID
+
+            currentTime =
+                0
+
+            duration =
+                resource.duration
+                ?? item.duration
+                ?? 0
+
+
+            installObservers(
+                for:
+                    newPlayer
+            )
+
+
+            newPlayer
+                .play()
+
+
+            isPlaying =
+                true
+
+
+        // MARK: Extended Codec → PCM → AVAudioEngine
+
+        case .decodedPCM(
+            let pcmResource
+        ):
+
+            let engine =
+                try PCMPlaybackEngine(
+                    resource:
+                        pcmResource
+                )
+
+
+            engine.onEnded = {
+                [weak self] in
+
+                self?
+                    .handlePlaybackEnded()
+            }
+
+
+            engine.onFailure = {
+                [weak self]
+                error in
+
+                guard
+                    let self
+                else {
+
+                    return
+                }
+
+
+                self.playbackErrorMessage =
+                    error.localizedDescription
+
+                self.isPlaying =
+                    false
+
+
+                print(
+                    "PCM Playback ✕",
+                    error.localizedDescription
+                )
+            }
+
+
+            pcmEngine =
+                engine
+
+            currentResource =
+                resource
+
+            currentProviderID =
+                resource.providerID
+
+            currentTime =
+                0
+
+            duration =
+                resource.duration
+                ?? pcmResource
+                    .format
+                    .duration
+                ?? item.duration
+                ?? 0
+
+
+            startPCMTimeUpdates(
+                engine
+            )
+
+
+            engine.play()
+
+
+            isPlaying =
+                true
+
+
+        // MARK: Future Provider-native Transport
 
         case .providerNative(
             let providerID,
@@ -1448,57 +1611,140 @@ final class PlaybackController {
         }
 
 
-        removeObservers()
-
-
-        let newPlayer =
-            AVPlayer(
-                url:
-                    url
-            )
-
-
-        player =
-            newPlayer
-
-
-        currentResource =
-            resource
-
-
-        currentProviderID =
-            resource.providerID
-
-
-        currentTime =
-            0
-
-
-        duration =
-            resource.duration
-            ?? item.duration
-            ?? 0
-
-
-        installObservers(
-            for:
-                newPlayer
-        )
-
-
-        newPlayer
-            .play()
-
-
-        isPlaying =
-            true
-
-
         print(
             "Playback ▶︎",
             "[\(resource.providerID.rawValue)]",
             item.title
         )
+    }
+
+
+    // MARK: - Active Transport
+
+    private var hasActiveTransport:
+        Bool {
+
+        player != nil
+        ||
+        pcmEngine != nil
+    }
+
+
+    private func resumeActiveTransport() {
+
+        player?
+            .play()
+
+        pcmEngine?
+            .play()
+    }
+
+
+    private func tearDownActiveTransport() {
+
+        /*
+         先移除 AVPlayer Observer，
+         此时 player 仍然存在。
+         */
+
+        removeObservers()
+
+
+        player?
+            .pause()
+
+        player =
+            nil
+
+
+        /*
+         PCM 时间观察任务只属于当前 Engine。
+         */
+
+        pcmTimeTask?
+            .cancel()
+
+        pcmTimeTask =
+            nil
+
+
+        /*
+         先从 Controller 移除引用，
+         再异步关闭旧 Engine。
+
+         这样旧 Engine 的异步关闭不会误伤
+         后续刚建立的新 Engine。
+         */
+
+        let previousPCMEngine =
+            pcmEngine
+
+        pcmEngine =
+            nil
+
+
+        if let previousPCMEngine {
+
+            Task {
+
+                await previousPCMEngine
+                    .close()
+            }
+        }
+    }
+
+
+    // MARK: - PCM Time Updates
+
+    private func startPCMTimeUpdates(
+        _ engine:
+            PCMPlaybackEngine
+    ) {
+
+        pcmTimeTask?
+            .cancel()
+
+
+        pcmTimeTask =
+            Task {
+                [weak self] in
+
+                while
+                    !Task.isCancelled {
+
+                    do {
+
+                        try await Task.sleep(
+                            nanoseconds:
+                                250_000_000
+                        )
+
+                    } catch {
+
+                        return
+                    }
+
+
+                    guard
+                        let self,
+                        self.pcmEngine === engine
+                    else {
+
+                        return
+                    }
+
+
+                    self.currentTime =
+                        engine.currentTime
+
+
+                    if engine.duration > 0 {
+
+                        self.duration =
+                            engine.duration
+                    }
+                }
+            }
     }
 
 
@@ -1509,18 +1755,14 @@ final class PlaybackController {
         resolutionTask?
             .cancel()
 
-
         resolutionTask =
             nil
-
 
         activeResolutionID =
             nil
 
-
         resolvingItem =
             nil
-
 
         isResolving =
             false
@@ -1553,6 +1795,7 @@ final class PlaybackController {
                 ) {
                     [weak self, weak player]
                     time in
+
 
                     let seconds =
                         CMTimeGetSeconds(
@@ -1633,6 +1876,7 @@ final class PlaybackController {
                         [weak self]
                         _ in
 
+
                         Task {
                             @MainActor
                             [weak self] in
@@ -1691,7 +1935,6 @@ final class PlaybackController {
 
         isPlaying =
             false
-
 
         currentTime =
             duration

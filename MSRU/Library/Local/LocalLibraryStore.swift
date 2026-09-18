@@ -30,20 +30,6 @@ final class LocalLibraryStore {
         false
 
 
-    // MARK: - Supported Formats
-
-    private let supportedExtensions:
-        Set<String> = [
-            "mp3",
-            "m4a",
-            "aac",
-            "wav",
-            "aif",
-            "aiff",
-            "caf",
-            "flac",
-            "mp4"
-        ]
 
 
     // MARK: - Load Existing Library
@@ -279,29 +265,58 @@ final class LocalLibraryStore {
     }
 
 
+
     // MARK: - Metadata
 
     private func readTrack(
-        from url: URL
+        from url:
+            URL
     ) async throws -> LocalTrack {
 
         let asset =
             AVURLAsset(
-                url: url
+                url:
+                    url
             )
 
 
-        let metadata =
-            try await asset.load(
-                .commonMetadata
+        /*
+         Metadata 是增强信息，不应该成为
+         “这个文件是否允许进入 Library”的前置条件。
+
+         特别是 DTS / 新格式 / Provider-backed media，
+         系统可能能保存文件，但不一定能通过
+         AVURLAsset 解析全部 metadata。
+         */
+
+        let metadata:
+            [AVMetadataItem]
+
+
+        do {
+
+            metadata =
+                try await asset.load(
+                    .commonMetadata
+                )
+
+        } catch {
+
+            metadata = []
+
+
+            print(
+                """
+                Local Metadata △
+                \(url.lastPathComponent)
+                common metadata unavailable:
+                \(error.localizedDescription)
+                """
             )
+        }
 
 
-        let durationValue =
-            try await asset.load(
-                .duration
-            )
-
+        // MARK: Title
 
         let title =
             await metadataString(
@@ -315,6 +330,8 @@ final class LocalLibraryStore {
                 .lastPathComponent
 
 
+        // MARK: Artist
+
         let artist =
             await metadataString(
                 identifier:
@@ -325,6 +342,8 @@ final class LocalLibraryStore {
             ?? "Unknown Artist"
 
 
+        // MARK: Album
+
         let album =
             await metadataString(
                 identifier:
@@ -333,6 +352,8 @@ final class LocalLibraryStore {
                     metadata
             )
 
+
+        // MARK: Artwork
 
         let artworkData =
             await metadataData(
@@ -343,19 +364,53 @@ final class LocalLibraryStore {
             )
 
 
-        let seconds =
-            durationValue.seconds
+        // MARK: Duration
+
+        let duration:
+            TimeInterval
 
 
-        let duration =
-            seconds.isFinite
-            ? seconds
-            : 0
+        do {
 
+            let durationValue =
+                try await asset.load(
+                    .duration
+                )
+
+
+            let seconds =
+                durationValue.seconds
+
+
+            duration =
+                seconds.isFinite
+                && seconds > 0
+                ? seconds
+                : 0
+
+        } catch {
+
+            duration = 0
+
+
+            print(
+                """
+                Local Metadata △
+                \(url.lastPathComponent)
+                duration unavailable:
+                \(error.localizedDescription)
+                """
+            )
+        }
+
+
+        // MARK: Diagnostics
 
         print(
             """
             Local Metadata ✓
+            file: \(url.lastPathComponent)
+            format: \(url.pathExtension.lowercased())
             title: \(title)
             artist: \(artist)
             album: \(album ?? "—")
@@ -380,7 +435,6 @@ final class LocalLibraryStore {
                 artworkData
         )
     }
-
 
     private func metadataString(
         identifier:
@@ -550,13 +604,12 @@ final class LocalLibraryStore {
 
 
     private func isSupported(
-        _ url: URL
+        _ url:
+            URL
     ) -> Bool {
-
-        supportedExtensions
-            .contains(
-                url.pathExtension
-                    .lowercased()
+        LocalAudioFormatSupport
+            .supports(
+                url
             )
     }
 }

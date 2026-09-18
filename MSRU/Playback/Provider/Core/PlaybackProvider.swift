@@ -12,7 +12,10 @@ enum PlaybackProviderID:
     Hashable,
     Sendable {
 
+    case extendedAudio
+
     case local
+
     case openverse
 }
 

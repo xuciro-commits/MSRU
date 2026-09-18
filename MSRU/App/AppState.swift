@@ -14,10 +14,8 @@ final class AppState {
     // MARK: - Navigation
 
     var selectedSection:
-        SidebarSection? = .listenNow
-
-    var searchText =
-        ""
+        SidebarSection? =
+            .listenNow
 
 
     // MARK: - Catalog
@@ -25,14 +23,9 @@ final class AppState {
     var selectedMusicContent:
         MusicContent?
 
+
     let musicCatalog =
         MusicCatalogStore()
-
-
-    // MARK: - Openverse
-
-    let openverse =
-        OpenverseProviderStore()
 
 
     // MARK: - Local Library
@@ -40,33 +33,15 @@ final class AppState {
     var selectedLocalTrack:
         LocalTrack?
 
+
     let localLibrary =
         LocalLibraryStore()
 
 
     // MARK: - MSRU Library
 
-    /*
-     MSRU 自己的统一资料库。
-
-     它与 LocalLibraryStore 不同：
-
-     LocalLibraryStore
-     = 本地文件扫描 / 导入结果
-
-     LibraryStore
-     = 用户真正收藏到 MSRU 的音乐资料库
-
-     LibraryTrack 可以来自：
-     - Local
-     - Openverse
-     - Jamendo
-     - Apple Music
-     - OpenSubsonic
-     - Future Providers
-     */
-    let library =
-        LibraryStore()
+    let library:
+        LibraryStore
 
 
     // MARK: - Apple Music
@@ -77,8 +52,14 @@ final class AppState {
 
     // MARK: - Playback
 
-    let playback =
-        PlaybackController()
+    let playback:
+        PlaybackController
+
+
+    // MARK: - Browse Feature
+
+    let browse:
+        BrowseFeatureHost
 
 
     // MARK: - Provider Management
@@ -97,24 +78,54 @@ final class AppState {
 
     init() {
 
+        let library =
+            LibraryStore()
+
+
+        let playback =
+            PlaybackController()
+
+
+        self.library =
+            library
+
+
+        self.playback =
+            playback
+
+
+        self.browse =
+            BrowseFeatureHost(
+                service:
+                    BrowseFeature.Service(
+                        searchClient:
+                            .live,
+                        playback:
+                            playback,
+                        library:
+                            library
+                    )
+            )
+
+
         /*
-         AppState 创建后立即恢复持久化 Library。
+         恢复 MSRU 自己的持久化 Library。
 
-         LibraryStore 自己负责：
-         Repository
-         JSON decoding
-         Error state
-
-         AppState 不需要知道 Library.json
-         实际存在哪里。
+         Repository 的具体文件位置
+         仍由 LibraryStore /
+         JSONLibraryRepository 管理。
          */
-        Task {
-            [weak self] in
 
-            guard let self
+        Task {
+            [weak self]
+            in
+
+            guard
+                let self
             else {
                 return
             }
+
 
             await library
                 .load()
