@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Observation
+import AppFoundation
 
 
 struct BrowseView: View {

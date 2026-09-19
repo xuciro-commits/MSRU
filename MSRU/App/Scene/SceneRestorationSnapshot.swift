@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import AppFoundation
 
 
 // MARK: - Scene Restoration Snapshot

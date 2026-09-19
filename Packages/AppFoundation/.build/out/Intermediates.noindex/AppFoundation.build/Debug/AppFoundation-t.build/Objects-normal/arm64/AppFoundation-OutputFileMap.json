@@ -1,0 +1,79 @@
+{
+  "" : {
+    "diagnostics" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/AppFoundation-primary.dia",
+    "emit-module-dependencies" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/AppFoundation-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/AppFoundation-primary-emit-module.dia",
+    "pch" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/AppFoundation-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/AppFoundation-primary.swiftdeps"
+  },
+  "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/Sources/AppFoundation/Dependencies/Dependency.swift" : {
+    "const-values" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/Dependency.swiftconstvalues",
+    "dependencies" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/Dependency.d",
+    "diagnostics" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/Dependency.dia",
+    "index-unit-output-path" : "/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/Dependency.o",
+    "llvm-bc" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/Dependency.bc",
+    "object" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/Dependency.o",
+    "swift-dependencies" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/Dependency.swiftdeps",
+    "swiftmodule" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/Dependency~partial.swiftmodule"
+  },
+  "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/Sources/AppFoundation/Dependencies/DependencyKey.swift" : {
+    "const-values" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/DependencyKey.swiftconstvalues",
+    "dependencies" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/DependencyKey.d",
+    "diagnostics" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/DependencyKey.dia",
+    "index-unit-output-path" : "/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/DependencyKey.o",
+    "llvm-bc" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/DependencyKey.bc",
+    "object" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/DependencyKey.o",
+    "swift-dependencies" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/DependencyKey.swiftdeps",
+    "swiftmodule" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/DependencyKey~partial.swiftmodule"
+  },
+  "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/Sources/AppFoundation/Dependencies/DependencyValues.swift" : {
+    "const-values" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/DependencyValues.swiftconstvalues",
+    "dependencies" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/DependencyValues.d",
+    "diagnostics" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/DependencyValues.dia",
+    "index-unit-output-path" : "/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/DependencyValues.o",
+    "llvm-bc" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/DependencyValues.bc",
+    "object" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/DependencyValues.o",
+    "swift-dependencies" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/DependencyValues.swiftdeps",
+    "swiftmodule" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/DependencyValues~partial.swiftmodule"
+  },
+  "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/Sources/AppFoundation/Dependencies/WithDependencies.swift" : {
+    "const-values" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/WithDependencies.swiftconstvalues",
+    "dependencies" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/WithDependencies.d",
+    "diagnostics" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/WithDependencies.dia",
+    "index-unit-output-path" : "/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/WithDependencies.o",
+    "llvm-bc" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/WithDependencies.bc",
+    "object" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/WithDependencies.o",
+    "swift-dependencies" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/WithDependencies.swiftdeps",
+    "swiftmodule" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/WithDependencies~partial.swiftmodule"
+  },
+  "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/Sources/AppFoundation/FeatureRuntime/Feature.swift" : {
+    "const-values" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/Feature.swiftconstvalues",
+    "dependencies" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/Feature.d",
+    "diagnostics" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/Feature.dia",
+    "index-unit-output-path" : "/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/Feature.o",
+    "llvm-bc" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/Feature.bc",
+    "object" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/Feature.o",
+    "swift-dependencies" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/Feature.swiftdeps",
+    "swiftmodule" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/Feature~partial.swiftmodule"
+  },
+  "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/Sources/AppFoundation/FeatureRuntime/FeatureHost.swift" : {
+    "const-values" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/FeatureHost.swiftconstvalues",
+    "dependencies" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/FeatureHost.d",
+    "diagnostics" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/FeatureHost.dia",
+    "index-unit-output-path" : "/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/FeatureHost.o",
+    "llvm-bc" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/FeatureHost.bc",
+    "object" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/FeatureHost.o",
+    "swift-dependencies" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/FeatureHost.swiftdeps",
+    "swiftmodule" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/FeatureHost~partial.swiftmodule"
+  },
+  "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/Sources/AppFoundation/FeatureRuntime/FeatureTask.swift" : {
+    "const-values" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/FeatureTask.swiftconstvalues",
+    "dependencies" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/FeatureTask.d",
+    "diagnostics" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/FeatureTask.dia",
+    "index-unit-output-path" : "/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/FeatureTask.o",
+    "llvm-bc" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/FeatureTask.bc",
+    "object" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/FeatureTask.o",
+    "swift-dependencies" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/FeatureTask.swiftdeps",
+    "swiftmodule" : "/Users/ciro/Developer/xcode/MSRU/MSRU/Packages/AppFoundation/.build/out/Intermediates.noindex/AppFoundation.build/Debug/AppFoundation-t.build/Objects-normal/arm64/FeatureTask~partial.swiftmodule"
+  }
+}

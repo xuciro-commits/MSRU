@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		404E9F84305D9AEF003BA949 /* MSRUCodecFFmpeg in Frameworks */ = {isa = PBXBuildFile; productRef = 404E9F83305D9AEF003BA949 /* MSRUCodecFFmpeg */; };
 		404E9F95305DA24F003BA949 /* MSRUCodecFFmpeg in Frameworks */ = {isa = PBXBuildFile; productRef = 404E9F94305DA24F003BA949 /* MSRUCodecFFmpeg */; };
+		404EA147305E8362003BA949 /* AppFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 404EA146305E8362003BA949 /* AppFoundation */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,6 +73,7 @@
 			files = (
 				404E9F84305D9AEF003BA949 /* MSRUCodecFFmpeg in Frameworks */,
 				404E9F95305DA24F003BA949 /* MSRUCodecFFmpeg in Frameworks */,
+				404EA147305E8362003BA949 /* AppFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -134,6 +136,7 @@
 			packageProductDependencies = (
 				404E9F83305D9AEF003BA949 /* MSRUCodecFFmpeg */,
 				404E9F94305DA24F003BA949 /* MSRUCodecFFmpeg */,
+				404EA146305E8362003BA949 /* AppFoundation */,
 			);
 			productName = MSRU;
 			productReference = 40F5DDF83057009E00CA46B2 /* MSRU.app */;
@@ -219,6 +222,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				404E9F93305DA24F003BA949 /* XCLocalSwiftPackageReference "Packages/MSRUCodecFFmpeg" */,
+				404EA145305E8362003BA949 /* XCLocalSwiftPackageReference "Packages/AppFoundation" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 40F5DDF93057009E00CA46B2 /* Products */;
@@ -686,6 +690,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/MSRUCodecFFmpeg;
 		};
+		404EA145305E8362003BA949 /* XCLocalSwiftPackageReference "Packages/AppFoundation" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/AppFoundation;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -696,6 +704,10 @@
 		404E9F94305DA24F003BA949 /* MSRUCodecFFmpeg */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MSRUCodecFFmpeg;
+		};
+		404EA146305E8362003BA949 /* AppFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppFoundation;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

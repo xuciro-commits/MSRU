@@ -3,6 +3,7 @@
 //  MSRUTests
 //
 
+import AppFoundation
 import Foundation
 import Testing
 
