@@ -2,6 +2,8 @@
 
 import AppKit
 import SwiftUI
+import AppFoundation
+import AppFoundation
 
 
 @MainActor

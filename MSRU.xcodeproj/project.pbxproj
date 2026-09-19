@@ -7,9 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		404E9F84305D9AEF003BA949 /* MSRUCodecFFmpeg in Frameworks */ = {isa = PBXBuildFile; productRef = 404E9F83305D9AEF003BA949 /* MSRUCodecFFmpeg */; };
-		404E9F95305DA24F003BA949 /* MSRUCodecFFmpeg in Frameworks */ = {isa = PBXBuildFile; productRef = 404E9F94305DA24F003BA949 /* MSRUCodecFFmpeg */; };
 		404EA147305E8362003BA949 /* AppFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 404EA146305E8362003BA949 /* AppFoundation */; };
+		404EA14E305E9751003BA949 /* MSRUCodecFFmpeg in Frameworks */ = {isa = PBXBuildFile; productRef = 404EA14D305E9751003BA949 /* MSRUCodecFFmpeg */; };
+		404EA153305E9777003BA949 /* AppFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 404EA152305E9777003BA949 /* AppFoundation */; };
+		404EA155305E9777003BA949 /* AppFoundationUI in Frameworks */ = {isa = PBXBuildFile; productRef = 404EA154305E9777003BA949 /* AppFoundationUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -71,9 +72,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				404E9F84305D9AEF003BA949 /* MSRUCodecFFmpeg in Frameworks */,
-				404E9F95305DA24F003BA949 /* MSRUCodecFFmpeg in Frameworks */,
 				404EA147305E8362003BA949 /* AppFoundation in Frameworks */,
+				404EA155305E9777003BA949 /* AppFoundationUI in Frameworks */,
+				404EA14E305E9751003BA949 /* MSRUCodecFFmpeg in Frameworks */,
+				404EA153305E9777003BA949 /* AppFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -94,12 +96,20 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		404EA14A305E96CF003BA949 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		40F5DDEF3057009E00CA46B2 = {
 			isa = PBXGroup;
 			children = (
 				40F5DDFA3057009E00CA46B2 /* MSRU */,
 				40F5DE0A3057009F00CA46B2 /* MSRUTests */,
 				40F5DE143057009F00CA46B2 /* MSRUUITests */,
+				404EA14A305E96CF003BA949 /* Frameworks */,
 				40F5DDF93057009E00CA46B2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -134,9 +144,10 @@
 			);
 			name = MSRU;
 			packageProductDependencies = (
-				404E9F83305D9AEF003BA949 /* MSRUCodecFFmpeg */,
-				404E9F94305DA24F003BA949 /* MSRUCodecFFmpeg */,
 				404EA146305E8362003BA949 /* AppFoundation */,
+				404EA14D305E9751003BA949 /* MSRUCodecFFmpeg */,
+				404EA152305E9777003BA949 /* AppFoundation */,
+				404EA154305E9777003BA949 /* AppFoundationUI */,
 			);
 			productName = MSRU;
 			productReference = 40F5DDF83057009E00CA46B2 /* MSRU.app */;
@@ -222,7 +233,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				404E9F93305DA24F003BA949 /* XCLocalSwiftPackageReference "Packages/MSRUCodecFFmpeg" */,
-				404EA145305E8362003BA949 /* XCLocalSwiftPackageReference "Packages/AppFoundation" */,
+				404EA151305E9777003BA949 /* XCLocalSwiftPackageReference "Packages/AppFoundation" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 40F5DDF93057009E00CA46B2 /* Products */;
@@ -457,10 +468,10 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.msru.cn.MSRU;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -474,7 +485,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				XROS_DEPLOYMENT_TARGET = 26.5;
+				XROS_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Debug;
 		};
@@ -517,10 +528,10 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.msru.cn.MSRU;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -534,7 +545,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				XROS_DEPLOYMENT_TARGET = 26.5;
+				XROS_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Release;
 		};
@@ -547,8 +558,8 @@
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = J8NX4X6YZZ;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.msru.cn.MSRUTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -561,7 +572,7 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MSRU.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/MSRU";
-				XROS_DEPLOYMENT_TARGET = 26.5;
+				XROS_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Debug;
 		};
@@ -574,8 +585,8 @@
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = J8NX4X6YZZ;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.msru.cn.MSRUTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -588,7 +599,7 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MSRU.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/MSRU";
-				XROS_DEPLOYMENT_TARGET = 26.5;
+				XROS_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Release;
 		};
@@ -600,8 +611,8 @@
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = J8NX4X6YZZ;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.msru.cn.MSRUUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -614,7 +625,7 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 				TEST_TARGET_NAME = MSRU;
-				XROS_DEPLOYMENT_TARGET = 26.5;
+				XROS_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Debug;
 		};
@@ -626,8 +637,8 @@
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = J8NX4X6YZZ;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.msru.cn.MSRUUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -640,7 +651,7 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 				TEST_TARGET_NAME = MSRU;
-				XROS_DEPLOYMENT_TARGET = 26.5;
+				XROS_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Release;
 		};
@@ -690,24 +701,29 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/MSRUCodecFFmpeg;
 		};
-		404EA145305E8362003BA949 /* XCLocalSwiftPackageReference "Packages/AppFoundation" */ = {
+		404EA151305E9777003BA949 /* XCLocalSwiftPackageReference "Packages/AppFoundation" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/AppFoundation;
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		404E9F83305D9AEF003BA949 /* MSRUCodecFFmpeg */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = MSRUCodecFFmpeg;
-		};
-		404E9F94305DA24F003BA949 /* MSRUCodecFFmpeg */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = MSRUCodecFFmpeg;
-		};
 		404EA146305E8362003BA949 /* AppFoundation */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AppFoundation;
+		};
+		404EA14D305E9751003BA949 /* MSRUCodecFFmpeg */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 404E9F93305DA24F003BA949 /* XCLocalSwiftPackageReference "Packages/MSRUCodecFFmpeg" */;
+			productName = MSRUCodecFFmpeg;
+		};
+		404EA152305E9777003BA949 /* AppFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppFoundation;
+		};
+		404EA154305E9777003BA949 /* AppFoundationUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppFoundationUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
