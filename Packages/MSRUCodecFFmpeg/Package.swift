@@ -9,7 +9,12 @@ let package = Package(
         "MSRUCodecFFmpeg",
 
     platforms: [
-        .macOS(.v15)
+        .macOS(
+            .v15
+        ),
+        .iOS(
+            .v18
+        )
     ],
 
     products: [
@@ -26,15 +31,20 @@ let package = Package(
     targets: [
 
         /*
-         我们自己构建的 FFmpeg Micro。
+         MSRU FFmpeg Micro
 
-         不是 .framework，
-         而是 static-library XCFramework。
+         Static-library XCFramework containing only
+         the FFmpeg components required by MSRU's
+         extended DTS / DCA audio pipeline.
 
-         因此：
-         - 不嵌入 App Frameworks
-         - 不存在 macOS shallow framework 问题
-         - 不携带完整 FFmpegKit dependency graph
+         Platforms:
+
+         - macOS arm64
+         - iOS arm64
+         - iOS Simulator arm64 + x86_64
+
+         This is deliberately not a complete FFmpeg
+         distribution and does not contain FFmpegKit.
          */
 
         .binaryTarget(
@@ -44,6 +54,11 @@ let package = Package(
                 "Vendor/MSRUFFmpegMicro.xcframework"
         ),
 
+
+        /*
+         C boundary between the public Swift codec
+         package and FFmpeg's C API.
+         */
 
         .target(
             name:
@@ -55,6 +70,10 @@ let package = Package(
                 "include"
         ),
 
+
+        /*
+         Swift-facing codec implementation.
+         */
 
         .target(
             name:

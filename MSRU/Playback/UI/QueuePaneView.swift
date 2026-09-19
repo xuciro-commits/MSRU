@@ -3,28 +3,45 @@
 //  MSRU
 //
 
+import Foundation
 import SwiftUI
 import Observation
 
-struct QueuePaneView: View {
+#if canImport(AppKit)
+import AppKit
+#elseif canImport(UIKit)
+import UIKit
+#endif
+
+
+struct QueuePaneView:
+    View {
 
     @Bindable var playback:
         PlaybackController
 
-    var body: some View {
+
+    var body:
+        some View {
 
         Group {
 
             switch playback.activeSource {
 
             case .local:
+
                 localQueue
 
+
             case .openverse:
+
                 openverseQueue
             }
         }
     }
+
+
+    // MARK: - Local Queue
 
     @ViewBuilder
     private var localQueue:
@@ -52,6 +69,7 @@ struct QueuePaneView: View {
                         )
                     }
                 }
+
 
                 if !playback
                     .upNextTracks
@@ -81,6 +99,9 @@ struct QueuePaneView: View {
             )
         }
     }
+
+
+    // MARK: - Openverse Queue
 
     @ViewBuilder
     private var openverseQueue:
@@ -112,6 +133,7 @@ struct QueuePaneView: View {
                     }
                 }
 
+
                 if !playback
                     .openverseUpNextTracks
                     .isEmpty {
@@ -141,6 +163,9 @@ struct QueuePaneView: View {
         }
     }
 
+
+    // MARK: - Empty
+
     private var emptyQueue:
         some View {
 
@@ -155,6 +180,9 @@ struct QueuePaneView: View {
         )
     }
 
+
+    // MARK: - Local Row
+
     private func localRow(
         _ track:
             LocalTrack,
@@ -163,34 +191,47 @@ struct QueuePaneView: View {
     ) -> some View {
 
         HStack(
-            spacing: 10
+            spacing:
+                10
         ) {
 
             localArtwork(
                 track
             )
 
+
             VStack(
-                alignment: .leading,
-                spacing: 2
+                alignment:
+                    .leading,
+                spacing:
+                    2
             ) {
 
                 Text(
                     track.title
                 )
-                .lineLimit(1)
+                .lineLimit(
+                    1
+                )
+
 
                 Text(
                     track.artist
                 )
-                .font(.caption)
+                .font(
+                    .caption
+                )
                 .foregroundStyle(
                     .secondary
                 )
-                .lineLimit(1)
+                .lineLimit(
+                    1
+                )
             }
 
+
             Spacer()
+
 
             if isCurrent {
 
@@ -202,13 +243,17 @@ struct QueuePaneView: View {
         )
         .onTapGesture {
 
-            playback.play(
-                track,
-                queue:
-                    playback.queue
-            )
+            playback
+                .play(
+                    track,
+                    queue:
+                        playback.queue
+                )
         }
     }
+
+
+    // MARK: - Openverse Row
 
     private func openverseRow(
         _ track:
@@ -218,7 +263,8 @@ struct QueuePaneView: View {
     ) -> some View {
 
         HStack(
-            spacing: 10
+            spacing:
+                10
         ) {
 
             AsyncImage(
@@ -241,35 +287,50 @@ struct QueuePaneView: View {
                 }
             }
             .frame(
-                width: 42,
-                height: 42
+                width:
+                    42,
+                height:
+                    42
             )
             .clipShape(
                 RoundedRectangle(
-                    cornerRadius: 7,
-                    style: .continuous
+                    cornerRadius:
+                        7,
+                    style:
+                        .continuous
                 )
             )
 
+
             VStack(
-                alignment: .leading,
-                spacing: 2
+                alignment:
+                    .leading,
+                spacing:
+                    2
             ) {
 
                 Text(
                     track.title
                 )
-                .lineLimit(2)
+                .lineLimit(
+                    2
+                )
+
 
                 HStack(
-                    spacing: 5
+                    spacing:
+                        5
                 ) {
 
                     Text(
                         track.creatorTitle
                     )
 
-                    Text("·")
+
+                    Text(
+                        "·"
+                    )
+
 
                     Text(
                         "OPENVERSE"
@@ -281,10 +342,14 @@ struct QueuePaneView: View {
                 .foregroundStyle(
                     .secondary
                 )
-                .lineLimit(1)
+                .lineLimit(
+                    1
+                )
             }
 
+
             Spacer()
+
 
             if isCurrent {
 
@@ -296,15 +361,19 @@ struct QueuePaneView: View {
         )
         .onTapGesture {
 
-            playback.play(
-                openverse:
-                    track,
-                queue:
-                    playback
-                        .openverseQueue
-            )
+            playback
+                .play(
+                    openverse:
+                        track,
+                    queue:
+                        playback
+                            .openverseQueue
+                )
         }
     }
+
+
+    // MARK: - Current Indicator
 
     @ViewBuilder
     private var currentIndicator:
@@ -332,6 +401,9 @@ struct QueuePaneView: View {
         }
     }
 
+
+    // MARK: - Local Artwork
+
     private func localArtwork(
         _ track:
             LocalTrack
@@ -340,17 +412,12 @@ struct QueuePaneView: View {
         Group {
 
             if let data =
-                track.artworkData,
-               let image =
-                NSImage(
-                    data: data
-                ) {
+                track.artworkData {
 
-                Image(
-                    nsImage: image
+                platformArtwork(
+                    data:
+                        data
                 )
-                .resizable()
-                .scaledToFill()
 
             } else {
 
@@ -358,16 +425,86 @@ struct QueuePaneView: View {
             }
         }
         .frame(
-            width: 42,
-            height: 42
+            width:
+                42,
+            height:
+                42
         )
         .clipShape(
             RoundedRectangle(
-                cornerRadius: 7,
-                style: .continuous
+                cornerRadius:
+                    7,
+                style:
+                    .continuous
             )
         )
     }
+
+
+    // MARK: - Platform Artwork Adapter
+
+    /*
+     SwiftUI owns the view API.
+
+     AppKit / UIKit are restricted to this tiny
+     platform decoding boundary.
+     */
+
+    @ViewBuilder
+    private func platformArtwork(
+        data:
+            Data
+    ) -> some View {
+
+#if canImport(AppKit)
+
+        if let image =
+            NSImage(
+                data:
+                    data
+            ) {
+
+            Image(
+                nsImage:
+                    image
+            )
+            .resizable()
+            .scaledToFill()
+
+        } else {
+
+            queuePlaceholder
+        }
+
+#elseif canImport(UIKit)
+
+        if let image =
+            UIImage(
+                data:
+                    data
+            ) {
+
+            Image(
+                uiImage:
+                    image
+            )
+            .resizable()
+            .scaledToFill()
+
+        } else {
+
+            queuePlaceholder
+        }
+
+#else
+
+        queuePlaceholder
+
+#endif
+    }
+
+
+    // MARK: - Placeholder
 
     private var queuePlaceholder:
         some View {
@@ -378,6 +515,7 @@ struct QueuePaneView: View {
                 .fill(
                     .quaternary
                 )
+
 
             Image(
                 systemName:
@@ -390,6 +528,7 @@ struct QueuePaneView: View {
     }
 }
 
+
 #Preview {
 
     QueuePaneView(
@@ -397,7 +536,9 @@ struct QueuePaneView: View {
             PlaybackController()
     )
     .frame(
-        width: 340,
-        height: 700
+        width:
+            340,
+        height:
+            700
     )
 }
