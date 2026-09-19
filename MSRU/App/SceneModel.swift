@@ -12,27 +12,18 @@ import Observation
 /*
  一个 SceneModel 对应一个 Window / Scene。
 
- 多窗口时：
+ Application Scope 负责共享资源。
 
- ApplicationModel
- ├── SceneModel A
- ├── SceneModel B
- └── SceneModel C
+ Scene Scope 负责：
 
- 三个 Scene 共享：
+ - Identity
+ - Navigation
+ - Selection
+ - Presentation
+ - Feature runtime
 
- - LibraryStore
- - PlaybackController
- - Catalog
- - Provider registry
- - Dependencies
-
- 但拥有独立：
-
- - Navigation / selection
- - presentation
- - Feature State
- - Feature Tasks
+ Restoration 只恢复语义状态，
+ 不恢复 Runtime object graph。
  */
 
 @MainActor
@@ -43,7 +34,7 @@ final class SceneModel:
     // MARK: - Identity
 
     let id:
-        UUID
+        SceneID
 
 
     // MARK: - Application
@@ -54,12 +45,21 @@ final class SceneModel:
 
     // MARK: - Navigation
 
-    var selectedSection:
-        SidebarSection? =
-            .listenNow
+    let navigation:
+        SceneNavigation
 
 
     // MARK: - Selection
+
+    /*
+     Selection != Navigation。
+
+     这些仍然只是 Feature / Page
+     当前选择的 runtime state。
+
+     当前没有真实 detail route，
+     所以暂不进入 Restoration Contract。
+     */
 
     var selectedMusicContent:
         MusicContent?
@@ -71,8 +71,8 @@ final class SceneModel:
 
     // MARK: - Presentation
 
-    var isQueuePresented =
-        true
+    var isQueuePresented:
+        Bool
 
 
     // MARK: - Features
@@ -85,13 +85,17 @@ final class SceneModel:
         FeatureHost<LibraryFeature>
 
 
-    // MARK: - Init
+    // MARK: - New Scene
 
     init(
         id:
-            UUID = UUID(),
+            SceneID = SceneID(),
         application:
-            ApplicationModel
+            ApplicationModel,
+        section:
+            SceneSection = .listenNow,
+        isQueuePresented:
+            Bool = true
     ) {
 
         self.id =
@@ -102,19 +106,18 @@ final class SceneModel:
             application
 
 
-        /*
-         每个 Scene 拥有自己的 FeatureHost。
+        self.navigation =
+            SceneNavigation(
+                section:
+                    section
+            )
 
-         所以：
 
-         Browse query / loading / task
-         Library pending-removal state
+        self.isQueuePresented =
+            isQueuePresented
 
-         都不会跨 Window 相互污染。
 
-         Service 依赖的 Library / Playback
-         仍然来自共享的 Application scope。
-         */
+        // MARK: Feature Scope
 
         self.browse =
             withDependencies(
@@ -140,5 +143,59 @@ final class SceneModel:
                             .Service()
                 )
             }
+    }
+
+
+    // MARK: - Restored Scene
+
+    /*
+     不支持的 Snapshot version
+     必须由调用者决定 fallback 行为。
+
+     Core 不偷偷降级或猜测旧格式。
+     */
+
+    convenience init?(
+        application:
+            ApplicationModel,
+        restoration:
+            SceneRestorationSnapshot
+    ) {
+
+        guard
+            restoration.isSupported
+        else {
+
+            return nil
+        }
+
+
+        self.init(
+            id:
+                restoration.sceneID,
+            application:
+                application,
+            section:
+                restoration.section,
+            isQueuePresented:
+                restoration.isQueuePresented
+        )
+    }
+
+
+    // MARK: - Snapshot
+
+    func restorationSnapshot()
+        -> SceneRestorationSnapshot {
+
+        SceneRestorationSnapshot(
+            sceneID:
+                id,
+            section:
+                navigation
+                    .section,
+            isQueuePresented:
+                isQueuePresented
+        )
     }
 }

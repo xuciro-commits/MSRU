@@ -1,33 +1,26 @@
 //
-//  SidebarSection.swift
+//  SceneSection+Sidebar.swift
 //  MSRU
 //
 
 import Foundation
 
 
-enum SidebarSection:
-    String,
-    CaseIterable,
-    Identifiable,
-    Hashable {
+// MARK: - Sidebar Presentation
 
-    case listenNow
-    case browse
-    case radio
+/*
+ SceneSection 本身只表达语义。
 
-    case library
-    case addMusic
+ 这里才定义它在当前 Sidebar UI 中
+ 如何被展示和分组。
+ */
 
-    case settings
+@MainActor
+extension SceneSection {
 
+    var title:
+        String {
 
-    var id: Self {
-        self
-    }
-
-
-    var title: String {
         switch self {
 
         case .listenNow:
@@ -51,7 +44,9 @@ enum SidebarSection:
     }
 
 
-    var systemImage: String {
+    var systemImage:
+        String {
+
         switch self {
 
         case .listenNow:
@@ -75,17 +70,19 @@ enum SidebarSection:
     }
 
 
-    // MARK: - Groups
+    static let discoverSections:
+        [SceneSection] = [
 
-    static let discoverSections: [SidebarSection] = [
-        .listenNow,
-        .browse,
-        .radio
-    ]
+            .listenNow,
+            .browse,
+            .radio
+        ]
 
 
-    static let librarySections: [SidebarSection] = [
-        .library,
-        .addMusic
-    ]
+    static let librarySections:
+        [SceneSection] = [
+
+            .library,
+            .addMusic
+        ]
 }

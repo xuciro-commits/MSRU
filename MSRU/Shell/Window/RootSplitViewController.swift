@@ -196,8 +196,10 @@ final class RootSplitViewController:
 
                             self?
                                 .scene
-                                .selectedSection =
-                                .settings
+                                .navigation
+                                .select(
+                                    .settings
+                                )
                         }
                     )
             )

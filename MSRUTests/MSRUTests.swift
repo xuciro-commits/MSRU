@@ -847,23 +847,26 @@ struct MSRUTests {
 
 
         #expect(
-            sceneA.selectedSection
+            sceneA.navigation.section
             == .listenNow
         )
 
 
         #expect(
-            sceneB.selectedSection
+            sceneB.navigation.section
             == .listenNow
         )
 
 
-        sceneA.selectedSection =
-            .browse
+        sceneA
+            .navigation
+            .select(
+                .browse
+            )
 
 
         #expect(
-            sceneA.selectedSection
+            sceneA.navigation.section
             == .browse
         )
 
@@ -874,7 +877,7 @@ struct MSRUTests {
          */
 
         #expect(
-            sceneB.selectedSection
+            sceneB.navigation.section
             == .listenNow
         )
 

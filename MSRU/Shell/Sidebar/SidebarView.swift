@@ -6,13 +6,16 @@
 import SwiftUI
 
 
-struct SidebarView: View {
+struct SidebarView:
+    View {
 
-    @Binding var selection:
-        SidebarSection?
+    @Binding
+    var selection:
+        SceneSection?
 
 
-    var body: some View {
+    var body:
+        some View {
 
         List(
             selection:
@@ -24,16 +27,19 @@ struct SidebarView: View {
             ) {
 
                 ForEach(
-                    SidebarSection
+                    SceneSection
                         .discoverSections
-                ) { section in
+                ) {
+                    section in
 
                     Label(
                         section.title,
                         systemImage:
                             section.systemImage
                     )
-                    .tag(section)
+                    .tag(
+                        section
+                    )
                 }
             }
 
@@ -43,16 +49,19 @@ struct SidebarView: View {
             ) {
 
                 ForEach(
-                    SidebarSection
+                    SceneSection
                         .librarySections
-                ) { section in
+                ) {
+                    section in
 
                     Label(
                         section.title,
                         systemImage:
                             section.systemImage
                     )
-                    .tag(section)
+                    .tag(
+                        section
+                    )
                 }
             }
         }
@@ -63,7 +72,10 @@ struct SidebarView: View {
 }
 
 
+// MARK: - Preview
+
 #Preview {
+
     SidebarView(
         selection:
             .constant(
@@ -71,7 +83,9 @@ struct SidebarView: View {
             )
     )
     .frame(
-        width: 220,
-        height: 600
+        width:
+            220,
+        height:
+            600
     )
 }

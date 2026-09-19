@@ -95,8 +95,9 @@ struct MainContentView:
         some View {
 
         switch
-            scene.selectedSection
-            ?? .listenNow {
+            scene
+                .navigation
+                .section {
 
         // MARK: Listen Now
 
@@ -161,8 +162,10 @@ struct MainContentView:
                 onAddMusic: {
 
                     scene
-                        .selectedSection =
-                        .addMusic
+                        .navigation
+                        .select(
+                            .addMusic
+                        )
                 }
             )
 
@@ -181,8 +184,10 @@ struct MainContentView:
                 onOpenLibrary: {
 
                     scene
-                        .selectedSection =
-                        .library
+                        .navigation
+                        .select(
+                            .library
+                        )
                 }
             )
 
