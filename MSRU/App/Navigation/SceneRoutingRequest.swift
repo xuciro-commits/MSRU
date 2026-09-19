@@ -2,7 +2,44 @@
 //  SceneRoutingRequest.swift
 //  MSRU
 //
-//  Created by 许强 on 9/19/26.
-//
 
-import Foundation
+
+// MARK: - Scene Routing Request
+
+/*
+ Route:
+
+ “去哪里”
+
+ Target:
+
+ “在哪个 Scene 中打开”
+ */
+
+nonisolated struct SceneRoutingRequest:
+    Equatable,
+    Sendable {
+
+    let route:
+        SceneRoute
+
+
+    let target:
+        SceneRoutingTarget
+
+
+    init(
+        route:
+            SceneRoute,
+        target:
+            SceneRoutingTarget = .activeOrNew
+    ) {
+
+        self.route =
+            route
+
+
+        self.target =
+            target
+    }
+}

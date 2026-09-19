@@ -10,24 +10,21 @@ import AppKit
 
 // MARK: - macOS Scene Coordinator
 
-/*
- MacSceneCoordinator 是 macOS 平台层的
- Scene orchestration owner。
-
- 它管理：
-
- Application Scope
-        │
-        ├── Scene A -> Window A
-        ├── Scene B -> Window B
-        └── Scene C -> Window C
-
- Coordinator 不知道具体 Window
- 是 NSWindowController 还是测试 Double。
- */
-
 @MainActor
 final class MacSceneCoordinator {
+
+    // MARK: - Runtime
+
+    private struct Runtime {
+
+        let scene:
+            SceneModel
+
+
+        let window:
+            any MacSceneWindow
+    }
+
 
     // MARK: - Application
 
@@ -49,10 +46,10 @@ final class MacSceneCoordinator {
 
     // MARK: - Registry
 
-    private var windows:
+    private var runtimes:
         [
             SceneID:
-                any MacSceneWindow
+                Runtime
         ] = [:]
 
 
@@ -115,14 +112,27 @@ final class MacSceneCoordinator {
     // MARK: - New Scene
 
     @discardableResult
-    func openNewScene()
-        -> SceneID {
+    func openNewScene(
+        route:
+            SceneRoute? = nil
+    ) -> SceneID {
 
         let scene =
             SceneModel(
                 application:
                     application
             )
+
+
+        if let route {
+
+            scene
+                .send(
+                    .navigate(
+                        route
+                    )
+                )
+        }
 
 
         restorationStore
@@ -143,6 +153,153 @@ final class MacSceneCoordinator {
     }
 
 
+    // MARK: - Scene Routing
+
+    /*
+     Platform / External Intent
+              ↓
+       SceneRoutingRequest
+              ↓
+       Coordinator policy
+              ↓
+         SceneCommand
+     */
+
+    @discardableResult
+    func route(
+        _ request:
+            SceneRoutingRequest
+    ) -> SceneID? {
+
+        switch request.target {
+
+        case .activeOrNew:
+
+            if let activeSceneID {
+
+                return
+                    route(
+                        request.route,
+                        to:
+                            activeSceneID
+                    )
+            }
+
+
+            if let existingSceneID =
+                runtimes
+                    .keys
+                    .first {
+
+                return
+                    route(
+                        request.route,
+                        to:
+                            existingSceneID
+                    )
+            }
+
+
+            return
+                openNewScene(
+                    route:
+                        request.route
+                )
+
+
+        case .new:
+
+            return
+                openNewScene(
+                    route:
+                        request.route
+                )
+
+
+        case .scene(
+            let sceneID
+        ):
+
+            return
+                route(
+                    request.route,
+                    to:
+                        sceneID
+                )
+        }
+    }
+
+
+    // MARK: - Route Existing Scene
+
+    private func route(
+        _ route:
+            SceneRoute,
+        to sceneID:
+            SceneID
+    ) -> SceneID? {
+
+        guard
+            let runtime =
+                runtimes[
+                    sceneID
+                ]
+        else {
+
+            return nil
+        }
+
+
+        runtime
+            .scene
+            .send(
+                .navigate(
+                    route
+                )
+            )
+
+
+        /*
+         External routing 是 coordinator-owned mutation，
+         所以立即更新 semantic snapshot。
+
+         Live Window observation 仍然存在，
+         两层并不冲突。
+         */
+
+        restorationStore
+            .save(
+                runtime
+                    .scene
+                    .restorationSnapshot()
+            )
+
+
+        runtime
+            .window
+            .activate()
+
+
+        return
+            sceneID
+    }
+
+
+    // MARK: - Active Scene
+
+    private var activeSceneID:
+        SceneID? {
+
+        runtimes
+            .first {
+                $0.value
+                    .window
+                    .isActive
+            }?
+            .key
+    }
+
+
     // MARK: - Activate
 
     @discardableResult
@@ -152,8 +309,8 @@ final class MacSceneCoordinator {
     ) -> Bool {
 
         guard
-            let window =
-                windows[
+            let runtime =
+                runtimes[
                     sceneID
                 ]
         else {
@@ -162,7 +319,8 @@ final class MacSceneCoordinator {
         }
 
 
-        window
+        runtime
+            .window
             .activate()
 
 
@@ -174,13 +332,25 @@ final class MacSceneCoordinator {
 
     func reopen() {
 
-        if let window =
-            windows
-                .values
+        if let activeSceneID {
+
+            activateScene(
+                activeSceneID
+            )
+
+
+            return
+        }
+
+
+        if let sceneID =
+            runtimes
+                .keys
                 .first {
 
-            window
-                .activate()
+            activateScene(
+                sceneID
+            )
 
 
             return
@@ -195,12 +365,13 @@ final class MacSceneCoordinator {
 
     func saveScenes() {
 
-        for window
-        in windows.values {
+        for runtime
+        in runtimes.values {
 
             restorationStore
                 .save(
-                    window
+                    runtime
+                        .window
                         .restorationSnapshot()
                 )
         }
@@ -253,15 +424,7 @@ final class MacSceneCoordinator {
         }
 
 
-        /*
-         Store 中可能存在数据，
-         但全部因为版本或数据问题
-         无法恢复。
-
-         App 仍然必须拥有至少一个 Scene。
-         */
-
-        if windows
+        if runtimes
             .isEmpty {
 
             openNewScene()
@@ -275,11 +438,6 @@ final class MacSceneCoordinator {
         for scene:
             SceneModel
     ) {
-
-        /*
-         同一个 SceneID 永远只能对应
-         一个 active Window runtime。
-         */
 
         if activateScene(
             scene.id
@@ -316,10 +474,15 @@ final class MacSceneCoordinator {
                 )
 
 
-        windows[
+        runtimes[
             scene.id
         ] =
-            window
+            Runtime(
+                scene:
+                    scene,
+                window:
+                    window
+            )
 
 
         window
@@ -341,7 +504,7 @@ final class MacSceneCoordinator {
             )
 
 
-        windows[
+        runtimes[
             sceneID
         ] =
             nil

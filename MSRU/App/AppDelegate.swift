@@ -15,16 +15,32 @@ final class AppDelegate:
 
     // MARK: - Platform Composition
 
-    /*
-     AppDelegate 只是 macOS lifecycle
-     与 Application Commands 的 adapter。
-
-     Window / Scene orchestration
-     全部交给 MacSceneCoordinator。
-     */
-
     private let sceneCoordinator:
         MacSceneCoordinator
+
+
+    // MARK: - External Routing
+
+    private let routeCodec =
+        SceneRouteURLCodec(
+            scheme:
+                "msru"
+        )
+
+
+    /*
+     macOS 可能在 Application launch
+     完成之前交付 URL。
+
+     所以 External Intent 必须允许 buffering。
+     */
+
+    private var pendingExternalRoutes:
+        [SceneRoute] = []
+
+
+    private var hasStarted =
+        false
 
 
     // MARK: - Init
@@ -69,20 +85,17 @@ final class AppDelegate:
 
         sceneCoordinator
             .start()
+
+
+        hasStarted =
+            true
+
+
+        flushPendingExternalRoutes()
     }
 
 
-    // MARK: - Commands
-
-    /*
-     File -> New Window
-     Command-N
-
-     AppDelegate 只转发平台 Command。
-
-     真正的 Scene creation contract
-     在 MacSceneCoordinator。
-     */
+    // MARK: - New Window
 
     func openNewScene() {
 
@@ -96,6 +109,100 @@ final class AppDelegate:
 
         sceneCoordinator
             .openNewScene()
+    }
+
+
+    // MARK: - External URL
+
+    func application(
+        _ application:
+            NSApplication,
+        open urls:
+            [URL]
+    ) {
+
+        guard
+            !isRunningForPreviews
+        else {
+
+            return
+        }
+
+
+        let routes =
+            urls
+                .compactMap {
+                    routeCodec
+                        .decode(
+                            $0
+                        )
+                }
+
+
+        guard
+            hasStarted
+        else {
+
+            pendingExternalRoutes
+                .append(
+                    contentsOf:
+                        routes
+                )
+
+
+            return
+        }
+
+
+        route(
+            routes
+        )
+    }
+
+
+    private func flushPendingExternalRoutes() {
+
+        guard
+            !pendingExternalRoutes
+                .isEmpty
+        else {
+
+            return
+        }
+
+
+        let routes =
+            pendingExternalRoutes
+
+
+        pendingExternalRoutes
+            .removeAll()
+
+
+        route(
+            routes
+        )
+    }
+
+
+    private func route(
+        _ routes:
+            [SceneRoute]
+    ) {
+
+        for route
+        in routes {
+
+            sceneCoordinator
+                .route(
+                    SceneRoutingRequest(
+                        route:
+                            route,
+                        target:
+                            .activeOrNew
+                    )
+                )
+        }
     }
 
 

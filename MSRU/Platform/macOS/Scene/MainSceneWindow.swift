@@ -20,7 +20,7 @@ final class MainSceneWindow:
         SceneID
 
 
-    // MARK: - Runtime
+    // MARK: - Controller
 
     private let controller:
         MainWindowController
@@ -54,6 +54,19 @@ final class MainSceneWindow:
                 onSceneClosed:
                     onSceneClosed
             )
+    }
+
+
+    // MARK: - State
+
+    var isActive:
+        Bool {
+
+        controller
+            .window?
+            .isKeyWindow
+        ??
+        false
     }
 
 

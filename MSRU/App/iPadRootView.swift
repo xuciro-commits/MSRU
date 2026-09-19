@@ -12,15 +12,21 @@ struct iPadRootView:
         ApplicationModel
 
 
+    // MARK: - External Routing
+
+    private let routeCodec =
+        SceneRouteURLCodec(
+            scheme:
+                "msru"
+        )
+
+
+    @State
+    private var pendingRoute:
+        SceneRoute?
+
+
     // MARK: - Platform Restoration
-
-    /*
-     @SceneStorage 本身就是 per-scene。
-
-     这里只保存轻量 JSON String。
-
-     Runtime object graph 不进入 SceneStorage。
-     */
 
     @SceneStorage(
         "MSRU.Scene.RestorationSnapshot"
@@ -70,6 +76,13 @@ struct iPadRootView:
                     }
             }
         }
+        .onOpenURL {
+            url in
+
+            handleExternalURL(
+                url
+            )
+        }
     }
 
 
@@ -118,6 +131,51 @@ struct iPadRootView:
     }
 
 
+    // MARK: - External URL
+
+    @MainActor
+    private func handleExternalURL(
+        _ url:
+            URL
+    ) {
+
+        guard
+            let route =
+                routeCodec
+                    .decode(
+                        url
+                    )
+        else {
+
+            return
+        }
+
+
+        guard
+            let scene
+        else {
+
+            pendingRoute =
+                route
+
+            return
+        }
+
+
+        scene
+            .send(
+                .navigate(
+                    route
+                )
+            )
+
+
+        persist(
+            scene
+        )
+    }
+
+
     // MARK: - Bootstrap
 
     @MainActor
@@ -129,6 +187,10 @@ struct iPadRootView:
 
             return
         }
+
+
+        let resolvedScene:
+            SceneModel
 
 
         if let restorationJSON,
@@ -153,27 +215,40 @@ struct iPadRootView:
                     snapshot
             ) {
 
-            scene =
+            resolvedScene =
                 restoredScene
 
+        } else {
 
-            return
+            resolvedScene =
+                SceneModel(
+                    application:
+                        application
+                )
         }
 
 
-        let newScene =
-            SceneModel(
-                application:
-                    application
-            )
+        if let pendingRoute {
+
+            resolvedScene
+                .send(
+                    .navigate(
+                        pendingRoute
+                    )
+                )
+
+
+            self.pendingRoute =
+                nil
+        }
 
 
         scene =
-            newScene
+            resolvedScene
 
 
         persist(
-            newScene
+            resolvedScene
         )
     }
 
