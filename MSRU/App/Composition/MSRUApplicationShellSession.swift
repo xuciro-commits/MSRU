@@ -3,6 +3,7 @@
 //  MSRU
 //
 
+import Foundation
 import AppFoundationUI
 
 
@@ -38,6 +39,9 @@ final class MSRUApplicationShellSession {
     private var toggleQueueAction:
         () -> Void = {}
 
+    private var revealInFinderAction:
+        (URL) -> Void = { _ in }
+
 
     // MARK: - Init
 
@@ -66,11 +70,16 @@ final class MSRUApplicationShellSession {
 
     func installShellActions(
         toggleQueue:
-            @escaping () -> Void
+            @escaping () -> Void,
+        revealInFinder:
+            @escaping (URL) -> Void = { _ in }
     ) {
 
         toggleQueueAction =
             toggleQueue
+
+        revealInFinderAction =
+            revealInFinder
     }
 
 
@@ -108,6 +117,15 @@ final class MSRUApplicationShellSession {
 
                         self?
                             .toggleQueueAction()
+                    },
+                    revealInFinder: {
+                        [weak self]
+                        url in
+
+                        self?
+                            .revealInFinderAction(
+                                url
+                            )
                     }
                 )
         )

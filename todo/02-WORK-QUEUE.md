@@ -24,6 +24,7 @@
 | 4 | 已完成：App 和测试 target 使用 Swift 6 | Debug/Release 配置已更新；纯 URL command 转换显式 nonisolated；macOS 测试通过 |
 | 5 | 进行中：双平台 Shell 与搜索同步已实现 | ExperienceBlueprint / 图册；构建与状态测试通过，原生焦点测试通过，紧凑布局视觉待验收 |
 | 6 | 进行中：收藏事务、重启和播放入口已实现 | 图册；保存失败、并发、重启、混合队列测试通过，真实媒体待验收 |
+| 7 | 已完成：曲目属性检查器 (Track Inspector) 与上下文面板切换 | 图册 1.2 / 9.1；单元测试、Preview 门禁与架构检查全部通过 |
 
 具体文件和迁移范围见 [迁移路线](../Docs/Roadmap/FoundationRoadmap.md)。不要把本表与该路线维护成两套详细任务拆解。
 
@@ -46,20 +47,21 @@
 | 能力 | 实现与验证范围 |
 |---|---|
 | 目录与旧代码 | App / Features / Music / Platform / Shared / PreviewSupport 已落地；旧窗口、实验页、兼容转发及无调用者的诊断/健康/错误定义已删除。封面解码集中到 Platform，Feature 不再直接导入 AppKit/UIKit。 |
-| Preview | 33 个直接 View/Representable 有同文件 Preview，使用隔离数据与依赖；包含空、有内容、混合队列及窄布局。门禁识别后置协议、extension、枚举，过滤注释和字符串；间接协议仍需代码审查。 |
+| Preview | 36 个直接 View/Representable 有同文件 Preview，使用隔离数据与依赖；包含空、有内容、混合队列、检查器及窄布局。门禁识别后置协议、extension、枚举，过滤注释和字符串；间接协议仍需代码审查。 |
 | 生命周期 | token 撤销、场景关闭身份检查、迟到结果失效有可控时序测试；恢复逐条容错并备份损坏原文。真实 NSWindow 与进程级退出恢复分别验证。 |
 | Shell | App/测试采用 Swift 6；两种 Shell 共享语义，Browse 保留一个搜索入口；原生搜索保持控件身份、enabled 和 first responder。 |
+| Inspector & Context | 支持右侧 Context 区域 `[曲目详情] [队列]` 双面板切换。选中本地/曲库曲目时自动展现 Track Inspector，展示封面、标题、艺术家、专辑、时长、音频格式、文件大小、路径，并支持播放、下一首、队列、收藏和「在访达中显示」。架构无跨界 import，全 Preview 隔离覆盖，新增 TrackInspectorTests 4 项测试全部通过。 |
 | 数据 | 收藏先提交后发布；扫描、导入与收藏写入按序执行。失败、并发、路径别名、同名文件及重启恢复有回归测试。 |
 | 播放 | 混合队列保留重复实例；真实静音 AVPlayer 顺播两个 WAV，核对媒体时钟与队列终态。AVPlayer/PCM 失败清理、旧回调隔离和保留队列重试有测试。 |
 | FFmpeg | 构建暂存、互斥与发布回滚经过失败探针；完整重建 macOS/iOS/visionOS 切片，两个模拟器均含 arm64+x86_64。visionOS UI API 差异已适配。 |
 
 验证基线：
 
-- 应用：最近全量 **108 项通过**，使用 `MSRU-UnitTests` scheme；包含旧定义删除及 PCM 失败修复。
+- 应用：最近全量 **113 项通过**（原 109 项 + 4 项 Inspector 状态机测试），使用 `MSRU-UnitTests` scheme；包含旧定义删除及 PCM 失败修复。
 - 框架：最近 **53 项通过**（37 UI + 16 Core），包含 SwiftUI Shell 的平台适配。
 - 构建：PCM 清理与旧定义删除后的当前代码已复验，visionOS 真机／模拟器和 iOS Simulator 均编译链接通过；关闭签名，不代表设备安装运行验收。
 - UI：开发签名 Runner 的 **2 项通过**，验证前台启动、实际 Cmd+Q／重启、保留打开窗口并排除手动关闭窗口。使用独立恢复域与稳定 scene ID；后续播放改动及旧定义删除后已重新运行并通过。
-- 门禁：架构、Preview、diff 检查通过；入口链接须在修改后继续检查。源码检查不能替代渲染或运行时验收。
+- 门禁：架构（0 违规）、Preview（36 个全部覆盖）、diff 检查通过；入口链接须在修改后继续检查。源码检查不能替代渲染或运行时验收。
 
 ## 尚未完成的验收
 

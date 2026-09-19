@@ -388,6 +388,15 @@ struct LocalLibraryView: View {
                 .tertiary
             )
         }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(selectedTrack?.id == track.id ? Color.accentColor.opacity(0.12) : Color.clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(selectedTrack?.id == track.id ? Color.accentColor.opacity(0.4) : Color.clear, lineWidth: 1.5)
+        )
         .contentShape(
             Rectangle()
         )

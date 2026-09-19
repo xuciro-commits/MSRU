@@ -24,6 +24,9 @@ struct MSRUApplicationShellContext {
 
         let toggleQueue:
             () -> Void
+
+        let revealInFinder:
+            (URL) -> Void
     }
 }
 
@@ -35,8 +38,8 @@ enum MSRUApplicationShellPresentation {
 
     private enum ID {
 
-        static let playbackQueue =
-            "playback.queue"
+        static let contextSurface =
+            "msru.context"
 
         static let miniPlayer =
             "playback.mini-player"
@@ -48,25 +51,26 @@ enum MSRUApplicationShellPresentation {
 
     // MARK: - Context
 
-    static let playbackQueue =
+    static let contextSurface =
         ContextPresentation<
             MSRUApplicationShellContext
         >(
             id:
-                ID.playbackQueue,
+                ID.contextSurface,
             role:
-                .activity
+                .inspector
         ) {
             context in
 
-            QueuePaneView(
-                playback:
+            MSRUContextPaneView(
+                scene:
                     context
-                        .scene
-                        .application
-                        .playback
+                        .scene,
+                onRevealInFinder:
+                    context
+                        .actions
+                        .revealInFinder
             )
-
         }
 
 
@@ -134,7 +138,7 @@ enum MSRUApplicationShellPresentation {
         >(
             contexts:
                 [
-                    playbackQueue
+                    contextSurface
                 ],
             accessories:
                 [

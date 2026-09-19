@@ -81,7 +81,10 @@ private struct LibraryFeatureDestination:
             playback:
                 scene.application.playback,
             selectedLocalTrack:
-                $scene.selectedLocalTrack,
+                Binding(
+                    get: { scene.selectedLocalTrack },
+                    set: { scene.select(localTrack: $0) }
+                ),
             onAddMusic: {
 
                 scene.send(

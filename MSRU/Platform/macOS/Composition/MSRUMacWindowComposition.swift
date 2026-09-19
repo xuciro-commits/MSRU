@@ -164,27 +164,24 @@ final class MSRUMacWindowComposition {
                                 resolve: {
                                     shell in
 
-                                    let activities =
+                                    let contexts =
                                         shell
-                                            .applicationContexts(
-                                                role:
-                                                    .activity
-                                            )
+                                            .applicationContexts
 
 
                                     precondition(
-                                        activities.count
+                                        contexts.count
                                         ==
                                         1,
                                         """
                                         MSRU expects exactly one
-                                        application activity context.
+                                        application context.
                                         """
                                     )
 
 
                                     return
-                                        activities
+                                        contexts
                                             .first
                                 }
                             ),
@@ -245,6 +242,14 @@ final class MSRUMacWindowComposition {
 
                 shellRenderer?
                     .toggleContextPresentation()
+            },
+            revealInFinder: {
+                url in
+
+                PlatformFileViewer
+                    .revealInFinder(
+                        url: url
+                    )
             }
         )
 
@@ -293,40 +298,6 @@ final class MSRUMacWindowComposition {
                     .bottom
             )
 
-
-        // ----------------------------------------------------
-        // Product-specific Context Chrome
-        // ----------------------------------------------------
-
-        let queueHeader =
-            MacSplitAccessoryHostingController(
-                rootView:
-                    QueueHeaderView(
-                        onClear: {
-                            [weak scene]
-                            in
-
-                            scene?
-                                .application
-                                .playback
-                                .clearUpcoming()
-                        }
-                    )
-                    .background(
-                        Color.clear
-                    )
-            )
-
-
-        shellRenderer
-            .splitController
-            .addAccessory(
-                queueHeader,
-                to:
-                    .context,
-                edge:
-                    .top
-            )
 
 
         // ----------------------------------------------------
@@ -387,6 +358,7 @@ final class MSRUMacWindowComposition {
             // Resolving also observes query text and enabled predicates on this route.
             _ = session.resolve()
             _ = scene.isQueuePresented
+            _ = scene.activeContextPane
 
         } onChange: {
             [weak self]

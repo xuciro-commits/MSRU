@@ -74,8 +74,55 @@ final class SceneModel:
 
     // MARK: - Presentation
 
+    enum ContextPane: String, CaseIterable, Identifiable, Codable, Sendable {
+        case inspector
+        case queue
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .inspector: return "Details"
+            case .queue: return "Queue"
+            }
+        }
+    }
+
+    var activeContextPane: ContextPane = .inspector
+
     var isQueuePresented:
         Bool
+
+    func select(localTrack: LocalTrack?) {
+        self.selectedLocalTrack = localTrack
+        if localTrack != nil {
+            self.selectedMusicContent = nil
+            self.activeContextPane = .inspector
+            self.isQueuePresented = true
+        }
+    }
+
+    func select(musicContent: MusicContent?) {
+        self.selectedMusicContent = musicContent
+        if musicContent != nil {
+            self.selectedLocalTrack = nil
+            self.activeContextPane = .inspector
+            self.isQueuePresented = true
+        }
+    }
+
+    func toggleQueue() {
+        if isQueuePresented {
+            if activeContextPane == .queue {
+                isQueuePresented = false
+            } else {
+                activeContextPane = .queue
+            }
+        } else {
+            activeContextPane = .queue
+            isQueuePresented = true
+        }
+    }
 
 
     // MARK: - Features
