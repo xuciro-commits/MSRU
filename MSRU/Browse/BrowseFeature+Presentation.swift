@@ -3,8 +3,9 @@
 //  MSRU
 //
 
-import AppFoundationUI
 import SwiftUI
+
+import AppFoundationUI
 
 
 // MARK: - Application Presentation
@@ -16,34 +17,43 @@ extension BrowseFeature:
         SceneModel
 
 
-    @MainActor
     static var routeDestinations:
         [
             RouteDestination<
-                Route,
-                PresentationContext
+                SceneRoute,
+                SceneModel
             >
         ] {
 
         [
-
             RouteDestination(
                 id:
                     "browse",
                 route:
-                    SceneRoute
-                        .section(
-                            .browse
-                        )
-            ) {
-                scene in
+                    .section(
+                        .browse
+                    ),
+                workspace: {
+                    scene in
 
-                BrowseView(
-                    feature:
-                        scene
-                            .browse
-                )
-            }
+                    WorkspacePresentation(
+                        identity:
+                            WorkspaceIdentity(
+                                title:
+                                    "Browse",
+                                systemImage:
+                                    "square.grid.2x2"
+                            )
+                    ) {
+                        _ in
+
+                        BrowseView(
+                            feature:
+                                scene.browse
+                        )
+                    }
+                }
+            )
         ]
     }
 }

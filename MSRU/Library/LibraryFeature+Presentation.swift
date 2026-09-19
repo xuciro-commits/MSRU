@@ -3,10 +3,11 @@
 //  MSRU
 //
 
-import SwiftUI
 import Observation
-import AppFoundation
+import SwiftUI
+
 import AppFoundationUI
+import AppFoundation
 
 
 // MARK: - Application Presentation
@@ -18,33 +19,43 @@ extension LibraryFeature:
         SceneModel
 
 
-    @MainActor
     static var routeDestinations:
         [
             RouteDestination<
-                Route,
-                PresentationContext
+                SceneRoute,
+                SceneModel
             >
         ] {
 
         [
-
             RouteDestination(
                 id:
                     "library",
                 route:
-                    SceneRoute
-                        .section(
-                            .library
-                        )
-            ) {
-                scene in
+                    .section(
+                        .library
+                    ),
+                workspace: {
+                    scene in
 
-                LibraryFeatureDestination(
-                    scene:
-                        scene
-                )
-            }
+                    WorkspacePresentation(
+                        identity:
+                            WorkspaceIdentity(
+                                title:
+                                    "Library",
+                                systemImage:
+                                    "music.note.list"
+                            )
+                    ) {
+                        _ in
+
+                        LibraryFeatureDestination(
+                            scene:
+                                scene
+                        )
+                    }
+                }
+            )
         ]
     }
 }
@@ -55,8 +66,7 @@ extension LibraryFeature:
 private struct LibraryFeatureDestination:
     View {
 
-    @Bindable
-    var scene:
+    @Bindable var scene:
         SceneModel
 
 
@@ -65,29 +75,22 @@ private struct LibraryFeatureDestination:
 
         LibraryView(
             feature:
-                scene
-                    .libraryFeature,
+                scene.libraryFeature,
             localStore:
-                scene
-                    .application
-                    .localLibrary,
+                scene.application.localLibrary,
             playback:
-                scene
-                    .application
-                    .playback,
+                scene.application.playback,
             selectedLocalTrack:
-                $scene
-                    .selectedLocalTrack,
+                $scene.selectedLocalTrack,
             onAddMusic: {
 
-                scene
-                    .send(
-                        .navigate(
-                            .section(
-                                .addMusic
-                            )
+                scene.send(
+                    .navigate(
+                        .section(
+                            .addMusic
                         )
                     )
+                )
             }
         )
     }
