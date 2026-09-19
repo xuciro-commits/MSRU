@@ -1,4 +1,0 @@
-module AppFoundation {
-header "AppFoundation-Swift.h"
-export *
-}

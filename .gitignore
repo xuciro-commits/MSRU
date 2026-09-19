@@ -17,3 +17,7 @@ probe.md
 # MSRU FFmpeg Micro build workspace
 Packages/MSRUCodecFFmpeg/.build-ffmpeg/
 Packages/MSRUCodecFFmpeg/.build/
+
+# Swift Package Manager
+**/.build/
+**/.swiftpm/
