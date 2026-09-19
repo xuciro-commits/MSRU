@@ -6,6 +6,7 @@
 #if os(macOS)
 
 import Foundation
+import AppFoundation
 
 
 // MARK: - macOS Scene Restoration Store

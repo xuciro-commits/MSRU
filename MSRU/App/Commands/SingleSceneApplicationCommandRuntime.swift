@@ -1,3 +1,5 @@
+import AppFoundation
+
 //
 //  SingleSceneApplicationCommandRuntime.swift
 //  MSRU

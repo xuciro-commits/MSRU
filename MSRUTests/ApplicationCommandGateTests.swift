@@ -4,6 +4,7 @@
 //
 
 import Testing
+import AppFoundation
 
 @testable import MSRU
 

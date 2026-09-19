@@ -1,3 +1,5 @@
+import AppFoundation
+
 //
 //  MultiSceneApplicationCommandRuntime.swift
 //  MSRU

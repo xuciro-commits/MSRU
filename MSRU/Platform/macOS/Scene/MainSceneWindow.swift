@@ -6,6 +6,7 @@
 #if os(macOS)
 
 import AppKit
+import AppFoundation
 
 
 // MARK: - Main Scene Window

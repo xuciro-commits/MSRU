@@ -1,3 +1,5 @@
+import AppFoundation
+
 //
 //  ApplicationCommandResult.swift
 //  MSRU

@@ -1,3 +1,5 @@
+import AppFoundation
+
 //
 //  MacSceneWindow.swift
 //  MSRU

@@ -4,6 +4,7 @@
 //
 
 import Testing
+import AppFoundation
 
 @testable import MSRU
 
@@ -520,21 +521,20 @@ private let testRoute =
 
 // MARK: - Recording Scene Runtime
 
-@MainActor
 private final class RecordingApplicationSceneRuntime:
     ApplicationSceneRuntime {
 
     let id =
-        SceneID()
+        MSRU.SceneID()
 
 
     private(set) var commands:
-        [SceneCommand] = []
+        [MSRU.SceneCommand] = []
 
 
     func send(
         _ command:
-            SceneCommand
+            MSRU.SceneCommand
     ) {
 
         commands

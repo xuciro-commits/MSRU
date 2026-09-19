@@ -107,7 +107,7 @@ private enum PlaybackDependencyKey:
             PlaybackController dependency is not configured.
 
             Create the application-scoped PlaybackController
-            in AppState and inject it through DependencyValues.
+            in ApplicationModel and inject it through DependencyValues.
             """
         )
     }
@@ -142,7 +142,7 @@ private enum LibraryDependencyKey:
             LibraryStore dependency is not configured.
 
             Create the application-scoped LibraryStore
-            in AppState and inject it through DependencyValues.
+            in ApplicationModel and inject it through DependencyValues.
             """
         )
     }

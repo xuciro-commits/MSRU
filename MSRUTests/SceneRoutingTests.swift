@@ -5,9 +5,9 @@
 
 import Foundation
 import Testing
+import AppFoundation
 
 @testable import MSRU
-
 
 @MainActor
 struct SceneRoutingTests {
