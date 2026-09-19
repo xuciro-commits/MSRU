@@ -87,7 +87,12 @@ final class RootSplitViewController:
 
 
         splitView.autosaveName =
-            "MSRU.MainSplitView"
+            "MSRU.MainSplitView."
+            +
+            scene
+                .id
+                .rawValue
+                .uuidString
 
 
         /*

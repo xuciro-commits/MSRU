@@ -1,3 +1,8 @@
+//
+//  MSRUApp.swift
+//  MSRU
+//
+
 import SwiftUI
 
 
@@ -31,6 +36,27 @@ struct MSRUApp:
         Settings {
 
             EmptyView()
+        }
+        .commands {
+
+            CommandGroup(
+                replacing:
+                    .newItem
+            ) {
+
+                Button(
+                    "New Window"
+                ) {
+
+                    appDelegate
+                        .openNewScene()
+                }
+                .keyboardShortcut(
+                    "n",
+                    modifiers:
+                        .command
+                )
+            }
         }
 
 

@@ -13,16 +13,43 @@ final class AppDelegate:
     NSObject,
     NSApplicationDelegate {
 
-    // MARK: - Application Scope
+    // MARK: - Platform Composition
 
-    private let application =
-        ApplicationModel()
+    /*
+     AppDelegate 只是 macOS lifecycle
+     与 Application Commands 的 adapter。
+
+     Window / Scene orchestration
+     全部交给 MacSceneCoordinator。
+     */
+
+    private let sceneCoordinator:
+        MacSceneCoordinator
 
 
-    // MARK: - Window
+    // MARK: - Init
 
-    private var mainWindowController:
-        MainWindowController?
+    override init() {
+
+        let application =
+            ApplicationModel()
+
+
+        let restorationStore =
+            MacSceneRestorationStore()
+
+
+        self.sceneCoordinator =
+            MacSceneCoordinator(
+                application:
+                    application,
+                restorationStore:
+                    restorationStore
+            )
+
+
+        super.init()
+    }
 
 
     // MARK: - Launch
@@ -40,49 +67,35 @@ final class AppDelegate:
         }
 
 
-        application
+        sceneCoordinator
             .start()
+    }
 
 
-        /*
-         当前仍然只有一个主 Window。
+    // MARK: - Commands
 
-         但 SceneModel 已经与 ApplicationModel
-         分离。
+    /*
+     File -> New Window
+     Command-N
 
-         未来增加第二个 Window 时，
-         只需要再创建一个新的 SceneModel。
-         */
+     AppDelegate 只转发平台 Command。
 
-        let scene =
-            SceneModel(
-                application:
-                    application
-            )
+     真正的 Scene creation contract
+     在 MacSceneCoordinator。
+     */
 
+    func openNewScene() {
 
-        let windowController =
-            MainWindowController(
-                scene:
-                    scene
-            )
+        guard
+            !isRunningForPreviews
+        else {
+
+            return
+        }
 
 
-        mainWindowController =
-            windowController
-
-
-        windowController
-            .showWindow(
-                nil
-            )
-
-
-        windowController
-            .window?
-            .makeKeyAndOrderFront(
-                nil
-            )
+        sceneCoordinator
+            .openNewScene()
     }
 
 
@@ -99,33 +112,45 @@ final class AppDelegate:
             !isRunningForPreviews
         else {
 
-            return
-                false
+            return false
         }
 
 
-        if !flag {
+        guard
+            !flag
+        else {
 
-            mainWindowController?
-                .showWindow(
-                    nil
-                )
-
-
-            mainWindowController?
-                .window?
-                .makeKeyAndOrderFront(
-                    nil
-                )
+            return true
         }
 
 
-        return
-            true
+        sceneCoordinator
+            .reopen()
+
+
+        return true
     }
 
 
     // MARK: - Termination
+
+    func applicationWillTerminate(
+        _ notification:
+            Notification
+    ) {
+
+        guard
+            !isRunningForPreviews
+        else {
+
+            return
+        }
+
+
+        sceneCoordinator
+            .saveScenes()
+    }
+
 
     func applicationShouldTerminateAfterLastWindowClosed(
         _ sender:

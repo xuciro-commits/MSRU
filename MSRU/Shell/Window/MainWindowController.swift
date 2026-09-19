@@ -1,12 +1,14 @@
 #if os(macOS)
 
 import AppKit
+import Observation
 
 
 @MainActor
 final class MainWindowController:
     NSWindowController,
-    NSToolbarDelegate {
+    NSToolbarDelegate,
+    NSWindowDelegate {
 
     // MARK: - Scene
 
@@ -14,9 +16,38 @@ final class MainWindowController:
         SceneModel
 
 
+    // MARK: - Restoration Callbacks
+
+    private let onSnapshotChange:
+        @MainActor (
+            SceneRestorationSnapshot
+        ) -> Void
+
+
+    private let onSceneClosed:
+        @MainActor (
+            SceneID
+        ) -> Void
+
+
+    /*
+     windowShouldClose 是用户主动 Close
+     的语义入口。
+
+     App termination 不走这个入口。
+     */
+
+    private var shouldDiscardRestorationOnClose =
+        false
+
+
+    // MARK: - Root
+
     private let rootSplitViewController:
         RootSplitViewController
 
+
+    // MARK: - Toolbar
 
     private let mainToolbar =
         NSToolbar(
@@ -29,11 +60,27 @@ final class MainWindowController:
 
     init(
         scene:
-            SceneModel
+            SceneModel,
+        onSnapshotChange:
+            @escaping @MainActor (
+                SceneRestorationSnapshot
+            ) -> Void,
+        onSceneClosed:
+            @escaping @MainActor (
+                SceneID
+            ) -> Void
     ) {
 
         self.scene =
             scene
+
+
+        self.onSnapshotChange =
+            onSnapshotChange
+
+
+        self.onSceneClosed =
+            onSceneClosed
 
 
         self.rootSplitViewController =
@@ -67,13 +114,6 @@ final class MainWindowController:
             )
 
 
-        /*
-         SplitView 必须先进入 Window。
-
-         Tracking Separator 要求它跟踪的 splitView
-         已经存在于同一个 Window 中。
-         */
-
         window.contentViewController =
             rootSplitViewController
 
@@ -84,12 +124,22 @@ final class MainWindowController:
         )
 
 
+        window.delegate =
+            self
+
+
         configureToolbar()
 
 
         configureWindow(
             window
         )
+
+
+        observeRestorableSceneState()
+
+
+        publishSnapshot()
     }
 
 
@@ -105,6 +155,76 @@ final class MainWindowController:
         fatalError(
             "init(coder:) is not supported."
         )
+    }
+
+
+    // MARK: - Restoration
+
+    func restorationSnapshot()
+        -> SceneRestorationSnapshot {
+
+        scene
+            .restorationSnapshot()
+    }
+
+
+    private func publishSnapshot() {
+
+        onSnapshotChange(
+            scene
+                .restorationSnapshot()
+        )
+    }
+
+
+    /*
+     Observation tracking 是 one-shot。
+
+     每次变化发生以后：
+
+     1. publish snapshot
+     2. 重新建立 tracking
+
+     这样 View 不需要手动调用 save()。
+     */
+
+    private func observeRestorableSceneState() {
+
+        withObservationTracking {
+
+            _ =
+                scene
+                    .navigation
+                    .section
+
+
+            _ =
+                scene
+                    .isQueuePresented
+
+        } onChange: {
+            [weak self] in
+
+            Task {
+                @MainActor
+                [weak self] in
+
+                guard
+                    let self
+                else {
+
+                    return
+                }
+
+
+                self
+                    .publishSnapshot()
+
+
+                self
+                    .observeRestorableSceneState()
+            }
+        }
     }
 
 
@@ -130,13 +250,6 @@ final class MainWindowController:
         window.titlebarSeparatorStyle =
             .none
 
-
-        /*
-         Apple 原生 unified toolbar。
-
-         Sidebar Toggle 会存在于 Window Chrome 层，
-         而不是 Sidebar 内容层。
-         */
 
         window.toolbarStyle =
             .unified
@@ -178,7 +291,45 @@ final class MainWindowController:
             false
 
 
-        window.center()
+        // MARK: Frame Restoration
+
+        /*
+         Window geometry 属于 AppKit。
+
+         Scene semantic state 属于
+         SceneRestorationSnapshot。
+
+         两者使用同一个 SceneID
+         作为 identity bridge。
+         */
+
+        let frameAutosaveName =
+            "MSRU.SceneWindow."
+            +
+            scene
+                .id
+                .rawValue
+                .uuidString
+
+
+        let restoredFrame =
+            window
+                .setFrameUsingName(
+                    frameAutosaveName
+                )
+
+
+        _ =
+            window
+                .setFrameAutosaveName(
+                    frameAutosaveName
+                )
+
+
+        if !restoredFrame {
+
+            window.center()
+        }
     }
 
 
@@ -200,6 +351,46 @@ final class MainWindowController:
 
         mainToolbar.autosavesConfiguration =
             false
+    }
+
+
+    // MARK: - Window Delegate
+
+    func windowShouldClose(
+        _ sender:
+            NSWindow
+    ) -> Bool {
+
+        shouldDiscardRestorationOnClose =
+            true
+
+
+        return true
+    }
+
+
+    func windowWillClose(
+        _ notification:
+            Notification
+    ) {
+
+        if shouldDiscardRestorationOnClose {
+
+            onSceneClosed(
+                scene.id
+            )
+
+        } else {
+
+            /*
+             Application termination。
+
+             Scene 仍然存在于下次启动的
+             restoration set 中。
+             */
+
+            publishSnapshot()
+        }
     }
 
 
@@ -232,13 +423,6 @@ final class MainWindowController:
         ]
     }
 
-
-    /*
-     Toolbar 是代码创建的，所以保留 delegate factory。
-
-     这里使用的两个都是 AppKit 标准 Identifier；
-     AppKit 会自动创建标准 item，因此这里没有自定义 item。
-     */
 
     func toolbar(
         _ toolbar:
