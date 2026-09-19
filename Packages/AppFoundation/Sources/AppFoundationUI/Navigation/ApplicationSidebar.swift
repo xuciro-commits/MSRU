@@ -25,6 +25,18 @@ where
         [SidebarContribution<Route>]
 }
 
+#Preview("Application Sidebar") {
+    @Previewable @State var selection: String? = "library"
+    ApplicationSidebar(
+        selection: $selection,
+        contributions: [
+            SidebarContribution(id: "browse", title: "Browse", systemImage: "globe", route: "browse"),
+            SidebarContribution(id: "library", group: "Collection", title: "Library", systemImage: "books.vertical", route: "library")
+        ]
+    )
+    .frame(width: 240, height: 400)
+}
+
 
 // MARK: - Application Sidebar
 

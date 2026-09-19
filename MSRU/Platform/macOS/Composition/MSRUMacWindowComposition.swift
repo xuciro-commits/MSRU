@@ -1,0 +1,440 @@
+//
+//  MSRUMacWindowComposition.swift
+//  MSRU
+//
+
+#if os(macOS)
+
+import AppKit
+import Observation
+import SwiftUI
+
+import AppFoundationUI
+
+
+// MARK: - MSRU macOS Window Composition
+
+/// Product/platform composition boundary for one MSRU window.
+///
+/// All semantic surface resolution is owned by
+/// `MSRUApplicationShellSession`.
+///
+/// All native workspace/context/accessory rendering is owned by
+/// `MacApplicationShellRenderer`.
+@MainActor
+final class MSRUMacWindowComposition {
+
+    // MARK: - Scene
+
+    private let scene:
+        SceneModel
+
+
+    // MARK: - Semantic Runtime
+
+    private let session:
+        MSRUApplicationShellSession
+
+
+    // MARK: - Platform Renderer
+
+    private let shellRenderer:
+        MacApplicationShellRenderer
+
+
+    // MARK: - Platform
+
+    let toolbarAdapter:
+        MacToolbarAdapter
+
+    let windowController:
+        MacApplicationWindowController
+
+
+    // MARK: - Init
+
+    init(
+        scene:
+            SceneModel,
+        splitAutosaveName: String? = "MSRU.MainSplitView"
+    ) {
+
+        self.scene =
+            scene
+
+
+        // ----------------------------------------------------
+        // Semantic Runtime
+        // ----------------------------------------------------
+
+        let session =
+            MSRUApplicationShellSession(
+                scene:
+                    scene
+            )
+
+
+        self.session =
+            session
+
+
+        let initialShell =
+            session.resolve()
+
+
+        // ----------------------------------------------------
+        // Navigation
+        //
+        // Navigation is the stable outer application region.
+        // Workspace itself now comes from the Runtime.
+        // ----------------------------------------------------
+
+        let navigationController =
+            MacHostingControllerFactory
+                .make(
+                    rootView:
+                        SidebarPaneView(
+                            scene:
+                                scene
+                        )
+                )
+
+
+        // ----------------------------------------------------
+        // Semantic → macOS Renderer
+        // ----------------------------------------------------
+
+        let shellRenderer =
+            MacApplicationShellRenderer(
+                navigationViewController:
+                    navigationController,
+                shell:
+                    initialShell,
+                configuration:
+                    .init(
+                        split:
+                            .init(
+                                autosaveName:
+                                    splitAutosaveName,
+                                backgroundColor:
+                                    .windowBackgroundColor,
+                                navigation:
+                                    .init(
+                                        canCollapse:
+                                            true,
+                                        allowsFullHeightLayout:
+                                            true,
+                                        minimumThickness:
+                                            180,
+                                        maximumThickness:
+                                            280
+                                    ),
+                                workspace:
+                                    .init(
+                                        canCollapse:
+                                            false,
+                                        minimumThickness:
+                                            500,
+                                        automaticallyAdjustsSafeAreaInsets:
+                                            true
+                                    )
+                            ),
+
+                        /*
+                         MSRU explicitly chooses its application
+                         `.activity` context as the native right-hand
+                         context region.
+
+                         AppFoundation does not make this decision.
+                         */
+
+                        context:
+                            .init(
+                                region:
+                                    .init(
+                                        canCollapse:
+                                            true,
+                                        allowsFullHeightLayout:
+                                            true,
+                                        minimumThickness:
+                                            280,
+                                        maximumThickness:
+                                            420
+                                    ),
+                                resolve: {
+                                    shell in
+
+                                    let activities =
+                                        shell
+                                            .applicationContexts(
+                                                role:
+                                                    .activity
+                                            )
+
+
+                                    precondition(
+                                        activities.count
+                                        ==
+                                        1,
+                                        """
+                                        MSRU expects exactly one
+                                        application activity context.
+                                        """
+                                    )
+
+
+                                    return
+                                        activities
+                                            .first
+                                }
+                            ),
+
+                        /*
+                         MSRU currently has one persistent
+                         application-level accessory: Mini Player.
+                         */
+
+                        applicationAccessory:
+                            .init(
+                                resolve: {
+                                    shell in
+
+                                    let accessories =
+                                        shell
+                                            .applicationAccessories
+
+
+                                    precondition(
+                                        accessories.count
+                                        ==
+                                        1,
+                                        """
+                                        MSRU expects exactly one
+                                        application accessory.
+                                        """
+                                    )
+
+
+                                    return
+                                        accessories
+                                            .first
+                                }
+                            ),
+
+                        rendersWorkspaceAccessory:
+                            true
+                    ),
+                isContextPresented:
+                    scene
+                        .isQueuePresented
+            )
+
+
+        self.shellRenderer =
+            shellRenderer
+
+
+        // ----------------------------------------------------
+        // Semantic Actions → Native Presentation
+        // ----------------------------------------------------
+
+        session.installShellActions(
+            toggleQueue: {
+                [weak shellRenderer]
+                in
+
+                shellRenderer?
+                    .toggleContextPresentation()
+            }
+        )
+
+
+        shellRenderer
+            .splitController
+            .onContextPresentationChange = {
+                [weak scene]
+                isPresented in
+
+                scene?
+                    .isQueuePresented =
+                        isPresented
+            }
+
+
+        // ----------------------------------------------------
+        // Product-specific Navigation Accessory
+        // ----------------------------------------------------
+
+        let sidebarAccessory =
+            MacSplitAccessoryHostingController(
+                rootView:
+                    SidebarBottomAccessoryView(
+                        onOpenSettings: {
+                            [weak scene]
+                            in
+
+                            scene?
+                                .navigation
+                                .select(
+                                    .settings
+                                )
+                        }
+                    )
+            )
+
+
+        shellRenderer
+            .splitController
+            .addAccessory(
+                sidebarAccessory,
+                to:
+                    .navigation,
+                edge:
+                    .bottom
+            )
+
+
+        // ----------------------------------------------------
+        // Product-specific Context Chrome
+        // ----------------------------------------------------
+
+        let queueHeader =
+            MacSplitAccessoryHostingController(
+                rootView:
+                    QueueHeaderView(
+                        onClear: {
+                            [weak scene]
+                            in
+
+                            scene?
+                                .application
+                                .playback
+                                .clearUpcoming()
+                        }
+                    )
+                    .background(
+                        Color.clear
+                    )
+            )
+
+
+        shellRenderer
+            .splitController
+            .addAccessory(
+                queueHeader,
+                to:
+                    .context,
+                edge:
+                    .top
+            )
+
+
+        // ----------------------------------------------------
+        // Semantic Toolbar
+        // ----------------------------------------------------
+
+        let toolbarAdapter =
+            MacToolbarAdapter(
+                identifier:
+                    "MSRU.MainToolbar"
+            ) {
+                [weak session]
+                in
+
+                session?
+                    .resolve()
+                    .toolbar
+                ??
+                ResolvedToolbarPresentation()
+            }
+
+
+        self.toolbarAdapter =
+            toolbarAdapter
+
+
+        // ----------------------------------------------------
+        // Native Window
+        // ----------------------------------------------------
+
+        self.windowController =
+            MacApplicationWindowController(
+                contentViewController:
+                    shellRenderer
+                        .splitController,
+                configuration:
+                    MacWindowConfiguration(
+                        title:
+                            "MSRU"
+                    ),
+                toolbarAdapter:
+                    toolbarAdapter
+            )
+
+
+        observePresentation()
+    }
+
+
+    // MARK: - Runtime Observation
+
+    private func observePresentation() {
+
+        guard !scene.isClosed else { return }
+
+        withObservationTracking {
+
+            // Resolving also observes query text and enabled predicates on this route.
+            _ = session.resolve()
+            _ = scene.isQueuePresented
+
+        } onChange: {
+            [weak self]
+            in
+
+            Task {
+                @MainActor
+                [weak self]
+                in
+
+                guard
+                    let self, !self.scene.isClosed
+                else {
+
+                    return
+                }
+
+
+                let shell =
+                    session
+                        .resolve()
+
+
+                /*
+                 One semantic snapshot updates both:
+                 - native Workspace / Context / Accessories
+                 - native Toolbar
+
+                 There is no second route-resolution path.
+                 */
+
+                shellRenderer
+                    .apply(
+                        shell
+                    )
+
+
+                if shellRenderer.isContextPresented != scene.isQueuePresented {
+                    shellRenderer.setContextPresented(scene.isQueuePresented)
+                }
+                toolbarAdapter
+                    .reload()
+
+
+                observePresentation()
+            }
+        }
+    }
+}
+
+#endif

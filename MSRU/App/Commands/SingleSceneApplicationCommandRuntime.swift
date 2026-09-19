@@ -18,9 +18,6 @@ import AppFoundation
  ApplicationCommand
         │
         ▼
- ApplicationCommandCenter
-        │
-        ▼
  ApplicationCommandGate
         │
         ▼
@@ -71,10 +68,6 @@ final class SingleSceneApplicationCommandRuntime:
         ApplicationCommandGate
 
 
-    private let commandCenter:
-        ApplicationCommandCenter
-
-
     // MARK: - Init
 
     init() {
@@ -98,11 +91,6 @@ final class SingleSceneApplicationCommandRuntime:
             gate
 
 
-        self.commandCenter =
-            ApplicationCommandCenter(
-                handler:
-                    gate
-            )
     }
 
 
@@ -122,15 +110,6 @@ final class SingleSceneApplicationCommandRuntime:
         gate.isActive
         &&
         handler.isAttached
-    }
-
-
-    // MARK: - Compatibility Projection
-
-    var isReady:
-        Bool {
-
-        isActive
     }
 
 
@@ -158,10 +137,7 @@ final class SingleSceneApplicationCommandRuntime:
             ApplicationCommand
     ) -> ApplicationCommandResult {
 
-        commandCenter
-            .send(
-                command
-            )
+        gate.handle(command)
     }
 
 
@@ -171,10 +147,7 @@ final class SingleSceneApplicationCommandRuntime:
             [ApplicationCommand]
     ) -> [ApplicationCommandResult] {
 
-        commandCenter
-            .send(
-                commands
-            )
+        commands.map { gate.handle($0) }
     }
 
 

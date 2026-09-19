@@ -67,7 +67,7 @@ struct MSRUApp:
 
         WindowGroup {
 
-            iPadRootView(
+            SwiftUISceneRootView(
                 application:
                     application
             )

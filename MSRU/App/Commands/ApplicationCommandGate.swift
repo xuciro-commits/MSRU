@@ -42,7 +42,7 @@ import AppFoundation
 
  Pipeline:
 
- ApplicationCommandCenter
+ ApplicationCommandRuntime
           │
           ▼
  ApplicationCommandGate

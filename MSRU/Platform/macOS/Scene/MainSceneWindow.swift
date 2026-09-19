@@ -6,6 +6,8 @@
 #if os(macOS)
 
 import AppKit
+import Observation
+
 import AppFoundation
 
 
@@ -13,7 +15,9 @@ import AppFoundation
 
 @MainActor
 final class MainSceneWindow:
-    MacSceneWindow {
+    NSObject,
+    MacSceneWindow,
+    NSWindowDelegate {
 
     // MARK: - Identity
 
@@ -21,10 +25,29 @@ final class MainSceneWindow:
         SceneID
 
 
-    // MARK: - Controller
+    // MARK: - Scene
 
-    private let controller:
-        MainWindowController
+    private let scene:
+        SceneModel
+
+
+    // MARK: - Window Composition
+
+    private let composition:
+        MSRUMacWindowComposition
+
+
+    // MARK: - Lifecycle Callbacks
+
+    private let onSnapshotChange:
+        @MainActor (
+            SceneRestorationSnapshot
+        ) -> Void
+
+    private let onSceneClosed:
+        @MainActor (
+            SceneID
+        ) -> Void
 
 
     // MARK: - Init
@@ -32,6 +55,7 @@ final class MainSceneWindow:
     init(
         scene:
             SceneModel,
+        splitAutosaveName: String? = "MSRU.MainSplitView",
         onSnapshotChange:
             @escaping @MainActor (
                 SceneRestorationSnapshot
@@ -45,25 +69,45 @@ final class MainSceneWindow:
         self.sceneID =
             scene.id
 
+        self.scene =
+            scene
 
-        self.controller =
-            MainWindowController(
+        self.onSnapshotChange =
+            onSnapshotChange
+
+        self.onSceneClosed =
+            onSceneClosed
+
+        self.composition =
+            MSRUMacWindowComposition(
                 scene:
                     scene,
-                onSnapshotChange:
-                    onSnapshotChange,
-                onSceneClosed:
-                    onSceneClosed
+                splitAutosaveName: splitAutosaveName
             )
+
+
+        super.init()
+
+
+        composition
+            .windowController
+            .window?
+            .delegate =
+                self
+
+
+        composition.windowController.window?.setAccessibilityIdentifier("scene." + scene.id.description)
+        observeRestorationState()
     }
 
 
-    // MARK: - State
+    // MARK: - Window State
 
     var isActive:
         Bool {
 
-        controller
+        composition
+            .windowController
             .window?
             .isKeyWindow
         ??
@@ -71,17 +115,19 @@ final class MainSceneWindow:
     }
 
 
-    // MARK: - Activate
+    // MARK: - Activation
 
     func activate() {
 
-        controller
+        composition
+            .windowController
             .showWindow(
                 nil
             )
 
 
-        controller
+        composition
+            .windowController
             .window?
             .makeKeyAndOrderFront(
                 nil
@@ -94,8 +140,67 @@ final class MainSceneWindow:
     func restorationSnapshot()
         -> SceneRestorationSnapshot {
 
-        controller
+        scene
             .restorationSnapshot()
+    }
+
+
+    // MARK: - Restoration Observation
+
+    private func observeRestorationState() {
+
+        guard !scene.isClosed else { return }
+
+        withObservationTracking {
+
+            _ =
+                scene
+                    .navigation
+                    .section
+
+            _ =
+                scene
+                    .isQueuePresented
+
+        } onChange: {
+            [weak self]
+            in
+
+            Task {
+                @MainActor
+                [weak self]
+                in
+
+                guard
+                    let self, !self.scene.isClosed
+                else {
+
+                    return
+                }
+
+
+                onSnapshotChange(
+                    scene
+                        .restorationSnapshot()
+                )
+
+
+                observeRestorationState()
+            }
+        }
+    }
+
+
+    // MARK: - NSWindowDelegate
+
+    func windowWillClose(
+        _ notification:
+            Notification
+    ) {
+
+        onSceneClosed(
+            sceneID
+        )
     }
 }
 
@@ -105,6 +210,12 @@ final class MainSceneWindow:
 @MainActor
 final class MainSceneWindowFactory:
     MacSceneWindowFactory {
+
+    private let splitAutosaveName: String?
+
+    init(splitAutosaveName: String? = "MSRU.MainSplitView") {
+        self.splitAutosaveName = splitAutosaveName
+    }
 
     func makeWindow(
         scene:
@@ -122,6 +233,7 @@ final class MainSceneWindowFactory:
         MainSceneWindow(
             scene:
                 scene,
+            splitAutosaveName: splitAutosaveName,
             onSnapshotChange:
                 onSnapshotChange,
             onSceneClosed:

@@ -6,17 +6,13 @@ xcuserdata/
 # macOS
 .DS_Store
 
-# Xcode user data
-xcuserdata/
-*.xcuserstate
-
-# macOS
-.DS_Store
 probe.md
 
 # MSRU FFmpeg Micro build workspace
 Packages/MSRUCodecFFmpeg/.build-ffmpeg/
 Packages/MSRUCodecFFmpeg/.build/
+Packages/MSRUCodecFFmpeg/.build-ffmpeg.lock/
+Packages/MSRUCodecFFmpeg/.vendor-stage.*/
 
 # Swift Package Manager
 **/.build/

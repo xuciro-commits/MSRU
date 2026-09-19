@@ -58,7 +58,7 @@ protocol ApplicationCommandSource {
     associatedtype Input
 
 
-    func command(
+    nonisolated func command(
         from input:
             Input
     ) -> ApplicationCommand?

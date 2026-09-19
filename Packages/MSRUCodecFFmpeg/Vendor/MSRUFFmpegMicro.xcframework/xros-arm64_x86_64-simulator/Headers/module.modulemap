@@ -1,0 +1,6 @@
+module MSRUFFmpegMicro [system] {
+
+    umbrella header "MSRUFFmpegMicro.h"
+
+    export *
+}

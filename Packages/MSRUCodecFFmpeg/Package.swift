@@ -14,7 +14,8 @@ let package = Package(
         ),
         .iOS(
             .v18
-        )
+        ),
+        .visionOS(.v2)
     ],
 
     products: [
@@ -42,6 +43,8 @@ let package = Package(
          - macOS arm64
          - iOS arm64
          - iOS Simulator arm64 + x86_64
+         - visionOS arm64
+         - visionOS Simulator arm64 + x86_64
 
          This is deliberately not a complete FFmpeg
          distribution and does not contain FFmpegKit.

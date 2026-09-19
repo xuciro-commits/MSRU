@@ -214,10 +214,11 @@ where F: Feature {
                             [weak self]
                             action in
 
-                            self?
-                                .send(
-                                    action
-                                )
+                            // Cancellation is cooperative; revoke the callback as well.
+                            guard let self, self.isRunning(token: token, id: id) else {
+                                return
+                            }
+                            self.send(action)
                         }
                     }
 
@@ -324,6 +325,13 @@ where F: Feature {
             .removeAll()
     }
 
+
+    private func isRunning(token: UUID, id: FeatureTaskID?) -> Bool {
+        if let id {
+            return identifiedTasks[id]?[token] != nil
+        }
+        return anonymousTasks[token] != nil
+    }
 
     // MARK: - Completion
 

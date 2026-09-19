@@ -18,9 +18,6 @@ import AppFoundation
  ApplicationCommand
         │
         ▼
- ApplicationCommandCenter
-        │
-        ▼
  ApplicationCommandGate
         │
         ▼
@@ -45,10 +42,6 @@ final class MultiSceneApplicationCommandRuntime:
 
 
     // MARK: - Command Center
-
-    private let commandCenter:
-        ApplicationCommandCenter
-
 
     // MARK: - Init
 
@@ -79,11 +72,6 @@ final class MultiSceneApplicationCommandRuntime:
             gate
 
 
-        self.commandCenter =
-            ApplicationCommandCenter(
-                handler:
-                    gate
-            )
     }
 
 
@@ -128,10 +116,7 @@ final class MultiSceneApplicationCommandRuntime:
             ApplicationCommand
     ) -> ApplicationCommandResult {
 
-        commandCenter
-            .send(
-                command
-            )
+        gate.handle(command)
     }
 
 
@@ -141,10 +126,7 @@ final class MultiSceneApplicationCommandRuntime:
             [ApplicationCommand]
     ) -> [ApplicationCommandResult] {
 
-        commandCenter
-            .send(
-                commands
-            )
+        commands.map { gate.handle($0) }
     }
 
 

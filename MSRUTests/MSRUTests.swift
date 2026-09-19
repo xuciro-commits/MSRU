@@ -130,118 +130,43 @@ private enum DependencyCaptureFeature:
 
 // MARK: - Cancellation Feature
 
-private enum CancellationFeature:
-    Feature {
-
-    @MainActor
-    final class State {
-
-        var completedValues:
-            [Int] = []
+@MainActor
+private final class CancellationSignal {
+    private var fired = false
+    private var continuation: CheckedContinuation<Void, Never>?
+    func wait() async {
+        if fired { return }
+        await withCheckedContinuation { continuation = $0 }
     }
-
-
-    enum Action {
-
-        case start(
-            Int
-        )
-
-        case finished(
-            Int
-        )
+    func fire() {
+        fired = true
+        continuation?.resume()
+        continuation = nil
     }
+}
 
-
-    @MainActor
-    struct Service:
-        FeatureService {
-
-        private static let taskID:
-            FeatureTaskID =
-                "tests.cancellation.work"
-
-
-        init() {}
-
-
-        func handle(
-            _ action:
-                Action,
-            state:
-                State
-        ) -> [FeatureTask<Action>] {
-
+private enum CancellationFeature: Feature {
+    @MainActor final class State { var completedValues: [Int] = [] }
+    enum Action { case start(Int), finished(Int) }
+    @MainActor struct Service: FeatureService {
+        let work: @MainActor (Int) async -> Void
+        let completed: @MainActor (Int) -> Void
+        func handle(_ action: Action, state: State) -> [FeatureTask<Action>] {
             switch action {
-
-            case .start(
-                let value
-            ):
-
-                return [
-
-                    .run(
-                        id:
-                            Self.taskID,
-                        cancelInFlight:
-                            true
-                    ) {
-                        send in
-
-                        do {
-
-                            try await Task
-                                .sleep(
-                                    nanoseconds:
-                                        80_000_000
-                                )
-
-                        } catch {
-
-                            return
-                        }
-
-
-                        guard
-                            !Task.isCancelled
-                        else {
-
-                            return
-                        }
-
-
-                        send(
-                            .finished(
-                                value
-                            )
-                        )
-                    }
-                ]
-
-
-            case .finished(
-                let value
-            ):
-
-                state
-                    .completedValues
-                    .append(
-                        value
-                    )
-
-
+            case .start(let value):
+                return [.run(id: "tests.cancellation.work", cancelInFlight: true) { send in
+                    await work(value)
+                    // Intentionally non-cooperative: the host must reject revoked callbacks.
+                    send(.finished(value))
+                    completed(value)
+                }]
+            case .finished(let value):
+                state.completedValues.append(value)
                 return []
             }
         }
     }
-
-
-    @MainActor
-    static func makeInitialState()
-        -> State {
-
-        State()
-    }
+    @MainActor static func makeInitialState() -> State { State() }
 }
 
 
@@ -605,82 +530,31 @@ struct MSRUTests {
     // =========================================================
 
     @Test
-    func cancelInFlightReplacesPreviousTask()
-        async throws {
+    func cancelInFlightReplacesPreviousTask() async {
+        let started = (0..<3).map { _ in CancellationSignal() }
+        let release = (0..<3).map { _ in CancellationSignal() }
+        let finished = (0..<3).map { _ in CancellationSignal() }
+        let host = FeatureHost<CancellationFeature>(service: .init(work: { value in
+            started[value - 1].fire()
+            await release[value - 1].wait()
+        }, completed: { value in finished[value - 1].fire() }))
 
-        let host =
-            FeatureHost<CancellationFeature>(
-                service:
-                    CancellationFeature
-                        .Service()
-            )
+        host.send(.start(1))
+        await started[0].wait()
+        host.send(.start(2))
+        await started[1].wait()
+        release[1].fire()
+        await finished[1].wait()
+        release[0].fire()
+        await finished[0].wait()
+        #expect(host.state.completedValues == [2])
 
-
-        host.send(
-            .start(
-                1
-            )
-        )
-
-
-        host.send(
-            .start(
-                2
-            )
-        )
-
-
-        try await Task
-            .sleep(
-                nanoseconds:
-                    180_000_000
-            )
-
-
-        /*
-         第一条 work 已被第二条替换。
-         */
-
-        #expect(
-            host
-                .state
-                .completedValues
-            == [
-                2
-            ]
-        )
-
-
-        host.send(
-            .start(
-                3
-            )
-        )
-
-
+        host.send(.start(3))
+        await started[2].wait()
         host.cancelAll()
-
-
-        try await Task
-            .sleep(
-                nanoseconds:
-                    120_000_000
-            )
-
-
-        /*
-         cancelAll 后第三条 work
-         不允许完成。
-         */
-
-        #expect(
-            host
-                .state
-                .completedValues
-            == [
-                2
-            ]
-        )
+        release[2].fire()
+        await finished[2].wait()
+        #expect(host.state.completedValues == [2])
     }
 
 

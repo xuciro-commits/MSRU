@@ -523,6 +523,24 @@ struct MacSceneCoordinatorTests {
     }
 
 
+    @Test
+    func closedWindowCannotRecreateRestorationOrNavigate() {
+        let fixture = makeFixture()
+        fixture.coordinator.start()
+        let first = fixture.factory.windows.values.first!
+        _ = fixture.coordinator.openNewScene()
+        first.simulateClose()
+        #expect(first.scene.isClosed)
+        let oldRoute = first.scene.navigation.section
+        first.scene.send(.navigate(.section(.settings)))
+        #expect(first.scene.navigation.section == oldRoute)
+        first.publishSnapshot()
+        first.simulateClose()
+        let snapshots = fixture.store.loadSnapshots()
+        #expect(snapshots.count == 1)
+        #expect(!snapshots.contains { $0.sceneID == first.sceneID })
+    }
+
     // MARK: - Fixture
 
     private func makeFixture(

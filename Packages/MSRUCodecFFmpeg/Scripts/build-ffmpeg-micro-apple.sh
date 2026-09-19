@@ -18,6 +18,11 @@ set -euo pipefail
 #       arm64
 #       x86_64
 #
+#   visionOS Device
+#       arm64
+#   visionOS Simulator
+#       arm64 / x86_64
+#
 # FFmpeg configuration:
 #
 #   libavcodec
@@ -61,13 +66,47 @@ PACKAGE_DIR="$(
     pwd
 )"
 
-BUILD_ROOT="$PACKAGE_DIR/.build-ffmpeg"
+# Keep installed binaries intact until every build and verification succeeds.
+BUILD_CACHE="$PACKAGE_DIR/.build-ffmpeg"
+LOCK_DIR="$PACKAGE_DIR/.build-ffmpeg.lock"
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+    echo "Another build owns $LOCK_DIR; inspect it before retrying." >&2
+    exit 1
+fi
+STAGING_VENDOR=""
+BACKUP_VENDOR=""
+INSTALLED_VENDOR="$PACKAGE_DIR/Vendor"
+cleanup() {
+    local status=$?
+    if [[ -n "$BACKUP_VENDOR" && -d "$BACKUP_VENDOR" ]]; then
+        if [[ ! -e "$INSTALLED_VENDOR" ]]; then
+            mv "$BACKUP_VENDOR" "$INSTALLED_VENDOR" || return 1
+        elif [[ $status -eq 0 ]]; then
+            rm -rf "$BACKUP_VENDOR"
+        fi
+    fi
+    if [[ -n "$STAGING_VENDOR" && -d "$STAGING_VENDOR" ]]; then
+        rm -rf "$STAGING_VENDOR"
+    fi
+    rmdir "$LOCK_DIR"
+    return "$status"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+mkdir -p "$BUILD_CACHE"
+BUILD_ROOT="$(mktemp -d "$BUILD_CACHE/run.XXXXXX")"
+STAGING_VENDOR="$(mktemp -d "$PACKAGE_DIR/.vendor-stage.XXXXXX")"
+BACKUP_VENDOR="$STAGING_VENDOR.previous"
+if [[ -d "$INSTALLED_VENDOR" ]]; then
+    cp -R "$INSTALLED_VENDOR/." "$STAGING_VENDOR/"
+fi
 
 SOURCE_ROOT="$BUILD_ROOT/source"
 
 TARGET_ROOT="$BUILD_ROOT/targets"
 
-VENDOR_DIR="$PACKAGE_DIR/Vendor"
+VENDOR_DIR="$STAGING_VENDOR"
 
 XCFRAMEWORK="$VENDOR_DIR/MSRUFFmpegMicro.xcframework"
 
@@ -81,12 +120,13 @@ FFMPEG_VERSION="9.0.2"
 MACOS_MIN_VERSION="15.0"
 
 IOS_MIN_VERSION="18.0"
+VISIONOS_MIN_VERSION="2.0"
 
 ARCHIVE_NAME="ffmpeg-${FFMPEG_VERSION}.tar.xz"
 
 ARCHIVE_URL="https://ffmpeg.org/releases/${ARCHIVE_NAME}"
 
-ARCHIVE_PATH="$BUILD_ROOT/$ARCHIVE_NAME"
+ARCHIVE_PATH="$BUILD_CACHE/$ARCHIVE_NAME"
 
 
 # ============================================================
@@ -116,6 +156,8 @@ echo "  macOS             arm64"
 echo "  iOS               arm64"
 echo "  iOS Simulator     arm64"
 echo "  iOS Simulator     x86_64"
+echo "  visionOS          arm64"
+echo "  visionOS Simulator arm64 + x86_64"
 echo
 
 
@@ -125,7 +167,8 @@ echo
 
 echo "→ Clean"
 
-rm -rf "$BUILD_ROOT"
+# Each run has its own directory; retain failed compiler logs for diagnosis.
+# Only remove the copied framework inside the staging directory.
 
 mkdir -p "$BUILD_ROOT"
 mkdir -p "$TARGET_ROOT"
@@ -142,11 +185,12 @@ echo
 echo "→ Download FFmpeg $FFMPEG_VERSION"
 echo
 
-curl \
-    --fail \
-    --location \
-    --output "$ARCHIVE_PATH" \
-    "$ARCHIVE_URL"
+if [[ ! -f "$ARCHIVE_PATH" ]]; then
+    curl --fail --location --output "$BUILD_ROOT/$ARCHIVE_NAME.partial" "$ARCHIVE_URL"
+    mv "$BUILD_ROOT/$ARCHIVE_NAME.partial" "$ARCHIVE_PATH"
+else
+    echo "→ Reuse cached $ARCHIVE_NAME"
+fi
 
 
 # ============================================================
@@ -518,6 +562,15 @@ build_target \
     "yes"
 
 
+# visionOS uses target triples rather than iOS deployment flags.
+build_target "xros-arm64" "xros" "arm64" \
+    "-target arm64-apple-xros${VISIONOS_MIN_VERSION}" "no"
+build_target "xros-simulator-arm64" "xrsimulator" "arm64" \
+    "-target arm64-apple-xros${VISIONOS_MIN_VERSION}-simulator" "no"
+build_target "xros-simulator-x86_64" "xrsimulator" "x86_64" \
+    "-target x86_64-apple-xros${VISIONOS_MIN_VERSION}-simulator" "yes"
+
+
 # ============================================================
 # Merge iOS Simulator architectures
 # ============================================================
@@ -564,6 +617,15 @@ lipo \
     -info "$SIMULATOR_LIBRARY"
 
 
+XROS_SIMULATOR_ROOT="$TARGET_ROOT/xros-simulator-universal"
+mkdir -p "$XROS_SIMULATOR_ROOT"
+lipo -create \
+    "$TARGET_ROOT/xros-simulator-arm64/libMSRUFFmpegMicro.a" \
+    "$TARGET_ROOT/xros-simulator-x86_64/libMSRUFFmpegMicro.a" \
+    -output "$XROS_SIMULATOR_ROOT/libMSRUFFmpegMicro.a"
+cp -R "$TARGET_ROOT/xros-simulator-arm64/Headers" "$XROS_SIMULATOR_ROOT/Headers"
+xcrun ranlib "$XROS_SIMULATOR_ROOT/libMSRUFFmpegMicro.a"
+
 # ============================================================
 # Create XCFramework
 # ============================================================
@@ -593,6 +655,10 @@ xcodebuild \
     -headers \
         "$SIMULATOR_HEADERS" \
     \
+    -library "$TARGET_ROOT/xros-arm64/libMSRUFFmpegMicro.a" \
+    -headers "$TARGET_ROOT/xros-arm64/Headers" \
+    -library "$XROS_SIMULATOR_ROOT/libMSRUFFmpegMicro.a" \
+    -headers "$XROS_SIMULATOR_ROOT/Headers" \
     -output \
         "$XCFRAMEWORK"
 
@@ -716,6 +782,14 @@ done < <(
 )
 
 
+# Publish only after all commands above have succeeded. EXIT restores the previous
+# vendor directory if publication fails between the two same-filesystem renames.
+if [[ -e "$INSTALLED_VENDOR" ]]; then
+    mv "$INSTALLED_VENDOR" "$BACKUP_VENDOR"
+fi
+mv "$STAGING_VENDOR" "$INSTALLED_VENDOR"
+echo "Installed: $INSTALLED_VENDOR/MSRUFFmpegMicro.xcframework"
+
 # ============================================================
 # Complete
 # ============================================================
@@ -725,5 +799,5 @@ echo "============================================================"
 echo "MSRU FFmpeg Micro — Apple ✓"
 echo "============================================================"
 echo
-echo "$XCFRAMEWORK"
+echo "$INSTALLED_VENDOR/MSRUFFmpegMicro.xcframework"
 echo

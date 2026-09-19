@@ -54,6 +54,15 @@ final class MacSceneCoordinator {
         ] = [:]
 
 
+    // MARK: - Lifecycle
+
+    private let lifecyclePolicy:
+        MacSceneLifecyclePolicy
+
+    private var isTerminating =
+        false
+
+
     // MARK: - Live Init
 
     convenience init(
@@ -82,7 +91,9 @@ final class MacSceneCoordinator {
         restorationStore:
             any SceneRestorationStore,
         windowFactory:
-            any MacSceneWindowFactory
+            any MacSceneWindowFactory,
+        lifecyclePolicy:
+            MacSceneLifecyclePolicy = .init()
     ) {
 
         self.application =
@@ -95,6 +106,20 @@ final class MacSceneCoordinator {
 
         self.windowFactory =
             windowFactory
+
+
+        self.lifecyclePolicy =
+            lifecyclePolicy
+    }
+
+
+    // MARK: - Application Close Policy
+
+    var terminatesAfterLastWindowClosed:
+        Bool {
+
+        lifecyclePolicy
+            .terminatesAfterLastWindowClosed
     }
 
 
@@ -362,6 +387,34 @@ final class MacSceneCoordinator {
     }
 
 
+    // MARK: - Application Termination
+
+    /// Must be called before AppKit starts tearing down windows.
+    ///
+    /// This separates application termination from an explicit
+    /// user-requested Scene close.
+    func prepareForTermination() {
+
+        guard
+            !isTerminating
+        else {
+
+            return
+        }
+
+
+        isTerminating =
+            true
+
+
+        /*
+         Capture every live Scene before Window teardown begins.
+         */
+
+        saveScenes()
+    }
+
+
     // MARK: - Save
 
     func saveScenes() {
@@ -454,23 +507,22 @@ final class MacSceneCoordinator {
                     scene:
                         scene,
                     onSnapshotChange: {
-                        [weak self]
+                        [weak self, weak scene]
                         snapshot in
 
-                        self?
-                            .restorationStore
-                            .save(
-                                snapshot
-                            )
+                        guard let self, let scene,
+                              snapshot.sceneID == scene.id,
+                              self.runtimes[scene.id]?.scene === scene else { return }
+                        self.restorationStore.save(snapshot)
                     },
                     onSceneClosed: {
-                        [weak self]
+                        [weak self, weak scene]
                         sceneID in
 
-                        self?
-                            .sceneDidClose(
-                                sceneID
-                            )
+                        guard let self, let scene,
+                              sceneID == scene.id,
+                              self.runtimes[scene.id]?.scene === scene else { return }
+                        self.sceneDidClose(sceneID)
                     }
                 )
 
@@ -498,11 +550,59 @@ final class MacSceneCoordinator {
             SceneID
     ) {
 
-        restorationStore
-            .remove(
-                sceneID:
+        guard
+            let runtime =
+                runtimes[
                     sceneID
-            )
+                ]
+        else {
+
+            return
+        }
+
+
+        runtime.scene.close()
+
+        let disposition =
+            lifecyclePolicy
+                .restorationDisposition(
+                    isApplicationTerminating:
+                        isTerminating
+                )
+
+
+        switch disposition {
+
+        case .preserve:
+
+            /*
+             Capture the final semantic Scene state.
+
+             Window close during application termination must never
+             erase the restoration snapshot.
+             */
+
+            restorationStore
+                .save(
+                    runtime
+                        .window
+                        .restorationSnapshot()
+                )
+
+
+        case .remove:
+
+            /*
+             A non-final Scene explicitly closed while the app
+             continues running should not return next launch.
+             */
+
+            restorationStore
+                .remove(
+                    sceneID:
+                        sceneID
+                )
+        }
 
 
         runtimes[

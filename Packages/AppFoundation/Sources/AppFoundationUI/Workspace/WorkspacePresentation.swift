@@ -8,24 +8,20 @@ import SwiftUI
 
 // MARK: - Workspace Presentation
 
-/// Describes the semantic presentation of one active workspace.
+/// Semantic presentation of an application's primary workspace.
 ///
-/// A workspace is the center of the application shell. Navigation, context,
-/// accessories, and platform chrome exist in support of it.
+/// A workspace describes what is being presented.
 ///
-/// This type deliberately does not know about:
-/// - routes
-/// - split views
-/// - toolbars
-/// - windows
-/// - AppKit or UIKit
-///
-/// Those concerns belong to neighboring layers.
+/// It does not decide how a platform shell arranges navigation,
+/// context, toolbar, or accessory regions.
 @MainActor
 public struct WorkspacePresentation<Context> {
 
     public let identity:
         WorkspaceIdentity?
+
+    public let toolbar:
+        ToolbarPresentation<Context>
 
     public let context:
         ContextPresentation<Context>?
@@ -33,26 +29,40 @@ public struct WorkspacePresentation<Context> {
     public let workspaceAccessory:
         AccessoryPresentation<Context>?
 
+
     private let buildContent:
         (Context) -> AnyView
 
 
     public init<Content: View>(
-        identity: WorkspaceIdentity? = nil,
-        context: ContextPresentation<Context>? = nil,
-        workspaceAccessory: AccessoryPresentation<Context>? = nil,
-        @ViewBuilder content: @escaping (Context) -> Content
+        identity:
+            WorkspaceIdentity? = nil,
+        toolbar:
+            ToolbarPresentation<Context> = .init(),
+        context:
+            ContextPresentation<Context>? = nil,
+        workspaceAccessory:
+            AccessoryPresentation<Context>? = nil,
+        @ViewBuilder content:
+            @escaping (Context) -> Content
     ) {
+
         precondition(
-            workspaceAccessory?.scope != .application,
+            workspaceAccessory?.scope
+            !=
+            .application,
             """
-            WorkspacePresentation may only own workspace-scoped accessories.
-            Application-scoped accessories belong to the application shell.
+            WorkspacePresentation cannot own an
+            application-scoped accessory.
             """
         )
 
+
         self.identity =
             identity
+
+        self.toolbar =
+            toolbar
 
         self.context =
             context
@@ -64,14 +74,17 @@ public struct WorkspacePresentation<Context> {
             context in
 
             AnyView(
-                content(context)
+                content(
+                    context
+                )
             )
         }
     }
 
 
     public func content(
-        for context: Context
+        for context:
+            Context
     ) -> AnyView {
 
         buildContent(

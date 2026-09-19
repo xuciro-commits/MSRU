@@ -9,20 +9,6 @@
 ///
 /// `ApplicationShellPresentation` is semantic composition only.
 /// It does not prescribe where or how these surfaces are rendered.
-///
-/// A platform shell may present contexts using:
-///
-/// - a split item
-/// - an inspector
-/// - a sheet
-/// - a popover
-/// - an overlay
-///
-/// Application accessories may similarly be hosted using the
-/// native mechanism most appropriate for the platform.
-///
-/// This type deliberately does not contain navigation, toolbar,
-/// window, AppKit, or UIKit behavior.
 @MainActor
 public struct ApplicationShellPresentation<Context> {
 
@@ -32,12 +18,17 @@ public struct ApplicationShellPresentation<Context> {
     public let accessories:
         [AccessoryPresentation<Context>]
 
+    public let toolbar:
+        ToolbarPresentation<Context>
+
 
     public init(
         contexts:
             [ContextPresentation<Context>] = [],
         accessories:
-            [AccessoryPresentation<Context>] = []
+            [AccessoryPresentation<Context>] = [],
+        toolbar:
+            ToolbarPresentation<Context> = .init()
     ) {
 
         precondition(
@@ -59,6 +50,9 @@ public struct ApplicationShellPresentation<Context> {
 
         self.accessories =
             accessories
+
+        self.toolbar =
+            toolbar
     }
 
 
@@ -91,8 +85,6 @@ public struct ApplicationShellPresentation<Context> {
             }
     }
 
-
-    // MARK: - Semantic Queries
 
     public func contexts(
         role:

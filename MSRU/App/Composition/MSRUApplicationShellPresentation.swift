@@ -10,12 +10,6 @@ import AppFoundationUI
 
 // MARK: - Shell Presentation Context
 
-/// Runtime context available to application-level shell presentations.
-///
-/// Domain and scene state remain owned by `SceneModel`.
-///
-/// Shell-owned mechanics are exposed as semantic actions so product
-/// presentation does not depend on AppKit window-controller behavior.
 @MainActor
 struct MSRUApplicationShellContext {
 
@@ -25,8 +19,6 @@ struct MSRUApplicationShellContext {
     let actions:
         Actions
 
-
-    // MARK: Actions
 
     struct Actions {
 
@@ -38,25 +30,8 @@ struct MSRUApplicationShellContext {
 
 // MARK: - MSRU Application Shell Presentation
 
-/// Product-level semantic description of MSRU's supporting surfaces.
-///
-/// This layer answers:
-///
-/// - what the surface means
-/// - what scope it belongs to
-/// - what product content it displays
-///
-/// It deliberately does not answer:
-///
-/// - which NSSplitViewItem hosts it
-/// - where the accessory is attached
-/// - how wide the context pane is
-/// - how the presentation adapts on iPad
 @MainActor
 enum MSRUApplicationShellPresentation {
-
-
-    // MARK: - Identifiers
 
     private enum ID {
 
@@ -65,6 +40,9 @@ enum MSRUApplicationShellPresentation {
 
         static let miniPlayer =
             "playback.mini-player"
+
+        static let toggleQueue =
+            "playback.toggle-queue"
     }
 
 
@@ -88,12 +66,7 @@ enum MSRUApplicationShellPresentation {
                         .application
                         .playback
             )
-            .scrollContentBackground(
-                .hidden
-            )
-            .background(
-                Color.clear
-            )
+
         }
 
 
@@ -124,6 +97,35 @@ enum MSRUApplicationShellPresentation {
         }
 
 
+    // MARK: - Application Toolbar
+
+    static let toolbar =
+        ToolbarPresentation<
+            MSRUApplicationShellContext
+        >(
+            items:
+                [
+                    .action(
+                        ToolbarActionPresentation(
+                            id:
+                                ID.toggleQueue,
+                            title:
+                                "Queue",
+                            systemImage:
+                                "list.bullet",
+                            perform: {
+                                context in
+
+                                context
+                                    .actions
+                                    .toggleQueue()
+                            }
+                        )
+                    )
+                ]
+        )
+
+
     // MARK: - Definition
 
     static let definition =
@@ -137,6 +139,8 @@ enum MSRUApplicationShellPresentation {
             accessories:
                 [
                     miniPlayer
-                ]
+                ],
+            toolbar:
+                toolbar
         )
 }

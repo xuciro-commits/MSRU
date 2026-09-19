@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import MusicKit
 import AppFoundation
 
 
@@ -530,7 +531,7 @@ extension MSRUPreviewData {
 
 
         let playback =
-            PlaybackController()
+            makePlaybackController()
 
 
         let state =
@@ -583,9 +584,11 @@ extension MSRUPreviewData {
 private actor PreviewLibraryRepository:
     LibraryRepository {
 
-    private var tracks:
-        [LibraryTrack] = []
+    private var tracks: [LibraryTrack]
 
+    init(tracks: [LibraryTrack] = []) {
+        self.tracks = tracks
+    }
 
     func loadTracks()
         async throws
@@ -603,4 +606,81 @@ private actor PreviewLibraryRepository:
         self.tracks =
             tracks
     }
+}
+
+// Provider previews never read preferences or contact a remote endpoint.
+extension MSRUPreviewData {
+    @MainActor
+    static func makeProviderStore() -> ProviderManagerStore {
+        ProviderManagerStore(defaults: nil) { request in
+            HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        }
+    }
+}
+
+extension MSRUPreviewData {
+    static let localTracks = [
+        LocalTrack(fileURL: URL(fileURLWithPath: "/preview/Northern Lights.m4a"),
+                   title: "Northern Lights", artist: "Aurora Ensemble", album: "Night Studies",
+                   duration: 184, artworkData: nil),
+        LocalTrack(fileURL: URL(fileURLWithPath: "/preview/Quiet Geometry.mp3"),
+                   title: "Quiet Geometry", artist: "Mira Vale", album: nil,
+                   duration: 256, artworkData: nil)
+    ]
+
+    @MainActor
+    static func makeLocalLibraryStore(empty: Bool = false) -> LocalLibraryStore {
+        LocalLibraryStore(repository: PreviewLocalLibraryRepository(tracks: empty ? [] : localTracks))
+    }
+
+    @MainActor
+    static func makeAppleMusicStore() -> AppleMusicLibraryStore {
+        AppleMusicLibraryStore(service: PreviewAppleMusicService(), authorizationStatus: .notDetermined)
+    }
+
+    @MainActor
+    static func makePlaybackController() -> PlaybackController {
+        // No providers: interactive previews cannot resolve real files or remote media.
+        PlaybackController(providerKernel: PlaybackProviderKernel(registry: ProviderRegistry()))
+    }
+
+    @MainActor
+    static func makeApplication(savedTracks: [LibraryTrack] = []) -> ApplicationModel {
+        ApplicationModel(
+            musicCatalog: makeCatalogStore(),
+            localLibrary: makeLocalLibraryStore(),
+            library: LibraryStore(repository: PreviewLibraryRepository(tracks: savedTracks)),
+            musicLibrary: makeAppleMusicStore(),
+            playback: makePlaybackController(),
+            providerManager: makeProviderStore(),
+            openverseSearch: .preview(results: openverseResults)
+        )
+    }
+
+    @MainActor
+    static func makeScene(section: SceneSection = .listenNow) -> SceneModel {
+        SceneModel(application: makeApplication(), section: section)
+    }
+}
+
+@MainActor
+private struct PreviewLocalLibraryRepository: LocalLibraryRepository {
+    let tracks: [LocalTrack]
+    func loadTracks() async throws -> [LocalTrack] { tracks }
+    func importTrack(from url: URL) async throws -> LocalTrack? {
+        throw PreviewImportError.unavailable
+    }
+}
+
+private enum PreviewImportError: LocalizedError {
+    case unavailable
+    var errorDescription: String? { "File import is unavailable in previews." }
+}
+
+@MainActor
+private struct PreviewAppleMusicService: AppleMusicLibraryServing {
+    func requestAuthorization() async -> MusicAuthorization.Status { .denied }
+    func fetchAlbums() async throws -> [Album] { [] }
+    func fetchArtists() async throws -> [Artist] { [] }
+    func fetchSongs() async throws -> [Song] { [] }
 }

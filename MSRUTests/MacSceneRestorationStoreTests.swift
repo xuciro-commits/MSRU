@@ -266,6 +266,63 @@ struct MacSceneRestorationStoreTests {
     }
 
 
+    @Test
+    func mixedRecordsRestoreIndependentlyAndOpaqueRecordsSurviveWrites() throws {
+        let fixture = makeFixture()
+        defer { fixture.defaults.removePersistentDomain(forName: fixture.suiteName) }
+        let key = "MSRU.SceneRestoration.Snapshots.v1"
+        let valid = SceneRestorationSnapshot(sceneID: SceneID(), section: .browse, isQueuePresented: true)
+        let validRecord = try JSONSerialization.jsonObject(with: JSONEncoder().encode(valid))
+        let unknown: [String: Any] = ["version": 99, "payload": ["future": true]]
+        let invalid: [String: Any] = ["version": 1, "sceneID": "broken"]
+        fixture.defaults.set(try JSONSerialization.data(withJSONObject: [validRecord, unknown, invalid, NSNull()]), forKey: key)
+        #expect(fixture.store.loadSnapshots() == [valid])
+        var updated = valid
+        updated.section = .library
+        fixture.store.save(updated)
+        #expect(fixture.store.loadSnapshots() == [updated])
+        fixture.store.remove(sceneID: valid.sceneID)
+        #expect(fixture.store.loadSnapshots().isEmpty)
+        let remainingData = try #require(fixture.defaults.data(forKey: key))
+        let remaining = try #require(JSONSerialization.jsonObject(with: remainingData) as? [Any])
+        #expect(remaining.count == 3)
+        #expect((remaining[0] as? NSDictionary) == (unknown as NSDictionary))
+        #expect((remaining[1] as? NSDictionary) == (invalid as NSDictionary))
+        #expect(remaining[2] is NSNull)
+    }
+
+    @Test
+    func corruptDocumentIsPreservedBeforeReplacement() throws {
+        let fixture = makeFixture()
+        defer { fixture.defaults.removePersistentDomain(forName: fixture.suiteName) }
+        let key = "MSRU.SceneRestoration.Snapshots.v1"
+        let original = Data("not valid JSON".utf8)
+        fixture.defaults.set(original, forKey: key)
+        #expect(fixture.store.loadSnapshots().isEmpty)
+        #expect(fixture.defaults.data(forKey: key) == original)
+        let snapshot = SceneRestorationSnapshot(sceneID: SceneID(), section: .browse, isQueuePresented: false)
+        fixture.store.save(snapshot)
+        #expect(fixture.store.loadSnapshots() == [snapshot])
+        #expect(fixture.defaults.array(forKey: key + ".quarantine") as? [Data] == [original])
+        fixture.store.save(snapshot)
+        #expect(fixture.defaults.array(forKey: key + ".quarantine") as? [Data] == [original])
+    }
+
+    @Test
+    func duplicateSupportedRecordsResolveToLatestAndSaveConverges() throws {
+        let fixture = makeFixture()
+        defer { fixture.defaults.removePersistentDomain(forName: fixture.suiteName) }
+        let key = "MSRU.SceneRestoration.Snapshots.v1"
+        let original = SceneRestorationSnapshot(sceneID: SceneID(), section: .browse, isQueuePresented: false)
+        var updated = original
+        updated.section = .library
+        fixture.defaults.set(try JSONEncoder().encode([original, updated]), forKey: key)
+        #expect(fixture.store.loadSnapshots() == [updated])
+        fixture.store.save(original)
+        let stored = try JSONDecoder().decode([SceneRestorationSnapshot].self, from: #require(fixture.defaults.data(forKey: key)))
+        #expect(stored == [original])
+    }
+
     // MARK: - Fixture
 
     private func makeFixture()
