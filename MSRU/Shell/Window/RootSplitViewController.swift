@@ -4,6 +4,8 @@ import AppKit
 import SwiftUI
 import AppFoundation
 import AppFoundation
+import AppFoundationUI
+import AppFoundationUI
 
 
 @MainActor
@@ -266,19 +268,12 @@ final class RootSplitViewController:
         let playerAccessory =
             SplitAccessoryHostingController(
                 rootView:
-                    MiniPlayerAccessoryView(
-                        playback:
-                            scene
-                                .application
-                                .playback,
-                        onToggleQueue: {
-                            [weak self]
-                            in
-
-                            self?
-                                .toggleQueueInspector()
-                        }
-                    )
+                    MSRUApplicationShellPresentation
+                        .miniPlayer
+                        .content(
+                            for:
+                                makeShellPresentationContext()
+                        )
             )
 
 
@@ -302,18 +297,12 @@ final class RootSplitViewController:
     private func configureQueue() {
 
         let queueView =
-            QueuePaneView(
-                playback:
-                    scene
-                        .application
-                        .playback
-            )
-            .scrollContentBackground(
-                .hidden
-            )
-            .background(
-                Color.clear
-            )
+            MSRUApplicationShellPresentation
+                .playbackQueue
+                .content(
+                    for:
+                        makeShellPresentationContext()
+                )
 
 
         let hostingController =
@@ -383,6 +372,28 @@ final class RootSplitViewController:
 
         addSplitViewItem(
             item
+        )
+    }
+
+
+    // MARK: - Shell Presentation Context
+
+    private func makeShellPresentationContext()
+        -> MSRUApplicationShellContext {
+
+        MSRUApplicationShellContext(
+            scene:
+                scene,
+            actions:
+                .init(
+                    toggleQueue: {
+                        [weak self]
+                        in
+
+                        self?
+                            .toggleQueueInspector()
+                    }
+                )
         )
     }
 
