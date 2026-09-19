@@ -49,7 +49,9 @@ struct MSRUApp:
                 ) {
 
                     appDelegate
-                        .openNewScene()
+                        .send(
+                            .newScene
+                        )
                 }
                 .keyboardShortcut(
                     "n",
@@ -68,11 +70,6 @@ struct MSRUApp:
                 application:
                     application
             )
-            .task {
-
-                application
-                    .start()
-            }
         }
 
         #endif

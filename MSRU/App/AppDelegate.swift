@@ -13,34 +13,37 @@ final class AppDelegate:
     NSObject,
     NSApplicationDelegate {
 
-    // MARK: - Platform Composition
+    // MARK: - Platform Scene Runtime
 
     private let sceneCoordinator:
         MacSceneCoordinator
 
 
-    // MARK: - External Routing
+    // MARK: - Command Runtime
 
-    private let routeCodec =
-        SceneRouteURLCodec(
+    private let commandRuntime:
+        MultiSceneApplicationCommandRuntime
+
+
+    // MARK: - Lifecycle Runtime
+
+    /*
+     Platform delegate 只负责把
+     platform lifecycle event
+     映射到 Foundation lifecycle semantic。
+     */
+
+    private let lifecycleRuntime:
+        ApplicationLifecycleRuntime
+
+
+    // MARK: - External Command Source
+
+    private let externalURLSource =
+        SceneRouteURLCommandSource(
             scheme:
                 "msru"
         )
-
-
-    /*
-     macOS 可能在 Application launch
-     完成之前交付 URL。
-
-     所以 External Intent 必须允许 buffering。
-     */
-
-    private var pendingExternalRoutes:
-        [SceneRoute] = []
-
-
-    private var hasStarted =
-        false
 
 
     // MARK: - Init
@@ -55,7 +58,7 @@ final class AppDelegate:
             MacSceneRestorationStore()
 
 
-        self.sceneCoordinator =
+        let sceneCoordinator =
             MacSceneCoordinator(
                 application:
                     application,
@@ -64,7 +67,48 @@ final class AppDelegate:
             )
 
 
+        let commandRuntime =
+            MultiSceneApplicationCommandRuntime(
+                runtime:
+                    sceneCoordinator
+            )
+
+
+        let lifecycleRuntime =
+            ApplicationLifecycleRuntime(
+                commandRuntime:
+                    commandRuntime
+            )
+
+
+        self.sceneCoordinator =
+            sceneCoordinator
+
+
+        self.commandRuntime =
+            commandRuntime
+
+
+        self.lifecycleRuntime =
+            lifecycleRuntime
+
+
         super.init()
+    }
+
+
+    // MARK: - Command Entry
+
+    @discardableResult
+    func send(
+        _ command:
+            ApplicationCommand
+    ) -> ApplicationCommandResult {
+
+        commandRuntime
+            .send(
+                command
+            )
     }
 
 
@@ -83,32 +127,23 @@ final class AppDelegate:
         }
 
 
+        lifecycleRuntime
+            .beginBootstrap()
+
+
+        /*
+         真正的 platform bootstrap。
+
+         Foundation lifecycle
+         不知道里面发生了什么。
+         */
+
         sceneCoordinator
             .start()
 
 
-        hasStarted =
-            true
-
-
-        flushPendingExternalRoutes()
-    }
-
-
-    // MARK: - New Window
-
-    func openNewScene() {
-
-        guard
-            !isRunningForPreviews
-        else {
-
-            return
-        }
-
-
-        sceneCoordinator
-            .openNewScene()
+        lifecycleRuntime
+            .markReady()
     }
 
 
@@ -129,80 +164,21 @@ final class AppDelegate:
         }
 
 
-        let routes =
+        let commands =
             urls
                 .compactMap {
-                    routeCodec
-                        .decode(
-                            $0
+                    externalURLSource
+                        .command(
+                            from:
+                                $0
                         )
                 }
 
 
-        guard
-            hasStarted
-        else {
-
-            pendingExternalRoutes
-                .append(
-                    contentsOf:
-                        routes
-                )
-
-
-            return
-        }
-
-
-        route(
-            routes
-        )
-    }
-
-
-    private func flushPendingExternalRoutes() {
-
-        guard
-            !pendingExternalRoutes
-                .isEmpty
-        else {
-
-            return
-        }
-
-
-        let routes =
-            pendingExternalRoutes
-
-
-        pendingExternalRoutes
-            .removeAll()
-
-
-        route(
-            routes
-        )
-    }
-
-
-    private func route(
-        _ routes:
-            [SceneRoute]
-    ) {
-
-        for route
-        in routes {
-
-            sceneCoordinator
-                .route(
-                    SceneRoutingRequest(
-                        route:
-                            route,
-                        target:
-                            .activeOrNew
-                    )
-                )
-        }
+        commandRuntime
+            .send(
+                commands
+            )
     }
 
 
@@ -252,6 +228,10 @@ final class AppDelegate:
 
             return
         }
+
+
+        lifecycleRuntime
+            .terminate()
 
 
         sceneCoordinator

@@ -1,8 +1,10 @@
 #if os(iOS)
 
+import Foundation
 import SwiftUI
 
 
+@MainActor
 struct iPadRootView:
     View {
 
@@ -12,18 +14,27 @@ struct iPadRootView:
         ApplicationModel
 
 
-    // MARK: - External Routing
+    // MARK: - External Command Source
 
-    private let routeCodec =
-        SceneRouteURLCodec(
+    private let externalURLSource =
+        SceneRouteURLCommandSource(
             scheme:
                 "msru"
         )
 
 
+    // MARK: - Command Runtime
+
     @State
-    private var pendingRoute:
-        SceneRoute?
+    private var commandRuntime:
+        SingleSceneApplicationCommandRuntime
+
+
+    // MARK: - Lifecycle Runtime
+
+    @State
+    private var lifecycleRuntime:
+        ApplicationLifecycleRuntime
 
 
     // MARK: - Platform Restoration
@@ -51,6 +62,27 @@ struct iPadRootView:
 
         self.application =
             application
+
+
+        let commandRuntime =
+            SingleSceneApplicationCommandRuntime()
+
+
+        _commandRuntime =
+            State(
+                initialValue:
+                    commandRuntime
+            )
+
+
+        _lifecycleRuntime =
+            State(
+                initialValue:
+                    ApplicationLifecycleRuntime(
+                        commandRuntime:
+                            commandRuntime
+                    )
+            )
     }
 
 
@@ -70,11 +102,11 @@ struct iPadRootView:
             } else {
 
                 ProgressView()
-                    .task {
-
-                        restoreOrCreateScene()
-                    }
             }
+        }
+        .task {
+
+            bootstrapIfNeeded()
         }
         .onOpenURL {
             url in
@@ -133,17 +165,17 @@ struct iPadRootView:
 
     // MARK: - External URL
 
-    @MainActor
     private func handleExternalURL(
         _ url:
             URL
     ) {
 
         guard
-            let route =
-                routeCodec
-                    .decode(
-                        url
+            let command =
+                externalURLSource
+                    .command(
+                        from:
+                            url
                     )
         else {
 
@@ -151,54 +183,93 @@ struct iPadRootView:
         }
 
 
-        guard
-            let scene
-        else {
-
-            pendingRoute =
-                route
-
-            return
-        }
-
-
-        scene
+        commandRuntime
             .send(
-                .navigate(
-                    route
-                )
+                command
             )
-
-
-        persist(
-            scene
-        )
     }
 
 
     // MARK: - Bootstrap
 
-    @MainActor
-    private func restoreOrCreateScene() {
+    private func bootstrapIfNeeded() {
 
         guard
-            scene == nil
+            lifecycleRuntime.phase
+            ==
+            .initialized
         else {
 
             return
         }
 
 
-        let resolvedScene:
-            SceneModel
+        lifecycleRuntime
+            .beginBootstrap()
 
+
+        /*
+         Application Scope startup。
+
+         idempotency 属于 ApplicationModel。
+         */
+
+        application
+            .start()
+
+
+        let resolvedScene =
+            restoreOrCreateScene()
+
+
+        scene =
+            resolvedScene
+
+
+        /*
+         Wiring。
+         不自动 activate。
+         */
+
+        commandRuntime
+            .attach(
+                resolvedScene
+            )
+
+
+        /*
+         Platform runtime 现在真正 ready。
+         */
+
+        lifecycleRuntime
+            .markReady()
+
+
+        /*
+         markReady() 可能 flush
+         bootstrap 前到达的 commands。
+
+         所以 snapshot 必须在 flush 后保存。
+         */
+
+        persist(
+            resolvedScene
+        )
+    }
+
+
+    // MARK: - Restore / Create
+
+    private func restoreOrCreateScene()
+        -> SceneModel {
 
         if let restorationJSON,
            let data =
-            restorationJSON.data(
-                using:
-                    .utf8
-            ),
+            restorationJSON
+                .data(
+                    using:
+                        .utf8
+                ),
            let snapshot =
             try? JSONDecoder()
                 .decode(
@@ -215,47 +286,21 @@ struct iPadRootView:
                     snapshot
             ) {
 
-            resolvedScene =
+            return
                 restoredScene
-
-        } else {
-
-            resolvedScene =
-                SceneModel(
-                    application:
-                        application
-                )
         }
 
 
-        if let pendingRoute {
-
-            resolvedScene
-                .send(
-                    .navigate(
-                        pendingRoute
-                    )
-                )
-
-
-            self.pendingRoute =
-                nil
-        }
-
-
-        scene =
-            resolvedScene
-
-
-        persist(
-            resolvedScene
-        )
+        return
+            SceneModel(
+                application:
+                    application
+            )
     }
 
 
     // MARK: - Persist
 
-    @MainActor
     private func persist(
         _ scene:
             SceneModel
