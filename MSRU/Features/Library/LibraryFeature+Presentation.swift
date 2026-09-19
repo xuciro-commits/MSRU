@@ -85,6 +85,11 @@ private struct LibraryFeatureDestination:
                     get: { scene.selectedLocalTrack },
                     set: { scene.select(localTrack: $0) }
                 ),
+            selectedLibraryTrack:
+                Binding(
+                    get: { scene.selectedLibraryTrack },
+                    set: { scene.select(libraryTrack: $0) }
+                ),
             onAddMusic: {
 
                 scene.send(

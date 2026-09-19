@@ -25,6 +25,7 @@ struct MSRUContextPaneView: View {
             switch scene.activeContextPane {
             case .inspector:
                 TrackInspectorView(
+                    libraryTrack: scene.selectedLibraryTrack,
                     localTrack: scene.selectedLocalTrack,
                     musicContent: scene.selectedMusicContent,
                     playback: scene.application.playback,

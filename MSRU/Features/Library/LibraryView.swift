@@ -72,6 +72,10 @@ struct LibraryView:
     var selectedLocalTrack:
         LocalTrack?
 
+    @Binding
+    var selectedLibraryTrack:
+        LibraryTrack?
+
 
     let onAddMusic:
         () -> Void
@@ -82,6 +86,47 @@ struct LibraryView:
     @State
     private var scope:
         Scope = .saved
+
+    @State
+    private var viewMode:
+        LibraryViewMode = .table
+
+    @State
+    private var sortField:
+        LibrarySortField = .dateAdded
+
+    @State
+    private var sortAscending:
+        Bool = false
+
+    @State
+    private var searchQuery:
+        String = ""
+
+
+    // MARK: - Init
+
+    init(
+        feature:
+            FeatureHost<LibraryFeature>,
+        localStore:
+            LocalLibraryStore,
+        playback:
+            PlaybackController,
+        selectedLocalTrack:
+            Binding<LocalTrack?>,
+        selectedLibraryTrack:
+            Binding<LibraryTrack?> = .constant(nil),
+        onAddMusic:
+            @escaping () -> Void
+    ) {
+        self.feature = feature
+        self.localStore = localStore
+        self.playback = playback
+        self._selectedLocalTrack = selectedLocalTrack
+        self._selectedLibraryTrack = selectedLibraryTrack
+        self.onAddMusic = onAddMusic
+    }
 
 
     // MARK: - Body
@@ -281,15 +326,85 @@ struct LibraryView:
 
         } else {
 
-            savedGrid
+            let tracks =
+                LibraryCollectionSortFilter
+                    .filterAndSort(
+                        tracks:
+                            feature.tracks,
+                        query:
+                            searchQuery,
+                        field:
+                            sortField,
+                        ascending:
+                            sortAscending
+                    )
+
+
+            VStack(
+                spacing: 0
+            ) {
+
+                LibraryFilterBar(
+                    viewMode:
+                        $viewMode,
+                    sortField:
+                        $sortField,
+                    sortAscending:
+                        $sortAscending,
+                    searchQuery:
+                        $searchQuery
+                )
+
+
+                Divider()
+
+
+                if tracks.isEmpty {
+
+                    ContentUnavailableView
+                        .search(
+                            text: searchQuery
+                        )
+                        .frame(
+                            maxWidth: .infinity,
+                            maxHeight: .infinity
+                        )
+
+                } else {
+
+                    switch viewMode {
+
+                    case .table:
+
+                        LibraryTrackTableView(
+                            tracks:
+                                tracks,
+                            selectedTrack:
+                                $selectedLibraryTrack,
+                            playback:
+                                playback,
+                            library:
+                                feature.libraryStore
+                        )
+
+
+                    case .grid:
+
+                        savedGrid(
+                            tracks
+                        )
+                    }
+                }
+            }
         }
     }
 
 
     // MARK: - Saved Grid
 
-    private var savedGrid:
-        some View {
+    private func savedGrid(
+        _ tracks: [LibraryTrack]
+    ) -> some View {
 
         ScrollView {
 
@@ -314,7 +429,7 @@ struct LibraryView:
             ) {
 
                 ForEach(
-                    feature.tracks
+                    tracks
                 ) {
                     track in
 
@@ -342,6 +457,9 @@ struct LibraryView:
                 .isRemoving(
                     track
                 )
+
+        let isSelected =
+            selectedLibraryTrack?.id == track.id
 
 
         return VStack(
@@ -460,6 +578,19 @@ struct LibraryView:
                     track
                 )
             }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            selectedLibraryTrack = track
         }
     }
 

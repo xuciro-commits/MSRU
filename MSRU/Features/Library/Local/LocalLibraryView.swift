@@ -32,6 +32,18 @@ struct LocalLibraryView: View {
     @State private var isDropTargeted =
         false
 
+    @State private var viewMode:
+        LibraryViewMode = .table
+
+    @State private var sortField:
+        LibrarySortField = .dateAdded
+
+    @State private var sortAscending:
+        Bool = false
+
+    @State private var searchQuery:
+        String = ""
+
 
     // MARK: - Body
 
@@ -93,7 +105,76 @@ struct LocalLibraryView: View {
 
         } else {
 
-            trackGrid
+            let tracks =
+                LibraryCollectionSortFilter
+                    .filterAndSort(
+                        tracks:
+                            store.tracks,
+                        query:
+                            searchQuery,
+                        field:
+                            sortField,
+                        ascending:
+                            sortAscending
+                    )
+
+
+            VStack(
+                spacing: 0
+            ) {
+
+                LibraryFilterBar(
+                    viewMode:
+                        $viewMode,
+                    sortField:
+                        $sortField,
+                    sortAscending:
+                        $sortAscending,
+                    searchQuery:
+                        $searchQuery
+                )
+
+
+                Divider()
+
+
+                if tracks.isEmpty {
+
+                    ContentUnavailableView
+                        .search(
+                            text: searchQuery
+                        )
+                        .frame(
+                            maxWidth: .infinity,
+                            maxHeight: .infinity
+                        )
+
+                } else {
+
+                    switch viewMode {
+
+                    case .table:
+
+                        LocalTrackTableView(
+                            tracks:
+                                tracks,
+                            selectedTrack:
+                                $selectedTrack,
+                            playback:
+                                playback,
+                            library:
+                                library
+                        )
+
+
+                    case .grid:
+
+                        trackGrid(
+                            tracks
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -165,8 +246,9 @@ struct LocalLibraryView: View {
 
     // MARK: - Grid
 
-    private var trackGrid:
-        some View {
+    private func trackGrid(
+        _ tracks: [LocalTrack]
+    ) -> some View {
 
         ScrollView {
 
@@ -190,7 +272,7 @@ struct LocalLibraryView: View {
             ) {
 
                 ForEach(
-                    store.tracks
+                    tracks
                 ) {
                     track in
 

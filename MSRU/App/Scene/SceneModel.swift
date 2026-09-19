@@ -72,6 +72,10 @@ final class SceneModel:
         LocalTrack?
 
 
+    var selectedLibraryTrack:
+        LibraryTrack?
+
+
     // MARK: - Presentation
 
     enum ContextPane: String, CaseIterable, Identifiable, Codable, Sendable {
@@ -96,6 +100,7 @@ final class SceneModel:
     func select(localTrack: LocalTrack?) {
         self.selectedLocalTrack = localTrack
         if localTrack != nil {
+            self.selectedLibraryTrack = nil
             self.selectedMusicContent = nil
             self.activeContextPane = .inspector
             self.isQueuePresented = true
@@ -106,6 +111,17 @@ final class SceneModel:
         self.selectedMusicContent = musicContent
         if musicContent != nil {
             self.selectedLocalTrack = nil
+            self.selectedLibraryTrack = nil
+            self.activeContextPane = .inspector
+            self.isQueuePresented = true
+        }
+    }
+
+    func select(libraryTrack: LibraryTrack?) {
+        self.selectedLibraryTrack = libraryTrack
+        if libraryTrack != nil {
+            self.selectedLocalTrack = nil
+            self.selectedMusicContent = nil
             self.activeContextPane = .inspector
             self.isQueuePresented = true
         }
