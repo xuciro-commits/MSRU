@@ -172,7 +172,7 @@ public struct ResolvedWorkspacePresentation {
 /// A complete semantic shell snapshot ready for a platform renderer.
 ///
 /// All application-specific generic Context types have already been
-/// consumed by `ApplicationShellRuntime`.
+/// consumed by `ApplicationShellResolver`.
 @MainActor
 public struct ResolvedApplicationShell {
 

@@ -1,13 +1,13 @@
 //
-//  ApplicationShellRuntime.swift
+//  ApplicationShellResolver.swift
 //  AppFoundationUI
 //
 
-// MARK: - Application Shell Runtime
+// MARK: - Application Shell Resolver
 
-/// Resolves application semantics into a platform-consumable shell.
+/// Pure stateless combinator that resolves application semantics into a platform-consumable shell.
 ///
-/// The runtime intentionally separates two context domains:
+/// The resolver intentionally separates two context domains:
 ///
 /// - `WorkspaceContext`
 /// - `ShellContext`
@@ -15,9 +15,9 @@
 /// A workspace may depend on a scene/domain context while the
 /// application shell can depend on a different action-enabled context.
 ///
-/// Neither context escapes the runtime after resolution.
+/// Neither context escapes the resolver after resolution.
 @MainActor
-public struct ApplicationShellRuntime<
+public struct ApplicationShellResolver<
     Route,
     WorkspaceContext,
     ShellContext

@@ -36,7 +36,8 @@ public enum DependencyEnvironment:
 @MainActor
 public protocol DependencyKey {
 
-    associatedtype Value
+    associatedtype Value:
+        Sendable
 
 
     static var liveValue:

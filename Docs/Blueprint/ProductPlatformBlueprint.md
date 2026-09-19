@@ -106,7 +106,7 @@
 | Auxiliary region | 控制台、日志、批处理结果等辅助工作区域，和 Workflow 分开 |
 | Dependency / Service / Provider | 分别是交付能力的关系、完成用例的能力、同类能力的来源实现；不是规定每个用例必须经过的三层 |
 
-`ApplicationShellRuntime` 当前更接近无状态组合器。它可以保留实现或在适当时机更名，但不能吸收上述所有责任。架构完整不等于拥有一个名为 `ApplicationRuntime` 的类型。
+`ApplicationShellResolver` 为纯无状态组合器。它不吸收上述所有责任。架构完整不等于拥有一个名为 `ApplicationRuntime` 的类型。
 
 ### 最小应用组合契约
 

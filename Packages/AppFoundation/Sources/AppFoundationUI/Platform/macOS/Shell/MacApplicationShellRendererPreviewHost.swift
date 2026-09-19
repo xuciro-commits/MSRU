@@ -88,7 +88,7 @@ private struct MacApplicationShellRendererRepresentable:
 
 
                     Text(
-                        "Resolved by ApplicationShellRuntime"
+                        "Resolved by ApplicationShellResolver"
                     )
                     .foregroundStyle(
                         .secondary

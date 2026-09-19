@@ -105,7 +105,7 @@ public struct SwiftUIApplicationShell<Navigation: View>: View {
 
 #Preview("SwiftUI Application Shell") {
     @Previewable @State var showsContext = true
-    let shell = ApplicationShellRuntime<String, String, String>(
+    let shell = ApplicationShellResolver<String, String, String>(
         shell: ApplicationShellPresentation(contexts: [
             ContextPresentation(id: "details", role: .inspector) { (_: String) in Text("Selection details").padding() }
         ]),

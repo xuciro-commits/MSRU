@@ -25,6 +25,7 @@
 | 5 | 进行中：双平台 Shell 与搜索同步已实现 | ExperienceBlueprint / 图册；构建与状态测试通过，原生焦点测试通过，紧凑布局视觉待验收 |
 | 6 | 进行中：收藏事务、重启和播放入口已实现 | 图册；保存失败、并发、重启、混合队列测试通过，真实媒体待验收 |
 | 7 | 已完成：曲目属性检查器 (Track Inspector) 与上下文面板切换 | 图册 1.2 / 9.1；单元测试、Preview 门禁与架构检查全部通过 |
+| 8 | 已完成：基础框架收敛（DependencyValues 并发硬化与 ShellResolver 命名澄清） | AbstractionAudit / NorthStarArchitecture；Sendable 存储收窄、无状态组合器重命名，全量 53 项框架测试与 113 项应用测试全部通过 |
 
 具体文件和迁移范围见 [迁移路线](../Docs/Roadmap/FoundationRoadmap.md)。不要把本表与该路线维护成两套详细任务拆解。
 
@@ -51,6 +52,7 @@
 | 生命周期 | token 撤销、场景关闭身份检查、迟到结果失效有可控时序测试；恢复逐条容错并备份损坏原文。真实 NSWindow 与进程级退出恢复分别验证。 |
 | Shell | App/测试采用 Swift 6；两种 Shell 共享语义，Browse 保留一个搜索入口；原生搜索保持控件身份、enabled 和 first responder。 |
 | Inspector & Context | 支持右侧 Context 区域 `[曲目详情] [队列]` 双面板切换。选中本地/曲库曲目时自动展现 Track Inspector，展示封面、标题、艺术家、专辑、时长、音频格式、文件大小、路径，并支持播放、下一首、队列、收藏和「在访达中显示」。架构无跨界 import，全 Preview 隔离覆盖，新增 TrackInspectorTests 4 项测试全部通过。 |
+| 基础架构与并发 | `DependencyKey` 强化 `associatedtype Value: Sendable`，`DependencyValues` 擦除存储收窄为 `[ObjectIdentifier: any Sendable]` 并消除 `@unchecked Sendable`。纯函数式无状态组合器统一由 `ApplicationShellRuntime` 规范更名为 `ApplicationShellResolver`，不留无用兼容别名。AppFoundation 单元测试及应用全量测试完整回归。 |
 | 数据 | 收藏先提交后发布；扫描、导入与收藏写入按序执行。失败、并发、路径别名、同名文件及重启恢复有回归测试。 |
 | 播放 | 混合队列保留重复实例；真实静音 AVPlayer 顺播两个 WAV，核对媒体时钟与队列终态。AVPlayer/PCM 失败清理、旧回调隔离和保留队列重试有测试。 |
 | FFmpeg | 构建暂存、互斥与发布回滚经过失败探针；完整重建 macOS/iOS/visionOS 切片，两个模拟器均含 arm64+x86_64。visionOS UI API 差异已适配。 |

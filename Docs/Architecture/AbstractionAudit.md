@@ -8,7 +8,7 @@
 | FeatureHost | KEEP | 拥有状态、依赖快照及任务登记。删掉只会让每个功能重复实现；先修取消后的回传权限。 |
 | FeatureTask | KEEP / SIMPLIFY | 表达异步工作与取消。实际执行是 host 管理的非结构化 Task，不要称为 Swift 结构化并发；暂不扩成效果 DSL。 |
 | FeatureService | SIMPLIFY | 实际是同步状态转换加任务描述。名字容易与数据 Service 混淆；不因此新增一层业务服务。 |
-| DependencyValues | KEEP / CONSTRAIN | 支持 live/preview/test 和局部替换；删除会丢失已有测试能力。`Any` 加 `@unchecked Sendable` 的承诺需收窄，见并发文档。 |
+| DependencyValues | KEEP / CONSTRAIN | 支持 live/preview/test 和局部替换；删除会丢失已有测试能力。已收窄为 associatedtype Value: Sendable 与 storage: [ObjectIdentifier: any Sendable]。 |
 | ApplicationFeature | KEEP，暂缓扩展 | 静态贡献入口；与运行 Feature 职责不同。不能强制所有贡献者有 FeatureHost。 |
 | FeatureContribution | KEEP | 汇集一项功能的路由、侧栏、命令。保留纯值；不装运行对象。 |
 | FeaturePack | KEEP / SIMPLIFY | 归一化及校验贡献。删除后 ApplicationDefinition 仍需同等逻辑；没有独立消费者前不要扩充插件系统。 |
@@ -21,7 +21,7 @@
 | AccessoryPresentation / AccessoryScope | SIMPLIFY | 保留持久辅助 UI。当前 `.application` 表示跨工作区可见，不证明对象是应用单例；寿命与摆放位置必须分开。 |
 | ToolbarPresentation | KEEP，补同步契约 | 操作与搜索已有真实使用。不要复制一整套原生菜单/toolbar API。 |
 | ApplicationShellPresentation | KEEP | 定义跨工作区的辅助区域；同一描述可在多窗口各自呈现。 |
-| ApplicationShellRuntime | SIMPLIFY | 无状态组合器。职责止于 resolve；下一次相关修改可改名 ShellResolver。 |
+| ApplicationShellResolver | SIMPLIFY | 无状态组合器。职责止于 resolve；已由原 ApplicationShellRuntime 规范更名，无冗余别名。 |
 | ResolvedApplicationShell | KEEP，作为实现边界 | 消除 renderer 的产品泛型；`AnyView` 在此合理。不要序列化、跨 actor 传递或作为领域状态。 |
 | MacApplicationShellRenderer | KEEP | 统一原生 split、hosting 和 accessory 安装。应用仍决定选择哪个辅助区域；这种少量组合代码是正常成本。 |
 | MSRUApplicationShellSession | MERGE 候选 | 为 Scene/context/action 组装提供小包装。等 iPad slice 证明是否复用，再决定并入场景组合对象；现在直接删可能损害弱引用关系。 |

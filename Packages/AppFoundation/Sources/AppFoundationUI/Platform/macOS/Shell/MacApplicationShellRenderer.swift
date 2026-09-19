@@ -15,7 +15,7 @@ import SwiftUI
 ///
 /// Semantic ownership:
 ///
-///     ApplicationShellRuntime
+///     ApplicationShellResolver
 ///
 /// Platform ownership:
 ///

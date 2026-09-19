@@ -32,7 +32,7 @@ import Foundation
  */
 
 public struct DependencyValues:
-    @unchecked Sendable {
+    Sendable {
 
     // MARK: - Environment
 
@@ -45,7 +45,7 @@ public struct DependencyValues:
     private var storage:
         [
             ObjectIdentifier:
-                Any
+                any Sendable
         ]
 
 

@@ -1,5 +1,5 @@
 //
-//  ApplicationShellRuntimeTests.swift
+//  ApplicationShellResolverTests.swift
 //  AppFoundationUITests
 //
 
@@ -9,28 +9,28 @@ import Testing
 @testable import AppFoundationUI
 
 
-private enum RuntimeTestRoute {
+private enum ResolverTestRoute {
 
     case home
     case missing
 }
 
 
-private struct RuntimeWorkspaceContext {
+private struct ResolverWorkspaceContext {
 
     let title:
         String
 }
 
 
-private struct RuntimeShellContext {
+private struct ResolverShellContext {
 
     let value:
         String
 }
 
 
-struct ApplicationShellRuntimeTests {
+struct ApplicationShellResolverTests {
 
     @Test
     @MainActor
@@ -40,11 +40,11 @@ struct ApplicationShellRuntimeTests {
             makeApplicationShell()
 
 
-        let runtime =
-            ApplicationShellRuntime<
-                RuntimeTestRoute,
-                RuntimeWorkspaceContext,
-                RuntimeShellContext
+        let resolver =
+            ApplicationShellResolver<
+                ResolverTestRoute,
+                ResolverWorkspaceContext,
+                ResolverShellContext
             >(
                 shell:
                     shell,
@@ -70,7 +70,7 @@ struct ApplicationShellRuntimeTests {
 
 
         let resolved =
-            runtime.resolve(
+            resolver.resolve(
                 route:
                     .home,
                 workspaceContext:
@@ -147,11 +147,11 @@ struct ApplicationShellRuntimeTests {
     @MainActor
     func mergesApplicationAndWorkspaceToolbars() {
 
-        let runtime =
-            ApplicationShellRuntime<
-                RuntimeTestRoute,
-                RuntimeWorkspaceContext,
-                RuntimeShellContext
+        let resolver =
+            ApplicationShellResolver<
+                ResolverTestRoute,
+                ResolverWorkspaceContext,
+                ResolverShellContext
             >(
                 shell:
                     makeApplicationShell(),
@@ -171,7 +171,7 @@ struct ApplicationShellRuntimeTests {
 
 
         let resolved =
-            runtime.resolve(
+            resolver.resolve(
                 route:
                     .home,
                 workspaceContext:
@@ -207,11 +207,11 @@ struct ApplicationShellRuntimeTests {
     @MainActor
     func applicationShellSurvivesMissingWorkspace() {
 
-        let runtime =
-            ApplicationShellRuntime<
-                RuntimeTestRoute,
-                RuntimeWorkspaceContext,
-                RuntimeShellContext
+        let resolver =
+            ApplicationShellResolver<
+                ResolverTestRoute,
+                ResolverWorkspaceContext,
+                ResolverShellContext
             >(
                 shell:
                     makeApplicationShell(),
@@ -225,7 +225,7 @@ struct ApplicationShellRuntimeTests {
 
 
         let resolved =
-            runtime.resolve(
+            resolver.resolve(
                 route:
                     .missing,
                 workspaceContext:
@@ -286,7 +286,7 @@ struct ApplicationShellRuntimeTests {
     @MainActor
     private func makeApplicationShell()
         -> ApplicationShellPresentation<
-            RuntimeShellContext
+            ResolverShellContext
         > {
 
         ApplicationShellPresentation(
@@ -346,7 +346,7 @@ struct ApplicationShellRuntimeTests {
     @MainActor
     private func makeWorkspace()
         -> WorkspacePresentation<
-            RuntimeWorkspaceContext
+            ResolverWorkspaceContext
         > {
 
         WorkspacePresentation(

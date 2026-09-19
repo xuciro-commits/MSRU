@@ -66,7 +66,7 @@ flowchart TD
 
 ## Application Runtime 的终点
 
-`ApplicationShellRuntime.resolve` 当前只有 workspace 查询、context/accessory 映射和 toolbar 合并，没有任务、资源或状态寿命。因此保留功能，将来顺手改名为 `ShellResolver` 即可；不要扩展成 `ApplicationRuntime`。不要为了改名现在制造兼容别名链。
+`ApplicationShellResolver.resolve` 当前只有 workspace 查询、context/accessory 映射和 toolbar 合并，没有任务、资源或状态寿命。已由原无状态的 `ApplicationShellRuntime` 规范更名为 `ApplicationShellResolver`，不设冗余别名；不扩展成 `ApplicationRuntime`。
 
 应用组合根负责装配服务、启动/停止、场景注册和外部命令分发；场景负责导航、FeatureHost、恢复与面板状态；ShellResolver 只组合呈现。Search/Selection 属于对应 Feature；Focus 由平台维护，必要时暴露类型化操作；没有证据需要通用 SearchRuntime、SelectionRuntime、FocusRuntime。
 

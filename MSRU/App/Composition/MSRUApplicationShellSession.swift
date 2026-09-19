@@ -24,10 +24,10 @@ final class MSRUApplicationShellSession {
         SceneModel
 
 
-    // MARK: - Runtime
+    // MARK: - Resolver
 
-    private let runtime:
-        ApplicationShellRuntime<
+    private let resolver:
+        ApplicationShellResolver<
             SceneRoute,
             SceneModel,
             MSRUApplicationShellContext
@@ -54,8 +54,8 @@ final class MSRUApplicationShellSession {
             scene
 
 
-        self.runtime =
-            ApplicationShellRuntime(
+        self.resolver =
+            ApplicationShellResolver(
                 definition:
                     MSRUApplication
                         .definition,
@@ -88,7 +88,7 @@ final class MSRUApplicationShellSession {
     func resolve()
         -> ResolvedApplicationShell {
 
-        runtime.resolve(
+        resolver.resolve(
             route:
                 scene
                     .navigation
