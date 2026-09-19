@@ -5,6 +5,8 @@
 
 import SwiftUI
 import Observation
+import AppFoundationUI
+
 
 #if os(macOS)
 
@@ -27,16 +29,6 @@ struct MainContentView:
         SceneModel
 
 
-    // MARK: - Application
-
-    private var application:
-        ApplicationModel {
-
-        scene
-            .application
-    }
-
-
     // MARK: - Body
 
     var body:
@@ -48,7 +40,20 @@ struct MainContentView:
                 .ignoresSafeArea()
 
 
-            page
+            ApplicationRouteView(
+                route:
+                    scene
+                        .navigation
+                        .route,
+                context:
+                    scene,
+                destinations:
+                    MSRUApplication.definition.routeDestinations
+            ) {
+                _ in
+
+                unsupportedDestination
+            }
         }
         .frame(
             maxWidth:
@@ -88,150 +93,18 @@ struct MainContentView:
     }
 
 
-    // MARK: - Page
+    // MARK: - Unsupported Destination
 
-    @ViewBuilder
-    private var page:
+    private var unsupportedDestination:
         some View {
 
-        switch
-            scene
-                .navigation
-                .section {
-
-        // MARK: Listen Now
-
-        case .listenNow:
-
-            ListenNowView(
-                store:
-                    application
-                        .musicCatalog,
-                onSelect: {
-                    item in
-
-                    scene
-                        .selectedMusicContent =
-                        item
-                }
-            )
-
-
-        // MARK: Browse
-
-        case .browse:
-
-            BrowseView(
-                feature:
-                    scene
-                        .browse
-            )
-
-
-        // MARK: Radio
-
-        case .radio:
-
-            placeholder(
-                title:
-                    "Radio",
-                systemImage:
-                    "dot.radiowaves.left.and.right",
-                description:
-                    "Radio providers and continuous playback will land in a later milestone."
-            )
-
-
-        // MARK: Library
-
-        case .library:
-
-            LibraryView(
-                feature:
-                    scene
-                        .libraryFeature,
-                localStore:
-                    application
-                        .localLibrary,
-                playback:
-                    application
-                        .playback,
-                selectedLocalTrack:
-                    $scene
-                        .selectedLocalTrack,
-                onAddMusic: {
-
-                    scene
-                        .send(
-                            .navigate(
-                                .section(
-                                    .addMusic
-                                )
-                            )
-                        )
-                }
-            )
-
-
-        // MARK: Add Music
-
-        case .addMusic:
-
-            AddMusicView(
-                localStore:
-                    application
-                        .localLibrary,
-                appleMusicStore:
-                    application
-                        .musicLibrary,
-                onOpenLibrary: {
-
-                    scene
-                        .send(
-                            .navigate(
-                                .section(
-                                    .library
-                                )
-                            )
-                        )
-                }
-            )
-
-
-        // MARK: Settings
-
-        case .settings:
-
-            SettingsView(
-                playback:
-                    application
-                        .playback,
-                providerManager:
-                    application
-                        .providerManager
-            )
-        }
-    }
-
-
-    // MARK: - Placeholder
-
-    private func placeholder(
-        title:
-            String,
-        systemImage:
-            String,
-        description:
-            String
-    ) -> some View {
-
         ContentUnavailableView(
-            title,
+            "Destination Unavailable",
             systemImage:
-                systemImage,
+                "questionmark.square.dashed",
             description:
                 Text(
-                    description
+                    "No presentation is registered for this route."
                 )
         )
         .frame(

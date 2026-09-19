@@ -4,6 +4,8 @@
 //
 
 import SwiftUI
+import AppFoundation
+import AppFoundationUI
 
 
 struct SidebarView:
@@ -11,62 +13,21 @@ struct SidebarView:
 
     @Binding
     var selection:
-        SceneSection?
+        SceneRoute?
+
+
+    let contributions:
+        [SidebarContribution<SceneRoute>]
 
 
     var body:
         some View {
 
-        List(
+        ApplicationSidebar(
             selection:
-                $selection
-        ) {
-
-            Section(
-                "Discover"
-            ) {
-
-                ForEach(
-                    SceneSection
-                        .discoverSections
-                ) {
-                    section in
-
-                    Label(
-                        section.title,
-                        systemImage:
-                            section.systemImage
-                    )
-                    .tag(
-                        section
-                    )
-                }
-            }
-
-
-            Section(
-                "Library"
-            ) {
-
-                ForEach(
-                    SceneSection
-                        .librarySections
-                ) {
-                    section in
-
-                    Label(
-                        section.title,
-                        systemImage:
-                            section.systemImage
-                    )
-                    .tag(
-                        section
-                    )
-                }
-            }
-        }
-        .listStyle(
-            .sidebar
+                $selection,
+            contributions:
+                contributions
         )
     }
 }
@@ -79,8 +40,12 @@ struct SidebarView:
     SidebarView(
         selection:
             .constant(
-                .listenNow
-            )
+                .section(
+                    .listenNow
+                )
+            ),
+        contributions:
+            MSRUApplication.definition.sidebar
     )
     .frame(
         width:

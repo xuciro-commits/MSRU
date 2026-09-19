@@ -5,6 +5,8 @@
 
 import SwiftUI
 import Observation
+import AppFoundation
+import AppFoundationUI
 
 
 struct SidebarPaneView:
@@ -20,7 +22,9 @@ struct SidebarPaneView:
 
         SidebarView(
             selection:
-                sidebarSelection
+                sidebarSelection,
+            contributions:
+                MSRUApplication.definition.sidebar
         )
         .frame(
             maxWidth:
@@ -31,23 +35,25 @@ struct SidebarPaneView:
     }
 
 
-    // MARK: - SwiftUI Adapter
+    // MARK: - Scene Routing Adapter
 
     private var sidebarSelection:
-        Binding<SceneSection?> {
+        Binding<SceneRoute?> {
 
         Binding(
             get: {
 
-                scene
-                    .navigation
-                    .section
+                .section(
+                    scene
+                        .navigation
+                        .section
+                )
             },
             set: {
-                section in
+                route in
 
                 guard
-                    let section
+                    let route
                 else {
 
                     return
@@ -57,9 +63,7 @@ struct SidebarPaneView:
                 scene
                     .send(
                         .navigate(
-                            .section(
-                                section
-                            )
+                            route
                         )
                     )
             }
