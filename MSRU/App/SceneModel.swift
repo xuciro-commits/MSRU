@@ -17,13 +17,15 @@ import Observation
  Scene Scope 负责：
 
  - Identity
+ - Command Routing
  - Navigation
  - Selection
  - Presentation
- - Feature runtime
+ - Feature Runtime
+ - Restoration Snapshot
 
- Restoration 只恢复语义状态，
- 不恢复 Runtime object graph。
+ 外部语义 Intent
+ 统一通过 send(_:) 进入 Scene。
  */
 
 @MainActor
@@ -54,11 +56,11 @@ final class SceneModel:
     /*
      Selection != Navigation。
 
-     这些仍然只是 Feature / Page
-     当前选择的 runtime state。
+     当前 MusicContent / LocalTrack
+     还没有对应真实 detail route。
 
-     当前没有真实 detail route，
-     所以暂不进入 Restoration Contract。
+     所以它们暂时仍是 runtime selection，
+     不进入 SceneRoute。
      */
 
     var selectedMusicContent:
@@ -117,8 +119,6 @@ final class SceneModel:
             isQueuePresented
 
 
-        // MARK: Feature Scope
-
         self.browse =
             withDependencies(
                 application.dependencies
@@ -148,13 +148,6 @@ final class SceneModel:
 
     // MARK: - Restored Scene
 
-    /*
-     不支持的 Snapshot version
-     必须由调用者决定 fallback 行为。
-
-     Core 不偷偷降级或猜测旧格式。
-     */
-
     convenience init?(
         application:
             ApplicationModel,
@@ -183,7 +176,43 @@ final class SceneModel:
     }
 
 
-    // MARK: - Snapshot
+    // MARK: - Command Routing
+
+    /*
+     Scene-level semantic intent
+     统一从这里进入。
+
+     Future callers:
+
+     - Sidebar
+     - Menu Commands
+     - Deep Link
+     - Handoff
+     - Spotlight
+     - Automation
+     */
+
+    func send(
+        _ command:
+            SceneCommand
+    ) {
+
+        switch command {
+
+        case .navigate(
+            let route
+        ):
+
+            navigation
+                .navigate(
+                    to:
+                        route
+                )
+        }
+    }
+
+
+    // MARK: - Restoration
 
     func restorationSnapshot()
         -> SceneRestorationSnapshot {

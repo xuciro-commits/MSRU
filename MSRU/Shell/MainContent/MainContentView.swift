@@ -162,9 +162,12 @@ struct MainContentView:
                 onAddMusic: {
 
                     scene
-                        .navigation
-                        .select(
-                            .addMusic
+                        .send(
+                            .navigate(
+                                .section(
+                                    .addMusic
+                                )
+                            )
                         )
                 }
             )
@@ -184,9 +187,12 @@ struct MainContentView:
                 onOpenLibrary: {
 
                     scene
-                        .navigation
-                        .select(
-                            .library
+                        .send(
+                            .navigate(
+                                .section(
+                                    .library
+                                )
+                            )
                         )
                 }
             )

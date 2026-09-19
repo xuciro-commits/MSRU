@@ -201,9 +201,12 @@ final class RootSplitViewController:
 
                             self?
                                 .scene
-                                .navigation
-                                .select(
-                                    .settings
+                                .send(
+                                    .navigate(
+                                        .section(
+                                            .settings
+                                        )
+                                    )
                                 )
                         }
                     )

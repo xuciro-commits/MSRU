@@ -33,15 +33,6 @@ struct SidebarPaneView:
 
     // MARK: - SwiftUI Adapter
 
-    /*
-     SwiftUI List selection 使用 Optional。
-
-     SceneNavigation 的语义状态
-     始终必须存在一个 root section。
-
-     所以 nil 不进入 Runtime。
-     */
-
     private var sidebarSelection:
         Binding<SceneSection?> {
 
@@ -64,9 +55,12 @@ struct SidebarPaneView:
 
 
                 scene
-                    .navigation
-                    .select(
-                        section
+                    .send(
+                        .navigate(
+                            .section(
+                                section
+                            )
+                        )
                     )
             }
         )
