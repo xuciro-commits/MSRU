@@ -88,7 +88,9 @@ struct ImportReviewWorkspaceView: View {
             case .success(let urls):
                 startImportPipeline(urls: urls)
             case .failure(let error):
-                print("Import file importer failed:", error)
+                if (error as? CocoaError)?.code != .userCancelled {
+                    print("Import file importer failed:", error.localizedDescription)
+                }
             }
         }
     }

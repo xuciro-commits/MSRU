@@ -72,11 +72,12 @@ struct AddMusicView: View {
             case .failure(
                 let error
             ):
-
-                print(
-                    "Add Music file importer failed:",
-                    error
-                )
+                if (error as? CocoaError)?.code != .userCancelled {
+                    print(
+                        "Add Music file importer failed:",
+                        error.localizedDescription
+                    )
+                }
             }
         }
     }
