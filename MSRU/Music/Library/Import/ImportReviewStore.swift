@@ -117,16 +117,17 @@ public final class ImportReviewStore {
             for match in clusterResult.trackMatches {
                 let local = match.localTrack
                 let cand = match.candidate
-                let title = cand?.title ?? local.title
-                let artist = cand?.artist ?? local.artist ?? clusterResult.cluster.tracks.compactMap(\.artist).first ?? "Unknown Artist"
-                let album = cand?.album ?? local.album ?? clusterResult.cluster.albumName
+                let title = cand?.title ?? local.matchedMemory?.title ?? local.title
+                let artist = cand?.artist ?? local.matchedMemory?.artist ?? local.artist ?? clusterResult.cluster.tracks.compactMap(\.artist).first ?? "Unknown Artist"
+                let album = cand?.album ?? local.matchedMemory?.album ?? local.album ?? clusterResult.cluster.albumName
+                let artworkData = local.artworkData ?? local.matchedMemory?.artworkData
                 let track = LocalTrack(
                     fileURL: local.fileURL,
                     title: title,
                     artist: artist,
                     album: album,
-                    duration: local.duration ?? 0,
-                    artworkData: nil
+                    duration: local.duration,
+                    artworkData: artworkData
                 )
                 generatedTracks.append(track)
             }
@@ -151,13 +152,14 @@ public final class ImportReviewStore {
                 let title = local.title
                 let artist = local.artist ?? clusterResult.cluster.tracks.compactMap(\.artist).first ?? "Unknown Artist"
                 let album = local.album ?? clusterResult.cluster.albumName
+                let artworkData = local.artworkData ?? local.matchedMemory?.artworkData
                 let track = LocalTrack(
                     fileURL: local.fileURL,
                     title: title,
                     artist: artist,
                     album: album,
-                    duration: local.duration ?? 0,
-                    artworkData: nil
+                    duration: local.duration,
+                    artworkData: artworkData
                 )
                 generatedTracks.append(track)
             }

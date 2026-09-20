@@ -21,19 +21,23 @@ public struct MacScrollIndicatorRemover: NSViewRepresentable {
     }
 
     public func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async { [weak nsView] in
-            stripScrollers(from: nsView)
-        }
+        stripScrollers(from: nsView)
     }
 
     private func stripScrollers(from view: NSView?) {
         guard let view, let scrollView = view.enclosingScrollView else { return }
-        scrollView.hasVerticalScroller = false
-        scrollView.hasHorizontalScroller = false
-        scrollView.horizontalScroller = nil
-        scrollView.verticalScroller = nil
-        scrollView.scrollerStyle = .overlay
-        scrollView.autohidesScrollers = true
+        if scrollView.scrollerStyle != .overlay {
+            scrollView.scrollerStyle = .overlay
+        }
+        if !scrollView.autohidesScrollers {
+            scrollView.autohidesScrollers = true
+        }
+        if let h = scrollView.horizontalScroller, h.alphaValue != 0 {
+            h.alphaValue = 0
+        }
+        if let v = scrollView.verticalScroller, v.alphaValue != 0 {
+            v.alphaValue = 0
+        }
     }
 }
 #endif

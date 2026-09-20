@@ -22,14 +22,9 @@ public struct ArtistAvatarView: View {
 
     public var body: some View {
         VStack(spacing: 10) {
-            Circle()
-                .fill(Color.secondary.opacity(0.15))
+            avatarImageView
                 .aspectRatio(1, contentMode: .fit)
-                .overlay {
-                    Image(systemName: "music.mic")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.secondary.opacity(0.5))
-                }
+                .clipShape(Circle())
                 .shadow(color: .black.opacity(isHovered ? 0.15 : 0.05), radius: isHovered ? 12 : 5, y: isHovered ? 6 : 2)
                 .scaleEffect(isHovered ? 1.03 : 1.0)
 
@@ -54,6 +49,42 @@ public struct ArtistAvatarView: View {
                 isHovered = hovering
             }
         }
+    }
+
+    @ViewBuilder
+    private var avatarImageView: some View {
+        if let data = artist.artworkData, let image = Image(foundationArtworkData: data) {
+            image
+                .resizable()
+                .scaledToFill()
+        } else if let url = artist.artworkURL {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .empty:
+                    ProgressView()
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .failure:
+                    placeholderAvatarView
+                @unknown default:
+                    placeholderAvatarView
+                }
+            }
+        } else {
+            placeholderAvatarView
+        }
+    }
+
+    private var placeholderAvatarView: some View {
+        Circle()
+            .fill(Color.secondary.opacity(0.15))
+            .overlay {
+                Image(systemName: "music.mic")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.secondary.opacity(0.5))
+            }
     }
 }
 

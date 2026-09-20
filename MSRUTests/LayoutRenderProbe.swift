@@ -149,6 +149,15 @@ struct LayoutRenderProbe {
             name: "shell-compact-360",
             size: NSSize(width: 360, height: 640)
         )
+
+        // 8. Browse View Layout Verification
+        try await render(
+            BrowseView(feature: scene.browse)
+                .frame(width: 800, height: 600)
+                .background(Color.white),
+            name: "browse-800",
+            size: NSSize(width: 800, height: 600)
+        )
     }
 }
 #endif

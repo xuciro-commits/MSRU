@@ -268,50 +268,66 @@ final class FileLocalLibraryRepository: LocalLibraryRepository {
 
         // MARK: Title
 
-        let title =
+        let parsed = FileNameHeuristicParser.parse(fileURL: url)
+        let rule = await PathHeuristicRuleStore.shared.match(fileURL: url)
+
+        // MARK: Title
+
+        let rawTitle =
             await metadataString(
                 identifier:
                     .commonIdentifierTitle,
                 metadata:
                     metadata
             )
-            ?? url
-                .deletingPathExtension()
-                .lastPathComponent
+        let title = (rawTitle != nil && !rawTitle!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            ? rawTitle!
+            : parsed.title
 
 
         // MARK: Artist
 
-        let artist =
+        let rawArtist =
             await metadataString(
                 identifier:
                     .commonIdentifierArtist,
                 metadata:
                     metadata
             )
-            ?? "Unknown Artist"
+        let artist: String
+        if let rawArtist, !rawArtist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, rawArtist != "Unknown Artist" {
+            artist = rawArtist
+        } else {
+            artist = rule?.targetArtist ?? parsed.artist ?? "Unknown Artist"
+        }
 
 
         // MARK: Album
 
-        let album =
+        let rawAlbum =
             await metadataString(
                 identifier:
                     .commonIdentifierAlbumName,
                 metadata:
                     metadata
             )
+        let album = (rawAlbum != nil && !rawAlbum!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            ? rawAlbum
+            : (rule?.targetAlbum ?? parsed.album)
 
 
         // MARK: Artwork
 
-        let artworkData =
+        var artworkData =
             await metadataData(
                 identifier:
                     .commonIdentifierArtwork,
                 metadata:
                     metadata
             )
+        if artworkData == nil {
+            artworkData = LocalArtworkExtractor.extractFromDirectory(folderURL: url.deletingLastPathComponent())
+        }
 
 
         // MARK: Duration

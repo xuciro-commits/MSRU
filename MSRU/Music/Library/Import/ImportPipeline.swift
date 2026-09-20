@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import AVFoundation
 import AppFoundation
 
 /// Summary result of an 11-step automated import pipeline run.
@@ -69,19 +70,98 @@ public final class ImportPipeline: Sendable {
 
         var clusterItems: [ClusterTrackItem] = []
 
-        // Steps 1..4: Parse heuristic clues and compute fingerprints
+        // Steps 1..4: Parse embedded metadata, heuristic clues, consult local rules/fingerprint registry, and compute fingerprints
         for url in audioURLs {
             let parsed = FileNameHeuristicParser.parse(fileURL: url)
             let fp = try? await fingerprinter.generateFingerprint(for: url)
 
+            var detectedTitle: String? = nil
+            var detectedArtist: String? = nil
+            var detectedAlbum: String? = nil
+            var recordingMBID: String? = nil
+            var matchedMemoryRecord: AcousticFingerprintRecord? = nil
+            var artworkData: Data? = nil
+
+            // Priority 1: Local Acoustic Fingerprint Memory Registry
+            if let fp = fp,
+               let memory = await LocalFingerprintRegistry.shared.lookup(fingerprint: fp.fingerprint, duration: fp.duration) {
+                detectedTitle = memory.title
+                detectedArtist = memory.artist
+                detectedAlbum = memory.album
+                recordingMBID = memory.recordingMBID
+                matchedMemoryRecord = memory
+                artworkData = memory.artworkData
+            }
+
+            // Priority 2: Remote Acoustic Fingerprint (AcoustID / MusicBrainz)
+            if matchedMemoryRecord == nil, let fp = fp,
+               let online = (try? await catalog.lookupRecording(fingerprint: fp))?.first {
+                detectedTitle = online.title
+                detectedArtist = online.artist
+                recordingMBID = online.recordingMBID
+            }
+
+            // Priority 3: Embedded Tags in audio file (AVURLAsset)
+            if detectedTitle == nil || detectedArtist == nil || detectedAlbum == nil {
+                let asset = AVURLAsset(url: url)
+                if let metadata = try? await asset.load(.commonMetadata) {
+                    for item in metadata {
+                        if let key = item.commonKey?.rawValue {
+                            if key == "title", let val = try? await item.load(.stringValue), !val.isEmpty, detectedTitle == nil {
+                                detectedTitle = val
+                            } else if key == "artist", let val = try? await item.load(.stringValue), !val.isEmpty, detectedArtist == nil {
+                                detectedArtist = val
+                            } else if key == "albumName", let val = try? await item.load(.stringValue), !val.isEmpty, detectedAlbum == nil {
+                                detectedAlbum = val
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Priority 4: Filename parsed metadata (parsed.title, parsed.artist, parsed.album)
+            if detectedTitle == nil && !parsed.title.isEmpty {
+                detectedTitle = parsed.title
+            }
+            if detectedArtist == nil, let pa = parsed.artist, !pa.isEmpty, pa != "Unknown Artist" {
+                detectedArtist = pa
+            }
+            if detectedAlbum == nil, let pal = parsed.album, !pal.isEmpty {
+                detectedAlbum = pal
+            }
+
+            // Priority 5: Path Heuristic Rules (only for filling missing artist or album from directory structure)
+            if detectedArtist == nil || detectedArtist?.isEmpty == true || detectedArtist == "Unknown Artist" || detectedAlbum == nil {
+                if let rule = await PathHeuristicRuleStore.shared.match(fileURL: url) {
+                    if detectedArtist == nil || detectedArtist?.isEmpty == true || detectedArtist == "Unknown Artist" {
+                        detectedArtist = rule.targetArtist
+                    }
+                    if let album = rule.targetAlbum, detectedAlbum == nil {
+                        detectedAlbum = album
+                    }
+                }
+            }
+
+            let finalTitle = detectedTitle ?? (parsed.title.isEmpty ? url.deletingPathExtension().lastPathComponent : parsed.title)
+            let finalArtist = detectedArtist ?? (parsed.artist?.isEmpty == false ? parsed.artist : nil)
+            let finalAlbum = detectedAlbum ?? (parsed.album?.isEmpty == false ? parsed.album : nil)
+
+            // Discover Artwork if not already found from memory
+            if artworkData == nil {
+                artworkData = await LocalArtworkExtractor.extractArtwork(for: url, releaseMBID: matchedMemoryRecord?.releaseMBID)
+            }
+
             let item = ClusterTrackItem(
                 fileURL: url,
-                title: parsed.title,
-                artist: parsed.artist,
-                album: parsed.album,
+                title: finalTitle,
+                artist: finalArtist,
+                album: finalAlbum,
                 trackNumber: parsed.trackNumber,
                 duration: fp?.duration,
-                fingerprint: fp?.fingerprint
+                acoustID: fp?.fingerprint,
+                trackMBID: recordingMBID,
+                artworkData: artworkData,
+                matchedMemory: matchedMemoryRecord
             )
             clusterItems.append(item)
         }

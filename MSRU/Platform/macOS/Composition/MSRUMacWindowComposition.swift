@@ -326,6 +326,8 @@ final class MSRUMacWindowComposition {
             }
 
 
+        toolbarAdapter.trackingSplitView = shellRenderer.splitController.splitView
+
         self.toolbarAdapter =
             toolbarAdapter
 

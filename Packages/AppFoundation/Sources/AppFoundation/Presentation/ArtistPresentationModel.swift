@@ -14,6 +14,7 @@ public struct ArtistPresentationModel: Identifiable, Hashable, Sendable {
     public let country: String?
     public let albumCount: Int
     public let trackCount: Int
+    public let artworkData: Data?
     public let artworkURL: URL?
 
     public init(
@@ -23,6 +24,7 @@ public struct ArtistPresentationModel: Identifiable, Hashable, Sendable {
         country: String? = nil,
         albumCount: Int = 0,
         trackCount: Int = 0,
+        artworkData: Data? = nil,
         artworkURL: URL? = nil
     ) {
         self.id = id
@@ -31,6 +33,7 @@ public struct ArtistPresentationModel: Identifiable, Hashable, Sendable {
         self.country = country
         self.albumCount = albumCount
         self.trackCount = trackCount
+        self.artworkData = artworkData
         self.artworkURL = artworkURL
     }
 

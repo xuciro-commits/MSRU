@@ -26,14 +26,8 @@ public struct AlbumCardView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack(alignment: .bottomTrailing) {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.secondary.opacity(0.12))
+                coverImageView
                     .aspectRatio(1, contentMode: .fit)
-                    .overlay {
-                        Image(systemName: "music.note")
-                            .font(.system(size: 40))
-                            .foregroundStyle(.secondary.opacity(0.4))
-                    }
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .shadow(color: .black.opacity(isHovered ? 0.15 : 0.06), radius: isHovered ? 10 : 5, y: isHovered ? 6 : 2)
 
@@ -87,6 +81,42 @@ public struct AlbumCardView: View {
                 isHovered = hovering
             }
         }
+    }
+
+    @ViewBuilder
+    private var coverImageView: some View {
+        if let data = album.artworkData, let image = Image(foundationArtworkData: data) {
+            image
+                .resizable()
+                .scaledToFill()
+        } else if let url = album.artworkURL {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .empty:
+                    ProgressView()
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .failure:
+                    placeholderNoteView
+                @unknown default:
+                    placeholderNoteView
+                }
+            }
+        } else {
+            placeholderNoteView
+        }
+    }
+
+    private var placeholderNoteView: some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(Color.secondary.opacity(0.15))
+            .overlay {
+                Image(systemName: "music.note")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.secondary.opacity(0.5))
+            }
     }
 }
 

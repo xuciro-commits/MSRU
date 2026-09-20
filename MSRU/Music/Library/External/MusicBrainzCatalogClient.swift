@@ -18,6 +18,8 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
     private var mockRecordings: [String: [ExternalRecordingMatch]] = [:]
     private var mockAliases: [String: [EntityAlias]] = [:]
 
+    private let rateLimiter = MusicBrainzClientRateLimiter()
+
     public init(urlSession: URLSession = .shared) {
         self.urlSession = urlSession
         seedDefaultKnownCatalog()
@@ -40,6 +42,11 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
             }
         }
 
+        // Live AcoustID query
+        if let live = await queryLiveAcoustID(fingerprint: fingerprint.fingerprint, duration: fingerprint.duration) {
+            return live
+        }
+
         return []
     }
 
@@ -47,6 +54,13 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
         if let cached = mockReleases[releaseMBID] {
             return cached
         }
+
+        // Query MusicBrainz Web API live if not in local cache
+        if let live = await fetchLiveRelease(releaseMBID: releaseMBID) {
+            mockReleases[releaseMBID] = live
+            return live
+        }
+
         return nil
     }
 
@@ -68,7 +82,170 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
             }
         }
 
+        if results.isEmpty && (!artist.isEmpty || !album.isEmpty) {
+            let liveReleases = await searchLiveReleases(artist: artist, album: album)
+            for r in liveReleases {
+                mockReleases[r.releaseMBID] = r
+                results.append(r)
+            }
+        }
+
         return results
+    }
+
+    // MARK: - Live MusicBrainz HTTP Integration
+
+    private func executeReleaseSearch(queryString: String, fallbackArtist: String) async -> [ExternalReleaseMatch] {
+        await rateLimiter.waitIfNeeded()
+
+        guard let encodedQuery = queryString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://musicbrainz.org/ws/2/release/?query=\(encodedQuery)&fmt=json&limit=5") else {
+            return []
+        }
+
+        var request = URLRequest(url: url, timeoutInterval: 10.0)
+        request.setValue("MSRU/1.0 (contact@msru.local)", forHTTPHeaderField: "User-Agent")
+
+        print("[MusicBrainz] Querying live: \(queryString)...")
+
+        guard let (data, response) = try? await urlSession.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            print("[MusicBrainz] Live query failed or timed out for: \(queryString)")
+            return []
+        }
+
+        guard let parsed = try? JSONDecoder().decode(MBReleaseSearchResponse.self, from: data),
+              let releases = parsed.releases else {
+            print("[MusicBrainz] Failed to parse JSON response for: \(queryString)")
+            return []
+        }
+
+        print("[MusicBrainz] Successfully received \(releases.count) releases for \(queryString)")
+
+        return releases.map { item in
+            let artistName = item.artistCredit?.first?.name ?? fallbackArtist
+            return ExternalReleaseMatch(
+                releaseMBID: item.id,
+                releaseGroupMBID: nil,
+                title: item.title,
+                artist: artistName,
+                date: item.date,
+                country: item.country,
+                trackCount: item.trackCount ?? 0,
+                tracks: []
+            )
+        }
+    }
+
+    private func searchLiveReleases(artist: String, album: String) async -> [ExternalReleaseMatch] {
+        var queryParts: [String] = []
+        if !artist.isEmpty { queryParts.append("artist:\"\(artist)\"") }
+        if !album.isEmpty { queryParts.append("release:\"\(album)\"") }
+        guard !queryParts.isEmpty else { return [] }
+
+        let queryString = queryParts.joined(separator: " AND ")
+        var results = await executeReleaseSearch(queryString: queryString, fallbackArtist: artist)
+
+        // Fallback: If artist + album returned 0, try release alone
+        if results.isEmpty && !artist.isEmpty && !album.isEmpty {
+            results = await executeReleaseSearch(queryString: "release:\"\(album)\"", fallbackArtist: artist)
+        }
+
+        return results
+    }
+
+    private func queryLiveAcoustID(fingerprint: String, duration: TimeInterval) async -> [ExternalRecordingMatch]? {
+        await rateLimiter.waitIfNeeded()
+        let dur = Int(duration)
+        guard dur > 0, !fingerprint.isEmpty else { return nil }
+
+        let endpoint = "https://api.acoustid.org/v2/lookup?client=8XaBELgH&meta=recordings+releasegroups+compress&duration=\(dur)&fingerprint=\(fingerprint)"
+        guard let url = URL(string: endpoint) else { return nil }
+
+        var request = URLRequest(url: url, timeoutInterval: 10.0)
+        request.setValue("MSRU/1.0 (contact@msru.local)", forHTTPHeaderField: "User-Agent")
+
+        guard let (data, response) = try? await urlSession.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let status = json["status"] as? String, status == "ok",
+              let results = json["results"] as? [[String: Any]] else {
+            return nil
+        }
+
+        var matches: [ExternalRecordingMatch] = []
+        for res in results {
+            if let recordings = res["recordings"] as? [[String: Any]] {
+                for rec in recordings {
+                    let mbid = rec["id"] as? String ?? UUID().uuidString
+                    let title = rec["title"] as? String ?? ""
+                    var artistName = "Unknown Artist"
+                    if let artists = rec["artists"] as? [[String: Any]], let firstArt = artists.first {
+                        artistName = firstArt["name"] as? String ?? artistName
+                    }
+                    var albumTitle: String? = nil
+                    if let rgs = rec["releasegroups"] as? [[String: Any]], let firstRg = rgs.first {
+                        albumTitle = firstRg["title"] as? String
+                    }
+                    matches.append(ExternalRecordingMatch(
+                        recordingMBID: mbid,
+                        title: title,
+                        artist: artistName,
+                        duration: duration,
+                        acoustIDScore: 0.95,
+                        releaseMBIDs: []
+                    ))
+                }
+            }
+        }
+        return matches.isEmpty ? nil : matches
+    }
+
+    private func fetchLiveRelease(releaseMBID: String) async -> ExternalReleaseMatch? {
+        await rateLimiter.waitIfNeeded()
+
+        guard let url = URL(string: "https://musicbrainz.org/ws/2/release/\(releaseMBID)?inc=recordings+artists&fmt=json") else {
+            return nil
+        }
+
+        var request = URLRequest(url: url, timeoutInterval: 10.0)
+        request.setValue("MSRU/1.0 (contact@msru.local)", forHTTPHeaderField: "User-Agent")
+
+        guard let (data, response) = try? await urlSession.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let item = try? JSONDecoder().decode(MBReleaseItem.self, from: data) else {
+            return nil
+        }
+
+        let artistName = item.artistCredit?.first?.name ?? "Unknown Artist"
+
+        var tracks: [ExternalTrackMatch] = []
+        if let media = item.media {
+            for medium in media {
+                if let mediumTracks = medium.tracks {
+                    for t in mediumTracks {
+                        let durationSec = t.length.map { Double($0) / 1000.0 }
+                        tracks.append(ExternalTrackMatch(
+                            position: t.position ?? 1,
+                            title: t.title,
+                            recordingMBID: t.recording?.id ?? t.id,
+                            duration: durationSec
+                        ))
+                    }
+                }
+            }
+        }
+
+        return ExternalReleaseMatch(
+            releaseMBID: item.id,
+            releaseGroupMBID: nil,
+            title: item.title,
+            artist: artistName,
+            date: item.date,
+            country: item.country,
+            trackCount: item.trackCount ?? tracks.count,
+            tracks: tracks
+        )
     }
 
     public func fetchArtistAliases(artistMBID: String) async throws -> [EntityAlias] {
@@ -92,8 +269,8 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
     private func seedDefaultKnownCatalog() {
         // Seed Jay Chou - 叶惠美 (2003)
         let fatherTrack = ExternalTrackMatch(position: 1, title: "以父之名", recordingMBID: "rec_in_name_of_father", duration: 342.0)
-        let sunnyTrack = ExternalTrackMatch(position: 4, title: "晴天", recordingMBID: "rec_sunny_day_mbid", duration: 269.0)
-        let terracedTrack = ExternalTrackMatch(position: 7, title: "梯田", recordingMBID: "rec_terraced_field", duration: 213.0)
+        let cowardTrack = ExternalTrackMatch(position: 2, title: "懦夫", recordingMBID: "rec_coward", duration: 218.0)
+        let 晴天Track = ExternalTrackMatch(position: 3, title: "晴天", recordingMBID: "rec_sunny_day", duration: 269.0)
 
         let yeHuiMeiRelease = ExternalReleaseMatch(
             releaseMBID: "rel_ye_hui_mei",
@@ -102,31 +279,131 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
             artist: "周杰伦",
             date: "2003-07-31",
             country: "TW",
-            trackCount: 11,
-            tracks: [fatherTrack, sunnyTrack, terracedTrack]
+            trackCount: 3,
+            tracks: [fatherTrack, cowardTrack, 晴天Track]
         )
         mockReleases[yeHuiMeiRelease.releaseMBID] = yeHuiMeiRelease
 
-        // Seed Jay Chou artist aliases
-        mockAliases["artist_jay_chou"] = [
-            EntityAlias(name: "Jay Chou", localeIdentifier: "en", script: "Latn", isPrimary: true),
-            EntityAlias(name: "周杰倫", localeIdentifier: "zh-Hant", script: "Hant", isPrimary: false),
-            EntityAlias(name: "周杰伦", localeIdentifier: "zh-Hans", script: "Hans", isPrimary: false),
-            EntityAlias(name: "JAY", isPrimary: false)
-        ]
-
         // Seed Adele - 21 (2011)
-        let rollingTrack = ExternalTrackMatch(position: 1, title: "Rolling in the Deep", recordingMBID: "rec_rolling_deep", duration: 228.0)
-        let adeleRelease = ExternalReleaseMatch(
+        let rollingTrack = ExternalTrackMatch(position: 1, title: "Rolling in the Deep", recordingMBID: "rec_rolling", duration: 228.0)
+        let someoneTrack = ExternalTrackMatch(position: 2, title: "Someone Like You", recordingMBID: "rec_someone", duration: 285.0)
+
+        let adele21Release = ExternalReleaseMatch(
             releaseMBID: "rel_adele_21",
             releaseGroupMBID: "rg_adele_21",
             title: "21",
             artist: "Adele",
             date: "2011-01-24",
             country: "GB",
-            trackCount: 11,
-            tracks: [rollingTrack]
+            trackCount: 2,
+            tracks: [rollingTrack, someoneTrack]
         )
-        mockReleases[adeleRelease.releaseMBID] = adeleRelease
+        mockReleases[adele21Release.releaseMBID] = adele21Release
+
+        // Seed Wang Leehom - 唯一 (2001)
+        let onlyTrack = ExternalTrackMatch(position: 1, title: "唯一", recordingMBID: "rec_only_leehom", duration: 260.0)
+        let leehomRelease = ExternalReleaseMatch(
+            releaseMBID: "rel_leehom_only",
+            releaseGroupMBID: "rg_leehom_only",
+            title: "唯一",
+            artist: "王力宏",
+            date: "2001-12-04",
+            country: "TW",
+            trackCount: 1,
+            tracks: [onlyTrack]
+        )
+        mockReleases[leehomRelease.releaseMBID] = leehomRelease
+
+        // Seed Artist Aliases
+        mockAliases["artist_jay_chou"] = [
+            EntityAlias(name: "周杰伦", localeIdentifier: "zh-Hans", isPrimary: true),
+            EntityAlias(name: "周杰倫", localeIdentifier: "zh-Hant", isPrimary: false),
+            EntityAlias(name: "Jay Chou", localeIdentifier: "en", isPrimary: false)
+        ]
+        mockAliases["artist_leehom"] = [
+            EntityAlias(name: "王力宏", localeIdentifier: "zh-Hans", isPrimary: true),
+            EntityAlias(name: "Wang Leehom", localeIdentifier: "en", isPrimary: false)
+        ]
     }
 }
+
+// MARK: - Internal HTTP Serialization Models
+
+private actor MusicBrainzClientRateLimiter {
+    private var lastRequestTime: Date = .distantPast
+
+    func waitIfNeeded() async {
+        let elapsed = Date().timeIntervalSince(lastRequestTime)
+        if elapsed < 1.0 {
+            let waitTime = 1.0 - elapsed
+            try? await Task.sleep(nanoseconds: UInt64(waitTime * 1_000_000_000))
+        }
+        lastRequestTime = Date()
+    }
+}
+
+private struct MBReleaseSearchResponse: Codable {
+    let releases: [MBReleaseItem]?
+}
+
+private struct MBReleaseItem: Codable {
+    let id: String
+    let title: String
+    let status: String?
+    let date: String?
+    let country: String?
+    let trackCount: Int?
+    let artistCredit: [MBArtistCreditItem]?
+    let media: [MBMediaItem]?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case status
+        case date
+        case country
+        case trackCount = "track-count"
+        case artistCredit = "artist-credit"
+        case media
+    }
+}
+
+private struct MBMediaItem: Codable {
+    let position: Int?
+    let title: String?
+    let trackCount: Int?
+    let tracks: [MBTrackItem]?
+
+    enum CodingKeys: String, CodingKey {
+        case position
+        case title
+        case trackCount = "track-count"
+        case tracks
+    }
+}
+
+private struct MBTrackItem: Codable {
+    let id: String
+    let position: Int?
+    let number: String?
+    let title: String
+    let length: Int?
+    let recording: MBRecordingItem?
+}
+
+private struct MBRecordingItem: Codable {
+    let id: String
+    let title: String?
+    let length: Int?
+}
+
+private struct MBArtistCreditItem: Codable {
+    let name: String?
+    let artist: MBArtistItem?
+}
+
+private struct MBArtistItem: Codable {
+    let id: String?
+    let name: String?
+}
+

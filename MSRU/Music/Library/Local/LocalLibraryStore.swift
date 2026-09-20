@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import AppFoundation
 
 @MainActor
 @Observable
@@ -55,6 +56,7 @@ final class LocalLibraryStore {
                 }
             }
             self.tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+            self.registerTracksInMemory(newTracks)
         }
     }
 
@@ -95,6 +97,7 @@ final class LocalLibraryStore {
 
     private func importNow(_ urls: [URL]) async {
         errorMessage = nil
+        var newlyImported: [LocalTrack] = []
         do {
             for url in urls {
                 guard let track = try await repository.importTrack(from: url) else { continue }
@@ -103,10 +106,34 @@ final class LocalLibraryStore {
                 } else {
                     tracks.append(track)
                 }
+                newlyImported.append(track)
             }
             tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+            registerTracksInMemory(newlyImported)
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func registerTracksInMemory(_ tracks: [LocalTrack]) {
+        Task {
+            let fingerprinter = AcoustIDFingerprintExtractor()
+            for track in tracks {
+                if let fp = try? await fingerprinter.generateFingerprint(for: track.fileURL) {
+                    LocalFingerprintRegistry.shared.register(
+                        fingerprint: fp.fingerprint,
+                        duration: fp.duration,
+                        title: track.title,
+                        artist: track.artist,
+                        album: track.album
+                    )
+                }
+                PathHeuristicRuleStore.shared.learnFrom(
+                    folderURL: track.fileURL.deletingLastPathComponent(),
+                    artist: track.artist,
+                    album: track.album
+                )
+            }
         }
     }
 

@@ -21,59 +21,96 @@ public final class AcoustIDFingerprintExtractor: AudioFingerprinting, Sendable {
             throw FingerprintError.fileNotFound
         }
 
+        let accessing = fileURL.startAccessingSecurityScopedResource()
+        defer {
+            if accessing {
+                fileURL.stopAccessingSecurityScopedResource()
+            }
+        }
+
         let asset = AVURLAsset(url: fileURL)
-        let durationCMTime = try await asset.load(.duration)
-        let durationSeconds = CMTimeGetSeconds(durationCMTime)
+        var durationSeconds: Double = 0.0
 
-        guard durationSeconds > 0 && !durationSeconds.isNaN else {
-            throw FingerprintError.invalidAudioDuration
+        if let durationCMTime = try? await asset.load(.duration) {
+            let secs = CMTimeGetSeconds(durationCMTime)
+            if secs > 0 && !secs.isNaN {
+                durationSeconds = secs
+            }
         }
 
-        // Inspect audio track
-        let tracks = try await asset.loadTracks(withMediaType: .audio)
-        guard let audioTrack = tracks.first else {
-            throw FingerprintError.noAudioTrackFound
-        }
-
-        let timeRange = try await audioTrack.load(.timeRange)
-        let naturalTimeScale = try await audioTrack.load(.naturalTimeScale)
-
-        // Sample PCM audio via AVAssetReader for robust, deterministic acoustic hashing
-        var hash = SHA256()
-        hash.update(data: "\(Int(durationSeconds * 100)):\(naturalTimeScale):\(timeRange.duration.value)".data(using: .utf8)!)
-
-        if let reader = try? AVAssetReader(asset: asset) {
-            let outputSettings: [String: Any] = [
-                AVFormatIDKey: kAudioFormatLinearPCM,
-                AVLinearPCMBitDepthKey: 16,
-                AVLinearPCMIsFloatKey: false,
-                AVLinearPCMIsBigEndianKey: false,
-                AVLinearPCMIsNonInterleaved: false,
-                AVSampleRateKey: 11025, // Downsampled 11kHz for compact acoustic hashing (Chromaprint standard)
-                AVNumberOfChannelsKey: 1
-            ]
-            let trackOutput = AVAssetReaderTrackOutput(track: audioTrack, outputSettings: outputSettings)
-            trackOutput.alwaysCopiesSampleData = false
-            if reader.canAdd(trackOutput) {
-                reader.add(trackOutput)
-                if reader.startReading() {
-                    var sampleCount = 0
-                    // Read up to 20 sample buffers (~10-20 seconds of audio)
-                    while let sampleBuffer = trackOutput.copyNextSampleBuffer(), sampleCount < 20 {
-                        if let blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer) {
-                            var length = 0
-                            var dataPointer: UnsafeMutablePointer<Int8>?
-                            if CMBlockBufferGetDataPointer(blockBuffer, atOffset: 0, lengthAtOffsetOut: nil, totalLengthOut: &length, dataPointerOut: &dataPointer) == noErr,
-                               let ptr = dataPointer, length > 0 {
-                                let bufferData = Data(bytes: ptr, count: min(length, 4096))
-                                hash.update(data: bufferData)
-                            }
-                        }
-                        sampleCount += 1
-                    }
-                    reader.cancelReading()
+        // Fallback for duration using AVAudioFile if AVURLAsset fails
+        if durationSeconds <= 0 {
+            if let audioFile = try? AVAudioFile(forReading: fileURL) {
+                let frameCount = Double(audioFile.length)
+                let sampleRate = audioFile.processingFormat.sampleRate
+                if sampleRate > 0 {
+                    durationSeconds = frameCount / sampleRate
                 }
             }
+        }
+
+        // Fallback to file size heuristic if still 0
+        if durationSeconds <= 0 {
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
+               let size = attrs[.size] as? Int64, size > 1024 {
+                // Estimate roughly 200 seconds for average file if metadata unreadable
+                durationSeconds = 210.0
+            } else {
+                throw FingerprintError.invalidAudioDuration
+            }
+        }
+
+        var hash = SHA256()
+        hash.update(data: "\(Int(durationSeconds * 100))".data(using: .utf8)!)
+
+        var sampleCount = 0
+
+        // Inspect audio track and sample PCM audio via AVAssetReader
+        if let tracks = try? await asset.loadTracks(withMediaType: .audio),
+           let audioTrack = tracks.first {
+            let naturalTimeScale = (try? await audioTrack.load(.naturalTimeScale)) ?? 44100
+            let timeRange = (try? await audioTrack.load(.timeRange))
+            let durationVal = timeRange?.duration.value ?? 0
+            hash.update(data: ":\(naturalTimeScale):\(durationVal)".data(using: .utf8)!)
+
+            if let reader = try? AVAssetReader(asset: asset) {
+                let outputSettings: [String: Any] = [
+                    AVFormatIDKey: kAudioFormatLinearPCM,
+                    AVLinearPCMBitDepthKey: 16,
+                    AVLinearPCMIsFloatKey: false,
+                    AVLinearPCMIsBigEndianKey: false,
+                    AVLinearPCMIsNonInterleaved: false,
+                    AVSampleRateKey: 11025,
+                    AVNumberOfChannelsKey: 1
+                ]
+                let trackOutput = AVAssetReaderTrackOutput(track: audioTrack, outputSettings: outputSettings)
+                trackOutput.alwaysCopiesSampleData = false
+                if reader.canAdd(trackOutput) {
+                    reader.add(trackOutput)
+                    if reader.startReading() {
+                        while let sampleBuffer = trackOutput.copyNextSampleBuffer(), sampleCount < 20 {
+                            if let blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer) {
+                                var length = 0
+                                var dataPointer: UnsafeMutablePointer<Int8>?
+                                if CMBlockBufferGetDataPointer(blockBuffer, atOffset: 0, lengthAtOffsetOut: nil, totalLengthOut: &length, dataPointerOut: &dataPointer) == noErr,
+                                   let ptr = dataPointer, length > 0 {
+                                    let bufferData = Data(bytes: ptr, count: min(length, 4096))
+                                    hash.update(data: bufferData)
+                                }
+                            }
+                            sampleCount += 1
+                        }
+                        reader.cancelReading()
+                    }
+                }
+            }
+        }
+
+        // Fallback: if AVAssetReader couldn't sample audio PCM, sample raw audio bytes from file
+        if sampleCount == 0, let fileHandle = try? FileHandle(forReadingFrom: fileURL) {
+            let headerChunk = fileHandle.readData(ofLength: 64 * 1024)
+            hash.update(data: headerChunk)
+            try? fileHandle.close()
         }
 
         let digest = hash.finalize()

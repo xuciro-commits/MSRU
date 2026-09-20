@@ -19,6 +19,8 @@ nonisolated public struct AlbumTrackItem: Identifiable, Sendable, Equatable, Cod
     public let duration: TimeInterval
     public let acoustID: String?
     public let trackMBID: String?
+    public let artworkData: Data?
+    public let matchedMemory: AcousticFingerprintRecord?
 
     public var fingerprint: String? {
         acoustID
@@ -34,7 +36,9 @@ nonisolated public struct AlbumTrackItem: Identifiable, Sendable, Equatable, Cod
         duration: TimeInterval? = 0.0,
         acoustID: String? = nil,
         trackMBID: String? = nil,
-        fingerprint: String? = nil
+        fingerprint: String? = nil,
+        artworkData: Data? = nil,
+        matchedMemory: AcousticFingerprintRecord? = nil
     ) {
         self.id = id
         self.fileURL = fileURL
@@ -45,6 +49,8 @@ nonisolated public struct AlbumTrackItem: Identifiable, Sendable, Equatable, Cod
         self.duration = duration ?? 0.0
         self.acoustID = acoustID ?? fingerprint
         self.trackMBID = trackMBID
+        self.artworkData = artworkData
+        self.matchedMemory = matchedMemory
     }
 }
 
@@ -142,8 +148,15 @@ nonisolated public enum AlbumClusterer {
 
             for (_, albumTracks) in albumSubgroups {
                 let sorted = sortTracks(albumTracks)
-                let consensusAlbum = consensusValue(from: sorted.compactMap(\.album))
-                let consensusArtist = consensusValue(from: sorted.compactMap(\.artist))
+                var consensusAlbum = consensusValue(from: sorted.compactMap(\.album))
+                var consensusArtist = consensusValue(from: sorted.compactMap(\.artist))
+
+                // Fallback to directory name heuristic if album or artist clues are absent
+                if consensusAlbum == nil || consensusArtist == nil {
+                    let folderMeta = FileNameHeuristicParser.parseFolderMetadata(folder.lastPathComponent)
+                    if consensusAlbum == nil { consensusAlbum = folderMeta.album }
+                    if consensusArtist == nil { consensusArtist = folderMeta.artist }
+                }
 
                 clusters.append(AlbumCluster(
                     id: "\(folder.lastPathComponent):\(consensusAlbum ?? "album")",

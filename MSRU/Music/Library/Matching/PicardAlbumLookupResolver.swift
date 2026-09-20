@@ -62,10 +62,21 @@ public enum PicardAlbumLookupResolver {
         catalog: any ExternalCatalogService = MusicBrainzCatalogClient.shared
     ) async throws -> AlbumClusterLookupResult {
         // 1. Search candidate releases by album name and artist clues from cluster
-        let artistClue = cluster.tracks.compactMap { $0.artist }.first ?? ""
-        let albumClue = cluster.albumName ?? ""
+        var artistClue = cluster.tracks.compactMap { $0.artist }.first ?? ""
+        var albumClue = cluster.albumName ?? ""
+
+        if (albumClue.isEmpty || artistClue.isEmpty), let folder = cluster.folderURL?.lastPathComponent {
+            let folderMeta = FileNameHeuristicParser.parseFolderMetadata(folder)
+            if albumClue.isEmpty, let a = folderMeta.album { albumClue = a }
+            if artistClue.isEmpty, let art = folderMeta.artist { artistClue = art }
+        }
 
         var candidateReleases = try await catalog.searchReleases(artist: artistClue, album: albumClue)
+
+        // Fallback: If artist + album returned empty, try album alone
+        if candidateReleases.isEmpty && !albumClue.isEmpty && !artistClue.isEmpty {
+            candidateReleases = try await catalog.searchReleases(artist: "", album: albumClue)
+        }
 
         // If no candidate by text search, try looking up release via recording MBID of first track
         if candidateReleases.isEmpty, let firstMBID = cluster.tracks.compactMap({ $0.trackMBID }).first {
@@ -76,34 +87,69 @@ public enum PicardAlbumLookupResolver {
         }
 
         guard !candidateReleases.isEmpty else {
-            // No candidate release found -> Unidentified tier
+            // No candidate release found in MusicBrainz -> rely on acoustic fingerprint memory / AcoustID
             let fallbackMatches = cluster.tracks.map { track in
-                ClusterTrackMatch(
-                    localTrack: track,
-                    candidate: nil,
-                    score: WeightedScoreResult(confidence: 0.0, tier: .low, components: [])
-                )
+                fallbackTrackMatch(for: track, clusterAlbum: cluster.albumName)
             }
+            let avgConfidence = cluster.tracks.isEmpty ? 0.0 : (fallbackMatches.reduce(0.0) { $0 + $1.score.confidence } / Double(cluster.tracks.count))
+            let overallTier = ConfidenceTier(confidence: avgConfidence)
+
+            let matchedRelease: ExternalReleaseMatch?
+            if avgConfidence >= 0.7 {
+                let repTitle = cluster.albumName ?? cluster.tracks.compactMap(\.matchedMemory?.album).first ?? "本地匹配专辑"
+                let repArtist = cluster.tracks.compactMap(\.artist).first ?? cluster.tracks.compactMap(\.matchedMemory?.artist).first ?? "本地艺术家"
+                matchedRelease = ExternalReleaseMatch(
+                    releaseMBID: cluster.tracks.compactMap(\.matchedMemory?.releaseMBID).first ?? "local_acoustic_\(cluster.id)",
+                    title: repTitle,
+                    artist: repArtist,
+                    date: nil,
+                    trackCount: cluster.tracks.count
+                )
+            } else {
+                matchedRelease = nil
+            }
+
             return AlbumClusterLookupResult(
                 cluster: cluster,
-                matchedRelease: nil,
-                confidence: 0.0,
-                tier: .low,
+                matchedRelease: matchedRelease,
+                confidence: avgConfidence,
+                tier: overallTier,
                 trackMatches: fallbackMatches,
                 candidateReleases: []
             )
         }
 
-        // 2. Score candidate releases and select the best one
+        // 2. Enrich candidate releases: Fetch track listings if not already present
+        var enrichedCandidates: [ExternalReleaseMatch] = []
+        for rel in candidateReleases {
+            if rel.tracks.isEmpty {
+                if let full = try await catalog.lookupRelease(releaseMBID: rel.releaseMBID) {
+                    enrichedCandidates.append(full)
+                } else {
+                    enrichedCandidates.append(rel)
+                }
+            } else {
+                enrichedCandidates.append(rel)
+            }
+        }
+
+        // 3. Score candidate releases and select the best one
         var bestRelease: ExternalReleaseMatch? = nil
-        var bestConfidence: Double = -1.0
+        var bestConfidence: Double = 0.0
         var bestTrackMatches: [ClusterTrackMatch] = []
 
-        for release in candidateReleases {
+        for release in enrichedCandidates {
             var currentMatches: [ClusterTrackMatch] = []
             var totalScore = 0.0
 
             for localTrack in cluster.tracks {
+                if localTrack.matchedMemory != nil || (localTrack.trackMBID != nil && !localTrack.trackMBID!.isEmpty) {
+                    let match = fallbackTrackMatch(for: localTrack, release: release, clusterAlbum: release.title)
+                    currentMatches.append(match)
+                    totalScore += match.score.confidence
+                    continue
+                }
+
                 // Find best matching track candidate in this release
                 let query = MatchQuery(
                     trackMBID: localTrack.trackMBID,
@@ -149,10 +195,31 @@ public enum PicardAlbumLookupResolver {
             }
 
             let releaseConfidence = cluster.tracks.isEmpty ? 0.0 : (totalScore / Double(cluster.tracks.count))
-            if releaseConfidence > bestConfidence {
+            if releaseConfidence > bestConfidence && releaseConfidence >= 0.05 {
                 bestConfidence = releaseConfidence
                 bestRelease = release
                 bestTrackMatches = currentMatches
+            }
+        }
+
+        if bestRelease == nil {
+            let fallbackMatches = cluster.tracks.map { track in
+                fallbackTrackMatch(for: track, clusterAlbum: cluster.albumName)
+            }
+            let avgConfidence = cluster.tracks.isEmpty ? 0.0 : (fallbackMatches.reduce(0.0) { $0 + $1.score.confidence } / Double(cluster.tracks.count))
+            bestConfidence = avgConfidence
+            bestTrackMatches = fallbackMatches
+
+            if avgConfidence >= 0.7 {
+                let repTitle = cluster.albumName ?? cluster.tracks.compactMap(\.matchedMemory?.album).first ?? "本地匹配专辑"
+                let repArtist = cluster.tracks.compactMap(\.artist).first ?? cluster.tracks.compactMap(\.matchedMemory?.artist).first ?? "本地艺术家"
+                bestRelease = ExternalReleaseMatch(
+                    releaseMBID: cluster.tracks.compactMap(\.matchedMemory?.releaseMBID).first ?? "local_acoustic_\(cluster.id)",
+                    title: repTitle,
+                    artist: repArtist,
+                    date: nil,
+                    trackCount: cluster.tracks.count
+                )
             }
         }
 
@@ -166,5 +233,63 @@ public enum PicardAlbumLookupResolver {
             trackMatches: bestTrackMatches,
             candidateReleases: candidateReleases
         )
+    }
+
+    private static func fallbackTrackMatch(
+        for track: ClusterTrackItem,
+        release: ExternalReleaseMatch? = nil,
+        clusterAlbum: String? = nil
+    ) -> ClusterTrackMatch {
+        if let memory = track.matchedMemory {
+            let cand = CatalogTrackCandidate(
+                trackMBID: memory.recordingMBID ?? "",
+                releaseMBID: memory.releaseMBID ?? (release?.releaseMBID ?? ""),
+                title: memory.title,
+                artist: memory.artist,
+                artistAliases: [],
+                album: memory.album ?? release?.title ?? clusterAlbum,
+                duration: memory.duration,
+                trackNumber: memory.trackNumber ?? track.trackNumber
+            )
+            return ClusterTrackMatch(
+                localTrack: track,
+                candidate: cand,
+                score: WeightedScoreResult(
+                    confidence: 1.0,
+                    tier: .high,
+                    components: [
+                        WeightedComponent(name: "本地声纹记忆", weight: 1.0, similarity: 1.0)
+                    ]
+                )
+            )
+        } else if let trackMBID = track.trackMBID, !trackMBID.isEmpty {
+            let cand = CatalogTrackCandidate(
+                trackMBID: trackMBID,
+                releaseMBID: release?.releaseMBID ?? "",
+                title: track.title,
+                artist: track.artist ?? (release?.artist ?? "Unknown Artist"),
+                artistAliases: [],
+                album: track.album ?? release?.title ?? clusterAlbum,
+                duration: track.duration,
+                trackNumber: track.trackNumber
+            )
+            return ClusterTrackMatch(
+                localTrack: track,
+                candidate: cand,
+                score: WeightedScoreResult(
+                    confidence: 0.95,
+                    tier: .high,
+                    components: [
+                        WeightedComponent(name: "AcoustID 声学指纹", weight: 1.0, similarity: 0.95)
+                    ]
+                )
+            )
+        } else {
+            return ClusterTrackMatch(
+                localTrack: track,
+                candidate: nil,
+                score: WeightedScoreResult(confidence: 0.0, tier: .low, components: [])
+            )
+        }
     }
 }

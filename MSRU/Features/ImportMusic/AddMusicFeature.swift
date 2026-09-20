@@ -49,7 +49,7 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
                         systemImage: "tray.and.arrow.down"
                     )
                 ) { _ in
-                    ImportReviewWorkspaceView(
+                    MetadataManagerWorkspaceView(
                         localStore: scene.application.localLibrary,
                         onOpenLibrary: {
                             scene.send(.navigate(.section(.library)))
@@ -67,7 +67,7 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
                         systemImage: "tray.and.arrow.down"
                     )
                 ) { _ in
-                    ImportReviewWorkspaceView(
+                    MetadataManagerWorkspaceView(
                         localStore: scene.application.localLibrary,
                         onOpenLibrary: {
                             scene.send(.navigate(.section(.library)))

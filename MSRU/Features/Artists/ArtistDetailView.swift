@@ -43,14 +43,9 @@ struct ArtistDetailView: View {
 
                 // Hero Header
                 HStack(alignment: .center, spacing: 24) {
-                    Circle()
-                        .fill(Color.secondary.opacity(0.15))
+                    artistArtworkView
                         .frame(width: 140, height: 140)
-                        .overlay {
-                            Image(systemName: "music.mic")
-                                .font(.system(size: 50))
-                                .foregroundStyle(.secondary.opacity(0.5))
-                        }
+                        .clipShape(Circle())
                         .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -221,6 +216,42 @@ struct ArtistDetailView: View {
     private func shuffleAll() {
         guard let first = tracks.shuffled().first else { return }
         playback.play(first)
+    }
+
+    @ViewBuilder
+    private var artistArtworkView: some View {
+        if let data = artist.artworkData, let image = Image(artworkData: data) {
+            image
+                .resizable()
+                .scaledToFill()
+        } else if let url = artist.artworkURL {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .empty:
+                    ProgressView()
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .failure:
+                    placeholderArtistView
+                @unknown default:
+                    placeholderArtistView
+                }
+            }
+        } else {
+            placeholderArtistView
+        }
+    }
+
+    private var placeholderArtistView: some View {
+        Circle()
+            .fill(Color.secondary.opacity(0.15))
+            .overlay {
+                Image(systemName: "music.mic")
+                    .font(.system(size: 50))
+                    .foregroundStyle(.secondary.opacity(0.5))
+            }
     }
 }
 

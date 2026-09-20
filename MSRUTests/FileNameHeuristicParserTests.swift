@@ -62,4 +62,46 @@ struct FileNameHeuristicParserTests {
         #expect(edm.artist == "Play House")
         #expect(edm.title == "EDM or something")
     }
+
+    @Test
+    func parseComplexFolderMetadataWithSpecs() {
+        // 1. 万青 with technical spec & year
+        let wq = FileNameHeuristicParser.parseFolderMetadata("万能青年旅店 - 冀西南林路行 (2020)[FLAC 24bit／48khz]")
+        #expect(wq.artist == "万能青年旅店")
+        #expect(wq.album == "冀西南林路行")
+        #expect(wq.year == 2020)
+
+        // 2. Prefixed album folder
+        let wqPrefixed = FileNameHeuristicParser.parseFolderMetadata("茶壶专辑 - 万能青年旅店 - 冀西南林路行 (2020) [FLAC 24bit / 48khz]")
+        #expect(wqPrefixed.artist == "万能青年旅店")
+        #expect(wqPrefixed.album == "冀西南林路行")
+        #expect(wqPrefixed.year == 2020)
+
+        // 3. Allan Taylor with (WAV/Cue)
+        let at = FileNameHeuristicParser.parseFolderMetadata("Allan Taylor - Looking for You (WAV/Cue)")
+        #expect(at.artist == "Allan Taylor")
+        #expect(at.album == "Looking for You")
+
+        // 4. Audiophile gold master
+        let ld = FileNameHeuristicParser.parseFolderMetadata("刘达 - 甄选2024(24K金碟头版限量)")
+        #expect(ld.artist == "刘达")
+        #expect(ld.album == "甄选2024")
+
+        // 5. Test parse(fileURL:) integration with real user directory (万青)
+        let fileURL = URL(fileURLWithPath: "/Volumes/Music/茶壶专辑 - 万能青年旅店 - 冀西南林路行 (2020)[FLAC 24bit／48khz]/01 - 早.flac")
+        let parsed = FileNameHeuristicParser.parse(fileURL: fileURL)
+        #expect(parsed.artist == "万能青年旅店")
+        #expect(parsed.album == "冀西南林路行")
+        #expect(parsed.title == "早")
+        #expect(parsed.trackNumber == 1)
+        #expect(parsed.year == 2020)
+
+        // 6. Test parse(fileURL:) integration with real user directory inside "男歌手" (Allan Taylor)
+        let atURL = URL(fileURLWithPath: "/Volumes/Music/1.歌曲/男歌手/Allan Taylor - Looking for You (WAV/Cue)/Allan Taylor - 01.The Traveler.flac")
+        let atParsed = FileNameHeuristicParser.parse(fileURL: atURL)
+        #expect(atParsed.artist == "Allan Taylor")
+        #expect(atParsed.album == "Looking for You")
+        #expect(atParsed.title == "The Traveler")
+        #expect(atParsed.trackNumber == 1)
+    }
 }

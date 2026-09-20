@@ -52,12 +52,14 @@ final class LibraryPresentationAggregator {
             let year = tracks.compactMap { FileNameHeuristicParser.parse(fileName: $0.title).year }.first
 
             let disc = DiscTrackGroup(discNumber: 1, discTitle: nil, tracks: presentationTracks)
+            let albumArtwork = tracks.compactMap(\.artworkData).first
 
             let model = AlbumPresentationModel(
                 id: key,
                 title: albumTitle,
                 artist: artist,
                 year: year,
+                artworkData: albumArtwork,
                 artworkURL: nil,
                 trackCount: tracks.count,
                 duration: totalDuration,
@@ -83,6 +85,7 @@ final class LibraryPresentationAggregator {
 
         for (artistName, tracks) in artistGroups {
             let albumsCount = Set(tracks.compactMap { $0.album }).count
+            let artistArtwork = tracks.compactMap(\.artworkData).first
             let model = ArtistPresentationModel(
                 id: artistName,
                 name: artistName,
@@ -90,6 +93,7 @@ final class LibraryPresentationAggregator {
                 country: nil,
                 albumCount: max(1, albumsCount),
                 trackCount: tracks.count,
+                artworkData: artistArtwork,
                 artworkURL: nil
             )
             models.append(model)

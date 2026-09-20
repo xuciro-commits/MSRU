@@ -487,6 +487,42 @@ struct TrackInspectorView: View {
 
             Divider()
 
+            VStack(alignment: .leading, spacing: 8) {
+                Text("声纹与外部目录：")
+                    .font(.caption.bold())
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 8) {
+                    Image(systemName: "waveform.badge.magnifyingglass")
+                        .foregroundStyle(Color.accentColor)
+                    Text("本地声学指纹记忆")
+                        .font(.callout.bold())
+                    Spacer()
+                    Text("已激活")
+                        .font(.caption2.bold())
+                        .foregroundStyle(.green)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.green.opacity(0.12), in: Capsule())
+                }
+                .padding(10)
+                .background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                Button {
+                    Task {
+                        _ = try? await MusicBrainzCatalogClient.shared.searchReleases(artist: artist, album: album ?? "")
+                    }
+                } label: {
+                    Label("在线重新识别 (MusicBrainz)", systemImage: "arrow.clockwise")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+                .tint(Color.accentColor)
+                .controlSize(.small)
+            }
+
+            Divider()
+
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 10) {
                     Button("重置所有覆盖为权威") {

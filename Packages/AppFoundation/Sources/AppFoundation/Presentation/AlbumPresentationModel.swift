@@ -68,6 +68,7 @@ public struct AlbumPresentationModel: Identifiable, Hashable, Sendable {
     public let title: String
     public let artist: String
     public let year: Int?
+    public let artworkData: Data?
     public let artworkURL: URL?
     public let trackCount: Int
     public let duration: TimeInterval
@@ -79,6 +80,7 @@ public struct AlbumPresentationModel: Identifiable, Hashable, Sendable {
         title: String,
         artist: String,
         year: Int? = nil,
+        artworkData: Data? = nil,
         artworkURL: URL? = nil,
         trackCount: Int,
         duration: TimeInterval,
@@ -89,6 +91,7 @@ public struct AlbumPresentationModel: Identifiable, Hashable, Sendable {
         self.title = title
         self.artist = artist
         self.year = year
+        self.artworkData = artworkData
         self.artworkURL = artworkURL
         self.trackCount = trackCount
         self.duration = duration

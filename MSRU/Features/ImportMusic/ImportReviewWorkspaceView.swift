@@ -43,8 +43,29 @@ struct ImportReviewWorkspaceView: View {
                     onCommit: { tracks in
                         Task {
                             await localStore.addTracks(tracks)
+
+                            // Auto-learn acoustic fingerprints and path heuristic rules locally
+                            let fingerprinter = AcoustIDFingerprintExtractor()
+                            for track in tracks {
+                                if let fp = try? await fingerprinter.generateFingerprint(for: track.fileURL) {
+                                    LocalFingerprintRegistry.shared.register(
+                                        fingerprint: fp.fingerprint,
+                                        duration: fp.duration,
+                                        title: track.title,
+                                        artist: track.artist,
+                                        album: track.album,
+                                        artworkData: track.artworkData
+                                    )
+                                }
+                                PathHeuristicRuleStore.shared.learnFrom(
+                                    folderURL: track.fileURL.deletingLastPathComponent(),
+                                    artist: track.artist,
+                                    album: track.album
+                                )
+                            }
+
                             state = .success(
-                                message: "已成功将 \(tracks.count) 首曲目加入资料库（纯路径就地只读引用，原文件保持原样）。",
+                                message: "已成功将 \(tracks.count) 首曲目加入资料库，并已记录至本地声纹库与目录规则中（纯路径就地只读引用，原文件保持原样）。",
                                 undoEntries: []
                             )
                         }
@@ -261,10 +282,14 @@ struct ImportReviewWorkspaceView: View {
         Task {
             var urls: [URL] = []
             for provider in providers {
-                if let item = try? await provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil),
-                   let data = item as? Data,
-                   let url = URL(dataRepresentation: data, relativeTo: nil) {
-                    urls.append(url)
+                if let item = try? await provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) {
+                    if let directURL = item as? URL {
+                        urls.append(directURL)
+                    } else if let nsURL = item as? NSURL {
+                        urls.append(nsURL as URL)
+                    } else if let data = item as? Data, let decoded = URL(dataRepresentation: data, relativeTo: nil) {
+                        urls.append(decoded)
+                    }
                 }
             }
             if !urls.isEmpty {

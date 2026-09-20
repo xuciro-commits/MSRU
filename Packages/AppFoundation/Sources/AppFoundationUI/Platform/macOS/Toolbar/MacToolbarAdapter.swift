@@ -43,6 +43,8 @@ public final class MacToolbarAdapter:
     private let semanticPrefix =
         "AppFoundation.SemanticToolbar."
 
+    public weak var trackingSplitView: NSSplitView?
+
 
     public init(
         identifier:
@@ -301,6 +303,7 @@ public final class MacToolbarAdapter:
         item.isEnabled =
             search.isEnabled
         item.searchField.isEnabled = search.isEnabled
+        item.preferredWidthForSearchField = 280
 
 
         let field =
@@ -521,6 +524,13 @@ public final class MacToolbarAdapter:
         }
 
         if itemIdentifier == .sidebarTrackingSeparator {
+            if let splitView = trackingSplitView {
+                return NSTrackingSeparatorToolbarItem(
+                    identifier: .sidebarTrackingSeparator,
+                    splitView: splitView,
+                    dividerIndex: 0
+                )
+            }
             return NSToolbarItem(itemIdentifier: .sidebarTrackingSeparator)
         }
 

@@ -33,14 +33,8 @@ struct AlbumDetailView: View {
                 // Hero Header
                 HStack(alignment: .bottom, spacing: 24) {
                     ZStack(alignment: .bottomTrailing) {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.secondary.opacity(0.15))
+                        heroArtworkView
                             .frame(width: 180, height: 180)
-                            .overlay {
-                                Image(systemName: "music.note")
-                                    .font(.system(size: 60))
-                                    .foregroundStyle(.secondary.opacity(0.4))
-                            }
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                             .shadow(color: .black.opacity(0.12), radius: 10, y: 5)
 
@@ -206,6 +200,42 @@ struct AlbumDetailView: View {
     private func shuffleAll() {
         guard let first = localTracks.shuffled().first else { return }
         playback.play(first)
+    }
+
+    @ViewBuilder
+    private var heroArtworkView: some View {
+        if let data = album.artworkData, let image = Image(artworkData: data) {
+            image
+                .resizable()
+                .scaledToFill()
+        } else if let url = album.artworkURL {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .empty:
+                    ProgressView()
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .failure:
+                    placeholderHeroView
+                @unknown default:
+                    placeholderHeroView
+                }
+            }
+        } else {
+            placeholderHeroView
+        }
+    }
+
+    private var placeholderHeroView: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(Color.secondary.opacity(0.15))
+            .overlay {
+                Image(systemName: "music.note")
+                    .font(.system(size: 60))
+                    .foregroundStyle(.secondary.opacity(0.4))
+            }
     }
 }
 
