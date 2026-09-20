@@ -7,6 +7,19 @@ import AVFoundation
 import Foundation
 import Observation
 
+// MARK: - Playback Session Observer Protocol
+
+@MainActor
+protocol PlaybackSessionObserving: AnyObject {
+    func playbackDidUpdateState(_ controller: PlaybackController)
+    func playbackDidUpdateItem(_ controller: PlaybackController)
+    func playbackDidSeek(_ controller: PlaybackController, to time: TimeInterval)
+}
+
+private struct WeakSessionObserver {
+    weak var value: PlaybackSessionObserving?
+}
+
 @MainActor @Observable final class PlaybackController {
 
     // MARK: - Provider Kernel
@@ -17,6 +30,45 @@ import Observation
 
     let playbackQueue: PlaybackQueueController
 
+    // MARK: - Session Observers
+
+    @ObservationIgnored
+    private var sessionObservers: [WeakSessionObserver] = []
+
+    func addSessionObserver(_ observer: PlaybackSessionObserving) {
+        sessionObservers.removeAll { $0.value == nil }
+        if !sessionObservers.contains(where: { $0.value === observer }) {
+            sessionObservers.append(WeakSessionObserver(value: observer))
+            observer.playbackDidUpdateItem(self)
+            observer.playbackDidUpdateState(self)
+        }
+    }
+
+    func removeSessionObserver(_ observer: PlaybackSessionObserving) {
+        sessionObservers.removeAll { $0.value == nil || $0.value === observer }
+    }
+
+    private func notifyStateChanged() {
+        sessionObservers.removeAll { $0.value == nil }
+        for observer in sessionObservers {
+            observer.value?.playbackDidUpdateState(self)
+        }
+    }
+
+    private func notifyItemChanged() {
+        sessionObservers.removeAll { $0.value == nil }
+        for observer in sessionObservers {
+            observer.value?.playbackDidUpdateItem(self)
+        }
+    }
+
+    private func notifySeek(to time: TimeInterval) {
+        sessionObservers.removeAll { $0.value == nil }
+        for observer in sessionObservers {
+            observer.value?.playbackDidSeek(self, to: time)
+        }
+    }
+
     // MARK: - Playback Resource
 
     private(set) var currentResource: PlaybackResource?
@@ -25,7 +77,13 @@ import Observation
 
     // MARK: - Playback State
 
-    private(set) var isPlaying = false
+    private(set) var isPlaying = false {
+        didSet {
+            if oldValue != isPlaying {
+                notifyStateChanged()
+            }
+        }
+    }
 
     private(set) var isResolving = false
 
@@ -737,6 +795,7 @@ import Observation
         let clamped = min(max(seconds, 0), max(0, upperBound))
 
         currentTime = clamped
+        notifySeek(to: clamped)
 
         // AVPlayer transport
         if let player {
@@ -855,8 +914,8 @@ import Observation
         }
 
         currentTime = 0
-
         isPlaying = false
+        notifyItemChanged()
     }
 
     // MARK: - Retry
@@ -1055,6 +1114,7 @@ import Observation
         }
 
         print("Playback ▶︎", "[\(resource.providerID.rawValue)]", item.title)
+        notifyItemChanged()
     }
 
     // MARK: - Active Transport

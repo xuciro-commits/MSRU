@@ -43,6 +43,9 @@
 | 23 | 已完成：AcoustID 密钥体系梳理、内置应用客户端 Key 与智能诊断 | 查证并厘清 AcoustID 官网 User API Key（10位，用于贡献上传）与 Application API Key（8位，用于查询）的技术区隔；在 AcoustIDConfiguration 内置已实测验证的客户端密钥 cSpUJKpD 并提供 resetToDefault 接口；完善 verifyConnectivity 连通性测试逻辑与智能错误提示；在 MetadataManagerWorkspaceView 端出注册指引直达链接与恢复默认按键；新增 AcoustIDConfigurationTests，全量通过（应用 234 项 + 框架 85 项全部通过），Preview 门禁保持 100%，架构检查 0 违规 |
 | 24 | 已完成：分层国际化多语言体系（框架下沉+应用定义）、英语/汉语/藏语全链路支持与动态切换收口 | 严格遵循 Apple macOS/iOS 多语言最佳实践（Xcode 16 String Catalog `.xcstrings`）；分支 `feat/localization`；框架层（AppFoundation）落地 `SupportedLanguage`（支持系统跟随、en、zh-Hans、bo）、`LanguageSettings`（响应式 `@Observable` 与 UserDefaults 持久化）、`MacApplicationShellRenderer.locale` 动态环境注入；应用层（MSRU）以英文 Canonical Keys 为开发基准全面收口硬编码中文字符串与侧栏贡献、落地统一 `Localizable.xcstrings`（覆盖 471 条全量文本，en/zh-Hans/bo 100% 完整覆盖）；解决 macOS 原生分栏宿主动态 Locale 穿透与侧栏分组分裂问题；设置中心通用分段语言切换器即时响应；架构文档同步更新；全量通过（框架 49 项 + 应用 231 项测试全部通过，构建 0 报错） |
 | 25 | 已完成：右侧检查器/播放面板/广播全量多语言收口与动态 String 变量本地化修复 | 针对 ContextPaneHeaderView、VisualizerPaneView、LyricsPaneView、MiniPlayerBar、NowPlayingCanvasView、AudioFormatBadgeView、TrackInspectorView、RadioStationInspectorView、RadioView、AlbumsView、LibraryFilterBar 等界面中动态 String 变量调用 Text(str) 导致绕过本地化的底层缺陷，全面统一封装 LocalizedStringKey；补齐 Spectrum、Nothing Playing、Versions (3)、Metadata Override Layers、Codec、Quality 等 18 条缺失词条，扩充 Localizable.xcstrings 达到 489 条 100% 完整覆盖（en / zh-Hans / bo）；全部 280 项测试（应用 231 项 + 框架 49 项）全量通过，macOS build 干净通过 |
+| 26 | 已完成：跨平台架构适配、iOS 编译打通、iPhone 原生紧凑 Shell (CompactApplicationShell) 与触控 Tab 落地 | 解决 iOS Simulator 构建阻塞（LocalLibraryRepository 安全书签条件隔离、Color.platformWindowBackground 跨平台语义背景、AppFoundation 模块补全）；依据 InteractionAtlas 第 2.1 节与第 19 节落地 CompactApplicationShell 原生紧凑移动端宿主（4 大 Tab：发现/电台/资料库/工具、顶部 Segmented 控制器、悬浮 Liquid Glass 胶囊 MiniPlayerBar、向上平滑呼出全屏 NowPlayingCanvasView 沉浸画卷、移动端原生 Sheet 抽屉呈现场景 Context）；SwiftUISceneRootView 实现 horizontalSizeClass 自适应分流（iPadOS Regular 走分栏 SplitView，iPhone Compact 走 TabView）；新增 CompactNavigationTests，全量通过（应用 233 项 + 框架 49 项全部通过），Preview 门禁覆盖 62 视图（100% 覆盖），架构检查 0 违规，iOS Simulator 干净构建通过 |
+| 27 | 已完成：watchOS 独立短任务切片、手表正在播放与轻量队列落地 | 遵循 01-USER-INTENT.md（visionOS 暂停，watchOS 与 iOS 继续保留推进）及 InteractionAtlas 第 19.1 节手表短任务切片规范；落地专属 40/41/45/49mm 小表盘的 WatchNowPlayingView（极简曲目信息、HI-RES/LOSSLESS 规格徽标、44pt 专辑封面微缩图、3pt 紧凑进度条、超大指尖触控 Play/Pause/Prev/Next 播放控制、音量滑块与一键静音抽屉）；落地轻量 WatchQueueSheetView（当前曲目高亮、即时点击切歌与一键清空后续）；复用统一 PlaybackController 单向事件流；新增 WatchNowPlayingTests，全量通过（应用 236 项 + 框架 49 项全部通过），Preview 门禁覆盖 64 视图（100% 覆盖），架构检查 0 违规，macOS 与 iOS Simulator 干净构建通过 |
+| 28 | 已完成：系统级播控打通与硬件联动 (MPRemoteCommandCenter 与 MPNowPlayingInfoCenter) | 遵循 Apple MediaPlayer 原生规范；在 PlaybackController 扩展 PlaybackSessionObserving 弱引用监听流；在 Platform/Media 落地 SystemNowPlayingCoordinator 系统级播控协调器，打通 Mac 键盘物理媒体按键、耳机触控/线控、系统锁屏与控制中心封面元数据同步（MPMediaItemPropertyArtwork / Title / Artist / Duration / Rate / isLiveStream）及锁屏拖拽 Seek；ApplicationModel 生命周期在 start() 与 terminate() 幂等激活与清理；新增 SystemNowPlayingCoordinatorTests，全量通过（应用 241 项 + 框架 49 项全部通过），Preview 门禁保持 64 视图 100% 覆盖，架构检查 0 违规，macOS 与 iOS 编译干净通过 |
 
 具体文件和迁移范围见 [迁移路线](../Docs/Roadmap/FoundationRoadmap.md)。不要把本表与该路线维护成两套详细任务拆解。
 
@@ -90,15 +93,17 @@
 | 工业级声学元数据管线与物理写回 | 落地《AcousticMetadataPipelineArchitecture.md》9步管线规范；彻底清除旧版假桩与过期 key，以 actor 接入官方 AcoustID API Key（eKeKSuffE6）；纯 Swift 二进制实现物理标签写回器 AudioTagWriter（FLAC Vorbis Comments + PICTURE 块原子写入，MP3 ID3v2.4 标准帧 APIC 原子替换）与伴生封面导出器 ArtworkFileExporter（cover.jpg）；落地 8 维加权消歧打分引擎 ExactReleaseResolver；ImportReviewStore 与 ImportReviewView 升级支持多候选发行版本无缝切换与「写入物理Tag并安全入库」；LocalLibraryRepository 强化物理删除移入废纸篓、专辑空壳自动回收与伴生封面同步清理；LocalFingerprintRegistry 与 MetadataManagerWorkspaceView 落地孤立声纹清理工具；经 ExactReleaseResolverTests、AudioTagWriterTests 及 LocalLibraryCascadeDeletionTests 全量通过。 |
 | 动态同步歌词与维基歌手生平 | 框架层落地标准 LrcParser、LrcDocument 与 LrcLine；应用层落地四级歌词服务 LyricsService（本地同级 .lrc -> 本地缓存 -> 内嵌标签 -> 免 Key 公网 LRCLIB REST API），LyricsStore 纳秒级同步播放时钟；LyricsPaneView 彻底拔除 simulatedLyrics，实现平滑自动居中滚动、活跃行高亮放大与点击 seek；NowPlayingCanvasView 新增「歌词」模式，支持全屏大画卷动态滚动流光歌词；落地 ArtistBiographyService，通过维基百科 REST API（中文/英文维基）与 MusicBrainz 自动拉取歌手生平、活跃年份与流派并持久化本地磁盘缓存；ArtistDetailView 呈现可折叠生平卡片。经 LrcLyricsTests、LyricsServiceTests、ArtistBiographyServiceTests 全量验证通过。 |
 | AcoustID 密钥体系与诊断 | 查证 AcoustID User API Key（10位）与 Application API Key（8位）的区别；AcoustIDConfiguration 内置实测可用的应用客户端密钥（cSpUJKpD），提供恢复默认与智能错误诊断提示；MetadataManagerWorkspaceView 提供直达官网新应用注册链接；经 AcoustIDConfigurationTests 实测验证通过。 |
+| watchOS 短任务切片与轻量播控 | 依据 InteractionAtlas 第 19.1 节落地 WatchNowPlayingView 与 WatchQueueSheetView；专为 Apple Watch 小表盘设计的紧凑层级与大触控热区；规格徽标、微缩封面、紧凑进度条、队列管理与音量弹窗；100% 覆盖同文件 Preview；经 WatchNowPlayingTests 自动化测试通过。 |
+| 系统级播控打通与硬件联动 | 落地 SystemNowPlayingCoordinator 与 PlaybackSessionObserving 弱引用监听；对接系统级 MPRemoteCommandCenter（键盘播放/暂停/切歌物理键、耳机线控、锁屏拖拽 Seek）与 MPNowPlayingInfoCenter（封面、曲目标题、副标题、进度、电台直播标识）；ApplicationModel 完整生命周期绑定；经 SystemNowPlayingCoordinatorTests 自动化测试通过。 |
 
 
 验证基线：
 
-- 应用：全量 **234 项通过**，使用 `MSRUTests`。
-- 框架：**85 项通过**（39 UI + 46 Core）。
-- 构建：macOS 与 iOS 均编译链接通过；关闭签名，不代表设备安装运行验收。
+- 应用：全量 **241 项通过**，使用 `MSRU-UnitTests`。
+- 框架：**49 项通过**，使用 `AppFoundation` Package 测试。
+- 构建：macOS 与 iOS 均编译链接通过（iOS Simulator 干净构建通过，0 错误 0 警告）；关闭签名，不代表设备安装运行验收。
 - UI：开发签名 Runner 的 **2 项通过**，验证前台启动、实际 Cmd+Q／重启、保留打开窗口并排除手动关闭窗口。使用独立恢复域与稳定 scene ID；测试全部通过。
-- 门禁：架构（0 违规）、Preview（61 个全部覆盖）、diff 检查通过；入口链接须在修改后继续检查。源码检查不能替代渲染或运行时验收。
+- 门禁：架构（0 违规）、Preview（**64 个全部覆盖**，新增 WatchNowPlayingView 与 WatchQueueSheetView 同文件 Preview）、diff 检查通过；入口链接须在修改后继续检查。源码检查不能替代渲染或运行时验收。
 
 ## 尚未完成的验收
 

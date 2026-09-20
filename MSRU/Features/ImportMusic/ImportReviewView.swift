@@ -42,7 +42,7 @@ struct ImportReviewView: View {
             bottomActionBar
         }
         .frame(minWidth: 800, minHeight: 560)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Color.platformWindowBackground)
         .onAppear {
             // Expand all by default
             expandedClusterIDs = Set(store.pendingReviewClusters.map { $0.id })
@@ -397,7 +397,7 @@ struct ImportReviewView: View {
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 14)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Color.platformWindowBackground)
     }
 }
 

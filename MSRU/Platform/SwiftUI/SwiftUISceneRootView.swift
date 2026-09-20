@@ -2,6 +2,7 @@
 
 import Foundation
 import SwiftUI
+import AppFoundation
 import AppFoundationUI
 
 
@@ -55,6 +56,8 @@ struct SwiftUISceneRootView:
 
 
     @State private var shellSession: MSRUApplicationShellSession?
+
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     // MARK: - Init
 
@@ -135,26 +138,19 @@ struct SwiftUISceneRootView:
 
         Group {
             if let shellSession {
-                SwiftUIApplicationShell(
-                    shell: shellSession.resolve(),
-                    isContextPresented: Binding(get: { scene.isQueuePresented }, set: { scene.isQueuePresented = $0 })
-                ) {
-                    SidebarPaneView(scene: scene)
+                if horizontalSizeClass == .compact {
+                    CompactApplicationShell(
+                        scene: scene,
+                        shellSession: shellSession
+                    )
+                } else {
+                    regularSplitShell(
+                        scene: scene,
+                        shellSession: shellSession
+                    )
                 }
             }
         }
-        .overlay {
-            if scene.isNowPlayingPresented {
-                NowPlayingCanvasView(
-                    playback: scene.application.playback,
-                    onClose: {
-                        scene.setNowPlaying(presented: false)
-                    }
-                )
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .animation(.easeInOut(duration: 0.3), value: scene.isNowPlayingPresented)
         .onChange(
             of:
                 scene
@@ -176,6 +172,30 @@ struct SwiftUISceneRootView:
                 scene
             )
         }
+    }
+
+    private func regularSplitShell(
+        scene: SceneModel,
+        shellSession: MSRUApplicationShellSession
+    ) -> some View {
+        SwiftUIApplicationShell(
+            shell: shellSession.resolve(),
+            isContextPresented: Binding(get: { scene.isQueuePresented }, set: { scene.isQueuePresented = $0 })
+        ) {
+            SidebarPaneView(scene: scene)
+        }
+        .overlay {
+            if scene.isNowPlayingPresented {
+                NowPlayingCanvasView(
+                    playback: scene.application.playback,
+                    onClose: {
+                        scene.setNowPlaying(presented: false)
+                    }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: scene.isNowPlayingPresented)
     }
 
 
@@ -353,8 +373,13 @@ struct SwiftUISceneRootView:
     }
 }
 
-#Preview("iPad Application") {
+#Preview("iPad Application · Regular") {
     SwiftUISceneRootView(application: MSRUPreviewData.makeApplication())
+}
+
+#Preview("iPhone Application · Compact") {
+    SwiftUISceneRootView(application: MSRUPreviewData.makeApplication())
+        .environment(\.horizontalSizeClass, .compact)
 }
 
 #endif

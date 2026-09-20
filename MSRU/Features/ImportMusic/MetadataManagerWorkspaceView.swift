@@ -78,7 +78,7 @@ struct MetadataManagerWorkspaceView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Color.platformWindowBackground)
         .sheet(isPresented: $isAddRulePresented) {
             addRuleSheet
         }

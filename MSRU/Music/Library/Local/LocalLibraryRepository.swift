@@ -108,7 +108,12 @@ final class FileLocalLibraryRepository: LocalLibraryRepository {
             existingRecords = decoded
         }
 
-        let bookmark = try? track.fileURL.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+#if os(macOS)
+        let bookmarkOptions: URL.BookmarkCreationOptions = .withSecurityScope
+#else
+        let bookmarkOptions: URL.BookmarkCreationOptions = []
+#endif
+        let bookmark = try? track.fileURL.bookmarkData(options: bookmarkOptions, includingResourceValuesForKeys: nil, relativeTo: nil)
         let newRecord = PersistedTrackRecord(
             fileURL: track.fileURL,
             bookmarkData: bookmark,
@@ -215,8 +220,13 @@ final class FileLocalLibraryRepository: LocalLibraryRepository {
         var tracks: [LocalTrack] = []
         for record in records {
             var isStale = false
+#if os(macOS)
+            let resolveOptions: URL.BookmarkResolutionOptions = .withSecurityScope
+#else
+            let resolveOptions: URL.BookmarkResolutionOptions = []
+#endif
             if let bookmark = record.bookmarkData,
-               let resolvedURL = try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale) {
+               let resolvedURL = try? URL(resolvingBookmarkData: bookmark, options: resolveOptions, relativeTo: nil, bookmarkDataIsStale: &isStale) {
                 _ = resolvedURL.startAccessingSecurityScopedResource()
                 tracks.append(LocalTrack(
                     fileURL: resolvedURL,

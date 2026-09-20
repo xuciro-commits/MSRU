@@ -106,6 +106,9 @@ final class ApplicationModel {
     private(set) var isTerminated =
         false
 
+    private(set) var systemNowPlayingCoordinator:
+        SystemNowPlayingCoordinator?
+
 
     // MARK: - Live Init
 
@@ -270,6 +273,10 @@ final class ApplicationModel {
         let library =
             library
 
+        let coordinator =
+            SystemNowPlayingCoordinator(playback: playback)
+        coordinator.activate()
+        self.systemNowPlayingCoordinator = coordinator
 
         startupTask = Task {
 
@@ -294,6 +301,8 @@ final class ApplicationModel {
         isTerminated =
             true
 
+        systemNowPlayingCoordinator?.deactivate()
+        systemNowPlayingCoordinator = nil
 
         startupTask?
             .cancel()
