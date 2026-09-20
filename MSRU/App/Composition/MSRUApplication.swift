@@ -51,6 +51,10 @@ enum MSRUApplication {
             )
 
             builder.add(
+                PlaylistsFeature.self
+            )
+
+            builder.add(
                 RadioFeature.self
             )
 

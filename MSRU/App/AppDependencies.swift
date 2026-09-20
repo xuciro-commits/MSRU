@@ -273,6 +273,32 @@ extension DependencyValues {
                 newValue
         }
     }
+
+
+    // MARK: Playlist Store
+
+    @MainActor
+    var playlistStore:
+        PlaylistStore {
+
+        get {
+
+            self[
+                PlaylistStoreDependencyKey
+                    .self
+            ]
+        }
+
+
+        set {
+
+            self[
+                PlaylistStoreDependencyKey
+                    .self
+            ] =
+                newValue
+        }
+    }
 }
 
 
@@ -292,4 +318,23 @@ private enum RadioStoreDependencyKey:
     @MainActor
     static let testValue =
         RadioStore()
+}
+
+
+// MARK: - Playlist Store Key
+
+private enum PlaylistStoreDependencyKey:
+    DependencyKey {
+
+    @MainActor
+    static let liveValue =
+        PlaylistStore()
+
+    @MainActor
+    static let previewValue =
+        PlaylistStore()
+
+    @MainActor
+    static let testValue =
+        PlaylistStore()
 }

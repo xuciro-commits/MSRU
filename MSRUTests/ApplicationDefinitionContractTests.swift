@@ -52,6 +52,7 @@ struct ApplicationDefinitionContractTests {
         #expect(routeIDs.contains("library"))
         #expect(routeIDs.contains("albums"))
         #expect(routeIDs.contains("artists"))
+        #expect(routeIDs.contains("playlists"))
         #expect(routeIDs.contains("radio"))
         #expect(routeIDs.contains("add-music"))
         #expect(routeIDs.contains("import-review"))
@@ -64,6 +65,7 @@ struct ApplicationDefinitionContractTests {
         #expect(sidebarIDs.contains("library"))
         #expect(sidebarIDs.contains("albums"))
         #expect(sidebarIDs.contains("artists"))
+        #expect(sidebarIDs.contains("playlists"))
         #expect(sidebarIDs.contains("radio"))
         #expect(sidebarIDs.contains("add-music"))
 
@@ -74,6 +76,7 @@ struct ApplicationDefinitionContractTests {
         #expect(destinationIDs.contains("library"))
         #expect(destinationIDs.contains("albums"))
         #expect(destinationIDs.contains("artists"))
+        #expect(destinationIDs.contains("playlists"))
         #expect(destinationIDs.contains("radio"))
         #expect(destinationIDs.contains("add-music"))
         #expect(destinationIDs.contains("import-review"))

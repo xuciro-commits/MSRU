@@ -162,6 +162,7 @@ struct CompactApplicationShell: View {
                     get: {
                         if scene.navigation.section == .albums { return SceneSection.albums }
                         if scene.navigation.section == .artists { return SceneSection.artists }
+                        if scene.navigation.section == .playlists { return SceneSection.playlists }
                         return SceneSection.library
                     },
                     set: { newSection in
@@ -171,6 +172,7 @@ struct CompactApplicationShell: View {
                     Text(LocalizedStringKey("Songs")).tag(SceneSection.library)
                     Text(LocalizedStringKey("Albums")).tag(SceneSection.albums)
                     Text(LocalizedStringKey("Artists")).tag(SceneSection.artists)
+                    Text(LocalizedStringKey("Playlists")).tag(SceneSection.playlists)
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal, 16)
@@ -290,7 +292,7 @@ struct CompactApplicationShell: View {
             if selectedTab != .discovery { selectedTab = .discovery }
         case .radio:
             if selectedTab != .radio { selectedTab = .radio }
-        case .library, .albums, .artists:
+        case .library, .albums, .artists, .playlists:
             if selectedTab != .library { selectedTab = .library }
         case .addMusic, .importReview, .settings:
             if selectedTab != .tools { selectedTab = .tools }
@@ -308,7 +310,7 @@ struct CompactApplicationShell: View {
                 scene.send(.navigate(.section(.radio)))
             }
         case .library:
-            if scene.navigation.section != .library && scene.navigation.section != .albums && scene.navigation.section != .artists {
+            if scene.navigation.section != .library && scene.navigation.section != .albums && scene.navigation.section != .artists && scene.navigation.section != .playlists {
                 scene.send(.navigate(.section(.library)))
             }
         case .tools:

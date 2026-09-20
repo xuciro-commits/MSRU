@@ -76,6 +76,12 @@ final class ApplicationModel {
         RadioStore
 
 
+    // MARK: - Playlists
+
+    let playlistStore:
+        PlaylistStore
+
+
     // MARK: - Language
 
     let languageSettings:
@@ -139,9 +145,11 @@ final class ApplicationModel {
             providerManager:
                 ProviderManagerStore(),
             openverseSearch:
-                .live,
+                OpenverseSearchClient.live,
             radioStore:
                 RadioStore(),
+            playlistStore:
+                PlaylistStore(),
             languageSettings:
                 LanguageSettings()
         )
@@ -178,6 +186,8 @@ final class ApplicationModel {
             OpenverseSearchClient,
         radioStore:
             RadioStore? = nil,
+        playlistStore:
+            PlaylistStore? = nil,
         languageSettings:
             LanguageSettings? = nil
     ) {
@@ -213,6 +223,13 @@ final class ApplicationModel {
             resolvedRadioStore
 
 
+        let resolvedPlaylistStore =
+            playlistStore ?? PlaylistStore()
+
+        self.playlistStore =
+            resolvedPlaylistStore
+
+
         self.languageSettings =
             languageSettings ?? LanguageSettings()
 
@@ -238,6 +255,10 @@ final class ApplicationModel {
 
         dependencies.radioStore =
             resolvedRadioStore
+
+
+        dependencies.playlistStore =
+            resolvedPlaylistStore
 
 
         self.dependencies =
@@ -273,6 +294,9 @@ final class ApplicationModel {
         let library =
             library
 
+        let playlistStore =
+            playlistStore
+
         let coordinator =
             SystemNowPlayingCoordinator(playback: playback)
         coordinator.activate()
@@ -281,6 +305,8 @@ final class ApplicationModel {
         startupTask = Task {
 
             await library
+                .load()
+            await playlistStore
                 .load()
         }
     }

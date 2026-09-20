@@ -651,6 +651,23 @@ extension MSRUPreviewData {
     }
 
     @MainActor
+    static func makePlaylistStore() -> PlaylistStore {
+        PlaylistStore(repository: PreviewPlaylistRepository(playlists: [
+            Playlist(
+                title: "Favorites",
+                description: "Your hand-picked top tracks",
+                trackIDs: localTracks.prefix(3).map(\.id),
+                isPinned: true
+            ),
+            Playlist(
+                title: "Night Drive Vibes",
+                description: "Late night atmospheric synthwave and ambient beats",
+                trackIDs: localTracks.suffix(2).map(\.id)
+            )
+        ]))
+    }
+
+    @MainActor
     static func makeApplication(savedTracks: [LibraryTrack] = []) -> ApplicationModel {
         ApplicationModel(
             musicCatalog: makeCatalogStore(),
@@ -659,7 +676,8 @@ extension MSRUPreviewData {
             musicLibrary: makeAppleMusicStore(),
             playback: makePlaybackController(),
             providerManager: makeProviderStore(),
-            openverseSearch: .preview(results: openverseResults)
+            openverseSearch: .preview(results: openverseResults),
+            playlistStore: makePlaylistStore()
         )
     }
 
