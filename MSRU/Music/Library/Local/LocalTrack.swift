@@ -6,31 +6,47 @@
 import Foundation
 
 
-struct LocalTrack:
+public struct LocalTrack:
     Identifiable,
     Hashable,
-    Sendable {
+    Sendable,
+    Codable {
 
-    let fileURL:
+    public let fileURL:
         URL
 
-    let title:
+    public let title:
         String
 
-    let artist:
+    public let artist:
         String
 
-    let album:
+    public let album:
         String?
 
-    let duration:
+    public let duration:
         TimeInterval
 
-    let artworkData:
+    public let artworkData:
         Data?
 
+    public init(
+        fileURL: URL,
+        title: String,
+        artist: String,
+        album: String? = nil,
+        duration: TimeInterval = 0,
+        artworkData: Data? = nil
+    ) {
+        self.fileURL = fileURL
+        self.title = title
+        self.artist = artist
+        self.album = album
+        self.duration = duration
+        self.artworkData = artworkData
+    }
 
-    var id: String {
+    public var id: String {
         fileURL.absoluteString
     }
 }

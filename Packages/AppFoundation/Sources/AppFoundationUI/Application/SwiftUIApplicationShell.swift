@@ -45,6 +45,7 @@ public struct SwiftUIApplicationShell<Navigation: View>: View {
                                     action.perform()
                                 }
                                 .disabled(!action.isEnabled)
+                                .controlSize(.small)
                             }
                         }
                     }
@@ -64,7 +65,7 @@ public struct SwiftUIApplicationShell<Navigation: View>: View {
                     VStack(spacing: 0) {
                         HStack {
                             Spacer()
-                            Button("Done", systemImage: "checkmark") { isContextPresented = false }
+                            Button("完成", systemImage: "checkmark") { isContextPresented = false }
                         }
                         .padding()
                         contextContent
@@ -106,7 +107,7 @@ public struct SwiftUIApplicationShell<Navigation: View>: View {
         if let workspace = shell.workspace {
             workspace.content
         } else {
-            ContentUnavailableView("Destination Unavailable", systemImage: "questionmark.square.dashed")
+            ContentUnavailableView("目标不可用", systemImage: "questionmark.square.dashed")
         }
     }
 }
@@ -145,4 +146,3 @@ public struct SwiftUIApplicationShell<Navigation: View>: View {
     .frame(width: 360, height: 600)
 }
 #endif
-

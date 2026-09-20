@@ -27,7 +27,7 @@ struct ProviderDetailView: View {
                             }
                             Spacer()
                             Toggle(
-                                "Enabled",
+                                "已启用",
                                 isOn: Binding(
                                     get: { provider.isEnabled },
                                     set: { store.setEnabled($0, id: provider.id) }
@@ -36,12 +36,12 @@ struct ProviderDetailView: View {
                             .toggleStyle(.switch)
                         }
 
-                        GroupBox("Configuration") {
+                        GroupBox("配置") {
                             VStack(spacing: 14) {
                                 if provider.isCustom {
-                                    LabeledContent("Name") {
+                                    LabeledContent("名称") {
                                         TextField(
-                                            "Provider name",
+                                            "服务提供方名称",
                                             text: Binding(
                                                 get: { provider.name },
                                                 set: { store.setName($0, id: provider.id) }
@@ -60,13 +60,13 @@ struct ProviderDetailView: View {
                                         .frame(maxWidth: 360)
                                     }
                                 } else {
-                                    LabeledContent("Type", value: "Built-in")
+                                    LabeledContent("类型", value: "内置")
                                     if let endpoint = provider.endpoint {
-                                        LabeledContent("Endpoint", value: endpoint)
+                                        LabeledContent("端点", value: endpoint)
                                     }
                                 }
 
-                                LabeledContent("Priority") {
+                                LabeledContent("优先级") {
                                     Stepper(
                                         value: Binding(
                                             get: { provider.priority },
@@ -81,7 +81,7 @@ struct ProviderDetailView: View {
                             .padding(.vertical, 4)
                         }
 
-                        GroupBox("Capabilities") {
+                        GroupBox("能力") {
                             VStack(alignment: .leading, spacing: 10) {
                                 ForEach(ManagedProviderCapability.allCases) { capability in
                                     if provider.isCustom {
@@ -107,7 +107,7 @@ struct ProviderDetailView: View {
                             .padding(.vertical, 4)
                         }
 
-                        GroupBox("Connection") {
+                        GroupBox("连接") {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack {
                                     Label(provider.healthTitle, systemImage: healthSymbol(provider))
@@ -122,7 +122,7 @@ struct ProviderDetailView: View {
                                         .foregroundStyle(.secondary)
                                         .textSelection(.enabled)
                                 }
-                                Button("Test Connection") {
+                                Button("测试连接") {
                                     Task { await store.testConnection(id: provider.id) }
                                 }
                                 .disabled(store.isTesting(id: provider.id))
@@ -133,7 +133,7 @@ struct ProviderDetailView: View {
 
                         if provider.isRemovable {
                             Divider()
-                            Button("Remove Provider", role: .destructive) {
+                            Button("移除服务提供方", role: .destructive) {
                                 store.remove(id: provider.id)
                                 dismiss()
                             }
@@ -141,8 +141,9 @@ struct ProviderDetailView: View {
                     }
                     .padding(24)
                 }
+                .scrollIndicators(.hidden)
             } else {
-                ContentUnavailableView("Provider Removed", systemImage: "network.slash")
+                ContentUnavailableView("服务提供方已移除", systemImage: "network.slash")
             }
         }
         .frame(minWidth: 560, minHeight: 560)

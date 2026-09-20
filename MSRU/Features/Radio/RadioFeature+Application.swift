@@ -16,8 +16,8 @@ extension RadioFeature: ApplicationFeature {
             sidebar: [
                 SidebarContribution(
                     id: "radio",
-                    group: "Discover",
-                    title: "Radio",
+                    group: "发现",
+                    title: "电台",
                     systemImage: "dot.radiowaves.left.and.right",
                     route: SceneRoute.section(.radio),
                     order: 30

@@ -15,9 +15,9 @@ struct MusicLibraryView: View {
         CaseIterable,
         Identifiable {
 
-        case albums = "Albums"
-        case artists = "Artists"
-        case songs = "Songs"
+        case albums = "专辑"
+        case artists = "艺术家"
+        case songs = "歌曲"
 
 
         var id: Self {
@@ -70,7 +70,7 @@ struct MusicLibraryView: View {
 
 
             Picker(
-                "Library Section",
+                "资料库分区",
                 selection:
                     $selection
             ) {
@@ -112,12 +112,12 @@ struct MusicLibraryView: View {
         if !store.hasContent {
 
             ContentUnavailableView(
-                "No Imported Music",
+                "没有已导入的音乐",
                 systemImage:
                     "music.note.house",
                 description:
                     Text(
-                        "Import your Apple Music library to start browsing."
+                        "导入 Apple Music 资料库后即可开始浏览。"
                     )
             )
             .frame(
@@ -174,6 +174,7 @@ struct MusicLibraryView: View {
             }
             .padding(28)
         }
+        .scrollIndicators(.hidden)
     }
 
 
@@ -264,6 +265,7 @@ struct MusicLibraryView: View {
             }
             .padding(28)
         }
+        .scrollIndicators(.hidden)
     }
 
 
@@ -332,6 +334,9 @@ struct MusicLibraryView: View {
             .plain
         )
         .scrollContentBackground(
+            .hidden
+        )
+        .scrollIndicators(
             .hidden
         )
     }

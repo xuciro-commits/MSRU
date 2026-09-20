@@ -129,7 +129,7 @@ struct MiniPlayerBar: View {
         .buttonStyle(.plain)
         .foregroundStyle(playback.unifiedCanPrevious ? Color.primary : Color.secondary.opacity(0.35))
         .disabled(!playback.unifiedCanPrevious)
-        .help("Previous")
+        .help("上一首")
         .fixedSize()
     }
 
@@ -152,7 +152,7 @@ struct MiniPlayerBar: View {
         .buttonStyle(.plain)
         .foregroundStyle(playback.unifiedHasTrack ? Color.primary : Color.secondary.opacity(0.35))
         .disabled(!playback.unifiedHasTrack || playback.isResolving)
-        .help(playback.isPlaying ? "Pause" : "Play")
+        .help(playback.isPlaying ? "暂停" : "播放")
         .fixedSize()
     }
 
@@ -168,7 +168,7 @@ struct MiniPlayerBar: View {
         .buttonStyle(.plain)
         .foregroundStyle(playback.unifiedCanNext ? Color.primary : Color.secondary.opacity(0.35))
         .disabled(!playback.unifiedCanNext)
-        .help("Next")
+        .help("下一首")
         .fixedSize()
     }
 
@@ -226,7 +226,7 @@ struct MiniPlayerBar: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             } else if playback.radioCurrentStation != nil {
-                Text("LIVE")
+                Text("直播")
                     .font(.system(size: 8, weight: .bold))
                     .foregroundStyle(.red)
                     .padding(.horizontal, 4)
@@ -316,7 +316,7 @@ struct MiniPlayerBar: View {
             artworkImage(size: size)
         }
         .buttonStyle(.plain)
-        .help("Open Now Playing Canvas")
+        .help("打开正在播放画布")
     }
 
     private func artworkImage(size: CGFloat = 42) -> some View {
@@ -374,7 +374,7 @@ struct MiniPlayerBar: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(Color.secondary)
-        .help("Lyrics")
+        .help("歌词")
         .fixedSize()
     }
 
@@ -389,7 +389,7 @@ struct MiniPlayerBar: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(Color.secondary)
-        .help("Spectrum Visualizer")
+        .help("频谱可视化")
         .fixedSize()
     }
 
@@ -402,7 +402,7 @@ struct MiniPlayerBar: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(Color.primary)
-        .help("Up Next")
+        .help("接下来播放")
         .fixedSize()
     }
 
@@ -417,7 +417,7 @@ struct MiniPlayerBar: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(Color.secondary)
-        .help("Full Canvas")
+        .help("完整画布")
         .fixedSize()
     }
 
@@ -465,7 +465,7 @@ struct MiniPlayerBar: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(playback.isMuted ? "Unmute" : "Mute")
+            .help(playback.isMuted ? "取消静音" : "静音")
 
             Slider(
                 value: Binding(
@@ -885,4 +885,3 @@ private struct HoverScrubber:
     MiniPlayerBar(playback: playback, onToggleQueue: {})
         .frame(width: 480).padding()
 }
-

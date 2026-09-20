@@ -76,7 +76,8 @@ struct MSRUContextPaneView: View {
                 )
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(minWidth: 260, maxWidth: .infinity, maxHeight: .infinity)
+        .tint(Color.accentColor)
     }
 }
 

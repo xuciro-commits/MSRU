@@ -32,7 +32,7 @@ struct ArtistDetailView: View {
                 Button(action: onBack) {
                     HStack(spacing: 6) {
                         Image(systemName: "chevron.backward")
-                        Text("Artists")
+                        Text("艺术家")
                     }
                     .font(.subheadline.bold())
                 }
@@ -54,7 +54,7 @@ struct ArtistDetailView: View {
                         .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("ARTIST")
+                        Text("艺术家")
                             .font(.caption.bold())
                             .foregroundStyle(.secondary)
 
@@ -65,7 +65,7 @@ struct ArtistDetailView: View {
                         // Aliases tags
                         if !artist.aliases.isEmpty {
                             HStack(spacing: 6) {
-                                Text("Aliases:")
+                                Text("别名：")
                                     .font(.caption)
                                     .foregroundStyle(.tertiary)
 
@@ -85,7 +85,7 @@ struct ArtistDetailView: View {
 
                         HStack(spacing: 12) {
                             Button(action: playAll) {
-                                Label("Play", systemImage: "play.fill")
+                                Label("播放", systemImage: "play.fill")
                                     .font(.headline)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
@@ -93,7 +93,7 @@ struct ArtistDetailView: View {
                             .buttonStyle(.borderedProminent)
 
                             Button(action: shuffleAll) {
-                                Label("Shuffle", systemImage: "shuffle")
+                                Label("随机播放", systemImage: "shuffle")
                                     .font(.headline)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
@@ -111,7 +111,7 @@ struct ArtistDetailView: View {
                 // Top Tracks Section
                 if !topTracks.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Top Songs")
+                        Text("热门歌曲")
                             .font(.title2.bold())
                             .padding(.horizontal, 24)
 
@@ -127,7 +127,7 @@ struct ArtistDetailView: View {
                 // Discography Section
                 if !albums.isEmpty {
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("Albums")
+                        Text("专辑")
                             .font(.title2.bold())
                             .padding(.horizontal, 24)
 
@@ -155,6 +155,7 @@ struct ArtistDetailView: View {
             }
             .padding(.bottom, 40)
         }
+        .scrollIndicators(.hidden)
     }
 
     private func trackRow(_ track: LocalTrack, number: Int) -> some View {

@@ -56,6 +56,8 @@ struct RadioView: View {
             }
             .padding(28)
         }
+        .scrollIndicators(.hidden)
+        .hideScrollIndicatorsCompletely()
         .sheet(isPresented: $isShowingAddStationSheet) {
             AddStationSheetView { newStation in
                 feature.send(.addCustomStationRequested(newStation))
@@ -71,10 +73,10 @@ struct RadioView: View {
     private var header: some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Radio")
+                Text("电台")
                     .font(.system(size: 32, weight: .bold))
 
-                Text("Curated live internet radio stations with lossless and high-bitrate streaming.")
+                Text("精选互联网直播电台，支持无损和高码率播放。")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -84,7 +86,7 @@ struct RadioView: View {
             Button {
                 isShowingAddStationSheet = true
             } label: {
-                Label("Add Station", systemImage: "plus")
+                Label("添加电台", systemImage: "plus")
                     .font(.system(size: 13, weight: .semibold))
             }
             .buttonStyle(.borderedProminent)
@@ -105,7 +107,7 @@ struct RadioView: View {
                         HStack(spacing: 6) {
                             Image(systemName: genre.systemImage)
                                 .font(.system(size: 11, weight: .semibold))
-                            Text(genre.rawValue)
+                            Text(genre.displayTitle)
                                 .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
                         }
                         .padding(.horizontal, 12)
@@ -123,6 +125,7 @@ struct RadioView: View {
             }
             .padding(.vertical, 2)
         }
+        .hideScrollIndicatorsCompletely()
     }
 
     // MARK: - Favorites Section
@@ -132,7 +135,7 @@ struct RadioView: View {
             HStack(spacing: 6) {
                 Image(systemName: "heart.fill")
                     .foregroundStyle(.red)
-                Text("Favorites")
+                Text("收藏")
                     .font(.title3.bold())
             }
 
@@ -163,6 +166,7 @@ struct RadioView: View {
                 }
                 .padding(.vertical, 4)
             }
+            .hideScrollIndicatorsCompletely()
         }
     }
 
@@ -173,7 +177,7 @@ struct RadioView: View {
             HStack(spacing: 6) {
                 Image(systemName: "clock.arrow.circlepath")
                     .foregroundStyle(.secondary)
-                Text("Recently Played")
+                Text("最近播放")
                     .font(.title3.bold())
             }
 
@@ -204,6 +208,7 @@ struct RadioView: View {
                 }
                 .padding(.vertical, 4)
             }
+            .hideScrollIndicatorsCompletely()
         }
     }
 
@@ -220,7 +225,7 @@ struct RadioView: View {
 
     private func featuredSection(_ station: RadioStation) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Featured Broadcast")
+            Text("精选广播")
                 .font(.title3.bold())
 
             RadioHeroBannerView(
@@ -242,21 +247,21 @@ struct RadioView: View {
     private var stationsGridSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text(state.selectedGenre == .all ? "All Stations" : "\(state.selectedGenre.rawValue) Stations")
+                Text(state.selectedGenre == .all ? "全部电台" : "\(state.selectedGenre.displayTitle) 电台")
                     .font(.title3.bold())
 
                 Spacer()
 
-                Text("\(state.stations.count) stations")
+                Text("\(state.stations.count) 个电台")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             if state.stations.isEmpty {
                 ContentUnavailableView(
-                    "No Radio Stations Found",
+                    "未找到电台",
                     systemImage: "dot.radiowaves.left.and.right",
-                    description: Text("Try selecting a different genre or adjusting your search terms.")
+                    description: Text("请尝试选择其他类型或调整搜索关键词。")
                 )
                 .frame(maxWidth: .infinity, minHeight: 200)
             } else {

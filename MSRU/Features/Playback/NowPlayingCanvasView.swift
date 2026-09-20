@@ -65,7 +65,7 @@ struct NowPlayingCanvasView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 14, weight: .bold))
-                    Text("Collapse")
+                    Text("收起")
                         .font(.system(size: 13, weight: .medium))
                 }
                 .foregroundStyle(.white.opacity(0.85))
@@ -74,13 +74,13 @@ struct NowPlayingCanvasView: View {
                 .background(Color.white.opacity(0.12), in: Capsule())
             }
             .buttonStyle(.plain)
-            .help("Collapse to player bar (ESC)")
+            .help("收起到播放器栏（ESC）")
             .keyboardShortcut(.cancelAction)
 
             Spacer()
 
             VStack(spacing: 2) {
-                Text("NOW PLAYING")
+                Text("正在播放")
                     .font(.system(size: 11, weight: .bold))
                     .tracking(1.5)
                     .foregroundStyle(.white.opacity(0.6))
@@ -94,7 +94,7 @@ struct NowPlayingCanvasView: View {
                     .foregroundStyle(.white.opacity(0.65))
             }
             .buttonStyle(.plain)
-            .help("Close")
+            .help("关闭")
         }
     }
 
@@ -123,7 +123,7 @@ struct NowPlayingCanvasView: View {
                         Circle()
                             .fill(Color.red)
                             .frame(width: 7, height: 7)
-                        Text("LIVE RADIO")
+                        Text("直播电台")
                             .font(.system(size: 11, weight: .bold))
                             .tracking(1.0)
                     }
@@ -207,7 +207,7 @@ struct NowPlayingCanvasView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!playback.unifiedCanPrevious)
-                .help("Previous Track")
+                .help("上一首")
 
                 // Play / Pause Hero button
                 Button {
@@ -233,7 +233,7 @@ struct NowPlayingCanvasView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!playback.unifiedHasTrack || playback.isResolving)
-                .help(playback.isPlaying ? "Pause (Space)" : "Play (Space)")
+                .help(playback.isPlaying ? "暂停（空格）" : "播放（空格）")
                 .keyboardShortcut(.space, modifiers: [])
 
                 // Next button
@@ -246,7 +246,7 @@ struct NowPlayingCanvasView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!playback.unifiedCanNext)
-                .help("Next Track")
+                .help("下一首")
             }
 
             // Volume and Queue actions row
@@ -261,7 +261,7 @@ struct NowPlayingCanvasView: View {
                         .frame(width: 20)
                 }
                 .buttonStyle(.plain)
-                .help(playback.isMuted ? "Unmute" : "Mute")
+                .help(playback.isMuted ? "取消静音" : "静音")
 
                 // Volume slider
                 Slider(
@@ -290,7 +290,7 @@ struct NowPlayingCanvasView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "list.bullet")
                             .font(.system(size: 14, weight: .medium))
-                        Text("Queue")
+                        Text("队列")
                             .font(.system(size: 13, weight: .medium))
                     }
                     .foregroundStyle(isQueueDrawerPresented ? Color.accentColor : Color.white.opacity(0.8))
@@ -304,7 +304,7 @@ struct NowPlayingCanvasView: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .help("Toggle Queue")
+                .help("切换队列")
             }
             .padding(.top, 6)
         }
@@ -319,7 +319,7 @@ struct NowPlayingCanvasView: View {
                     Spacer()
                     HStack(spacing: 6) {
                         Image(systemName: "dot.radiowaves.left.and.right")
-                        Text("Continuous Broadcast · Live Audio")
+                        Text("连续广播 · 直播音频")
                     }
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.white.opacity(0.65))
@@ -420,7 +420,7 @@ struct NowPlayingCanvasView: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Text("Up Next Queue")
+                    Text("接下来播放")
                         .font(.headline)
                         .foregroundStyle(.white)
 

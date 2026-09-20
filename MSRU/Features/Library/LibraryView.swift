@@ -6,6 +6,7 @@
 import SwiftUI
 import Observation
 import AppFoundation
+import AppFoundationUI
 
 
 struct LibraryView:
@@ -36,13 +37,13 @@ struct LibraryView:
             case .saved:
 
                 return
-                    "Library"
+                    "资料库"
 
 
             case .local:
 
                 return
-                    "Local Files"
+                    "本地文件"
             }
         }
     }
@@ -146,7 +147,7 @@ struct LibraryView:
             if let error = feature.errorMessage {
                 VStack(alignment: .leading, spacing: 8) {
                     Label(error, systemImage: "exclamationmark.triangle")
-                    Button("Reload Library") { Task { await feature.libraryStore.load() } }
+                    Button("重新加载资料库") { Task { await feature.libraryStore.load() } }
                 }.font(.callout).padding()
             }
             if let error = playback.playbackErrorMessage {
@@ -190,20 +191,21 @@ struct LibraryView:
 
     private var libraryTitle: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Library").font(.largeTitle.bold())
+            Text("资料库").font(.largeTitle.bold())
             Text(librarySubtitle).font(.callout).foregroundStyle(.secondary)
         }
     }
 
     private var scopePicker: some View {
-        Picker("Library View", selection: $scope) {
+        Picker("资料库视图", selection: $scope) {
             ForEach(Scope.allCases) { scope in Text(scope.title).tag(scope) }
         }
         .pickerStyle(.segmented)
+        .labelsHidden()
     }
 
     private var importButton: some View {
-        Button(action: onAddMusic) { Label("Add Music", systemImage: "plus") }
+        Button(action: onAddMusic) { Label("添加音乐", systemImage: "plus") }
     }
 
     private var librarySubtitle:
@@ -214,13 +216,13 @@ struct LibraryView:
         case .saved:
 
             return
-                "\(feature.tracks.count) saved tracks"
+                "\(feature.tracks.count) 首已保存歌曲"
 
 
         case .local:
 
             return
-                "\(localStore.tracks.count) local tracks"
+                "\(localStore.tracks.count) 首本地歌曲"
         }
     }
 
@@ -274,7 +276,7 @@ struct LibraryView:
 
 
                 Text(
-                    "Loading Library…"
+                    "正在加载资料库…"
                 )
                 .foregroundStyle(
                     .secondary
@@ -296,7 +298,7 @@ struct LibraryView:
             ContentUnavailableView {
 
                 Label(
-                    "Your Library is Empty",
+                    "资料库为空",
                     systemImage:
                         "music.note.house"
                 )
@@ -304,13 +306,13 @@ struct LibraryView:
             } description: {
 
                 Text(
-                    "Add tracks from Browse or Local Files."
+                    "从浏览或本地文件中添加歌曲。"
                 )
 
             } actions: {
 
                 Button(
-                    "Add Music"
+                    "添加音乐"
                 ) {
 
                     onAddMusic()
@@ -442,6 +444,7 @@ struct LibraryView:
                 28
             )
         }
+        .scrollIndicators(.hidden)
     }
 
 
@@ -461,147 +464,62 @@ struct LibraryView:
         let isSelected =
             selectedLibraryTrack?.id == track.id
 
+        let item = PlaybackItem(library: track)
+        let isPlaying = playback.currentItem?.id == item?.id && playback.isPlaying
 
-        return VStack(
-            alignment:
-                .leading,
-            spacing:
-                9
-        ) {
-
-            artwork(
-                track
-            )
-            .aspectRatio(
-                1,
-                contentMode:
-                    .fit
-            )
-            .overlay(alignment: .bottomTrailing) {
-                let item = PlaybackItem(library: track)
-                Button {
-                    feature.send(.playRequested(id: track.id))
-                } label: {
-                    Image(systemName: playback.currentItem?.id == item?.id && playback.isPlaying ? "pause.fill" : "play.fill")
-                        .frame(width: 36, height: 36)
-                }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.circle)
-                .disabled(item == nil)
-                .help(item == nil ? "No supported playback source" : "Play or pause")
-                .accessibilityLabel("Play or pause " + track.title)
-                .padding(8)
+        return UnifiedTrackCardView(
+            title: track.title,
+            subtitle: track.artist,
+            secondaryText: track.album,
+            durationText: track.duration.map { durationText($0) },
+            qualityBadge: track.sources.first?.kind.rawValue.uppercased(),
+            isPlaying: isPlaying,
+            isSelected: isSelected,
+            onSelect: {
+                selectedLibraryTrack = track
+            },
+            onPlay: {
+                feature.send(.playRequested(id: track.id))
             }
-
-
-            Text(
-                track.title
-            )
-            .font(
-                .callout
-                    .weight(
-                        .semibold
-                    )
-            )
-            .lineLimit(
-                1
-            )
-
-
-            Text(
-                track.artist
-            )
-            .font(
-                .caption
-            )
-            .foregroundStyle(
-                .secondary
-            )
-            .lineLimit(
-                1
-            )
-
-
-            HStack(
-                spacing:
-                    6
-            ) {
-
-                sourceLabels(
-                    track
-                )
-
-
-                Spacer()
-
-
-                if isRemoving {
-
-                    ProgressView()
-                        .controlSize(
-                            .small
-                        )
-
-                } else {
-
-                    Menu {
-                        playbackActions(track)
-                        removeButton(
-                            track
-                        )
-
-                    } label: {
-
-                        Image(
-                            systemName:
-                                "ellipsis"
-                        )
-                        .frame(
-                            width:
-                                24,
-                            height:
-                                20
-                        )
-                    }
-                    .menuStyle(
-                        .borderlessButton
-                    )
-                    .fixedSize()
+        ) {
+            artwork(track)
+        } actionsMenu: {
+            if isRemoving {
+                ProgressView()
+                    .controlSize(.small)
+            } else {
+                Menu {
+                    playbackActions(track)
+                    removeButton(track)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .frame(width: 22, height: 18)
                 }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
             }
         }
         .contextMenu {
             playbackActions(track)
             if !isRemoving {
-
-                removeButton(
-                    track
-                )
+                removeButton(track)
             }
         }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
-        )
-        .contentShape(Rectangle())
-        .onTapGesture {
-            selectedLibraryTrack = track
-        }
+    }
+
+    private func durationText(_ duration: TimeInterval) -> String {
+        let seconds = max(0, Int(duration.rounded()))
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 
 
     @ViewBuilder
     private func playbackActions(_ track: LibraryTrack) -> some View {
         let supported = PlaybackItem(library: track) != nil
-        Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") {
+        Button("下一首播放", systemImage: "text.line.first.and.arrowtriangle.forward") {
             feature.send(.playNextRequested(id: track.id))
         }.disabled(!supported)
-        Button("Add to Queue", systemImage: "text.badge.plus") {
+        Button("加入队列", systemImage: "text.badge.plus") {
             feature.send(.enqueueRequested(id: track.id))
         }.disabled(!supported)
     }
@@ -629,7 +547,7 @@ struct LibraryView:
         } label: {
 
             Label(
-                "Remove from Library",
+                "从资料库移除",
                 systemImage:
                     "trash"
             )

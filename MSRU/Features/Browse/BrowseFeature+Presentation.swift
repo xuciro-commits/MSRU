@@ -41,7 +41,7 @@ extension BrowseFeature:
                         identity:
                             WorkspaceIdentity(
                                 title:
-                                    "Browse",
+                                    "浏览",
                                 systemImage:
                                     "square.grid.2x2"
                             ),
@@ -74,7 +74,7 @@ extension BrowseFeature:
                             id:
                                 "browse.search",
                             prompt:
-                                "Search Openverse",
+                                "搜索 Openverse",
                             text: {
                                 scene in
 

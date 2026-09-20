@@ -163,7 +163,7 @@ final class MSRUMacWindowComposition {
                                         allowsFullHeightLayout:
                                             true,
                                         minimumThickness:
-                                            280,
+                                            300,
                                         maximumThickness:
                                             420
                                     ),

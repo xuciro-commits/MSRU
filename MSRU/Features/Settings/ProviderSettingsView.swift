@@ -16,8 +16,8 @@ struct ProviderSettingsView: View {
         VStack(alignment: .leading, spacing: 24) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Configured Providers").font(.title3.bold())
-                    Text("Configure catalog, metadata, library, and playback capabilities independently.")
+                    Text("已配置的服务提供方").font(.title3.bold())
+                    Text("分别配置目录、元数据、资料库和播放能力。")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -25,7 +25,7 @@ struct ProviderSettingsView: View {
                 Button {
                     isAddingProvider = true
                 } label: {
-                    Label("Add Provider", systemImage: "plus")
+                    Label("添加服务提供方", systemImage: "plus")
                 }
                 .buttonStyle(.borderedProminent)
             }
@@ -75,7 +75,7 @@ struct ProviderSettingsView: View {
                         .buttonStyle(.plain)
 
                         Toggle(
-                            "Enabled",
+                            "已启用",
                             isOn: Binding(
                                 get: { provider.isEnabled },
                                 set: { store.setEnabled($0, id: provider.id) }
@@ -95,7 +95,7 @@ struct ProviderSettingsView: View {
             )
 
             VStack(alignment: .leading, spacing: 12) {
-                Text("Playback Priority").font(.title3.bold())
+                Text("播放优先级").font(.title3.bold())
                 let playback = store.playbackProviders
                 VStack(spacing: 0) {
                     ForEach(playback) { provider in
@@ -107,7 +107,7 @@ struct ProviderSettingsView: View {
                             Image(systemName: provider.systemImage).frame(width: 24)
                             Text(provider.name)
                             Spacer()
-                            Text(provider.isEnabled ? "Enabled" : "Disabled")
+                            Text(provider.isEnabled ? "已启用" : "已停用")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -145,5 +145,6 @@ struct ProviderSettingsView: View {
         ProviderSettingsView(store: MSRUPreviewData.makeProviderStore())
             .padding(28)
     }
+    .scrollIndicators(.hidden)
     .frame(width: 900, height: 760)
 }

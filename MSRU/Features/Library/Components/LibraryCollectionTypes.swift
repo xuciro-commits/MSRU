@@ -15,8 +15,8 @@ enum LibraryViewMode: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var title: String {
         switch self {
-        case .table: return "Table"
-        case .grid: return "Grid"
+        case .table: return "列表"
+        case .grid: return "网格"
         }
     }
 
@@ -41,11 +41,11 @@ enum LibrarySortField: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var title: String {
         switch self {
-        case .dateAdded: return "Date Added"
-        case .title: return "Title"
-        case .artist: return "Artist"
-        case .album: return "Album"
-        case .duration: return "Duration"
+        case .dateAdded: return "添加日期"
+        case .title: return "标题"
+        case .artist: return "艺术家"
+        case .album: return "专辑"
+        case .duration: return "时长"
         }
     }
 }

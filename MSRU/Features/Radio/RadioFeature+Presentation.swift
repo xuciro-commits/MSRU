@@ -21,7 +21,7 @@ extension RadioFeature: ApplicationFeaturePresentation {
                 workspace: { scene in
                     WorkspacePresentation(
                         identity: WorkspaceIdentity(
-                            title: "Radio",
+                            title: "电台",
                             systemImage: "dot.radiowaves.left.and.right"
                         ),
                         toolbar: radioToolbar
@@ -47,7 +47,7 @@ extension RadioFeature: ApplicationFeaturePresentation {
                 .search(
                     ToolbarSearchPresentation(
                         id: "radio.search",
-                        prompt: "Search Stations, Genres, Countries",
+                        prompt: "搜索电台、类型或国家",
                         text: { scene in
                             scene.radioFeature.state.searchQuery
                         },

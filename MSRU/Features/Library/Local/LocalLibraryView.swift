@@ -6,6 +6,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import Observation
+import AppFoundationUI
 
 
 
@@ -203,8 +204,8 @@ struct LocalLibraryView: View {
 
             Text(
                 isDropTargeted
-                ? "Drop to Import"
-                : "No Local Music"
+                ? "拖放以导入"
+                : "没有本地音乐"
             )
             .font(
                 .title2.bold()
@@ -212,7 +213,7 @@ struct LocalLibraryView: View {
 
 
             Text(
-                "Import audio files or drag them into MSRU."
+                "导入音频文件，或将文件拖到 MSRU 中。"
             )
             .foregroundStyle(
                 .secondary
@@ -226,7 +227,7 @@ struct LocalLibraryView: View {
             } label: {
 
                 Label(
-                    "Add Music",
+                    "添加音乐",
                     systemImage:
                         "plus"
                 )
@@ -283,6 +284,7 @@ struct LocalLibraryView: View {
             }
             .padding(28)
         }
+        .scrollIndicators(.hidden)
         .overlay {
 
             if isDropTargeted {
@@ -300,7 +302,7 @@ struct LocalLibraryView: View {
                 .overlay {
 
                     Label(
-                        "Drop to Import",
+                        "拖放以导入",
                         systemImage:
                             "arrow.down.circle.fill"
                     )
@@ -320,178 +322,45 @@ struct LocalLibraryView: View {
             LocalTrack
     ) -> some View {
 
-        VStack(
-            alignment:
-                .leading,
-            spacing:
-                8
-        ) {
+        let isSelected =
+            selectedTrack?.id == track.id
 
-            ZStack(
-                alignment:
-                    .bottomTrailing
-            ) {
-
-                artwork(
-                    track
-                )
-                .aspectRatio(
-                    1,
-                    contentMode:
-                        .fit
-                )
-
-
-                Button {
-
-                    playback
-                        .toggle(
-                            track:
-                                track,
-                            queue:
-                                store.tracks
-                        )
-
-                } label: {
-
-                    Image(
-                        systemName:
-                            isPlaying(
-                                track
-                            )
-                            ? "pause.fill"
-                            : "play.fill"
-                    )
-                    .font(
-                        .headline
-                    )
-                    .frame(
-                        width: 38,
-                        height: 38
-                    )
-                }
-                #if os(visionOS)
-                .buttonStyle(.bordered)
-                #else
-                .buttonStyle(.glass)
-                #endif
-                .padding(10)
+        return UnifiedTrackCardView(
+            title: track.title,
+            subtitle: track.artist,
+            secondaryText: track.album,
+            durationText: durationText(track.duration),
+            qualityBadge: track.fileURL.pathExtension.uppercased(),
+            isPlaying: isPlaying(track),
+            isSelected: isSelected,
+            onSelect: {
+                selectedTrack = track
+            },
+            onPlay: {
+                playback.toggle(track: track, queue: store.tracks)
             }
-
-
-            Text(
-                track.title
-            )
-            .font(
-                .callout.weight(
-                    .medium
-                )
-            )
-            .lineLimit(1)
-
-
-            Text(
-                track.artist
-            )
-            .font(
-                .caption
-            )
-            .foregroundStyle(
-                .secondary
-            )
-            .lineLimit(1)
-
-
-            HStack(
-                spacing: 8
-            ) {
-
-                if let album =
-                    track.album {
-
-                    Text(
-                        album
-                    )
-                    .lineLimit(1)
+        ) {
+            artwork(track)
+        } actionsMenu: {
+            HStack(spacing: 4) {
+                if library.contains(local: track) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color.accentColor)
+                        .font(.caption)
                 }
-
-
-                Spacer()
-
-
-                if library.contains(
-                    local:
-                        track
-                ) {
-
-                    Image(
-                        systemName:
-                            "checkmark.circle.fill"
-                    )
-                    .foregroundStyle(
-                        Color.accentColor
-                    )
-                }
-
 
                 Menu {
-
-                    trackActions(
-                        track
-                    )
-
+                    trackActions(track)
                 } label: {
-
-                    Image(
-                        systemName:
-                            "ellipsis"
-                    )
-                    .frame(
-                        width: 22,
-                        height: 18
-                    )
+                    Image(systemName: "ellipsis")
+                        .frame(width: 22, height: 18)
                 }
-                .menuStyle(
-                    .borderlessButton
-                )
+                .menuStyle(.borderlessButton)
                 .fixedSize()
-
-
-                Text(
-                    durationText(
-                        track.duration
-                    )
-                )
             }
-            .font(
-                .caption2
-            )
-            .foregroundStyle(
-                .tertiary
-            )
-        }
-        .padding(8)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(selectedTrack?.id == track.id ? Color.accentColor.opacity(0.12) : Color.clear)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(selectedTrack?.id == track.id ? Color.accentColor.opacity(0.4) : Color.clear, lineWidth: 1.5)
-        )
-        .contentShape(
-            Rectangle()
-        )
-        .onTapGesture {
-
-            selectedTrack =
-                track
         }
         .contextMenu {
-
-            trackActions(
-                track
-            )
+            trackActions(track)
         }
     }
 
@@ -514,7 +383,7 @@ struct LocalLibraryView: View {
         } label: {
 
             Label(
-                "Play Next",
+                "下一首播放",
                 systemImage:
                     "text.line.first.and.arrowtriangle.forward"
             )
@@ -531,7 +400,7 @@ struct LocalLibraryView: View {
         } label: {
 
             Label(
-                "Add to Queue",
+                "加入队列",
                 systemImage:
                     "text.badge.plus"
             )
@@ -560,7 +429,7 @@ struct LocalLibraryView: View {
             } label: {
 
                 Label(
-                    "Remove from Library",
+                    "从资料库移除",
                     systemImage:
                         "minus.circle"
                 )
@@ -582,7 +451,7 @@ struct LocalLibraryView: View {
             } label: {
 
                 Label(
-                    "Add to Library",
+                    "加入资料库",
                     systemImage:
                         "plus.circle"
                 )

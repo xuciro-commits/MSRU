@@ -110,13 +110,13 @@ struct AddMusicView: View {
 
                     actionCard(
                         title:
-                            "Files",
+                            "文件",
                         description:
-                            "Import audio files into your MSRU Library.",
+                            "将音频文件导入 MSRU 资料库。",
                         systemImage:
                             "doc.badge.plus",
                         status:
-                            "Available",
+                            "可用",
                         isEnabled:
                             true
                     ) {
@@ -128,27 +128,30 @@ struct AddMusicView: View {
 
                     actionCard(
                         title:
-                            "Folder",
+                            "文件夹",
                         description:
-                            "Add a folder and keep it available as a library source.",
+                            "添加文件夹并将其作为资料库来源。",
                         systemImage:
                             "folder.badge.plus",
                         status:
-                            "Coming later",
+                            "可用",
                         isEnabled:
-                            false
-                    ) {}
+                            true
+                    ) {
+                        isFileImporterPresented =
+                            true
+                    }
 
 
                     actionCard(
                         title:
                             "Apple Music",
                         description:
-                            "Connect or import albums, artists, and songs through the official Apple Music path.",
+                            "通过官方 Apple Music 途径连接或导入专辑、艺术家和歌曲。",
                         systemImage:
                             "apple.logo",
                         status:
-                            "Official integration",
+                            "官方集成",
                         isEnabled:
                             true
                     ) {
@@ -160,13 +163,13 @@ struct AddMusicView: View {
 
                     actionCard(
                         title:
-                            "Provider Library",
+                            "服务提供方资料库",
                         description:
-                            "Import saved music from a connected provider into the unified Library.",
+                            "将已连接服务提供方中的已保存音乐导入统一资料库。",
                         systemImage:
                             "rectangle.stack.badge.plus",
                         status:
-                            "Requires provider",
+                            "需要服务提供方",
                         isEnabled:
                             false
                     ) {}
@@ -174,6 +177,7 @@ struct AddMusicView: View {
             }
             .padding(28)
         }
+        .scrollIndicators(.hidden)
     }
 
 
@@ -185,11 +189,11 @@ struct AddMusicView: View {
             spacing: 5
         ) {
 
-            Text("Add Music")
+            Text("添加音乐")
                 .font(.largeTitle.bold())
 
             Text(
-                "Import local media or bring music in from connected services."
+                "导入本地媒体，或从已连接的服务中导入音乐。"
             )
             .font(.callout)
             .foregroundStyle(.secondary)
@@ -214,7 +218,7 @@ struct AddMusicView: View {
                 } label: {
 
                     Label(
-                        "Add Music",
+                        "添加音乐",
                         systemImage:
                             "chevron.left"
                     )
@@ -303,8 +307,8 @@ struct AddMusicView: View {
 
                     Text(
                         isEnabled
-                        ? "Open"
-                        : "Not available yet"
+                        ? "打开"
+                        : "暂不可用"
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)

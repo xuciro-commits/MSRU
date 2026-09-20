@@ -18,6 +18,14 @@ struct AlbumsView: View {
         case year = "Year"
 
         var id: String { rawValue }
+
+        var displayTitle: String {
+            switch self {
+            case .title: return "标题"
+            case .artist: return "艺术家"
+            case .year: return "年份"
+            }
+        }
     }
 
     @State private var searchQuery: String = ""
@@ -95,6 +103,7 @@ struct AlbumsView: View {
                     }
                     .padding(24)
                 }
+                .scrollIndicators(.hidden)
             }
         }
     }
@@ -102,23 +111,21 @@ struct AlbumsView: View {
     private var header: some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Albums")
+                Text("专辑")
                     .font(.largeTitle.bold())
 
-                Text("\(allAlbums.count) albums")
+                Text("\(allAlbums.count) 张专辑")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
-
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
 
-                TextField("Filter albums...", text: $searchQuery)
+                TextField("筛选专辑…", text: $searchQuery)
                     .textFieldStyle(.plain)
-                    .frame(width: 140)
 
                 if !searchQuery.isEmpty {
                     Button {
@@ -133,13 +140,18 @@ struct AlbumsView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+            .frame(width: 260)
 
-            Picker("Sort", selection: $sortField) {
-                ForEach(AlbumSortField.allCases) { field in
-                    Text(field.rawValue).tag(field)
+            HStack {
+                Spacer()
+                Picker("排序", selection: $sortField) {
+                    ForEach(AlbumSortField.allCases) { field in
+                        Text(field.displayTitle).tag(field)
+                    }
                 }
+                .frame(width: 110)
             }
-            .frame(width: 110)
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
@@ -151,10 +163,10 @@ struct AlbumsView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary.opacity(0.4))
 
-            Text("No Albums Found")
+            Text("未找到专辑")
                 .font(.headline)
 
-            Text("Import music or adjust search filters to view your album library.")
+            Text("导入音乐或调整搜索条件以查看专辑资料库。")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

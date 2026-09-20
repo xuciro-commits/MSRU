@@ -79,6 +79,7 @@ struct BrowseView: View {
             }
             .padding(28)
         }
+        .scrollIndicators(.hidden)
         .task {
 
             feature
@@ -107,7 +108,7 @@ struct BrowseView: View {
             ) {
 
                 Text(
-                    "Browse"
+                    "浏览"
                 )
                 .font(
                     .largeTitle.bold()
@@ -115,7 +116,7 @@ struct BrowseView: View {
 
 
                 Text(
-                    "Search openly licensed audio across connected catalog providers."
+                    "搜索已连接目录中的开放许可音频。"
                 )
                 .font(
                     .callout
@@ -184,7 +185,7 @@ struct BrowseView: View {
 
 
                 Text(
-                    "Catalog · artwork · license metadata · playback"
+                    "目录 · 封面 · 许可元数据 · 播放"
                 )
                 .font(
                     .caption
@@ -199,7 +200,7 @@ struct BrowseView: View {
 
 
             Text(
-                "CATALOG + PLAYBACK"
+                "目录与播放"
             )
             .font(
                 .caption2.weight(
@@ -247,12 +248,12 @@ struct BrowseView: View {
         } else if state.results.isEmpty {
 
             ContentUnavailableView(
-                "No Audio Found",
+                "未找到音频",
                 systemImage:
                     "music.note",
                 description:
                     Text(
-                        "Try a different Openverse search."
+                        "请尝试其他 Openverse 搜索词。"
                     )
             )
             .frame(
@@ -283,7 +284,7 @@ struct BrowseView: View {
 
 
             Text(
-                "Searching Openverse…"
+                "正在搜索 Openverse…"
             )
             .foregroundStyle(
                 .secondary
@@ -308,7 +309,7 @@ struct BrowseView: View {
         ContentUnavailableView {
 
             Label(
-                "Openverse Unavailable",
+                "Openverse 暂不可用",
                 systemImage:
                     "wifi.exclamationmark"
             )
@@ -322,7 +323,7 @@ struct BrowseView: View {
         } actions: {
 
             Button(
-                "Try Again"
+                "重试"
             ) {
 
                 feature
@@ -355,7 +356,7 @@ struct BrowseView: View {
             HStack {
 
                 Text(
-                    "Openverse Results"
+                    "Openverse 搜索结果"
                 )
                 .font(
                     .title2.bold()
@@ -366,7 +367,7 @@ struct BrowseView: View {
 
 
                 Text(
-                    "\(state.results.count) items"
+                    "\(state.results.count) 项"
                 )
                 .font(
                     .caption
@@ -498,8 +499,8 @@ struct BrowseView: View {
                     Label(
                         isCurrent
                             && feature.isPlaying
-                            ? "Pause"
-                            : "Play",
+                            ? "暂停"
+                            : "播放",
                         systemImage:
                             isCurrent
                             && feature.isPlaying
@@ -612,7 +613,7 @@ struct BrowseView: View {
         } label: {
 
             Label(
-                "Play Next",
+                "下一首播放",
                 systemImage:
                     "text.line.first.and.arrowtriangle.forward"
             )
@@ -631,7 +632,7 @@ struct BrowseView: View {
         } label: {
 
             Label(
-                "Add to Queue",
+                "加入队列",
                 systemImage:
                     "text.badge.plus"
             )
@@ -657,7 +658,7 @@ struct BrowseView: View {
             } label: {
 
                 Label(
-                    "Remove from Library",
+                    "从资料库移除",
                     systemImage:
                         "minus.circle"
                 )
@@ -677,7 +678,7 @@ struct BrowseView: View {
             } label: {
 
                 Label(
-                    "Add to Library",
+                    "加入资料库",
                     systemImage:
                         "plus.circle"
                 )

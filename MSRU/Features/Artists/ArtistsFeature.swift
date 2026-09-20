@@ -16,8 +16,8 @@ enum ArtistsFeature: ApplicationFeaturePresentation {
             sidebar: [
                 SidebarContribution(
                     id: "artists",
-                    group: "Library",
-                    title: "Artists",
+                    group: "资料库",
+                    title: "艺术家",
                     systemImage: "music.mic",
                     route: .section(.artists),
                     order: 120
@@ -41,7 +41,7 @@ enum ArtistsFeature: ApplicationFeaturePresentation {
             ) { scene in
                 WorkspacePresentation(
                     identity: WorkspaceIdentity(
-                        title: "Artists",
+                        title: "艺术家",
                         systemImage: "music.mic"
                     )
                 ) { _ in

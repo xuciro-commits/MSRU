@@ -6,6 +6,32 @@ import AVFoundation
 protocol LocalLibraryRepository {
     func loadTracks() async throws -> [LocalTrack]
     func importTrack(from url: URL) async throws -> LocalTrack?
+    func saveTrackInPlace(_ track: LocalTrack) async throws
+}
+
+extension LocalLibraryRepository {
+    func saveTrackInPlace(_ track: LocalTrack) async throws {}
+}
+
+private struct PersistedTrackRecord: Codable {
+    let fileURL: URL
+    let bookmarkData: Data?
+    let title: String
+    let artist: String
+    let album: String?
+    let duration: TimeInterval
+    let artworkData: Data?
+
+    func toLocalTrack() -> LocalTrack {
+        LocalTrack(
+            fileURL: fileURL,
+            title: title,
+            artist: artist,
+            album: album,
+            duration: duration,
+            artworkData: artworkData
+        )
+    }
 }
 
 @MainActor
@@ -17,69 +43,120 @@ final class FileLocalLibraryRepository: LocalLibraryRepository {
     }
 
     func loadTracks() async throws -> [LocalTrack] {
-            let directory =
-                try mediaDirectory()
+        let directory = try mediaDirectory()
 
-            let urls =
-                try FileManager
-                    .default
-                    .contentsOfDirectory(
-                        at: directory,
-                        includingPropertiesForKeys:
-                            nil,
-                        options: [
-                            .skipsHiddenFiles
-                        ]
-                    )
-                    .filter {
-                        isSupported(
-                            $0
-                        )
-                    }
-                    .sorted {
-                        $0.lastPathComponent
-                            .localizedCaseInsensitiveCompare(
-                                $1.lastPathComponent
-                            )
-                        == .orderedAscending
-                    }
+        let urls = (try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
 
+        let supportedURLs = urls.filter { isSupported($0) }.sorted {
+            $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending
+        }
 
-            var loadedTracks:
-                [LocalTrack] = []
+        var loadedTracks: [LocalTrack] = []
 
-
-            for url in urls {
-
-                do {
-
-                    let track =
-                        try await readTrack(
-                            from: url
-                        )
-
-                    loadedTracks
-                        .append(
-                            track
-                        )
-
-                } catch {
-
-                    print(
-                        "Local metadata failed:",
-                        url.lastPathComponent,
-                        error.localizedDescription
-                    )
-                }
+        for url in supportedURLs {
+            do {
+                let track = try await readTrack(from: url)
+                loadedTracks.append(track)
+            } catch {
+                print("Local metadata failed:", url.lastPathComponent, error.localizedDescription)
             }
+        }
 
+        // Also merge in-place referenced external tracks
+        let externalTracks = loadExternalTracks()
+        for ext in externalTracks {
+            if !loadedTracks.contains(where: { $0.fileURL.standardizedFileURL == ext.fileURL.standardizedFileURL }) {
+                loadedTracks.append(ext)
+            }
+        }
 
-            return loadedTracks
+        return loadedTracks
     }
 
     func importTrack(from url: URL) async throws -> LocalTrack? {
         guard isSupported(url) else { return nil }
-        return try await readTrack(from: copyFile(url))
+
+        if directory != nil {
+            // Injected test directory mode: copies into test directory
+            return try await readTrack(from: copyFile(url))
+        } else {
+            // Production in-place reference mode: zero copying, original file untouched!
+            let hasSecurityAccess = url.startAccessingSecurityScopedResource()
+            defer {
+                if hasSecurityAccess {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            let track = try await readTrack(from: url)
+            try await saveTrackInPlace(track)
+            return track
+        }
+    }
+
+    func saveTrackInPlace(_ track: LocalTrack) async throws {
+        var existingRecords: [PersistedTrackRecord] = []
+        let manifestURL = try externalManifestURL()
+        if let data = try? Data(contentsOf: manifestURL),
+           let decoded = try? JSONDecoder().decode([PersistedTrackRecord].self, from: data) {
+            existingRecords = decoded
+        }
+
+        let bookmark = try? track.fileURL.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+        let newRecord = PersistedTrackRecord(
+            fileURL: track.fileURL,
+            bookmarkData: bookmark,
+            title: track.title,
+            artist: track.artist,
+            album: track.album,
+            duration: track.duration,
+            artworkData: track.artworkData
+        )
+
+        if let idx = existingRecords.firstIndex(where: { $0.fileURL.standardizedFileURL == track.fileURL.standardizedFileURL }) {
+            existingRecords[idx] = newRecord
+        } else {
+            existingRecords.append(newRecord)
+        }
+
+        let encoded = try JSONEncoder().encode(existingRecords)
+        try encoded.write(to: manifestURL, options: .atomic)
+    }
+
+    private func externalManifestURL() throws -> URL {
+        try mediaDirectory().appendingPathComponent("external_tracks.json")
+    }
+
+    private func loadExternalTracks() -> [LocalTrack] {
+        guard let manifestURL = try? externalManifestURL(),
+              let data = try? Data(contentsOf: manifestURL),
+              let records = try? JSONDecoder().decode([PersistedTrackRecord].self, from: data) else {
+            return []
+        }
+
+        var tracks: [LocalTrack] = []
+        for record in records {
+            var isStale = false
+            if let bookmark = record.bookmarkData,
+               let resolvedURL = try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale) {
+                _ = resolvedURL.startAccessingSecurityScopedResource()
+                tracks.append(LocalTrack(
+                    fileURL: resolvedURL,
+                    title: record.title,
+                    artist: record.artist,
+                    album: record.album,
+                    duration: record.duration,
+                    artworkData: record.artworkData
+                ))
+            } else {
+                tracks.append(record.toLocalTrack())
+            }
+        }
+        return tracks
     }
 
     // MARK: - Import File

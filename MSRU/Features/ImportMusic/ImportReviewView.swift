@@ -15,6 +15,7 @@ struct ImportReviewView: View {
 
     @Bindable var store: ImportReviewStore
     var onDismiss: (() -> Void)? = nil
+    var onCommit: (([LocalTrack]) -> Void)? = nil
 
     @State private var expandedClusterIDs: Set<String> = []
 
@@ -35,6 +36,7 @@ struct ImportReviewView: View {
                 }
                 .padding(20)
             }
+            .scrollIndicators(.hidden)
 
             Divider()
             bottomActionBar
@@ -81,15 +83,17 @@ struct ImportReviewView: View {
 
     private var filterAndSearchBar: some View {
         HStack(spacing: 14) {
-            Picker("筛选", selection: $store.selectedFilter) {
-                ForEach(ReviewFilterOption.allCases) { opt in
-                    Text(opt.rawValue).tag(opt)
+            HStack {
+                Picker("筛选", selection: $store.selectedFilter) {
+                    ForEach(ReviewFilterOption.allCases) { opt in
+                        Text(opt.rawValue).tag(opt)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(maxWidth: 320)
             }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 320)
-
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack {
                 Image(systemName: "magnifyingglass")
@@ -100,7 +104,12 @@ struct ImportReviewView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(.quaternary, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .frame(maxWidth: 240)
+            .frame(width: 260)
+
+            HStack {
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 10)
@@ -212,7 +221,7 @@ struct ImportReviewView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     let albumTitle = clusterResult.matchedRelease?.title ?? clusterResult.cluster.albumName ?? "未知专辑"
-                    let artistTitle = clusterResult.matchedRelease?.artist ?? "未知歌手"
+                    let artistTitle = clusterResult.matchedRelease?.artist ?? clusterResult.cluster.tracks.compactMap(\.artist).first ?? "未知歌手"
                     Text("\(albumTitle) - \(artistTitle)")
                         .font(.subheadline.bold())
 
@@ -227,7 +236,7 @@ struct ImportReviewView: View {
                     .frame(width: 140, alignment: .leading)
 
                 // Release info
-                Text(clusterResult.matchedRelease?.date.map { "Release: \($0)" } ?? "待定候选")
+                Text(clusterResult.matchedRelease?.date.map { "Release: \($0)" } ?? "使用本地标签导入")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(width: 220, alignment: .leading)
@@ -332,12 +341,14 @@ struct ImportReviewView: View {
             Spacer()
 
             Button("以原始文件导入") {
-                store.importAsOriginalFiles()
+                let tracks = store.importAsOriginalFiles()
+                onCommit?(tracks)
             }
             .buttonStyle(.bordered)
 
             Button("确认并应用选中匹配 (\(store.selectedClusterIDs.count))") {
-                store.acceptSelectedMatches()
+                let tracks = store.acceptSelectedMatches()
+                onCommit?(tracks)
             }
             .buttonStyle(.borderedProminent)
             .disabled(store.selectedClusterIDs.isEmpty)

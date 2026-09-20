@@ -16,8 +16,8 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
             sidebar: [
                 SidebarContribution(
                     id: "add-music",
-                    group: "Tools",
-                    title: "Import & Review",
+                    group: "工具",
+                    title: "导入与审核",
                     systemImage: "tray.and.arrow.down",
                     route: .section(.addMusic),
                     order: 200
@@ -45,7 +45,7 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
             ) { scene in
                 WorkspacePresentation(
                     identity: WorkspaceIdentity(
-                        title: "Import & Review",
+                        title: "导入与审核",
                         systemImage: "tray.and.arrow.down"
                     )
                 ) { _ in
@@ -63,7 +63,7 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
             ) { scene in
                 WorkspacePresentation(
                     identity: WorkspaceIdentity(
-                        title: "Import & Review",
+                        title: "导入与审核",
                         systemImage: "tray.and.arrow.down"
                     )
                 ) { _ in

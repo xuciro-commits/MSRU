@@ -390,6 +390,23 @@ public final class MacApplicationSplitController:
             isContextPresented
         )
     }
+
+    public override func viewDidLayout() {
+        super.viewDidLayout()
+        hideAllScrollers(in: view)
+    }
+
+    private func hideAllScrollers(in root: NSView) {
+        if let scrollView = root as? NSScrollView {
+            scrollView.hasVerticalScroller = false
+            scrollView.hasHorizontalScroller = false
+            scrollView.horizontalScroller = nil
+            scrollView.verticalScroller = nil
+        }
+        for subview in root.subviews {
+            hideAllScrollers(in: subview)
+        }
+    }
 }
 
 #endif

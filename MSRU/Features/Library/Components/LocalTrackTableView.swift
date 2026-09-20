@@ -71,7 +71,7 @@ struct LocalTrackTableView: View {
             .width(min: 32, ideal: 36, max: 44)
 
             // Title column (Artwork + Title)
-            TableColumn("Title") { track in
+            TableColumn("标题") { track in
                 HStack(spacing: 10) {
                     trackArtwork(track)
                         .frame(width: 28, height: 28)
@@ -91,7 +91,7 @@ struct LocalTrackTableView: View {
             .width(min: 180, ideal: 240)
 
             // Artist column
-            TableColumn("Artist") { track in
+            TableColumn("艺术家") { track in
                 Text(track.artist)
                     .font(.body)
                     .foregroundStyle(.secondary)
@@ -100,7 +100,7 @@ struct LocalTrackTableView: View {
             .width(min: 120, ideal: 160)
 
             // Album column
-            TableColumn("Album") { track in
+            TableColumn("专辑") { track in
                 Text(track.album ?? "—")
                     .font(.body)
                     .foregroundStyle(.secondary)
@@ -109,7 +109,7 @@ struct LocalTrackTableView: View {
             .width(min: 120, ideal: 160)
 
             // Duration column
-            TableColumn("Time") { track in
+            TableColumn("时长") { track in
                 Text(durationString(track.duration))
                     .font(.callout.monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -117,7 +117,7 @@ struct LocalTrackTableView: View {
             .width(min: 50, ideal: 60, max: 70)
 
             // Favorite column
-            TableColumn("Favorite") { track in
+            TableColumn("收藏") { track in
                 let isSaved = library.contains(local: track)
                 Button {
                     Task {
@@ -133,10 +133,12 @@ struct LocalTrackTableView: View {
                         .font(.callout)
                 }
                 .buttonStyle(.plain)
-                .help(isSaved ? "Remove from Library" : "Add to Library")
+                .help(isSaved ? "从资料库移除" : "加入资料库")
             }
             .width(min: 32, ideal: 36, max: 40)
         }
+        .tint(Color.accentColor)
+        .scrollIndicators(.hidden)
     }
 
     // MARK: - Compact List View
@@ -151,6 +153,7 @@ struct LocalTrackTableView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
         }
+        .scrollIndicators(.hidden)
     }
 
     private func compactRow(index: Int, track: LocalTrack) -> some View {
@@ -211,13 +214,17 @@ struct LocalTrackTableView: View {
                     .font(.callout)
             }
             .buttonStyle(.plain)
-            .help(isSaved ? "Remove from Library" : "Add to Library")
+            .help(isSaved ? "从资料库移除" : "加入资料库")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
+                .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
         )
         .contentShape(Rectangle())
         .onTapGesture {
@@ -279,20 +286,20 @@ struct LocalTrackTableView: View {
         Button {
             playback.toggle(track: track, queue: tracks)
         } label: {
-            Label(isCurrentTrack(track) && playback.isPlaying ? "Pause" : "Play",
+            Label(isCurrentTrack(track) && playback.isPlaying ? "暂停" : "播放",
                   systemImage: isCurrentTrack(track) && playback.isPlaying ? "pause.fill" : "play.fill")
         }
 
         Button {
             playback.playNext(track)
         } label: {
-            Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
+            Label("下一首播放", systemImage: "text.line.first.and.arrowtriangle.forward")
         }
 
         Button {
             playback.addToQueue(track)
         } label: {
-            Label("Add to Queue", systemImage: "text.badge.plus")
+            Label("加入队列", systemImage: "text.badge.plus")
         }
 
         Divider()
@@ -307,7 +314,7 @@ struct LocalTrackTableView: View {
                 }
             }
         } label: {
-            Label(isSaved ? "Remove from Library" : "Add to Library",
+            Label(isSaved ? "从资料库移除" : "加入资料库",
                   systemImage: isSaved ? "heart.slash" : "heart")
         }
 
@@ -315,7 +322,7 @@ struct LocalTrackTableView: View {
             Button {
                 onRevealInFinder(track.fileURL)
             } label: {
-                Label("Show in Finder", systemImage: "arrow.up.forward.square")
+                Label("在访达中显示", systemImage: "arrow.up.forward.square")
             }
         }
     }
@@ -366,4 +373,3 @@ struct LocalTrackTableView: View {
     )
     .frame(width: 360, height: 400)
 }
-

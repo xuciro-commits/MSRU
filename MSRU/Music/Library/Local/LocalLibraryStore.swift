@@ -43,6 +43,21 @@ final class LocalLibraryStore {
         }
     }
 
+    func addTracks(_ newTracks: [LocalTrack]) async {
+        guard !newTracks.isEmpty else { return }
+        await serialized {
+            for track in newTracks {
+                try? await self.repository.saveTrackInPlace(track)
+                if let index = self.tracks.firstIndex(where: { $0.id == track.id || $0.fileURL.standardizedFileURL == track.fileURL.standardizedFileURL }) {
+                    self.tracks[index] = track
+                } else {
+                    self.tracks.append(track)
+                }
+            }
+            self.tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        }
+    }
+
     func importFiles(_ urls: [URL]) async {
         guard !urls.isEmpty else { return }
         pendingImports += 1
@@ -51,7 +66,31 @@ final class LocalLibraryStore {
             pendingImports -= 1
             isImporting = pendingImports > 0
         }
-        await serialized { await self.importNow(urls) }
+        await serialized {
+            var audioURLs: [URL] = []
+            for url in urls {
+                let accessing = url.startAccessingSecurityScopedResource()
+                defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+
+                var isDir: ObjCBool = false
+                if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
+                    if let enumerator = FileManager.default.enumerator(
+                        at: url,
+                        includingPropertiesForKeys: [.isRegularFileKey],
+                        options: [.skipsHiddenFiles, .skipsPackageDescendants]
+                    ) {
+                        while let fileURL = enumerator.nextObject() as? URL {
+                            if LocalAudioFormatSupport.supports(fileURL) {
+                                audioURLs.append(fileURL)
+                            }
+                        }
+                    }
+                } else if LocalAudioFormatSupport.supports(url) {
+                    audioURLs.append(url)
+                }
+            }
+            await self.importNow(audioURLs)
+        }
     }
 
     private func importNow(_ urls: [URL]) async {
@@ -59,7 +98,7 @@ final class LocalLibraryStore {
         do {
             for url in urls {
                 guard let track = try await repository.importTrack(from: url) else { continue }
-                if let index = tracks.firstIndex(where: { $0.id == track.id }) {
+                if let index = tracks.firstIndex(where: { $0.id == track.id || $0.fileURL.standardizedFileURL == track.fileURL.standardizedFileURL }) {
                     tracks[index] = track
                 } else {
                     tracks.append(track)

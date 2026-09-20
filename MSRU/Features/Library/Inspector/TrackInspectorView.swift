@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Observation
+import AppFoundationUI
 
 struct TrackInspectorView: View {
 
@@ -44,19 +45,37 @@ struct TrackInspectorView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .tint(Color.accentColor)
     }
 
     // MARK: - Library Track Content
 
     private var tabPicker: some View {
-        Picker("检查器标签", selection: $inspectorTab) {
+        HStack(spacing: 3) {
             ForEach(InspectorTab.allCases) { tab in
-                Text(tab.rawValue).tag(tab)
+                let isSelected = inspectorTab == tab
+                Button {
+                    inspectorTab = tab
+                } label: {
+                    Text(tab.rawValue)
+                        .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                        .lineLimit(1)
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 4)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            isSelected ? Color.accentColor : Color.primary.opacity(0.06),
+                            in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        )
+                        .foregroundStyle(isSelected ? Color.white : Color.primary)
+                }
+                .buttonStyle(.plain)
             }
         }
-        .pickerStyle(.segmented)
-        .padding(.horizontal, 18)
-        .padding(.top, 14)
+        .padding(2)
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
         .padding(.bottom, 6)
     }
 
@@ -106,14 +125,20 @@ struct TrackInspectorView: View {
                     }
                     .padding(18)
                 }
+                .scrollIndicators(.hidden)
+                .hideScrollIndicatorsCompletely()
             case .versions:
                 ScrollView {
                     versionsContent(title: track.title)
                 }
+                .scrollIndicators(.hidden)
+                .hideScrollIndicatorsCompletely()
             case .overlay:
                 ScrollView {
                     overlayContent(title: track.title, artist: track.artist, album: track.album)
                 }
+                .scrollIndicators(.hidden)
+                .hideScrollIndicatorsCompletely()
             }
         }
     }
@@ -128,10 +153,11 @@ struct TrackInspectorView: View {
                 Button {
                     playback.toggle(library: track)
                 } label: {
-                    Label(isPlaying ? "Pause" : "Play", systemImage: isPlaying ? "pause.fill" : "play.fill")
+                        Label(isPlaying ? "暂停" : "播放", systemImage: isPlaying ? "pause.fill" : "play.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(Color.accentColor)
                 .disabled(item == nil)
 
                 let isSaved = library.contains(id: track.id)
@@ -148,51 +174,80 @@ struct TrackInspectorView: View {
                         .foregroundStyle(isSaved ? Color.red : Color.primary)
                 }
                 .buttonStyle(.bordered)
-                .help(isSaved ? "Remove from Library" : "Add to Library")
+                .tint(Color.accentColor)
+                .help(isSaved ? "从资料库移除" : "加入资料库")
             }
 
-            HStack(spacing: 10) {
-                Button {
-                    playback.playNext(track)
-                } label: {
-                    Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
-                        .font(.caption)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .disabled(item == nil)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    Button {
+                        playback.playNext(track)
+                    } label: {
+                        Label("下一首播放", systemImage: "text.line.first.and.arrowtriangle.forward")
+                            .font(.caption)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.accentColor)
+                    .disabled(item == nil)
 
-                Button {
-                    playback.addToQueue(track)
-                } label: {
-                    Label("Add to Queue", systemImage: "text.badge.plus")
-                        .font(.caption)
-                        .frame(maxWidth: .infinity)
+                    Button {
+                        playback.addToQueue(track)
+                    } label: {
+                        Label("加入队列", systemImage: "text.badge.plus")
+                            .font(.caption)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.accentColor)
+                    .disabled(item == nil)
                 }
-                .buttonStyle(.bordered)
-                .disabled(item == nil)
+
+                VStack(spacing: 8) {
+                    Button {
+                        playback.playNext(track)
+                    } label: {
+                        Label("下一首播放", systemImage: "text.line.first.and.arrowtriangle.forward")
+                            .font(.caption)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.accentColor)
+                    .disabled(item == nil)
+
+                    Button {
+                        playback.addToQueue(track)
+                    } label: {
+                        Label("加入队列", systemImage: "text.badge.plus")
+                            .font(.caption)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.accentColor)
+                    .disabled(item == nil)
+                }
             }
         }
     }
 
     private func propertiesSection(_ track: LibraryTrack) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Properties")
+            Text("属性")
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            propertyRow(label: "Title", value: track.title)
-            propertyRow(label: "Artist", value: track.artist)
+            propertyRow(label: "标题", value: track.title)
+            propertyRow(label: "艺术家", value: track.artist)
             if let album = track.album {
-                propertyRow(label: "Album", value: album)
+                propertyRow(label: "专辑", value: album)
             }
             if let duration = track.duration {
-                propertyRow(label: "Duration", value: durationString(duration))
+                propertyRow(label: "时长", value: durationString(duration))
             }
-            propertyRow(label: "Added", value: track.dateAdded.formatted(date: .abbreviated, time: .shortened))
+            propertyRow(label: "添加时间", value: track.dateAdded.formatted(date: .abbreviated, time: .shortened))
             let sourceSummary = track.sources.map { $0.kind.rawValue.capitalized }.joined(separator: ", ")
             if !sourceSummary.isEmpty {
-                propertyRow(label: "Sources", value: sourceSummary)
+                propertyRow(label: "来源", value: sourceSummary)
             }
         }
     }
@@ -200,7 +255,7 @@ struct TrackInspectorView: View {
     private func sourceSection(_ track: LibraryTrack) -> some View {
         let localSource = track.sources.first { $0.kind == .local && $0.localFileURL != nil }
         return VStack(alignment: .leading, spacing: 10) {
-            Text("Source (Read-only)")
+            Text("来源（只读）")
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
@@ -212,7 +267,7 @@ struct TrackInspectorView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Location")
+                    Text("位置")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
@@ -227,7 +282,7 @@ struct TrackInspectorView: View {
                     Button {
                         onRevealInFinder(fileURL)
                     } label: {
-                        Label("Show in Finder", systemImage: "arrow.up.forward.square")
+                        Label("在访达中显示", systemImage: "arrow.up.forward.square")
                             .font(.callout)
                     }
                     .buttonStyle(.plain)
@@ -292,14 +347,20 @@ struct TrackInspectorView: View {
                     }
                     .padding(18)
                 }
+                .scrollIndicators(.hidden)
+                .hideScrollIndicatorsCompletely()
             case .versions:
                 ScrollView {
                     versionsContent(title: track.title)
                 }
+                .scrollIndicators(.hidden)
+                .hideScrollIndicatorsCompletely()
             case .overlay:
                 ScrollView {
                     overlayContent(title: track.title, artist: track.artist, album: track.album)
                 }
+                .scrollIndicators(.hidden)
+                .hideScrollIndicatorsCompletely()
             }
         }
     }
@@ -343,18 +404,43 @@ struct TrackInspectorView: View {
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
 
-                HStack(spacing: 8) {
-                    Button("设为首选版本") {}
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        Button("设为首选版本") {}
+                            .buttonStyle(.borderedProminent)
+                            .tint(Color.accentColor)
+                            .controlSize(.small)
 
-                    Button("在访达中显示") {}
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                        Button("在访达中显示") {}
+                            .buttonStyle(.bordered)
+                            .tint(Color.accentColor)
+                            .controlSize(.small)
 
-                    Button("移出本组版本") {}
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                        Button("移出本组版本") {}
+                            .buttonStyle(.bordered)
+                            .tint(Color.accentColor)
+                            .controlSize(.small)
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Button("设为首选版本") {}
+                            .buttonStyle(.borderedProminent)
+                            .tint(Color.accentColor)
+                            .controlSize(.small)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Button("在访达中显示") {}
+                            .buttonStyle(.bordered)
+                            .tint(Color.accentColor)
+                            .controlSize(.small)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Button("移出本组版本") {}
+                            .buttonStyle(.bordered)
+                            .tint(Color.accentColor)
+                            .controlSize(.small)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
             }
         }
@@ -362,7 +448,7 @@ struct TrackInspectorView: View {
     }
 
     private func versionItemRow(isPrimary: Bool, tag: String, desc: String, size: String) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Image(systemName: isPrimary ? "record.circle.fill" : "circle")
                 .foregroundStyle(isPrimary ? Color.accentColor : Color.secondary)
 
@@ -373,15 +459,19 @@ struct TrackInspectorView: View {
             Text(desc)
                 .font(.caption)
                 .lineLimit(1)
-
-            Spacer()
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             Text(size)
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(.tertiary)
         }
         .padding(8)
-        .background(isPrimary ? Color.accentColor.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .background(isPrimary ? Color.accentColor.opacity(0.18) : Color.clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .stroke(isPrimary ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1)
+        )
     }
 
     private func overlayContent(title: String, artist: String, album: String?) -> some View {
@@ -397,24 +487,50 @@ struct TrackInspectorView: View {
 
             Divider()
 
-            HStack(spacing: 10) {
-                Button("重置所有覆盖为权威") {
-                    titleOverlayTier = "权威 Canonical"
-                    artistOverlayTier = "权威 Canonical"
-                    albumOverlayTier = "权威 Canonical"
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    Button("重置所有覆盖为权威") {
+                        titleOverlayTier = "权威 Canonical"
+                        artistOverlayTier = "权威 Canonical"
+                        albumOverlayTier = "权威 Canonical"
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.accentColor)
+                    .controlSize(.small)
 
-                Spacer()
+                    Spacer()
 
-                Button("回退至文件原始标签") {
-                    titleOverlayTier = "原始 Original"
-                    artistOverlayTier = "原始 Original"
-                    albumOverlayTier = "原始 Original"
+                    Button("回退至文件原始标签") {
+                        titleOverlayTier = "原始 Original"
+                        artistOverlayTier = "原始 Original"
+                        albumOverlayTier = "原始 Original"
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.accentColor)
+                    .controlSize(.small)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+
+                VStack(spacing: 8) {
+                    Button("重置所有覆盖为权威") {
+                        titleOverlayTier = "权威 Canonical"
+                        artistOverlayTier = "权威 Canonical"
+                        albumOverlayTier = "权威 Canonical"
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.accentColor)
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity)
+
+                    Button("回退至文件原始标签") {
+                        titleOverlayTier = "原始 Original"
+                        artistOverlayTier = "原始 Original"
+                        albumOverlayTier = "原始 Original"
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.accentColor)
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity)
+                }
             }
         }
         .padding(18)
@@ -422,26 +538,45 @@ struct TrackInspectorView: View {
 
     private func overlaySelectorRow(field: String, selection: Binding<String>, value: String, options: [String]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Text(field)
-                    .font(.caption.bold())
-                    .frame(width: 60, alignment: .leading)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) {
+                    Text(field)
+                        .font(.caption.bold())
+                        .frame(width: 55, alignment: .leading)
+                        .lineLimit(1)
 
-                Picker("", selection: selection) {
-                    ForEach(options, id: \.self) { opt in
-                        Text(opt).tag(opt)
+                    Picker("", selection: selection) {
+                        ForEach(options, id: \.self) { opt in
+                            Text(opt).tag(opt)
+                        }
                     }
-                }
-                .labelsHidden()
-                .frame(maxWidth: 140)
+                    .labelsHidden()
+                    .tint(Color.accentColor)
+                    .frame(maxWidth: 140)
 
-                Spacer()
+                    Spacer()
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(field)
+                        .font(.caption.bold())
+
+                    Picker("", selection: selection) {
+                        ForEach(options, id: \.self) { opt in
+                            Text(opt).tag(opt)
+                        }
+                    }
+                    .labelsHidden()
+                    .tint(Color.accentColor)
+                }
             }
 
             Text(value)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-                .padding(.leading, 66)
+                .padding(.leading, 8)
+                .lineLimit(1)
+                .truncationMode(.middle)
         }
     }
 
@@ -456,10 +591,11 @@ struct TrackInspectorView: View {
                 Button {
                     playback.toggle(track: track, queue: [track])
                 } label: {
-                    Label(isPlaying ? "Pause" : "Play", systemImage: isPlaying ? "pause.fill" : "play.fill")
+                    Label(isPlaying ? "暂停" : "播放", systemImage: isPlaying ? "pause.fill" : "play.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(Color.accentColor)
 
                 let isSaved = library.contains(local: track)
                 Button {
@@ -475,27 +611,54 @@ struct TrackInspectorView: View {
                         .foregroundStyle(isSaved ? Color.red : Color.primary)
                 }
                 .buttonStyle(.bordered)
-                .help(isSaved ? "Remove from Library" : "Add to Library")
+                .tint(Color.accentColor)
+                .help(isSaved ? "从资料库移除" : "加入资料库")
             }
 
-            HStack(spacing: 10) {
-                Button {
-                    playback.playNext(track)
-                } label: {
-                    Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
-                        .font(.caption)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    Button {
+                        playback.playNext(track)
+                    } label: {
+                        Label("下一首播放", systemImage: "text.line.first.and.arrowtriangle.forward")
+                            .font(.caption)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.accentColor)
 
-                Button {
-                    playback.addToQueue(track)
-                } label: {
-                    Label("Add to Queue", systemImage: "text.badge.plus")
-                        .font(.caption)
-                        .frame(maxWidth: .infinity)
+                    Button {
+                        playback.addToQueue(track)
+                    } label: {
+                        Label("加入队列", systemImage: "text.badge.plus")
+                            .font(.caption)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.accentColor)
                 }
-                .buttonStyle(.bordered)
+
+                VStack(spacing: 8) {
+                    Button {
+                        playback.playNext(track)
+                    } label: {
+                        Label("下一首播放", systemImage: "text.line.first.and.arrowtriangle.forward")
+                            .font(.caption)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.accentColor)
+
+                    Button {
+                        playback.addToQueue(track)
+                    } label: {
+                        Label("加入队列", systemImage: "text.badge.plus")
+                            .font(.caption)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.accentColor)
+                }
             }
         }
     }
@@ -504,19 +667,19 @@ struct TrackInspectorView: View {
 
     private func propertiesSection(_ track: LocalTrack) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Properties")
+            Text("属性")
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            propertyRow(label: "Title", value: track.title)
-            propertyRow(label: "Artist", value: track.artist)
+            propertyRow(label: "标题", value: track.title)
+            propertyRow(label: "艺术家", value: track.artist)
             if let album = track.album {
-                propertyRow(label: "Album", value: album)
+                propertyRow(label: "专辑", value: album)
             }
-            propertyRow(label: "Duration", value: durationString(track.duration))
-            propertyRow(label: "Format", value: track.fileURL.pathExtension.uppercased())
+            propertyRow(label: "时长", value: durationString(track.duration))
+            propertyRow(label: "格式", value: track.fileURL.pathExtension.uppercased())
             if let fileSize = fileSizeString(for: track.fileURL) {
-                propertyRow(label: "Size", value: fileSize)
+                propertyRow(label: "大小", value: fileSize)
             }
         }
     }
@@ -525,14 +688,14 @@ struct TrackInspectorView: View {
 
     private func sourceSection(_ track: LocalTrack) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Source (Read-only)")
+            Text("来源（只读）")
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            propertyRow(label: "Kind", value: "Local Audio File")
+            propertyRow(label: "类型", value: "本地音频文件")
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Location")
+                Text("位置")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -547,7 +710,7 @@ struct TrackInspectorView: View {
                 Button {
                     onRevealInFinder(track.fileURL)
                 } label: {
-                    Label("Show in Finder", systemImage: "arrow.up.forward.square")
+                    Label("在访达中显示", systemImage: "arrow.up.forward.square")
                         .font(.callout)
                 }
                 .buttonStyle(.plain)
@@ -595,29 +758,31 @@ struct TrackInspectorView: View {
                 Divider()
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Details")
+                    Text("详情")
                         .font(.headline)
                         .foregroundStyle(.secondary)
 
-                    propertyRow(label: "Title", value: content.title)
+                    propertyRow(label: "标题", value: content.title)
                     if let subtitle = content.subtitle {
-                        propertyRow(label: "Subtitle", value: subtitle)
+                        propertyRow(label: "副标题", value: subtitle)
                     }
-                    propertyRow(label: "Provider", value: content.provider.title)
-                    propertyRow(label: "Type", value: content.kind.rawValue.capitalized)
+                    propertyRow(label: "服务提供方", value: content.provider.title)
+                    propertyRow(label: "类型", value: content.kind.rawValue.capitalized)
                 }
             }
             .padding(18)
         }
+        .scrollIndicators(.hidden)
+        .hideScrollIndicatorsCompletely()
     }
 
     // MARK: - Empty State
 
     private var emptySelectionView: some View {
         ContentUnavailableView {
-            Label("No Track Selected", systemImage: "music.note")
+            Label("未选择曲目", systemImage: "music.note")
         } description: {
-            Text("Select a track from your library or browse to view its properties and audio details.")
+            Text("从资料库或浏览页面选择一首曲目，以查看属性和音频详情。")
         }
     }
 

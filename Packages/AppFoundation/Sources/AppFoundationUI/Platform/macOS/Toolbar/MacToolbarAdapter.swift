@@ -97,36 +97,52 @@ public final class MacToolbarAdapter:
 
     public func reload() {
         let resolved = presentation()
-        let nativeItems = toolbar.items.filter { semanticID(from: $0.itemIdentifier) != nil }
-        let sameStructure = nativeItems.count == resolved.items.count
-            && zip(nativeItems, resolved.items).allSatisfy { native, semantic in
-                guard semanticID(from: native.itemIdentifier) == semantic.id else { return false }
-                switch semantic {
-                case .search: return native is NSSearchToolbarItem
-                case .action: return !(native is NSSearchToolbarItem)
-                }
-            }
+        let targetIdentifiers = orderedIdentifiers(for: resolved)
+        let currentIdentifiers = toolbar.items.map(\.itemIdentifier)
 
-        if sameStructure {
-            // Preserve search field identity, first responder and selection while typing.
-            for (native, semantic) in zip(nativeItems, resolved.items) {
-                update(native, with: semantic)
+        if currentIdentifiers == targetIdentifiers {
+            for item in resolved.items {
+                let itemID = identifier(for: item.id)
+                if let native = toolbar.items.first(where: { $0.itemIdentifier == itemID }) {
+                    update(native, with: item)
+                }
             }
         } else {
             for index in toolbar.items.indices.reversed() {
-                if semanticID(from: toolbar.items[index].itemIdentifier) != nil {
-                    toolbar.removeItem(at: index)
-                }
+                toolbar.removeItem(at: index)
+            }
+            for itemID in targetIdentifiers {
+                toolbar.insertItem(withItemIdentifier: itemID, at: toolbar.items.count)
             }
             for item in resolved.items {
                 let itemID = identifier(for: item.id)
-                if let existing = toolbar.items.first(where: { $0.itemIdentifier == itemID }) {
-                    update(existing, with: item)
-                } else {
-                    toolbar.insertItem(withItemIdentifier: itemID, at: toolbar.items.count)
+                if let native = toolbar.items.first(where: { $0.itemIdentifier == itemID }) {
+                    update(native, with: item)
                 }
             }
         }
+    }
+
+    private func orderedIdentifiers(for resolved: ResolvedToolbarPresentation) -> [NSToolbarItem.Identifier] {
+        var result: [NSToolbarItem.Identifier] = [
+            .toggleSidebar,
+            .sidebarTrackingSeparator,
+            .flexibleSpace
+        ]
+        let searches = resolved.items.compactMap { item -> NSToolbarItem.Identifier? in
+            guard case .search = item else { return nil }
+            return identifier(for: item.id)
+        }
+        let actions = resolved.items.compactMap { item -> NSToolbarItem.Identifier? in
+            guard case .action = item else { return nil }
+            return identifier(for: item.id)
+        }
+        if !searches.isEmpty {
+            result.append(contentsOf: searches)
+            result.append(.flexibleSpace)
+        }
+        result.append(contentsOf: actions)
+        return result
     }
 
     private func update(_ item: NSToolbarItem, with semantic: ResolvedToolbarItem) {
@@ -136,7 +152,9 @@ public final class MacToolbarAdapter:
             item.label = action.title
             item.paletteLabel = action.title
             item.toolTip = action.title
-            item.image = NSImage(systemSymbolName: action.systemImage, accessibilityDescription: action.title)
+            let symbolConfig = NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
+            item.image = NSImage(systemSymbolName: action.systemImage, accessibilityDescription: action.title)?
+                .withSymbolConfiguration(symbolConfig)
             item.isEnabled = action.isEnabled
         case .search(let search):
             guard let searchItem = item as? NSSearchToolbarItem else { return }
@@ -223,12 +241,20 @@ public final class MacToolbarAdapter:
         item.toolTip =
             action.title
 
+        let symbolConfig =
+            NSImage.SymbolConfiguration(
+                pointSize: 12,
+                weight: .regular
+            )
+
         item.image =
             NSImage(
                 systemSymbolName:
                     action.systemImage,
                 accessibilityDescription:
                     action.title
+            )?.withSymbolConfiguration(
+                symbolConfig
             )
 
         item.target =
@@ -422,6 +448,16 @@ public final class MacToolbarAdapter:
     ) -> [
         NSToolbarItem.Identifier
     ] {
+        orderedIdentifiers(for: presentation())
+    }
+
+
+    public func toolbarAllowedItemIdentifiers(
+        _ toolbar:
+            NSToolbar
+    ) -> [
+        NSToolbarItem.Identifier
+    ] {
 
         [
             .toggleSidebar,
@@ -440,19 +476,6 @@ public final class MacToolbarAdapter:
     }
 
 
-    public func toolbarAllowedItemIdentifiers(
-        _ toolbar:
-            NSToolbar
-    ) -> [
-        NSToolbarItem.Identifier
-    ] {
-
-        toolbarDefaultItemIdentifiers(
-            toolbar
-        )
-    }
-
-
     public func toolbar(
         _ toolbar:
             NSToolbar,
@@ -461,6 +484,45 @@ public final class MacToolbarAdapter:
         willBeInsertedIntoToolbar flag:
             Bool
     ) -> NSToolbarItem? {
+
+        if itemIdentifier == .toggleSidebar {
+            let item =
+                NSToolbarItem(
+                    itemIdentifier:
+                        .toggleSidebar
+                )
+            item.label = "Sidebar"
+            item.paletteLabel = "Sidebar"
+            item.toolTip = "Toggle Sidebar"
+            let symbolConfig =
+                NSImage.SymbolConfiguration(
+                    pointSize: 12,
+                    weight: .regular
+                )
+            item.image =
+                NSImage(
+                    systemSymbolName:
+                        "sidebar.left",
+                    accessibilityDescription:
+                        "Toggle Sidebar"
+                )?.withSymbolConfiguration(
+                    symbolConfig
+                )
+            item.target = nil
+            item.action =
+                #selector(
+                    NSSplitViewController.toggleSidebar(_:)
+                )
+            return item
+        }
+
+        if itemIdentifier == .flexibleSpace {
+            return NSToolbarItem(itemIdentifier: .flexibleSpace)
+        }
+
+        if itemIdentifier == .sidebarTrackingSeparator {
+            return NSToolbarItem(itemIdentifier: .sidebarTrackingSeparator)
+        }
 
         guard
             let id =

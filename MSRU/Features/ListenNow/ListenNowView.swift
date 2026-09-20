@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Observation
+import AppFoundationUI
 
 
 struct ListenNowView: View {
@@ -18,7 +19,7 @@ struct ListenNowView: View {
 
     var body: some View {
 
-        ScrollView {
+        ScrollView(showsIndicators: false) {
 
             LazyVStack(
                 alignment:
@@ -37,8 +38,9 @@ struct ListenNowView: View {
             )
         }
         .scrollIndicators(
-            .automatic
+            .hidden
         )
+        .hideScrollIndicatorsCompletely()
         .task {
 
             await store
@@ -70,7 +72,7 @@ struct ListenNowView: View {
             ) {
 
                 Text(
-                    "Listen Now"
+                    "现在收听"
                 )
                 .font(
                     .largeTitle.bold()
@@ -78,7 +80,7 @@ struct ListenNowView: View {
 
 
                 Text(
-                    "Discover music from \(store.selectedProvider.title)"
+                    "发现来自 \(store.selectedProvider.title) 的音乐"
                 )
                 .font(
                     .callout
@@ -113,7 +115,7 @@ struct ListenNowView: View {
         Menu {
 
             Section(
-                "Catalog Source"
+                "目录来源"
             ) {
 
                 ForEach(
@@ -182,7 +184,7 @@ struct ListenNowView: View {
         } label: {
 
             Label(
-                "Catalog: \(store.selectedProvider.title)",
+                "目录：\(store.selectedProvider.title)",
                 systemImage:
                     store
                         .selectedProvider
@@ -251,7 +253,7 @@ struct ListenNowView: View {
 
 
             Text(
-                "Loading music…"
+                "正在加载音乐…"
             )
             .foregroundStyle(
                 .secondary
@@ -278,7 +280,7 @@ struct ListenNowView: View {
         ContentUnavailableView {
 
             Label(
-                "Unable to Load Music",
+                "无法加载音乐",
                 systemImage:
                     "wifi.exclamationmark"
             )
@@ -302,7 +304,7 @@ struct ListenNowView: View {
             } label: {
 
                 Text(
-                    "Try Again"
+                    "重试"
                 )
             }
         }

@@ -25,9 +25,9 @@ extension LibraryFeature:
                     id:
                         "library",
                     group:
-                        "Library",
+                        "资料库",
                     title:
-                        "Songs",
+                        "歌曲",
                     systemImage:
                         "music.note",
                     route:

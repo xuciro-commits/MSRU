@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import AppFoundationUI
 
 
 struct MusicSectionView: View {
@@ -127,7 +128,8 @@ struct MusicSectionView: View {
     ) -> some View {
 
         ScrollView(
-            .horizontal
+            .horizontal,
+            showsIndicators: false
         ) {
 
             LazyHStack(
@@ -169,6 +171,7 @@ struct MusicSectionView: View {
         .scrollIndicators(
             .hidden
         )
+        .hideScrollIndicatorsCompletely()
     }
 
 

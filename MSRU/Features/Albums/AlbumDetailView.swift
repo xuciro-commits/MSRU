@@ -21,7 +21,7 @@ struct AlbumDetailView: View {
                 Button(action: onBack) {
                     HStack(spacing: 6) {
                         Image(systemName: "chevron.backward")
-                        Text("Albums")
+                        Text("专辑")
                     }
                     .font(.subheadline.bold())
                 }
@@ -55,7 +55,7 @@ struct AlbumDetailView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("ALBUM")
+                            Text("专辑")
                             .font(.caption.bold())
                             .foregroundStyle(.secondary)
 
@@ -72,14 +72,14 @@ struct AlbumDetailView: View {
                                 Text("\(year)")
                                 Text("•")
                             }
-                            Text("\(album.trackCount) songs, \(album.formattedDuration)")
+                            Text("\(album.trackCount) 首歌曲，\(album.formattedDuration)")
                         }
                         .font(.callout)
                         .foregroundStyle(.tertiary)
 
                         HStack(spacing: 12) {
                             Button(action: playAll) {
-                                Label("Play", systemImage: "play.fill")
+                                Label("播放", systemImage: "play.fill")
                                     .font(.headline)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
@@ -87,7 +87,7 @@ struct AlbumDetailView: View {
                             .buttonStyle(.borderedProminent)
 
                             Button(action: shuffleAll) {
-                                Label("Shuffle", systemImage: "shuffle")
+                                Label("随机播放", systemImage: "shuffle")
                                     .font(.headline)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
@@ -106,7 +106,7 @@ struct AlbumDetailView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     ForEach(album.discs) { disc in
                         if album.discs.count > 1 {
-                            Text(disc.discTitle ?? "Disc \(disc.discNumber)")
+                            Text(disc.discTitle ?? "第 \(disc.discNumber) 张碟")
                                 .font(.headline)
                                 .foregroundStyle(.secondary)
                                 .padding(.horizontal, 24)
@@ -123,6 +123,7 @@ struct AlbumDetailView: View {
             }
             .padding(.bottom, 40)
         }
+        .scrollIndicators(.hidden)
     }
 
     private func trackRow(_ trackModel: TrackPresentationModel) -> some View {
@@ -187,10 +188,10 @@ struct AlbumDetailView: View {
         }
         .contextMenu {
             if let local = matchingLocal {
-                Button("Play Next") {
+                Button("下一首播放") {
                     playback.playNext(local)
                 }
-                Button("Add to Queue") {
+                Button("加入队列") {
                     playback.addToQueue(local)
                 }
             }

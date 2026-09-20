@@ -25,9 +25,9 @@ extension BrowseFeature:
                     id:
                         "browse",
                     group:
-                        "Discover",
+                        "发现",
                     title:
-                        "Browse",
+                        "浏览",
                     systemImage:
                         "sparkles",
                     route:

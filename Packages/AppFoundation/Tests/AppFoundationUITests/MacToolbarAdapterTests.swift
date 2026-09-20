@@ -38,5 +38,30 @@ struct MacToolbarAdapterTests {
         toolbar.validateVisibleItems()
         #expect(!action.isEnabled)
     }
+
+    @Test
+    func toolbarLayoutCentersSearchAndPlacesActionAtTrailingEdge() throws {
+        let adapter = MacToolbarAdapter(identifier: "Fixture.LayoutToolbar") {
+            ResolvedToolbarPresentation(items: [
+                .search(ResolvedToolbarSearch(id: "browse.search", prompt: "Search", text: "query", isEnabled: true, update: { _ in })),
+                .action(ResolvedToolbarAction(id: "toggleQueue", title: "Inspector", systemImage: "sidebar.right", isEnabled: true, perform: {}))
+            ])
+        }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 600),
+                              styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        adapter.install(on: window)
+        adapter.reload()
+        let toolbar = try #require(window.toolbar)
+        let ids = toolbar.items.map(\.itemIdentifier)
+
+        #expect(ids == [
+            .toggleSidebar,
+            .sidebarTrackingSeparator,
+            .flexibleSpace,
+            NSToolbarItem.Identifier("AppFoundation.SemanticToolbar.browse.search"),
+            .flexibleSpace,
+            NSToolbarItem.Identifier("AppFoundation.SemanticToolbar.toggleQueue")
+        ])
+    }
 }
 #endif

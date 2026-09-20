@@ -14,15 +14,21 @@ struct LibraryFilterBar: View {
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            // Wide layout (single row)
+            // Wide layout (single row with centered search input)
             HStack(spacing: 12) {
+                HStack {
+                    // Balanced leading space
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
                 searchInput
-                    .frame(maxWidth: 260)
+                    .frame(width: 280)
 
-                Spacer()
-
-                sortMenu
-                viewModePicker
+                HStack(spacing: 12) {
+                    sortMenu
+                    viewModePicker
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
 
             // Compact layout (adaptive two rows)
@@ -49,7 +55,7 @@ struct LibraryFilterBar: View {
                 .foregroundStyle(.secondary)
                 .font(.caption)
 
-            TextField("Filter tracks…", text: $searchQuery)
+            TextField("筛选歌曲…", text: $searchQuery)
                 .textFieldStyle(.plain)
                 .font(.callout)
 
@@ -72,7 +78,7 @@ struct LibraryFilterBar: View {
 
     private var sortMenu: some View {
         Menu {
-            Section("Sort By") {
+            Section("排序方式") {
                 ForEach(LibrarySortField.allCases) { field in
                     Button {
                         if sortField == field {
@@ -92,12 +98,12 @@ struct LibraryFilterBar: View {
                 }
             }
 
-            Section("Order") {
+            Section("顺序") {
                 Button {
                     sortAscending = true
                 } label: {
                     HStack {
-                        Text("Ascending")
+                        Text("升序")
                         if sortAscending {
                             Image(systemName: "checkmark")
                         }
@@ -108,7 +114,7 @@ struct LibraryFilterBar: View {
                     sortAscending = false
                 } label: {
                     HStack {
-                        Text("Descending")
+                        Text("降序")
                         if !sortAscending {
                             Image(systemName: "checkmark")
                         }
@@ -124,7 +130,7 @@ struct LibraryFilterBar: View {
     }
 
     private var viewModePicker: some View {
-        Picker("View", selection: $viewMode) {
+        Picker("视图", selection: $viewMode) {
             ForEach(LibraryViewMode.allCases) { mode in
                 Image(systemName: mode.systemImage)
                     .tag(mode)
@@ -183,4 +189,3 @@ struct LibraryFilterBar: View {
     )
     .frame(width: 360)
 }
-

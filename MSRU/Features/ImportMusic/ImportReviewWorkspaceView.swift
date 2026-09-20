@@ -16,6 +16,7 @@ struct ImportReviewWorkspaceView: View {
         case idle
         case processing(step: String, progress: Double)
         case review(ImportReviewStore)
+        case empty(message: String)
         case success(message: String, undoEntries: [FileMoveItem])
     }
 
@@ -38,8 +39,20 @@ struct ImportReviewWorkspaceView: View {
                     store: reviewStore,
                     onDismiss: {
                         state = .idle
+                    },
+                    onCommit: { tracks in
+                        Task {
+                            await localStore.addTracks(tracks)
+                            state = .success(
+                                message: "已成功将 \(tracks.count) 首曲目加入资料库（纯路径就地只读引用，原文件保持原样）。",
+                                undoEntries: []
+                            )
+                        }
                     }
                 )
+
+            case .empty(let message):
+                emptyResultView(message: message)
 
             case .success(let message, let undoEntries):
                 successView(message: message, undoEntries: undoEntries)
@@ -47,7 +60,7 @@ struct ImportReviewWorkspaceView: View {
         }
         .fileImporter(
             isPresented: $isFileImporterPresented,
-            allowedContentTypes: LocalAudioFormatSupport.importContentTypes + [.folder],
+            allowedContentTypes: LocalAudioFormatSupport.importContentTypes,
             allowsMultipleSelection: true
         ) { result in
             switch result {
@@ -64,10 +77,10 @@ struct ImportReviewWorkspaceView: View {
     private var dropZoneView: some View {
         VStack(spacing: 32) {
             VStack(spacing: 8) {
-                Text("Music Import & Review Center")
+                Text("音乐导入与审核中心")
                     .font(.system(size: 28, weight: .bold))
 
-                Text("Import local music with acoustic fingerprinting, entity resolution, and confidence review.")
+                Text("导入本地音乐，进行声纹识别、实体归并和置信度审核。")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -91,10 +104,10 @@ struct ImportReviewWorkspaceView: View {
                         .foregroundStyle(isDropTargeted ? Color.accentColor : .secondary)
 
                     VStack(spacing: 4) {
-                        Text("Drag & drop music folder or audio files here")
+                        Text("将音乐文件夹或音频文件拖放到这里")
                             .font(.headline)
 
-                        Text("Supports FLAC, MP3, M4A, ALAC, WAV, AAC, AIFF")
+                        Text("支持 FLAC、MP3、M4A、ALAC、WAV、AAC、AIFF")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -102,7 +115,7 @@ struct ImportReviewWorkspaceView: View {
                     Button {
                         isFileImporterPresented = true
                     } label: {
-                        Label("Choose Files or Folder...", systemImage: "plus.circle.fill")
+                        Label("选择文件或文件夹…", systemImage: "plus.circle.fill")
                             .font(.headline)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
@@ -120,18 +133,18 @@ struct ImportReviewWorkspaceView: View {
             HStack(spacing: 32) {
                 engineHighlight(
                     icon: "waveform.badge.magnifyingglass",
-                    title: "AcoustID Fingerprint",
-                    desc: "Deterministic audio waveform recognition"
+                    title: "AcoustID 声纹",
+                    desc: "基于音频波形的确定性识别"
                 )
                 engineHighlight(
                     icon: "books.vertical.fill",
-                    title: "MusicBrainz Entity",
-                    desc: "Standardized canonical release & artist identity"
+                    title: "MusicBrainz 实体",
+                    desc: "标准化的发行版与艺术家权威身份"
                 )
                 engineHighlight(
                     icon: "arrow.triangle.2.circlepath",
-                    title: "Safe File Organizer",
-                    desc: "Dry-Run verification with one-click Undo"
+                    title: "安全文件整理器",
+                    desc: "先模拟验证，支持一键撤销"
                 )
             }
             .padding(.horizontal, 40)
@@ -169,7 +182,7 @@ struct ImportReviewWorkspaceView: View {
                 Text(step)
                     .font(.headline)
 
-                Text("Running 11-step Identity Resolution Pipeline...")
+                Text("正在运行 11 步实体归并流程…")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -185,7 +198,7 @@ struct ImportReviewWorkspaceView: View {
                 .font(.system(size: 56))
                 .foregroundStyle(.green)
 
-            Text("Import Completed")
+            Text("导入完成")
                 .font(.title2.bold())
 
             Text(message)
@@ -194,21 +207,49 @@ struct ImportReviewWorkspaceView: View {
 
             HStack(spacing: 16) {
                 if !undoEntries.isEmpty {
-                    Button("Undo Organization") {
+                    Button("撤销整理") {
                         try? SafeFileOrganizer.undo(executedItems: undoEntries)
                         Task {
                             await localStore.reload()
-                            state = .success(message: "Undo completed: files reverted.", undoEntries: [])
+                            state = .success(message: "撤销完成：文件已还原。", undoEntries: [])
                         }
                     }
                     .buttonStyle(.bordered)
                 }
 
-                Button("Open Library") {
+                Button("打开资料库") {
                     onOpenLibrary()
                 }
                 .buttonStyle(.borderedProminent)
             }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(40)
+    }
+
+    // MARK: - Empty Result View
+
+    private func emptyResultView(message: String) -> some View {
+        VStack(spacing: 20) {
+            Image(systemName: "questionmark.folder")
+                .font(.system(size: 56))
+                .foregroundStyle(.secondary)
+
+            Text("未找到可导入的音频")
+                .font(.title2.bold())
+
+            Text(message)
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 420)
+
+            Button("重新选择") {
+                state = .idle
+                isFileImporterPresented = true
+            }
+            .buttonStyle(.borderedProminent)
+            .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(40)
@@ -234,45 +275,68 @@ struct ImportReviewWorkspaceView: View {
     }
 
     private func startImportPipeline(urls: [URL]) {
-        state = .processing(step: "Collecting audio files...", progress: 0.1)
+        state = .processing(step: "正在收集音频文件…", progress: 0.1)
 
         Task {
+            var accessedURLs: [URL] = []
+            for u in urls {
+                if u.startAccessingSecurityScopedResource() {
+                    accessedURLs.append(u)
+                }
+            }
+            defer {
+                for u in accessedURLs {
+                    u.stopAccessingSecurityScopedResource()
+                }
+            }
+
             let audioURLs = collectAudioFiles(from: urls)
             guard !audioURLs.isEmpty else {
-                state = .idle
+                state = .empty(message: "在所选位置未发现受支持的音频文件（支持 FLAC、WAV、MP3、M4A、AAC、AIFF、DTS 等格式）。")
                 return
             }
 
-            state = .processing(step: "Extracting AcoustID fingerprints & Picard clustering...", progress: 0.4)
+            state = .processing(step: "正在提取 AcoustID 声纹并进行 Picard 聚类…", progress: 0.4)
 
             let pipeline = ImportPipeline()
             do {
                 let report = try await pipeline.process(audioURLs: audioURLs)
-                state = .processing(step: "Preparing review dashboard...", progress: 0.9)
+                state = .processing(step: "正在准备审核面板…", progress: 0.9)
 
                 let reviewStore = ImportReviewStore(report: report)
                 state = .review(reviewStore)
             } catch {
-                state = .idle
+                state = .empty(message: "处理导入文件时发生错误：\(error.localizedDescription)")
             }
         }
     }
 
     private func collectAudioFiles(from urls: [URL]) -> [URL] {
         var results: [URL] = []
-        let supportedExtensions = Set(LocalAudioFormatSupport.importContentTypes.compactMap { $0.preferredFilenameExtension?.lowercased() })
 
         for url in urls {
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer {
+                if accessing {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+
             var isDir: ObjCBool = false
             if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
-                if let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) {
-                    for case let fileURL as URL in enumerator {
-                        if supportedExtensions.contains(fileURL.pathExtension.lowercased()) {
+                let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey]
+                if let enumerator = FileManager.default.enumerator(
+                    at: url,
+                    includingPropertiesForKeys: keys,
+                    options: [.skipsHiddenFiles, .skipsPackageDescendants]
+                ) {
+                    while let fileURL = enumerator.nextObject() as? URL {
+                        if LocalAudioFormatSupport.supports(fileURL) {
                             results.append(fileURL)
                         }
                     }
                 }
-            } else if supportedExtensions.contains(url.pathExtension.lowercased()) {
+            } else if LocalAudioFormatSupport.supports(url) {
                 results.append(url)
             }
         }

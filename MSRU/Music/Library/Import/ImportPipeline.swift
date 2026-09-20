@@ -100,9 +100,11 @@ public final class ImportPipeline: Sendable {
             case .high:
                 // Step 10: Auto-commit high confidence matches
                 autoCommitted += cluster.tracks.count
+                pendingReview.append(lookupResult)
             case .medium:
                 pendingReview.append(lookupResult)
             case .low:
+                pendingReview.append(lookupResult)
                 unidentified.append(contentsOf: cluster.tracks)
             }
         }

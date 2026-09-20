@@ -56,9 +56,9 @@ struct LyricsPaneView: View {
                         Image(systemName: "antenna.radiowaves.left.and.right")
                             .font(.system(size: 36))
                             .foregroundStyle(.secondary)
-                        Text("Live Radio Broadcast")
+                        Text("直播电台")
                             .font(.headline)
-                        Text("Lyrics are not available for continuous live audio streams.")
+                        Text("连续直播音频不提供歌词。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -71,9 +71,9 @@ struct LyricsPaneView: View {
                         Image(systemName: "music.mic")
                             .font(.system(size: 36))
                             .foregroundStyle(.secondary)
-                        Text("No Track Playing")
+                        Text("当前没有播放曲目")
                             .font(.headline)
-                        Text("Choose a track to view lyrics.")
+                        Text("选择一首曲目以查看歌词。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -104,7 +104,7 @@ struct LyricsPaneView: View {
                     Button(action: onExpandCanvas) {
                         HStack {
                             Image(systemName: "arrow.up.left.and.arrow.down.right")
-                            Text("Full Lyrics Canvas")
+                            Text("完整歌词画布")
                         }
                         .font(.system(size: 13, weight: .medium))
                         .frame(maxWidth: .infinity)
@@ -119,6 +119,7 @@ struct LyricsPaneView: View {
             }
             .padding(.bottom, 24)
         }
+        .scrollIndicators(.hidden)
     }
 }
 

@@ -55,7 +55,7 @@ struct RadioStationCardView: View {
                     // Top Left Badges: Custom tag
                     HStack {
                         if station.isCustom {
-                            Text("CUSTOM")
+                            Text("自定义")
                                 .font(.system(size: 8, weight: .heavy))
                                 .tracking(0.5)
                                 .foregroundStyle(.white)
@@ -81,14 +81,14 @@ struct RadioStationCardView: View {
                                 .background(.black.opacity(0.45), in: Circle())
                         }
                         .buttonStyle(.plain)
-                        .help(isFavorite ? "Remove from Favorites" : "Add to Favorites")
+                        .help(isFavorite ? "取消收藏" : "加入收藏")
 
                         // Live Pill Badge
                         HStack(spacing: 4) {
                             Circle()
                                 .fill(isPlaying ? Color.red : Color.white.opacity(0.8))
                                 .frame(width: 6, height: 6)
-                            Text("LIVE")
+                            Text("直播")
                                 .font(.system(size: 9, weight: .heavy))
                                 .tracking(0.5)
                         }
@@ -139,7 +139,7 @@ struct RadioStationCardView: View {
                         .frame(height: 28, alignment: .topLeading)
 
                     HStack(spacing: 6) {
-                        Text(station.genre.rawValue)
+                        Text(station.genre.displayTitle)
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 6)
@@ -173,16 +173,16 @@ struct RadioStationCardView: View {
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
         .contextMenu {
-            Button(isPlaying ? "Pause" : "Play") {
+            Button(isPlaying ? "暂停" : "播放") {
                 onPlayPause()
             }
-            Button(isFavorite ? "Remove from Favorites" : "Favorite") {
+            Button(isFavorite ? "取消收藏" : "收藏") {
                 onToggleFavorite?()
             }
             if station.isCustom, let onDelete {
                 Divider()
                 Button(role: .destructive, action: onDelete) {
-                    Label("Delete Custom Station", systemImage: "trash")
+                    Label("删除自定义电台", systemImage: "trash")
                 }
             }
         }

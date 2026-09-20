@@ -67,6 +67,7 @@ struct SettingsView:
                         .leading
                 )
             }
+            .scrollIndicators(.hidden)
         }
         .frame(
             maxWidth:
@@ -107,6 +108,9 @@ struct SettingsView:
         }
         .listStyle(
             .sidebar
+        )
+        .scrollIndicators(
+            .hidden
         )
         .frame(
             width:
@@ -179,6 +183,9 @@ struct SettingsView:
         .listStyle(
             .sidebar
         )
+        .scrollIndicators(
+            .hidden
+        )
         .frame(
             width:
                 210
@@ -246,19 +253,19 @@ struct SettingsView:
 
             settingsCard(
                 title:
-                    "Application",
+                    "应用",
                 rows: [
                     (
-                        "Appearance",
-                        "System"
+                        "外观",
+                        "系统"
                     ),
                     (
-                        "Window",
+                        "窗口",
                         platformWindowDescription
                     ),
                     (
-                        "Language",
-                        "System"
+                        "语言",
+                        "系统"
                     )
                 ]
             )
@@ -268,19 +275,19 @@ struct SettingsView:
 
             settingsCard(
                 title:
-                    "Library",
+                    "资料库",
                 rows: [
                     (
-                        "Current source",
-                        "Local Files"
+                        "当前来源",
+                        "本地文件"
                     ),
                     (
-                        "Imported media",
+                        "已导入媒体",
                         "Application Support / MSRU"
                     ),
                     (
-                        "Unified library",
-                        "Planned for remote sources"
+                        "统一资料库",
+                        "计划支持远程来源"
                     )
                 ]
             )
@@ -290,23 +297,23 @@ struct SettingsView:
 
             settingsCard(
                 title:
-                    "Playback",
+                    "播放",
                 rows: [
                     (
-                        "Preferred quality",
-                        "Automatic"
+                        "首选音质",
+                        "自动"
                     ),
                     (
-                        "Current provider",
+                        "当前服务提供方",
                         playback
                             .currentProviderID?
                             .rawValue
                         ??
-                        "None"
+                        "无"
                     ),
                     (
-                        "Resolution",
-                        "Provider Kernel v1"
+                        "解析度",
+                        "服务提供方内核 v1"
                     )
                 ]
             )
@@ -331,26 +338,26 @@ struct SettingsView:
 
                 settingsCard(
                     title:
-                        "Diagnostics",
+                        "诊断",
                     rows: [
                         (
-                            "Playback diagnostics",
-                            "Available in kernel"
+                            "播放诊断",
+                            "内核已提供"
                         ),
                         (
-                            "Provider health",
-                            "Foundation ready"
+                            "服务提供方状态",
+                            "基础层已就绪"
                         ),
                         (
-                            "Catalog cache",
-                            "Enabled"
+                            "目录缓存",
+                            "已启用"
                         )
                     ]
                 )
 
 
                 Text(
-                    "Interactive diagnostics controls will be connected after the front-end information architecture is stable."
+                    "前端信息架构稳定后，将接入可交互的诊断控制。"
                 )
                 .font(
                     .callout
@@ -370,11 +377,11 @@ struct SettingsView:
 
 #if os(macOS)
 
-        "Native macOS split view"
+        "原生 macOS 分栏视图"
 
 #else
 
-        "Native Apple scene layout"
+        "原生 Apple 场景布局"
 
 #endif
     }
@@ -503,27 +510,27 @@ private enum SettingsCategory:
 
         case .general:
 
-            "General"
+            "通用"
 
 
         case .library:
 
-            "Library"
+            "资料库"
 
 
         case .playback:
 
-            "Playback"
+            "播放"
 
 
         case .providers:
 
-            "Providers"
+            "服务提供方"
 
 
         case .advanced:
 
-            "Advanced"
+            "高级"
         }
     }
 
@@ -535,27 +542,27 @@ private enum SettingsCategory:
 
         case .general:
 
-            "Application behavior and appearance."
+            "应用行为与外观。"
 
 
         case .library:
 
-            "Storage, imports, and unified library behavior."
+            "存储、导入和统一资料库行为。"
 
 
         case .playback:
 
-            "Playback quality and resolution behavior."
+            "播放音质与解析行为。"
 
 
         case .providers:
 
-            "Catalog, metadata, and playback providers."
+            "目录、元数据和播放服务提供方。"
 
 
         case .advanced:
 
-            "Diagnostics, health, and development tools."
+            "诊断、状态和开发工具。"
         }
     }
 

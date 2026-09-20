@@ -59,12 +59,12 @@ struct VisualizerPaneView: View {
                 // Waveform spectrum visualizer card
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Label("Real-time Spectrum", systemImage: "waveform")
+                        Label("实时频谱", systemImage: "waveform")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                         Spacer()
                         if playback.isPlaying {
-                            Text("ACTIVE")
+                            Text("运行中")
                                 .font(.system(size: 9, weight: .bold))
                                 .foregroundStyle(.green)
                                 .padding(.horizontal, 6)
@@ -91,15 +91,15 @@ struct VisualizerPaneView: View {
                 // Audio specs table
                 if let formatInfo = playback.audioFormatInfo {
                     VStack(spacing: 8) {
-                        specRow(label: "Codec", value: formatInfo.codec)
+                        specRow(label: "编码", value: formatInfo.codec)
                         if let bitDepth = formatInfo.bitDepth {
-                            specRow(label: "Bit Depth", value: bitDepth)
+                            specRow(label: "位深", value: bitDepth)
                         }
                         if let sampleRate = formatInfo.sampleRate {
-                            specRow(label: "Sample Rate", value: sampleRate)
+                            specRow(label: "采样率", value: sampleRate)
                         }
                         if let bitrate = formatInfo.bitrate {
-                            specRow(label: "Bitrate", value: bitrate)
+                            specRow(label: "码率", value: bitrate)
                         }
                         specRow(label: "Quality", value: formatInfo.isHiRes ? "Hi-Res Lossless" : (formatInfo.isLossless ? "Lossless" : "Standard"))
                     }
@@ -113,7 +113,7 @@ struct VisualizerPaneView: View {
                     Button(action: onExpandCanvas) {
                         HStack {
                             Image(systemName: "arrow.up.left.and.arrow.down.right")
-                            Text("Open Immersive Canvas")
+                            Text("打开沉浸式画布")
                         }
                         .font(.system(size: 13, weight: .medium))
                         .frame(maxWidth: .infinity)
@@ -128,6 +128,7 @@ struct VisualizerPaneView: View {
             }
             .padding(.bottom, 24)
         }
+        .scrollIndicators(.hidden)
     }
 
     private var fallbackArtwork: some View {

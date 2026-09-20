@@ -42,7 +42,7 @@ extension LibraryFeature:
                         identity:
                             WorkspaceIdentity(
                                 title:
-                                    "Songs",
+                                "歌曲",
                                 systemImage:
                                     "music.note"
                             )

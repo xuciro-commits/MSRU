@@ -108,21 +108,66 @@ public final class ImportReviewStore {
     }
 
     /// Approves and applies the selected cluster matches into the authoritative catalog.
-    public func acceptSelectedMatches() {
+    @discardableResult
+    public func acceptSelectedMatches() -> [LocalTrack] {
         let accepted = pendingReviewClusters.filter { selectedClusterIDs.contains($0.id) }
+        var generatedTracks: [LocalTrack] = []
+
+        for clusterResult in accepted {
+            for match in clusterResult.trackMatches {
+                let local = match.localTrack
+                let cand = match.candidate
+                let title = cand?.title ?? local.title
+                let artist = cand?.artist ?? local.artist ?? clusterResult.cluster.tracks.compactMap(\.artist).first ?? "Unknown Artist"
+                let album = cand?.album ?? local.album ?? clusterResult.cluster.albumName
+                let track = LocalTrack(
+                    fileURL: local.fileURL,
+                    title: title,
+                    artist: artist,
+                    album: album,
+                    duration: local.duration ?? 0,
+                    artworkData: nil
+                )
+                generatedTracks.append(track)
+            }
+        }
+
         let count = accepted.reduce(0) { $0 + $1.cluster.tracks.count }
         autoAcceptedCount += count
         pendingReviewClusters.removeAll { selectedClusterIDs.contains($0.id) }
         selectedClusterIDs.removeAll()
+        return generatedTracks
     }
 
     /// Imports the selected clusters using their raw local file metadata as-is.
-    public func importAsOriginalFiles() {
+    @discardableResult
+    public func importAsOriginalFiles() -> [LocalTrack] {
         let original = pendingReviewClusters.filter { selectedClusterIDs.contains($0.id) }
+        var generatedTracks: [LocalTrack] = []
+
+        for clusterResult in original {
+            for match in clusterResult.trackMatches {
+                let local = match.localTrack
+                let title = local.title
+                let artist = local.artist ?? clusterResult.cluster.tracks.compactMap(\.artist).first ?? "Unknown Artist"
+                let album = local.album ?? clusterResult.cluster.albumName
+                let track = LocalTrack(
+                    fileURL: local.fileURL,
+                    title: title,
+                    artist: artist,
+                    album: album,
+                    duration: local.duration ?? 0,
+                    artworkData: nil
+                )
+                generatedTracks.append(track)
+            }
+        }
+
         let count = original.reduce(0) { $0 + $1.cluster.tracks.count }
         autoAcceptedCount += count
         pendingReviewClusters.removeAll { selectedClusterIDs.contains($0.id) }
         selectedClusterIDs.removeAll()
+        return generatedTracks
     }
 
     /// Discards unconfirmed items without modifying the library database.

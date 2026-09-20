@@ -89,6 +89,7 @@ struct ArtistsView: View {
                     }
                     .padding(28)
                 }
+                .scrollIndicators(.hidden)
             }
         }
     }
@@ -96,23 +97,21 @@ struct ArtistsView: View {
     private var header: some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Artists")
+                Text("艺术家")
                     .font(.largeTitle.bold())
 
-                Text("\(allArtists.count) artists")
+                Text("\(allArtists.count) 位艺术家")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
-
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
 
-                TextField("Filter artists...", text: $searchQuery)
+                TextField("筛选艺术家…", text: $searchQuery)
                     .textFieldStyle(.plain)
-                    .frame(width: 160)
 
                 if !searchQuery.isEmpty {
                     Button {
@@ -127,6 +126,12 @@ struct ArtistsView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+            .frame(width: 260)
+
+            HStack {
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
@@ -138,10 +143,10 @@ struct ArtistsView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary.opacity(0.4))
 
-            Text("No Artists Found")
+            Text("未找到艺术家")
                 .font(.headline)
 
-            Text("Import music into your library to see your favorite artists here.")
+            Text("导入音乐后，你喜爱的艺术家会显示在这里。")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

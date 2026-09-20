@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Observation
+import AppFoundationUI
 
 struct RadioStationInspectorView: View {
 
@@ -42,7 +43,7 @@ struct RadioStationInspectorView: View {
                             Circle()
                                 .fill(isPlaying ? Color.red : Color.secondary)
                                 .frame(width: 7, height: 7)
-                            Text(isPlaying ? "LIVE BROADCAST" : "INTERNET RADIO")
+                            Text(isPlaying ? "直播广播" : "互联网电台")
                                 .font(.system(size: 10, weight: .bold))
                                 .tracking(0.8)
                                 .foregroundStyle(isPlaying ? Color.red : Color.secondary)
@@ -53,7 +54,7 @@ struct RadioStationInspectorView: View {
                             .multilineTextAlignment(.center)
                             .lineLimit(2)
 
-                        Text(station.genre.rawValue + " • " + station.country)
+                            Text(station.genre.displayTitle + " · " + station.country)
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -70,7 +71,7 @@ struct RadioStationInspectorView: View {
 
                 // Description
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("About Station")
+                    Text("关于电台")
                         .font(.headline)
                         .foregroundStyle(.secondary)
 
@@ -92,6 +93,9 @@ struct RadioStationInspectorView: View {
             }
             .padding(18)
         }
+        .scrollIndicators(.hidden)
+        .hideScrollIndicatorsCompletely()
+        .tint(Color.accentColor)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -110,13 +114,14 @@ struct RadioStationInspectorView: View {
                                 .padding(.trailing, 4)
                         }
                         Label(
-                            isPlaying ? "Pause Stream" : "Tune In",
+                            isPlaying ? "暂停流媒体" : "调入电台",
                             systemImage: isPlaying ? "pause.fill" : "play.fill"
                         )
                     }
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(Color.accentColor)
 
                 if let onToggleFavorite {
                     Button(action: onToggleFavorite) {
@@ -124,33 +129,60 @@ struct RadioStationInspectorView: View {
                             .foregroundStyle(isFavorite ? Color.red : Color.primary)
                     }
                     .buttonStyle(.bordered)
-                    .help(isFavorite ? "Remove from Favorites" : "Add to Favorites")
+                    .tint(Color.accentColor)
+                    .help(isFavorite ? "取消收藏" : "加入收藏")
                 }
             }
 
-            HStack(spacing: 10) {
-                Button {
-                    playback.playNext(radio: station)
-                } label: {
-                    Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
-                        .font(.caption)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    Button {
+                        playback.playNext(radio: station)
+                    } label: {
+                        Label("下一首播放", systemImage: "text.line.first.and.arrowtriangle.forward")
+                            .font(.caption)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.accentColor)
 
-                Button {
-                    playback.addToQueue(radio: station)
-                } label: {
-                    Label("Add to Queue", systemImage: "text.badge.plus")
-                        .font(.caption)
-                        .frame(maxWidth: .infinity)
+                    Button {
+                        playback.addToQueue(radio: station)
+                    } label: {
+                        Label("加入队列", systemImage: "text.badge.plus")
+                            .font(.caption)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.accentColor)
                 }
-                .buttonStyle(.bordered)
+
+                VStack(spacing: 8) {
+                    Button {
+                        playback.playNext(radio: station)
+                    } label: {
+                        Label("下一首播放", systemImage: "text.line.first.and.arrowtriangle.forward")
+                            .font(.caption)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.accentColor)
+
+                    Button {
+                        playback.addToQueue(radio: station)
+                    } label: {
+                        Label("加入队列", systemImage: "text.badge.plus")
+                            .font(.caption)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.accentColor)
+                }
             }
 
             if station.isCustom, let onDelete {
                 Button(role: .destructive, action: onDelete) {
-                    Label("Delete Custom Station", systemImage: "trash")
+                    Label("删除自定义电台", systemImage: "trash")
                         .font(.caption)
                         .frame(maxWidth: .infinity)
                 }
@@ -163,20 +195,20 @@ struct RadioStationInspectorView: View {
 
     private var propertiesSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Broadcast Details")
+            Text("广播详情")
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
             VStack(spacing: 8) {
-                propertyRow(title: "Genre", value: station.genre.rawValue)
-                propertyRow(title: "Country / Region", value: station.country)
-                propertyRow(title: "Language", value: station.language)
-                propertyRow(title: "Audio Codec", value: station.codec)
+                propertyRow(title: "类型", value: station.genre.displayTitle)
+                propertyRow(title: "国家/地区", value: station.country)
+                propertyRow(title: "语言", value: station.language)
+                propertyRow(title: "音频编码", value: station.codec)
                 if let bitrate = station.bitrateKbps {
-                    propertyRow(title: "Stream Bitrate", value: "\(bitrate) kbps")
+                    propertyRow(title: "流媒体码率", value: "\(bitrate) kbps")
                 }
                 if station.isCustom {
-                    propertyRow(title: "Origin", value: "Custom Stream")
+                    propertyRow(title: "来源", value: "自定义流媒体")
                 }
             }
             .padding(12)
@@ -200,14 +232,14 @@ struct RadioStationInspectorView: View {
 
     private var broadcastSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Stream & Web Links")
+            Text("流媒体与网页链接")
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
             VStack(spacing: 8) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Stream URL")
+                        Text("流媒体 URL")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text(station.streamURL.absoluteString)
@@ -222,7 +254,7 @@ struct RadioStationInspectorView: View {
                 if let homepageURL = station.homepageURL {
                     Link(destination: homepageURL) {
                         HStack {
-                            Label("Official Website", systemImage: "safari")
+                            Label("官方网站", systemImage: "safari")
                                 .font(.subheadline)
                             Spacer()
                             Image(systemName: "arrow.up.right")

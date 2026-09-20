@@ -26,7 +26,7 @@ struct ApplicationDefinitionContractTests {
         } else {
             Issue.record("Search disappeared after updating text")
         }
-        #expect(secondSession.resolve().workspace?.identity?.title == "Browse")
+        #expect(secondSession.resolve().workspace?.identity?.title == "浏览")
         first.send(.navigate(.section(.library)))
         #expect(firstSession.resolve().toolbar.item(id: "browse.search") == nil)
     }

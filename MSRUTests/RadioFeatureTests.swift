@@ -316,10 +316,10 @@ struct RadioFeatureTests {
         let session = MSRUApplicationShellSession(scene: scene)
         let resolved = session.resolve()
 
-        #expect(resolved.workspace?.identity?.title == "Radio")
+        #expect(resolved.workspace?.identity?.title == "电台")
         let searchItem = try #require(resolved.toolbar.item(id: "radio.search"))
         if case .search(let search) = searchItem {
-            #expect(search.prompt == "Search Stations, Genres, Countries")
+            #expect(search.prompt == "搜索电台、类型或国家")
         } else {
             Issue.record("Expected search item in radio toolbar")
         }

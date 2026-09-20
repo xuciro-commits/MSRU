@@ -123,9 +123,9 @@ enum MSRUApplicationShellPresentation {
                             id:
                                 ID.toggleQueue,
                             title:
-                                "Queue",
+                                "检查器",
                             systemImage:
-                                "list.bullet",
+                                "sidebar.right",
                             perform: {
                                 context in
 
