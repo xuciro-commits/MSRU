@@ -260,6 +260,45 @@ struct ImportReviewView: View {
 
             // Sub-tracks when expanded
             if isExpanded {
+                if clusterResult.scoredCandidates.count > 1 {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("发现多个匹配发行版本 (点击切换)：")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.secondary)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(clusterResult.scoredCandidates) { candidate in
+                                    let isCurrent = (clusterResult.matchedRelease?.releaseMBID == candidate.release.releaseMBID)
+                                    Button {
+                                        store.selectReleaseCandidate(clusterID: clusterResult.id, release: candidate.release)
+                                    } label: {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: isCurrent ? "checkmark.circle.fill" : "circle")
+                                                .foregroundStyle(isCurrent ? Color.accentColor : Color.secondary)
+                                            Text(candidate.disambiguationReason)
+                                                .font(.caption2)
+                                                .foregroundStyle(isCurrent ? Color.primary : Color.secondary)
+                                        }
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .background(isCurrent ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.06), in: Capsule())
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(isCurrent ? Color.accentColor : Color.secondary.opacity(0.15), lineWidth: 1)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.secondary.opacity(0.04))
+                    Divider()
+                }
+
                 VStack(spacing: 0) {
                     ForEach(clusterResult.trackMatches) { trackMatch in
                         trackRow(trackMatch)
@@ -346,9 +385,11 @@ struct ImportReviewView: View {
             }
             .buttonStyle(.bordered)
 
-            Button("确认并应用选中匹配 (\(store.selectedClusterIDs.count))") {
-                let tracks = store.acceptSelectedMatches()
-                onCommit?(tracks)
+            Button("写入物理Tag并安全入库 (\(store.selectedClusterIDs.count))") {
+                Task {
+                    let tracks = await store.commitSelectedMatches(writePhysicalTags: true, exportCompanionCover: true)
+                    onCommit?(tracks)
+                }
             }
             .buttonStyle(.borderedProminent)
             .disabled(store.selectedClusterIDs.isEmpty)

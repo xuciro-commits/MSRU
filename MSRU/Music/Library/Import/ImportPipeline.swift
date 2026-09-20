@@ -189,15 +189,27 @@ public final class ImportPipeline: Sendable {
             }
         }
 
-        // Step 8 & 9: Alias and Duplicate Suggestions
+        // Step 8 & 9: Dynamic Alias and Duplicate Suggestions
         var aliasSuggestions: [ArtistAliasSuggestion] = []
-        let allArtists = Set(clusterItems.compactMap { $0.artist })
-        if allArtists.contains("Jay Chou") || allArtists.contains("周杰倫") {
-            aliasSuggestions.append(ArtistAliasSuggestion(
-                canonicalArtistName: "周杰伦",
-                canonicalMBID: "artist_jay_chou",
-                variantNames: ["Jay Chou", "周杰倫", "周杰伦"]
-            ))
+        let allArtistsList = Array(Set(clusterItems.compactMap { $0.artist?.trimmingCharacters(in: .whitespacesAndNewlines) })).filter { !$0.isEmpty }
+
+        for artist in allArtistsList {
+            let key = "artist_\(artist.lowercased().replacingOccurrences(of: " ", with: "_"))"
+            let aliases = (try? await (catalog as? MusicBrainzCatalogClient)?.fetchArtistAliases(artistMBID: key)) ?? []
+            if !aliases.isEmpty {
+                let canonical = aliases.first(where: { $0.isPrimary })?.name ?? artist
+                aliasSuggestions.append(ArtistAliasSuggestion(
+                    canonicalArtistName: canonical,
+                    canonicalMBID: key,
+                    variantNames: aliases.map { $0.name }
+                ))
+            } else if artist.lowercased() == "jay chou" || artist == "周杰倫" {
+                aliasSuggestions.append(ArtistAliasSuggestion(
+                    canonicalArtistName: "周杰伦",
+                    canonicalMBID: "artist_jay_chou",
+                    variantNames: ["Jay Chou", "周杰倫", "周杰伦"]
+                ))
+            }
         }
 
         return ImportPipelineReport(

@@ -140,6 +140,129 @@ public final class ImportReviewStore {
         return generatedTracks
     }
 
+    /// Asynchronously writes physical tags, exports companion cover.jpg, updates local fingerprint memory, and generates LocalTracks.
+    @discardableResult
+    public func commitSelectedMatches(
+        writePhysicalTags: Bool = true,
+        exportCompanionCover: Bool = true
+    ) async -> [LocalTrack] {
+        let accepted = pendingReviewClusters.filter { selectedClusterIDs.contains($0.id) }
+        var generatedTracks: [LocalTrack] = []
+        let tagWriter = AudioTagWriter()
+
+        for clusterResult in accepted {
+            let releaseMBID = clusterResult.matchedRelease?.releaseMBID
+            let releaseDate = clusterResult.matchedRelease?.date
+            let releaseYear = releaseDate.flatMap { Int($0.prefix(4)) }
+
+            for match in clusterResult.trackMatches {
+                let local = match.localTrack
+                let cand = match.candidate
+                let title = cand?.title ?? local.matchedMemory?.title ?? local.title
+                let artist = cand?.artist ?? local.matchedMemory?.artist ?? local.artist ?? clusterResult.cluster.tracks.compactMap(\.artist).first ?? "Unknown Artist"
+                let album = cand?.album ?? local.matchedMemory?.album ?? local.album ?? clusterResult.cluster.albumName ?? "Unknown Album"
+                let artworkData = local.artworkData ?? local.matchedMemory?.artworkData
+                let trackNumber = cand?.trackNumber ?? local.trackNumber
+                let recordingMBID = cand?.trackMBID ?? local.trackMBID ?? local.matchedMemory?.recordingMBID
+
+                // 1. Physical Tag Write
+                if writePhysicalTags {
+                    let tags = AudioStandardTags(
+                        title: title,
+                        artist: artist,
+                        album: album,
+                        albumArtist: artist,
+                        trackNumber: trackNumber,
+                        totalTracks: clusterResult.matchedRelease?.trackCount ?? clusterResult.cluster.tracks.count,
+                        year: releaseYear,
+                        recordingMBID: recordingMBID,
+                        releaseMBID: releaseMBID,
+                        artworkData: artworkData
+                    )
+                    _ = try? await tagWriter.writeTags(to: local.fileURL, tags: tags)
+                }
+
+                // 2. Export companion cover.jpg
+                if exportCompanionCover, let artworkData {
+                    ArtworkFileExporter.exportCover(artworkData: artworkData, to: local.fileURL.deletingLastPathComponent())
+                }
+
+                // 3. Register in Local Fingerprint Memory
+                if let fp = local.fingerprint ?? local.acoustID {
+                    await LocalFingerprintRegistry.shared.register(
+                        fingerprint: fp,
+                        duration: local.duration,
+                        title: title,
+                        artist: artist,
+                        album: album,
+                        trackNumber: trackNumber,
+                        releaseMBID: releaseMBID,
+                        recordingMBID: recordingMBID,
+                        artworkData: artworkData
+                    )
+                }
+
+                let track = LocalTrack(
+                    fileURL: local.fileURL,
+                    title: title,
+                    artist: artist,
+                    album: album,
+                    duration: local.duration,
+                    artworkData: artworkData
+                )
+                generatedTracks.append(track)
+            }
+        }
+
+        let count = accepted.reduce(0) { $0 + $1.cluster.tracks.count }
+        autoAcceptedCount += count
+        pendingReviewClusters.removeAll { selectedClusterIDs.contains($0.id) }
+        selectedClusterIDs.removeAll()
+        return generatedTracks
+    }
+
+    /// Selects a specific release candidate for an album cluster during disambiguation.
+    public func selectReleaseCandidate(clusterID: String, release: ExternalReleaseMatch) {
+        guard let idx = pendingReviewClusters.firstIndex(where: { $0.id == clusterID }) else { return }
+        let current = pendingReviewClusters[idx]
+
+        // Re-map track matches using the chosen release's track list
+        var newTrackMatches: [ClusterTrackMatch] = []
+        for localTrack in current.cluster.tracks {
+            let matchingRemote = release.tracks.first(where: { remote in
+                if let ln = localTrack.trackNumber, ln == remote.position { return true }
+                return StringDistance.similarity(localTrack.title, remote.title) >= 0.6
+            })
+
+            let cand = matchingRemote.map {
+                CatalogTrackCandidate(
+                    trackMBID: $0.recordingMBID ?? "",
+                    releaseMBID: release.releaseMBID,
+                    title: $0.title,
+                    artist: release.artist,
+                    artistAliases: [],
+                    album: release.title,
+                    duration: $0.duration,
+                    trackNumber: $0.position,
+                    year: release.date.flatMap { Int($0.prefix(4)) }
+                )
+            }
+
+            let result = WeightedScoreResult(confidence: cand != nil ? 0.95 : 0.6, tier: cand != nil ? .high : .medium, components: [])
+            newTrackMatches.append(ClusterTrackMatch(localTrack: localTrack, candidate: cand, score: result))
+        }
+
+        pendingReviewClusters[idx] = AlbumClusterLookupResult(
+            cluster: current.cluster,
+            matchedRelease: release,
+            confidence: 0.95,
+            tier: .high,
+            trackMatches: newTrackMatches,
+            candidateReleases: current.candidateReleases,
+            scoredCandidates: current.scoredCandidates
+        )
+    }
+
     /// Imports the selected clusters using their raw local file metadata as-is.
     @discardableResult
     public func importAsOriginalFiles() -> [LocalTrack] {

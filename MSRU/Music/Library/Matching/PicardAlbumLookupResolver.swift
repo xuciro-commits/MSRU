@@ -35,6 +35,7 @@ public struct AlbumClusterLookupResult: Sendable, Equatable, Identifiable {
     public let tier: ConfidenceTier
     public let trackMatches: [ClusterTrackMatch]
     public let candidateReleases: [ExternalReleaseMatch]
+    public let scoredCandidates: [ScoredReleaseCandidate]
 
     public init(
         cluster: AlbumCluster,
@@ -42,7 +43,8 @@ public struct AlbumClusterLookupResult: Sendable, Equatable, Identifiable {
         confidence: Double,
         tier: ConfidenceTier,
         trackMatches: [ClusterTrackMatch] = [],
-        candidateReleases: [ExternalReleaseMatch] = []
+        candidateReleases: [ExternalReleaseMatch] = [],
+        scoredCandidates: [ScoredReleaseCandidate] = []
     ) {
         self.cluster = cluster
         self.matchedRelease = matchedRelease
@@ -50,6 +52,7 @@ public struct AlbumClusterLookupResult: Sendable, Equatable, Identifiable {
         self.tier = tier
         self.trackMatches = trackMatches
         self.candidateReleases = candidateReleases
+        self.scoredCandidates = scoredCandidates
     }
 }
 
@@ -224,6 +227,10 @@ public enum PicardAlbumLookupResolver {
         }
 
         let overallTier = ConfidenceTier(confidence: bestConfidence)
+        let scoredCandidates = ExactReleaseResolver.rankCandidates(
+            cluster: cluster,
+            candidates: enrichedCandidates
+        )
 
         return AlbumClusterLookupResult(
             cluster: cluster,
@@ -231,7 +238,8 @@ public enum PicardAlbumLookupResolver {
             confidence: bestConfidence,
             tier: overallTier,
             trackMatches: bestTrackMatches,
-            candidateReleases: candidateReleases
+            candidateReleases: candidateReleases,
+            scoredCandidates: scoredCandidates
         )
     }
 

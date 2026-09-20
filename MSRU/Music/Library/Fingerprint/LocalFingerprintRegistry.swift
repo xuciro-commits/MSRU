@@ -138,6 +138,24 @@ public final class LocalFingerprintRegistry {
         save()
     }
 
+    /// Cleans up acoustic fingerprint records that are no longer referenced by any active tracks.
+    @discardableResult
+    public func cleanOrphanRecords(activeTracks: [LocalTrack]) -> Int {
+        let activeKeys = Set(activeTracks.map {
+            "\($0.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())::\($0.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())"
+        })
+        let beforeCount = records.count
+        records.removeAll { record in
+            let key = "\(record.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())::\(record.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())"
+            return !activeKeys.contains(key)
+        }
+        let removed = beforeCount - records.count
+        if removed > 0 {
+            save()
+        }
+        return removed
+    }
+
     private func load() {
         guard FileManager.default.fileExists(atPath: storageURL.path),
               let data = try? Data(contentsOf: storageURL),

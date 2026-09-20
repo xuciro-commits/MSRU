@@ -153,10 +153,50 @@ final class FileLocalLibraryRepository: LocalLibraryRepository {
         try encoded.write(to: manifestURL, options: .atomic)
 
         if deletePhysicalFiles {
+            var foldersToCheck: Set<URL> = []
             for record in tracksToDelete {
                 let hasAccess = record.fileURL.startAccessingSecurityScopedResource()
-                try? FileManager.default.removeItem(at: record.fileURL)
-                if hasAccess { record.fileURL.stopAccessingSecurityScopedResource() }
+                defer { if hasAccess { record.fileURL.stopAccessingSecurityScopedResource() } }
+
+                let parent = record.fileURL.deletingLastPathComponent()
+                foldersToCheck.insert(parent)
+
+                do {
+                    try FileManager.default.trashItem(at: record.fileURL, resultingItemURL: nil)
+                } catch {
+                    try? FileManager.default.removeItem(at: record.fileURL)
+                }
+            }
+
+            // Cascade clean orphan companion covers and empty folders if no audio files remain
+            for folder in foldersToCheck {
+                let items = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])) ?? []
+                let audioItems = items.filter { LocalAudioFormatSupport.supports($0) }
+                if audioItems.isEmpty {
+                    // No audio tracks left in this album folder. Clean companion artwork
+                    let companionImages = items.filter { item in
+                        let ext = item.pathExtension.lowercased()
+                        return ["jpg", "jpeg", "png", "webp"].contains(ext)
+                    }
+                    for img in companionImages {
+                        do {
+                            try FileManager.default.trashItem(at: img, resultingItemURL: nil)
+                        } catch {
+                            try? FileManager.default.removeItem(at: img)
+                        }
+                    }
+
+                    // Re-check if directory is now empty of non-hidden files
+                    let remaining = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil, options: [])) ?? []
+                    let nonHiddenRemaining = remaining.filter { !$0.lastPathComponent.hasPrefix(".") }
+                    if nonHiddenRemaining.isEmpty {
+                        do {
+                            try FileManager.default.trashItem(at: folder, resultingItemURL: nil)
+                        } catch {
+                            try? FileManager.default.removeItem(at: folder)
+                        }
+                    }
+                }
             }
         }
     }

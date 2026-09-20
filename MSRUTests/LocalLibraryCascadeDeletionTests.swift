@@ -112,4 +112,61 @@ struct LocalLibraryCascadeDeletionTests {
         config.move(from: IndexSet(integer: 0), to: 2)
         #expect(config.providerPriority.first != .appleMusic)
     }
+
+    @Test
+    func cleanOrphanFingerprintsRegistryTest() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let registry = LocalFingerprintRegistry(storageURL: tempDir.appendingPathComponent("test_fp.json"))
+        registry.register(fingerprint: "fp1", duration: 180, title: "Title A", artist: "Artist A")
+        registry.register(fingerprint: "fp2", duration: 200, title: "Title B", artist: "Artist B")
+        registry.register(fingerprint: "fp3", duration: 220, title: "Title C", artist: "Artist C")
+
+        #expect(registry.records.count == 3)
+
+        // Only Title A and Title B are in active tracks
+        let activeTracks = [
+            LocalTrack(fileURL: URL(fileURLWithPath: "/dummy/a.flac"), title: "Title A", artist: "Artist A", duration: 180),
+            LocalTrack(fileURL: URL(fileURLWithPath: "/dummy/b.flac"), title: "Title B", artist: "Artist B", duration: 200)
+        ]
+
+        let cleaned = registry.cleanOrphanRecords(activeTracks: activeTracks)
+        #expect(cleaned == 1)
+        #expect(registry.records.count == 2)
+        #expect(registry.records.contains { $0.title == "Title A" })
+        #expect(registry.records.contains { $0.title == "Title B" })
+        #expect(!registry.records.contains { $0.title == "Title C" })
+    }
+
+    @Test
+    func fileLocalLibraryRepositoryPhysicalCascadeCleanupTest() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let albumDir = tempDir.appendingPathComponent("Artist X/Album Y", isDirectory: true)
+        try FileManager.default.createDirectory(at: albumDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let trackFile = albumDir.appendingPathComponent("01. Song.mp3")
+        try Data("dummy mp3 content".utf8).write(to: trackFile)
+
+        let coverFile = albumDir.appendingPathComponent("cover.jpg")
+        try Data("dummy cover jpg".utf8).write(to: coverFile)
+
+        let repo = FileLocalLibraryRepository(directory: tempDir)
+        let localTrack = LocalTrack(fileURL: trackFile, title: "Song", artist: "Artist X", album: "Album Y", duration: 180)
+        try await repo.saveTrackInPlace(localTrack)
+
+        #expect(FileManager.default.fileExists(atPath: trackFile.path))
+        #expect(FileManager.default.fileExists(atPath: coverFile.path))
+
+        // Cascade delete physical file
+        try await repo.deleteTracks(withIDs: [localTrack.id], deletePhysicalFiles: true)
+
+        // Both audio file and companion cover should be cleaned up (trashed/removed)
+        #expect(!FileManager.default.fileExists(atPath: trackFile.path))
+        #expect(!FileManager.default.fileExists(atPath: coverFile.path))
+        // And the empty album directory should be cleaned up as well
+        #expect(!FileManager.default.fileExists(atPath: albumDir.path))
+    }
 }

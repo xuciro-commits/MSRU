@@ -41,6 +41,10 @@ struct MetadataManagerWorkspaceView: View {
     @State private var isAddRulePresented: Bool = false
     @State private var newRulePath: String = ""
     @State private var newRuleArtist: String = ""
+    @State private var acoustIDApiKey: String = ""
+    @State private var acoustIDTestStatus: String? = nil
+    @State private var isVerifyingAcoustID: Bool = false
+    @State private var orphanCleanFeedback: String? = nil
 
     private var fingerprintRegistry = LocalFingerprintRegistry.shared
     private var ruleStore = PathHeuristicRuleStore.shared
@@ -165,11 +169,78 @@ struct MetadataManagerWorkspaceView: View {
                     ForEach(providerConfig.providerPriority) { provider in
                         providerRow(provider)
                     }
+
+                    acoustIDConfigCard
                 }
                 .padding(24)
             }
             .scrollIndicators(.hidden)
+            .task {
+                acoustIDApiKey = await AcoustIDConfiguration.shared.apiKey
+            }
         }
+    }
+
+    private var acoustIDConfigCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "key.fill")
+                    .font(.headline)
+                    .foregroundStyle(Color.accentColor)
+                Text("AcoustID 声学指纹服务授权 (API Key)")
+                    .font(.headline)
+                Spacer()
+                if let status = acoustIDTestStatus {
+                    Text(status)
+                        .font(.caption)
+                        .foregroundStyle(status.contains("成功") ? .green : .secondary)
+                }
+            }
+
+            Text("用于通过 Chromaprint 提取的声音特征查询全球 MusicBrainz 录音实体。系统已预设你的专属 API Key，亦可随时修改或测试连通性。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                TextField("AcoustID API Key", text: $acoustIDApiKey)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(.body, design: .monospaced))
+                    .onChange(of: acoustIDApiKey) { _, newValue in
+                        Task {
+                            await AcoustIDConfiguration.shared.setApiKey(newValue)
+                        }
+                    }
+
+                Button(action: {
+                    Task {
+                        isVerifyingAcoustID = true
+                        acoustIDTestStatus = "正在验证…"
+                        let res = await AcoustIDConfiguration.shared.verifyConnectivity()
+                        isVerifyingAcoustID = false
+                        acoustIDTestStatus = res.success ? "✓ 验证成功" : "✕ \(res.message)"
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        if isVerifyingAcoustID {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "checkmark.shield.fill")
+                        }
+                        Text("验证连接")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .disabled(isVerifyingAcoustID || acoustIDApiKey.isEmpty)
+            }
+        }
+        .padding(16)
+        .background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+        )
     }
 
     private func providerRow(_ provider: MetadataProviderType) -> some View {
@@ -240,9 +311,35 @@ struct MetadataManagerWorkspaceView: View {
 
                 Spacer()
 
+                if let feedback = orphanCleanFeedback {
+                    Text(feedback)
+                        .font(.caption)
+                        .foregroundStyle(Color.accentColor)
+                }
+
                 if !fingerprintRegistry.records.isEmpty {
+                    Button("清理未引用声纹") {
+                        let cleaned = fingerprintRegistry.cleanOrphanRecords(activeTracks: localStore.tracks)
+                        orphanCleanFeedback = cleaned > 0 ? "已清理 \(cleaned) 条未引用声纹" : "暂无孤立声纹"
+                        Task {
+                            try? await Task.sleep(for: .seconds(3))
+                            orphanCleanFeedback = nil
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .foregroundStyle(Color.accentColor)
+
+                    Text("·")
+                        .foregroundStyle(.secondary)
+
                     Button("清空声纹记忆") {
                         fingerprintRegistry.removeAll()
+                        orphanCleanFeedback = "已清空全部声纹"
+                        Task {
+                            try? await Task.sleep(for: .seconds(3))
+                            orphanCleanFeedback = nil
+                        }
                     }
                     .buttonStyle(.plain)
                     .font(.caption)

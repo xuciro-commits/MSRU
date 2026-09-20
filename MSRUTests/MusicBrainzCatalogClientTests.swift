@@ -15,7 +15,7 @@ struct MusicBrainzCatalogClientTests {
 
     @Test
     func lookupReleaseByAuthoritativeMBID() async throws {
-        let client = MusicBrainzCatalogClient.shared
+        let client = MusicBrainzCatalogClient(seedDefaultData: true)
         let release = try await client.lookupRelease(releaseMBID: "rel_ye_hui_mei")
 
         #expect(release != nil)
@@ -26,7 +26,7 @@ struct MusicBrainzCatalogClientTests {
 
     @Test
     func searchReleasesByArtistAndAlbum() async throws {
-        let client = MusicBrainzCatalogClient.shared
+        let client = MusicBrainzCatalogClient(seedDefaultData: true)
         let results = try await client.searchReleases(artist: "Adele", album: "21")
 
         #expect(!results.isEmpty)
@@ -36,7 +36,7 @@ struct MusicBrainzCatalogClientTests {
 
     @Test
     func fetchArtistAliasesReturnsMultilingualNames() async throws {
-        let client = MusicBrainzCatalogClient.shared
+        let client = MusicBrainzCatalogClient(seedDefaultData: true)
         let aliases = try await client.fetchArtistAliases(artistMBID: "artist_jay_chou")
 
         #expect(aliases.count >= 3)

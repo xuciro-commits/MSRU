@@ -20,9 +20,11 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
 
     private let rateLimiter = MusicBrainzClientRateLimiter()
 
-    public init(urlSession: URLSession = .shared) {
+    public init(urlSession: URLSession = .shared, seedDefaultData: Bool = true) {
         self.urlSession = urlSession
-        seedDefaultKnownCatalog()
+        if seedDefaultData {
+            seedDefaultKnownCatalog()
+        }
     }
 
     // MARK: - ExternalCatalogService Protocol
@@ -159,11 +161,27 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
         let dur = Int(duration)
         guard dur > 0, !fingerprint.isEmpty else { return nil }
 
-        let endpoint = "https://api.acoustid.org/v2/lookup?client=8XaBELgH&meta=recordings+releasegroups+compress&duration=\(dur)&fingerprint=\(fingerprint)"
+        let clientKey = await AcoustIDConfiguration.shared.apiKey
+        let endpoint = "https://api.acoustid.org/v2/lookup"
         guard let url = URL(string: endpoint) else { return nil }
 
-        var request = URLRequest(url: url, timeoutInterval: 10.0)
+        var request = URLRequest(url: url, timeoutInterval: 12.0)
+        request.httpMethod = "POST"
         request.setValue("MSRU/1.0 (contact@msru.local)", forHTTPHeaderField: "User-Agent")
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+
+        let bodyParameters: [(String, String)] = [
+            ("client", clientKey),
+            ("meta", "recordings+releasegroups+compress"),
+            ("duration", "\(dur)"),
+            ("fingerprint", fingerprint)
+        ]
+        let bodyString = bodyParameters.map { key, val in
+            let escapedKey = key.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? key
+            let escapedVal = val.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? val
+            return "\(escapedKey)=\(escapedVal)"
+        }.joined(separator: "&")
+        request.httpBody = bodyString.data(using: .utf8)
 
         guard let (data, response) = try? await urlSession.data(for: request),
               let http = response as? HTTPURLResponse, http.statusCode == 200,
@@ -266,7 +284,7 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
         mockAliases[artistMBID] = aliases
     }
 
-    private func seedDefaultKnownCatalog() {
+    public func seedDefaultKnownCatalog() {
         // Seed Jay Chou - 叶惠美 (2003)
         let fatherTrack = ExternalTrackMatch(position: 1, title: "以父之名", recordingMBID: "rec_in_name_of_father", duration: 342.0)
         let cowardTrack = ExternalTrackMatch(position: 2, title: "懦夫", recordingMBID: "rec_coward", duration: 218.0)
