@@ -41,8 +41,6 @@ final class MultiSceneApplicationCommandRuntime:
         ApplicationCommandGate
 
 
-    // MARK: - Command Center
-
     // MARK: - Init
 
     init(

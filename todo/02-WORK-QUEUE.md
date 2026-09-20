@@ -56,14 +56,14 @@
 | Inspector & Context | 支持右侧 Context 区域 `[曲目/电台详情] [队列]` 双面板切换。选中本地/曲库曲目时自动展现 Track Inspector，选中电台时自动展现 RadioStationInspectorView，展示电台封面、流派、LIVE 徽标、比特率/编码、国家语言、流地址及官网链接，支持爱心收藏切换、自定义电台删除、直接收听与播放控制。架构无跨界 import，全 Preview 隔离覆盖。 |
 | Radio 电台专区与最佳实践 | 原占位页全面升级为原生 Radio 专区。接入内置精选公开网络电台（KEXP、SomaFM、BBC Radio 1、WQXR、Jazz24、Ambient 等）；支持流派胶囊筛选与即时搜索；实现精选主打 Hero Banner 与自适应电台卡片网格；打通 PlaybackProvider 直播流无缝接入原生 AVPlayer，MiniPlayerBar 识别 LIVE 广播状态；联动 SceneModel 互斥选中与右侧检查器；参考现代网络电台最佳实践，增加电台收藏（Favorites）置顶专区、最近收听历史（Recently Played）、自定义网络电台添加弹窗（AddStationSheetView，支持 URL 合法性校验及流派/国家定义）与卡片/检查器删除入口，支持原子 JSON 本地持久化与冷启动恢复。 |
 | 曲库集合视图 | 支持资料库曲目与本地曲目原生 `Table`（表头、列排版、封面、时长、爱心及右键上下文菜单）与 `Grid` 双模式切换；顶部提供即时搜索文本过滤、多维度字段排序（添加时间、标题、艺术家、专辑、时长）与正反序切换；单选曲目双向联动 `SceneModel.selectedLibraryTrack` 并自动唤起右侧 Track Inspector；支持直接双击/右键发起播放、下一首与入队。 |
-| 基础架构与并发 | `DependencyKey` 强化 `associatedtype Value: Sendable`，`DependencyValues` 擦除存储收窄为 `[ObjectIdentifier: any Sendable]` 并消除 `@unchecked Sendable`。纯函数式无状态组合器统一由 `ApplicationShellRuntime` 规范更名为 `ApplicationShellResolver`，不留无用兼容别名。AppFoundation 单元测试及应用全量测试完整回归。 |
+| 基础架构与并发 | `DependencyKey` 强化 `associatedtype Value: Sendable`，`DependencyValues` 擦除存储收窄为 `[ObjectIdentifier: any Sendable]` 并消除 `@unchecked Sendable`。纯函数式无状态组合器统一由 `ApplicationShellRuntime` 规范更名为 `ApplicationShellResolver`，不留无用兼容别名。NEXT 2 阶段 Command Runtime 边界硬化，直接由 Gate 调度，清除历史废弃标记；`MSRUApplication` 彻底消除 `transitionalHost` 过渡模块代码，`ListenNow`、`AddMusic`、`Settings` 全面模块化遵循 `ApplicationFeaturePresentation`，统一通过 `builder.add(...)` 声明式装配，经契约测试严格验证。 |
 | 数据 | 收藏先提交后发布；扫描、导入与收藏写入按序执行。失败、并发、路径别名、同名文件及重启恢复有回归测试。 |
 | 播放 | 统一音量与静音管理（支持 AVPlayer 与 PCM 混音节点双向同步、切歌继承与取消静音恢复）；MiniPlayerBar 标准模式落地音量滑块与静音按钮（图册 15.1）；HoverScrubber 拖拽时实时目标时间预览、松手原子 commit seek 并支持 LIVE 电台停用；本地真实 WAV 与网络电台直播流混合队列连续播放与切换测试全部通过；混合队列保留重复实例，真实静音 AVPlayer 顺播两个 WAV 核对媒体时钟与队列终态；AVPlayer/PCM 失败清理、旧回调隔离和保留队列重试有回归测试。 |
 | FFmpeg | 构建暂存、互斥与发布回滚经过失败探针；完整重建 macOS/iOS/visionOS 切片，两个模拟器均含 arm64+x86_64。visionOS UI API 差异已适配。 |
 
 验证基线：
 
-- 应用：最近全量 **141 项通过**（原 137 项 + 4 项 Radio 收藏、最近播放历史、自定义网络电台添加与删除单元测试），使用 `MSRU-UnitTests` scheme。
+- 应用：最近全量 **142 项通过**（原 141 项 + 1 项全模块化 Feature 装配与路由契约回归测试），使用 `MSRU-UnitTests` scheme。
 - 框架：最近 **56 项通过**（37 UI + 19 Core，新增 stop、同ID并发与联合取消测试），包含 SwiftUI Shell 的平台适配。
 - 构建：PCM 清理与旧定义删除后的当前代码已复验，visionOS 真机／模拟器和 iOS Simulator 均编译链接通过；关闭签名，不代表设备安装运行验收。
 - UI：开发签名 Runner 的 **2 项通过**，验证前台启动、实际 Cmd+Q／重启、保留打开窗口并排除手动关闭窗口。使用独立恢复域与稳定 scene ID；后续播放改动及旧定义删除后已重新运行并通过。
