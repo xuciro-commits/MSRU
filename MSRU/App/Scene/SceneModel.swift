@@ -98,6 +98,7 @@ final class SceneModel:
         Bool
 
     func select(localTrack: LocalTrack?) {
+        guard !isClosed else { return }
         self.selectedLocalTrack = localTrack
         if localTrack != nil {
             self.selectedLibraryTrack = nil
@@ -108,6 +109,7 @@ final class SceneModel:
     }
 
     func select(musicContent: MusicContent?) {
+        guard !isClosed else { return }
         self.selectedMusicContent = musicContent
         if musicContent != nil {
             self.selectedLocalTrack = nil
@@ -118,6 +120,7 @@ final class SceneModel:
     }
 
     func select(libraryTrack: LibraryTrack?) {
+        guard !isClosed else { return }
         self.selectedLibraryTrack = libraryTrack
         if libraryTrack != nil {
             self.selectedLocalTrack = nil
@@ -128,6 +131,7 @@ final class SceneModel:
     }
 
     func toggleQueue() {
+        guard !isClosed else { return }
         if isQueuePresented {
             if activeContextPane == .queue {
                 isQueuePresented = false
@@ -157,8 +161,8 @@ final class SceneModel:
     func close() {
         guard !isClosed else { return }
         isClosed = true
-        browse.cancelAll()
-        libraryFeature.cancelAll()
+        browse.stop()
+        libraryFeature.stop()
     }
 
     // MARK: - New Scene

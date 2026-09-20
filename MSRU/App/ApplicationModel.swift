@@ -85,7 +85,13 @@ final class ApplicationModel {
 
     // MARK: - Lifecycle
 
-    private var hasStarted =
+    private(set) var hasStarted =
+        false
+
+    private(set) var startupTask:
+        Task<Void, Never>?
+
+    private(set) var isTerminated =
         false
 
 
@@ -214,7 +220,8 @@ final class ApplicationModel {
     func start() {
 
         guard
-            !hasStarted
+            !hasStarted,
+            !isTerminated
         else {
 
             return
@@ -229,10 +236,31 @@ final class ApplicationModel {
             library
 
 
-        Task {
+        startupTask = Task {
 
             await library
                 .load()
         }
+    }
+
+
+    // MARK: - Terminate
+
+    func terminate() {
+
+        guard
+            !isTerminated
+        else {
+
+            return
+        }
+
+
+        isTerminated =
+            true
+
+
+        startupTask?
+            .cancel()
     }
 }

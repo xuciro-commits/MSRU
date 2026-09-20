@@ -119,7 +119,12 @@ public final class MacToolbarAdapter:
                 }
             }
             for item in resolved.items {
-                toolbar.insertItem(withItemIdentifier: identifier(for: item.id), at: toolbar.items.count)
+                let itemID = identifier(for: item.id)
+                if let existing = toolbar.items.first(where: { $0.itemIdentifier == itemID }) {
+                    update(existing, with: item)
+                } else {
+                    toolbar.insertItem(withItemIdentifier: itemID, at: toolbar.items.count)
+                }
             }
         }
     }

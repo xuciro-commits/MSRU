@@ -86,6 +86,12 @@ where F: Feature {
             [:]
 
 
+    // MARK: - Lifecycle
+
+    public private(set) var isStopped:
+        Bool = false
+
+
     // MARK: - Init
 
     public init(
@@ -129,6 +135,10 @@ where F: Feature {
         _ action:
             F.Action
     ) {
+
+        guard !isStopped else {
+            return
+        }
 
         let tasks =
             withDependencies(
@@ -215,7 +225,7 @@ where F: Feature {
                             action in
 
                             // Cancellation is cooperative; revoke the callback as well.
-                            guard let self, self.isRunning(token: token, id: id) else {
+                            guard let self, !self.isStopped, self.isRunning(token: token, id: id) else {
                                 return
                             }
                             self.send(action)
@@ -323,6 +333,15 @@ where F: Feature {
 
         anonymousTasks
             .removeAll()
+    }
+
+
+    // MARK: - Stop
+
+    public func stop() {
+        guard !isStopped else { return }
+        isStopped = true
+        cancelAll()
     }
 
 
