@@ -58,6 +58,22 @@ struct MSRUContextPaneView: View {
                 QueuePaneView(
                     playback: scene.application.playback
                 )
+
+            case .visualizer:
+                VisualizerPaneView(
+                    playback: scene.application.playback,
+                    onExpandCanvas: {
+                        scene.setNowPlaying(presented: true)
+                    }
+                )
+
+            case .lyrics:
+                LyricsPaneView(
+                    playback: scene.application.playback,
+                    onExpandCanvas: {
+                        scene.setNowPlaying(presented: true)
+                    }
+                )
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -83,6 +99,20 @@ struct MSRUContextPaneView: View {
 #Preview("Context Pane · Queue") {
     let scene = MSRUPreviewData.makeScene()
     scene.activeContextPane = .queue
+    return MSRUContextPaneView(scene: scene)
+        .frame(width: 320, height: 600)
+}
+
+#Preview("Context Pane · Visualizer") {
+    let scene = MSRUPreviewData.makeScene()
+    scene.activeContextPane = .visualizer
+    return MSRUContextPaneView(scene: scene)
+        .frame(width: 320, height: 600)
+}
+
+#Preview("Context Pane · Lyrics") {
+    let scene = MSRUPreviewData.makeScene()
+    scene.activeContextPane = .lyrics
     return MSRUContextPaneView(scene: scene)
         .frame(width: 320, height: 600)
 }

@@ -11,6 +11,12 @@ struct MiniPlayerAccessoryView:
     let onToggleQueue:
         () -> Void
 
+    var onToggleVisualizer: (() -> Void)? = nil
+
+    var onToggleLyrics: (() -> Void)? = nil
+
+    var onExpandNowPlaying: (() -> Void)? = nil
+
 
     var body: some View {
 
@@ -18,7 +24,13 @@ struct MiniPlayerAccessoryView:
             playback:
                 playback,
             onToggleQueue:
-                onToggleQueue
+                onToggleQueue,
+            onToggleVisualizer:
+                onToggleVisualizer,
+            onToggleLyrics:
+                onToggleLyrics,
+            onExpandNowPlaying:
+                onExpandNowPlaying
         )
         /*
          这是 Capsule 外部 breathing room。

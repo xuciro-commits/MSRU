@@ -138,6 +138,18 @@ struct SwiftUISceneRootView:
                 }
             }
         }
+        .overlay {
+            if scene.isNowPlayingPresented {
+                NowPlayingCanvasView(
+                    playback: scene.application.playback,
+                    onClose: {
+                        scene.setNowPlaying(presented: false)
+                    }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: scene.isNowPlayingPresented)
         .onChange(
             of:
                 scene

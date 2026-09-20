@@ -85,6 +85,8 @@ final class SceneModel:
     enum ContextPane: String, CaseIterable, Identifiable, Codable, Sendable {
         case inspector
         case queue
+        case visualizer
+        case lyrics
 
         var id: String { rawValue }
 
@@ -92,6 +94,8 @@ final class SceneModel:
             switch self {
             case .inspector: return "Details"
             case .queue: return "Queue"
+            case .visualizer: return "Spectrum"
+            case .lyrics: return "Lyrics"
             }
         }
     }
@@ -99,6 +103,9 @@ final class SceneModel:
     var activeContextPane: ContextPane = .inspector
 
     var isQueuePresented:
+        Bool
+
+    var isNowPlayingPresented:
         Bool
 
     func select(localTrack: LocalTrack?) {
@@ -149,19 +156,30 @@ final class SceneModel:
         }
     }
 
-    func toggleQueue() {
+    func toggleContextPane(_ pane: ContextPane) {
         guard !isClosed else { return }
-        if isQueuePresented {
-            if activeContextPane == .queue {
-                isQueuePresented = false
-            } else {
-                activeContextPane = .queue
-            }
+        if isQueuePresented && activeContextPane == pane {
+            isQueuePresented = false
         } else {
-            activeContextPane = .queue
+            activeContextPane = pane
             isQueuePresented = true
         }
     }
+
+    func toggleQueue() {
+        toggleContextPane(.queue)
+    }
+
+    func toggleNowPlaying() {
+        guard !isClosed else { return }
+        isNowPlayingPresented.toggle()
+    }
+
+    func setNowPlaying(presented: Bool) {
+        guard !isClosed else { return }
+        isNowPlayingPresented = presented
+    }
+
 
 
     // MARK: - Features
@@ -184,6 +202,7 @@ final class SceneModel:
     func close() {
         guard !isClosed else { return }
         isClosed = true
+        isNowPlayingPresented = false
         browse.stop()
         libraryFeature.stop()
         radioFeature.stop()
@@ -199,7 +218,9 @@ final class SceneModel:
         section:
             SceneSection = .listenNow,
         isQueuePresented:
-            Bool = true
+            Bool = true,
+        isNowPlayingPresented:
+            Bool = false
     ) {
 
         self.id =
@@ -219,6 +240,10 @@ final class SceneModel:
 
         self.isQueuePresented =
             isQueuePresented
+
+
+        self.isNowPlayingPresented =
+            isNowPlayingPresented
 
 
         self.browse =

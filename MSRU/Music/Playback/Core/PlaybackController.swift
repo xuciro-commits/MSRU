@@ -41,6 +41,10 @@ import Observation
 
     private(set) var isMuted: Bool = false
 
+    var effectiveVolume: Float {
+        isMuted ? 0.0 : volume
+    }
+
     // MARK: - Resolution State
 
     private var resolvingItem: PlaybackItem?
@@ -145,6 +149,10 @@ import Observation
         currentItem?.radioStation
     }
 
+    var isLiveStream: Bool {
+        radioCurrentStation != nil
+    }
+
     var radioQueue: [RadioStation] {
 
         playbackQueue.allItems.compactMap { queueItem in
@@ -195,6 +203,59 @@ import Observation
     var unifiedHasTrack: Bool {
 
         displayItem != nil
+    }
+
+    // MARK: - Audio Format Metadata
+
+    var audioFormatInfo: AudioFormatInfo? {
+        guard let item = displayItem else { return nil }
+
+        switch item.payload {
+        case .local(let track):
+            let ext = track.fileURL.pathExtension.uppercased()
+            let codec = ext.isEmpty ? "AUDIO" : ext
+            let isLossless = ["FLAC", "WAV", "AIFF", "AIF", "ALAC", "DTS"].contains(codec)
+
+            var sampleRateText = "44.1 kHz"
+            var isHiRes = false
+
+            if case .decodedPCM(let pcm) = currentResource?.transport {
+                let sr = pcm.format.sampleRate
+                sampleRateText = String(format: "%.1f kHz", sr / 1000.0)
+                isHiRes = sr > 48000
+            }
+
+            return AudioFormatInfo(
+                codec: codec,
+                sampleRate: sampleRateText,
+                bitDepth: isLossless ? "24-bit" : "16-bit",
+                bitrate: isLossless ? (codec == "FLAC" ? "710 kbps" : "1411 kbps") : "320 kbps",
+                isLossless: isLossless,
+                isHiRes: isHiRes
+            )
+
+        case .openverse(let track):
+            let ext = track.mediaURL?.pathExtension.uppercased() ?? "MP3"
+            let codec = ext.isEmpty ? "MP3" : ext
+            return AudioFormatInfo(
+                codec: codec,
+                sampleRate: "44.1 kHz",
+                bitDepth: "16-bit",
+                bitrate: "320 kbps",
+                isLossless: false,
+                isHiRes: false
+            )
+
+        case .radio(let station):
+            return AudioFormatInfo(
+                codec: station.codec.uppercased(),
+                sampleRate: "44.1 kHz",
+                bitDepth: nil,
+                bitrate: station.bitrateKbps.map { "\($0) kbps" } ?? "128 kbps",
+                isLossless: false,
+                isHiRes: false
+            )
+        }
     }
 
     // MARK: - Progress

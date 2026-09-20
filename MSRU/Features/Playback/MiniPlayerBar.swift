@@ -11,6 +11,12 @@ struct MiniPlayerBar: View {
     let onToggleQueue:
         () -> Void
 
+    var onToggleVisualizer: (() -> Void)? = nil
+
+    var onToggleLyrics: (() -> Void)? = nil
+
+    var onExpandNowPlaying: (() -> Void)? = nil
+
     @State private var scrubbingProgress: Double? = nil
 
 
@@ -258,22 +264,28 @@ struct MiniPlayerBar: View {
             spacing: 1
         ) {
 
-            Text(
-                playback.unifiedTitle
-            )
-            .font(
-                .system(
-                    size: 13,
-                    weight: .semibold
+            HStack(spacing: 6) {
+                Text(
+                    playback.unifiedTitle
                 )
-            )
-            .foregroundStyle(
-                .primary
-            )
-            .lineLimit(1)
-            .truncationMode(
-                .tail
-            )
+                .font(
+                    .system(
+                        size: 13,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    .primary
+                )
+                .lineLimit(1)
+                .truncationMode(
+                    .tail
+                )
+
+                if let info = playback.audioFormatInfo {
+                    AudioFormatBadgeView(info: info, style: .compact)
+                }
+            }
 
 
             Text(
@@ -298,6 +310,16 @@ struct MiniPlayerBar: View {
     // MARK: - Artwork
 
     private func artwork(size: CGFloat = 42) -> some View {
+        Button {
+            onExpandNowPlaying?()
+        } label: {
+            artworkImage(size: size)
+        }
+        .buttonStyle(.plain)
+        .help("Open Now Playing Canvas")
+    }
+
+    private func artworkImage(size: CGFloat = 42) -> some View {
         Group {
             if let data = playback.unifiedArtworkData,
                let image = Image(artworkData: data) {
@@ -341,16 +363,61 @@ struct MiniPlayerBar: View {
 
     // MARK: - Trailing
 
+    private var lyricsButton: some View {
+        Button {
+            onToggleLyrics?()
+        } label: {
+            Image(systemName: "quote.bubble")
+                .font(.system(size: 14, weight: .medium))
+                .frame(width: 22, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Color.secondary)
+        .help("Lyrics")
+        .fixedSize()
+    }
+
+    private var visualizerButton: some View {
+        Button {
+            onToggleVisualizer?()
+        } label: {
+            Image(systemName: "waveform")
+                .font(.system(size: 14, weight: .medium))
+                .frame(width: 22, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Color.secondary)
+        .help("Spectrum Visualizer")
+        .fixedSize()
+    }
+
     private var queueButton: some View {
         Button(action: onToggleQueue) {
             Image(systemName: "list.bullet")
-                .font(.system(size: 16, weight: .medium))
-                .frame(width: 24, height: 28)
+                .font(.system(size: 15, weight: .medium))
+                .frame(width: 22, height: 28)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .foregroundStyle(Color.primary)
         .help("Up Next")
+        .fixedSize()
+    }
+
+    private var expandButton: some View {
+        Button {
+            onExpandNowPlaying?()
+        } label: {
+            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                .font(.system(size: 12, weight: .medium))
+                .frame(width: 22, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Color.secondary)
+        .help("Full Canvas")
         .fixedSize()
     }
 
@@ -360,7 +427,7 @@ struct MiniPlayerBar: View {
     ) -> some View {
         HStack(
             alignment: .center,
-            spacing: 12
+            spacing: 10
         ) {
             if !compact {
                 volumeControl
@@ -369,7 +436,19 @@ struct MiniPlayerBar: View {
                 }
             }
 
+            if onToggleLyrics != nil {
+                lyricsButton
+            }
+
+            if onToggleVisualizer != nil {
+                visualizerButton
+            }
+
             queueButton
+
+            if onExpandNowPlaying != nil {
+                expandButton
+            }
         }
         .fixedSize()
     }

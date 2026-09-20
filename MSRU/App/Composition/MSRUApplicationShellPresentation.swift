@@ -96,7 +96,16 @@ enum MSRUApplicationShellPresentation {
                 onToggleQueue:
                     context
                         .actions
-                        .toggleQueue
+                        .toggleQueue,
+                onToggleVisualizer: {
+                    context.scene.toggleContextPane(.visualizer)
+                },
+                onToggleLyrics: {
+                    context.scene.toggleContextPane(.lyrics)
+                },
+                onExpandNowPlaying: {
+                    context.scene.setNowPlaying(presented: true)
+                }
             )
         }
 
