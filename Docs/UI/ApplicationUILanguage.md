@@ -23,7 +23,7 @@ UI 语言首先是行为约定：位置表达层级，选择决定操作对象�
 
 macOS：侧栏 + 结果工作区；搜索放 toolbar；队列作为 activity 辅助区；持久播放器为 accessory。
 
-iPad：宽屏使用 adaptive split，窄宽度折叠导航；搜索选择原生 searchable 合适位置；队列按宽度显示辅助区域或 sheet；播放器在安全区域内持续可达。iPhone/visionOS 先留策略扩展点，不能因为源码能编译就宣称交互验证通过。
+iPad：宽屏使用 adaptive split，窄宽度折叠导航；搜索选择原生 searchable 合适位置；队列按宽度显示辅助区域或 sheet；播放器在安全区域内持续可达。iPhone/iOS 与 watchOS 继续保留推进；依用户最新指令，**visionOS 涉及的所有开发任务已明确暂停**。
 
 `SwiftUISceneRootView` 通过 `SwiftUIApplicationShell` 消费与 macOS 相同的 Shell 语义，不复制 Feature/runtime。只在 renderer/平台组合入口使用编译条件。不得为消除三行 `#if` 发明统一窗口 API。
 

@@ -30,4 +30,4 @@
 - NOW 0 阶段收口：旧 MainWindowController/RootSplitViewController 彻底退出；44 个 View/Representable 保持独立同文件 Preview 门禁；统一音量管理、Scrubber 拖拽预览、紧凑自适应排版及真实本地/电台直播流混合顺播通过回归测试。
 - NEXT 2 阶段收口：Command Runtime 维护边界硬化，直接调用 Gate，清除历史废弃标记；`MSRUApplication` 彻底消除过渡宿主模块（`transitionalHostContribution` / `transitionalHostDestinations`），`ListenNowFeature`、`AddMusicFeature` 与 `SettingsFeature` 全面模块化遵循 `ApplicationFeaturePresentation`，全量 6 大功能模块均通过统一的 `builder.add(...)` 进行纯净声明式装配，全量 142 项测试通过。
 
-已通过原生搜索焦点测试和真实 Cmd+Q / 重启的双窗口恢复 XCUITest。MiniPlayerBar 极窄/紧凑/标准三阶自适应与紧凑列表已完成；本地真实 AVPlayer 播放、音量继承、Seek 夹紧与电台直播流切换均已集成验证。visionOS 真机及双架构模拟器的 FFmpeg 切片已补齐，平台 API 差异已适配，完整 App 编译链接通过；头显上的交互与媒体运行时仍待验收。
+已通过原生搜索焦点测试和真实 Cmd+Q / 重启的双窗口恢复 XCUITest。MiniPlayerBar 极窄/紧凑/标准三阶自适应与紧凑列表已完成；本地真实 AVPlayer 播放、音量继承、Seek 夹紧与电台直播流切换均已集成验证。依用户最新指令，**visionOS 涉及的所有开发与验收任务已暂停**；后续跨平台推进将集中于 iOS（含 iPadOS）与 watchOS。历史已生成的 visionOS 构建切片保留作为归档参考。

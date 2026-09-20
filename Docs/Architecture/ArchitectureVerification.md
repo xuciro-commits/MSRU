@@ -16,7 +16,7 @@
 
 产品侧扫描全部 Swift 文件，不依赖 `*View.swift` 命名：AppKit / UIKit 导入及原生窗口、分栏控制器构造限定在 `MSRU/Platform`。内嵌封面数据通过 `Platform/SwiftUI/Image+ArtworkData.swift` 转换为 SwiftUI Image；各 Feature 继续拥有占位图、布局及裁剪。该边界不要求把纯 SwiftUI 表达迁入平台目录。
 
-FFmpeg 重建使用 `Packages/MSRUCodecFFmpeg/Scripts/build-ffmpeg-micro-apple.sh`。每次构建独立写入 `.build-ffmpeg/run.*`，失败日志保留；现有 Vendor 在全部构建及检查成功前保持可用。暂存产物通过同文件系统重命名发布，中途失败则恢复旧目录。`.build-ffmpeg.lock` 防止并发发布；异常断电或强杀后，须先确认原构建进程已结束，再处理遗留锁和暂存/备份目录。不要把仍存在的旧二进制当作本次构建成功证据。脚本构建 macOS arm64、iOS/visionOS 真机 arm64，以及各自包含 arm64 + x86_64 的模拟器切片。缓存压缩包按 FFmpeg 版本复用；下载先写临时文件，成功后才进入缓存。2026-09-20 已实际重建完整 XCFramework，visionOS 真机、visionOS Simulator 和 iOS Simulator 的 App 构建通过（关闭签名，仅验证编译链接）。visionOS 使用 sheet 呈现上下文、系统 bordered 按钮及 glassBackgroundEffect；macOS/iOS 保留原有 inspector 和玻璃样式。构建通过不代表头显交互或音频运行时已经验收。
+FFmpeg 重建使用 `Packages/MSRUCodecFFmpeg/Scripts/build-ffmpeg-micro-apple.sh`。每次构建独立写入 `.build-ffmpeg/run.*`，失败日志保留；现有 Vendor 在全部构建及检查成功前保持可用。暂存产物通过同文件系统重命名发布，中途失败则恢复旧目录。`.build-ffmpeg.lock` 防止并发发布；异常断电或强杀后，须先确认原构建进程已结束，再处理遗留锁和暂存/备份目录。不要把仍存在的旧二进制当作本次构建成功证据。脚本构建 macOS arm64、iOS/visionOS 真机 arm64，以及各自包含 arm64 + x86_64 的模拟器切片。缓存压缩包按 FFmpeg 版本复用；下载先写临时文件，成功后才进入缓存。2026-09-20 已实际重建完整 XCFramework，iOS Simulator 和历史 visionOS 模拟器的 App 编译链接均已验证通过。**依据最新用户指令，visionOS 涉及的所有开发与设备验收已明确暂停，watchOS 与 iOS 继续保留推进**；历史已生成的 visionOS 构建切片保留作为静态归档。
 
 本地/未来 CI 执行：
 
