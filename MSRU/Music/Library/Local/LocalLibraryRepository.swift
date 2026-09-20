@@ -7,10 +7,12 @@ protocol LocalLibraryRepository {
     func loadTracks() async throws -> [LocalTrack]
     func importTrack(from url: URL) async throws -> LocalTrack?
     func saveTrackInPlace(_ track: LocalTrack) async throws
+    func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws
 }
 
 extension LocalLibraryRepository {
     func saveTrackInPlace(_ track: LocalTrack) async throws {}
+    func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws {}
 }
 
 private struct PersistedTrackRecord: Codable {
@@ -125,6 +127,38 @@ final class FileLocalLibraryRepository: LocalLibraryRepository {
 
         let encoded = try JSONEncoder().encode(existingRecords)
         try encoded.write(to: manifestURL, options: .atomic)
+    }
+
+    func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws {
+        let manifestURL = try externalManifestURL()
+        var existingRecords: [PersistedTrackRecord] = []
+        if let data = try? Data(contentsOf: manifestURL),
+           let decoded = try? JSONDecoder().decode([PersistedTrackRecord].self, from: data) {
+            existingRecords = decoded
+        }
+
+        let tracksToDelete = existingRecords.filter {
+            ids.contains($0.fileURL.absoluteString) ||
+            ids.contains($0.fileURL.standardizedFileURL.path) ||
+            ids.contains($0.fileURL.path)
+        }
+
+        existingRecords.removeAll {
+            ids.contains($0.fileURL.absoluteString) ||
+            ids.contains($0.fileURL.standardizedFileURL.path) ||
+            ids.contains($0.fileURL.path)
+        }
+
+        let encoded = try JSONEncoder().encode(existingRecords)
+        try encoded.write(to: manifestURL, options: .atomic)
+
+        if deletePhysicalFiles {
+            for record in tracksToDelete {
+                let hasAccess = record.fileURL.startAccessingSecurityScopedResource()
+                try? FileManager.default.removeItem(at: record.fileURL)
+                if hasAccess { record.fileURL.stopAccessingSecurityScopedResource() }
+            }
+        }
     }
 
     private func externalManifestURL() throws -> URL {

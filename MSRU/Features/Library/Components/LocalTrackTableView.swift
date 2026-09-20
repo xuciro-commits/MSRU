@@ -14,40 +14,65 @@ struct LocalTrackTableView: View {
     @Bindable var library: LibraryStore
 
     var onRevealInFinder: ((URL) -> Void)? = nil
+    var onDeleteTracks: ((Set<String>) -> Void)? = nil
 
-    @State private var selectedTrackID: String?
+    @State private var selectedTrackIDs: Set<String> = []
+    @State private var isDeleteConfirmationPresented: Bool = false
 
     var body: some View {
         GeometryReader { proxy in
-            if proxy.size.width < 500 {
-                compactListView
-            } else {
-                tableView
+            ZStack(alignment: .bottom) {
+                if proxy.size.width < 500 {
+                    compactListView
+                } else {
+                    tableView
+                }
+
+                if selectedTrackIDs.count > 1 {
+                    floatingBatchBar
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
         }
-        .onChange(of: selectedTrackID) { _, newID in
-            if let newID, let found = tracks.first(where: { $0.id == newID }) {
+        .animation(.easeInOut(duration: 0.2), value: selectedTrackIDs.count)
+        .confirmationDialog(
+            "确认删除所选歌曲？",
+            isPresented: $isDeleteConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("从资料库移除 (\(selectedTrackIDs.count) 首)", role: .destructive) {
+                onDeleteTracks?(selectedTrackIDs)
+                selectedTrackIDs.removeAll()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("所选歌曲将从本地资料库中移除。原始音频文件将保留在磁盘上。")
+        }
+        .onChange(of: selectedTrackIDs) { _, newIDs in
+            if let firstID = newIDs.first, let found = tracks.first(where: { $0.id == firstID }) {
                 if selectedTrack?.id != found.id {
                     selectedTrack = found
                 }
-            } else if newID == nil {
+            } else if newIDs.isEmpty {
                 selectedTrack = nil
             }
         }
         .onChange(of: selectedTrack?.id) { _, newSelectedID in
-            if selectedTrackID != newSelectedID {
-                selectedTrackID = newSelectedID
+            if let newSelectedID, !selectedTrackIDs.contains(newSelectedID) {
+                selectedTrackIDs = [newSelectedID]
             }
         }
         .onAppear {
-            selectedTrackID = selectedTrack?.id
+            if let id = selectedTrack?.id {
+                selectedTrackIDs = [id]
+            }
         }
     }
 
     // MARK: - Table View
 
     private var tableView: some View {
-        Table(tracks, selection: $selectedTrackID) {
+        Table(tracks, selection: $selectedTrackIDs) {
             // Playing indicator / Index column
             TableColumn("#") { track in
                 let isCurrent = isCurrentTrack(track)
@@ -157,7 +182,7 @@ struct LocalTrackTableView: View {
     }
 
     private func compactRow(index: Int, track: LocalTrack) -> some View {
-        let isSelected = selectedTrackID == track.id
+        let isSelected = selectedTrackIDs.contains(track.id)
         let isCurrent = isCurrentTrack(track)
         let isSaved = library.contains(local: track)
 
@@ -228,7 +253,7 @@ struct LocalTrackTableView: View {
         )
         .contentShape(Rectangle())
         .onTapGesture {
-            selectedTrackID = track.id
+            selectedTrackIDs = [track.id]
             selectedTrack = track
         }
         .simultaneousGesture(
@@ -248,6 +273,66 @@ struct LocalTrackTableView: View {
         return track.artist
     }
 
+    // MARK: - Floating Batch Bar
+
+    private var floatingBatchBar: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(Color.accentColor)
+
+            Text("已选择 \(selectedTrackIDs.count) 首歌曲")
+                .font(.callout.weight(.medium))
+
+            Spacer()
+
+            Button {
+                let selected = tracks.filter { selectedTrackIDs.contains($0.id) }
+                if let first = selected.first {
+                    playback.toggle(track: first, queue: selected)
+                }
+            } label: {
+                Label("播放所选", systemImage: "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+
+            Button {
+                let selected = tracks.filter { selectedTrackIDs.contains($0.id) }
+                for t in selected {
+                    playback.addToQueue(t)
+                }
+            } label: {
+                Label("加入队列", systemImage: "text.badge.plus")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            Button(role: .destructive) {
+                isDeleteConfirmationPresented = true
+            } label: {
+                Label("从资料库删除", systemImage: "trash")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            Button("取消选择") {
+                selectedTrackIDs.removeAll()
+            }
+            .buttonStyle(.plain)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
+        .padding(.horizontal, 24)
+        .padding(.bottom, 16)
+    }
 
     // MARK: - Helpers
 
@@ -323,6 +408,24 @@ struct LocalTrackTableView: View {
                 onRevealInFinder(track.fileURL)
             } label: {
                 Label("在访达中显示", systemImage: "arrow.up.forward.square")
+            }
+        }
+
+        if onDeleteTracks != nil {
+            Divider()
+            Button(role: .destructive) {
+                if selectedTrackIDs.contains(track.id) && selectedTrackIDs.count > 1 {
+                    isDeleteConfirmationPresented = true
+                } else {
+                    onDeleteTracks?([track.id])
+                }
+            } label: {
+                Label(
+                    selectedTrackIDs.contains(track.id) && selectedTrackIDs.count > 1
+                        ? "从资料库删除所选 (\(selectedTrackIDs.count) 首)"
+                        : "从资料库删除",
+                    systemImage: "trash"
+                )
             }
         }
     }

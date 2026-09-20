@@ -11,6 +11,7 @@ struct AlbumsView: View {
     @Bindable var localStore: LocalLibraryStore
     @Bindable var playback: PlaybackController
     let onSelectTrack: (LocalTrack) -> Void
+    var onAddMusic: (() -> Void)? = nil
 
     enum AlbumSortField: String, CaseIterable, Identifiable {
         case title = "Title"
@@ -31,6 +32,8 @@ struct AlbumsView: View {
     @State private var searchQuery: String = ""
     @State private var sortField: AlbumSortField = .title
     @State private var selectedAlbum: AlbumPresentationModel?
+    @State private var albumPendingDelete: AlbumPresentationModel?
+    @State private var isDeleteConfirmationPresented: Bool = false
 
     private var allAlbums: [AlbumPresentationModel] {
         LibraryPresentationAggregator.buildAlbums(from: localStore.tracks)
@@ -68,11 +71,34 @@ struct AlbumsView: View {
                     localTracks: albumTracks,
                     playback: playback,
                     onBack: { selectedAlbum = nil },
-                    onSelectTrack: onSelectTrack
+                    onSelectTrack: onSelectTrack,
+                    onDeleteAlbum: {
+                        albumPendingDelete = album
+                        isDeleteConfirmationPresented = true
+                    }
                 )
             } else {
                 mainAlbumsGrid
             }
+        }
+        .confirmationDialog(
+            "确认删除专辑「\(albumPendingDelete?.title ?? "")」？",
+            isPresented: $isDeleteConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("级联删除该专辑及全部歌曲", role: .destructive) {
+                if let toDelete = albumPendingDelete {
+                    Task {
+                        await localStore.deleteAlbum(title: toDelete.title, artist: toDelete.artist)
+                        if selectedAlbum?.id == toDelete.id {
+                            selectedAlbum = nil
+                        }
+                    }
+                }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("此操作将执行级联删除，从本地资料库中移除该专辑名下的全部歌曲。")
         }
     }
 
@@ -99,6 +125,16 @@ struct AlbumsView: View {
                                     playAlbum(album)
                                 }
                             )
+                            .contextMenu {
+                                Button("播放专辑") { playAlbum(album) }
+                                Divider()
+                                Button(role: .destructive) {
+                                    albumPendingDelete = album
+                                    isDeleteConfirmationPresented = true
+                                } label: {
+                                    Label("删除专辑 (级联删除)", systemImage: "trash")
+                                }
+                            }
                         }
                     }
                     .padding(24)
@@ -119,6 +155,17 @@ struct AlbumsView: View {
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let onAddMusic {
+                Button {
+                    onAddMusic()
+                } label: {
+                    Label("添加音乐", systemImage: "plus")
+                        .font(.callout.bold())
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
 
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")

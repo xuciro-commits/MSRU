@@ -16,11 +16,19 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
             sidebar: [
                 SidebarContribution(
                     id: "add-music",
-                    group: "工具",
-                    title: "导入与审核",
-                    systemImage: "tray.and.arrow.down",
+                    group: "来源与导入",
+                    title: "添加音乐",
+                    systemImage: "plus.circle",
                     route: .section(.addMusic),
                     order: 200
+                ),
+                SidebarContribution(
+                    id: "metadata-center",
+                    group: "元数据",
+                    title: "元数据中心",
+                    systemImage: "sparkles.rectangle.stack",
+                    route: .section(.importReview),
+                    order: 300
                 )
             ],
             routes: [
@@ -45,12 +53,13 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
             ) { scene in
                 WorkspacePresentation(
                     identity: WorkspaceIdentity(
-                        title: "导入与审核",
-                        systemImage: "tray.and.arrow.down"
+                        title: "添加音乐",
+                        systemImage: "plus.circle"
                     )
                 ) { _ in
-                    MetadataManagerWorkspaceView(
+                    AddMusicView(
                         localStore: scene.application.localLibrary,
+                        appleMusicStore: scene.application.musicLibrary,
                         onOpenLibrary: {
                             scene.send(.navigate(.section(.library)))
                         }
@@ -63,8 +72,8 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
             ) { scene in
                 WorkspacePresentation(
                     identity: WorkspaceIdentity(
-                        title: "导入与审核",
-                        systemImage: "tray.and.arrow.down"
+                        title: "元数据中心",
+                        systemImage: "sparkles.rectangle.stack"
                     )
                 ) { _ in
                     MetadataManagerWorkspaceView(

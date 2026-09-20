@@ -50,6 +50,9 @@ enum ArtistsFeature: ApplicationFeaturePresentation {
                         playback: scene.application.playback,
                         onSelectTrack: { track in
                             scene.select(localTrack: track)
+                        },
+                        onAddMusic: {
+                            scene.send(.navigate(.section(.addMusic)))
                         }
                     )
                 }

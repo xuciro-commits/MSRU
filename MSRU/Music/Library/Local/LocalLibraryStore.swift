@@ -60,6 +60,51 @@ final class LocalLibraryStore {
         }
     }
 
+    func deleteTracks(withIDs ids: Set<String>, deletePhysical: Bool = false) async {
+        guard !ids.isEmpty else { return }
+        await serialized {
+            let deletedTracks = self.tracks.filter {
+                ids.contains($0.id) ||
+                ids.contains($0.fileURL.standardizedFileURL.path) ||
+                ids.contains($0.fileURL.path)
+            }
+            self.tracks.removeAll {
+                ids.contains($0.id) ||
+                ids.contains($0.fileURL.standardizedFileURL.path) ||
+                ids.contains($0.fileURL.path)
+            }
+            try? await self.repository.deleteTracks(withIDs: ids, deletePhysicalFiles: deletePhysical)
+            self.deregisterTracks(deletedTracks)
+        }
+    }
+
+    func deleteAlbum(title: String, artist: String, deletePhysical: Bool = false) async {
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let cleanArtist = artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        let trackIDsToDelete = Set(tracks.filter { track in
+            let matchTitle = (track.album?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == cleanTitle)
+            let matchArtist = cleanArtist.isEmpty || (track.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == cleanArtist)
+            return matchTitle && matchArtist
+        }.map(\.id))
+
+        await deleteTracks(withIDs: trackIDsToDelete, deletePhysical: deletePhysical)
+    }
+
+    func deleteArtist(name: String, deletePhysical: Bool = false) async {
+        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        let trackIDsToDelete = Set(tracks.filter { track in
+            track.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == cleanName
+        }.map(\.id))
+
+        await deleteTracks(withIDs: trackIDsToDelete, deletePhysical: deletePhysical)
+    }
+
+    private func deregisterTracks(_ tracks: [LocalTrack]) {
+        // Clear in-memory references
+    }
+
     func importFiles(_ urls: [URL]) async {
         guard !urls.isEmpty else { return }
         pendingImports += 1

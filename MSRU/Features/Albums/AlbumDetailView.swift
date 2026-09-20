@@ -13,6 +13,9 @@ struct AlbumDetailView: View {
     @Bindable var playback: PlaybackController
     let onBack: () -> Void
     let onSelectTrack: (LocalTrack) -> Void
+    var onDeleteAlbum: (() -> Void)? = nil
+
+    @State private var isDeleteConfirmationPresented: Bool = false
 
     var body: some View {
         ScrollView {
@@ -87,6 +90,16 @@ struct AlbumDetailView: View {
                                     .padding(.vertical, 8)
                             }
                             .buttonStyle(.bordered)
+
+                            if onDeleteAlbum != nil {
+                                Button(role: .destructive, action: { isDeleteConfirmationPresented = true }) {
+                                    Label("删除专辑", systemImage: "trash")
+                                        .font(.headline)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                }
+                                .buttonStyle(.bordered)
+                            }
                         }
                         .padding(.top, 6)
                     }
@@ -118,6 +131,18 @@ struct AlbumDetailView: View {
             .padding(.bottom, 40)
         }
         .scrollIndicators(.hidden)
+        .confirmationDialog(
+            "确认删除专辑「\(album.title)」？",
+            isPresented: $isDeleteConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("级联删除该专辑及全部 \(album.trackCount) 首歌曲", role: .destructive) {
+                onDeleteAlbum?()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("此操作将执行级联删除，从本地资料库中移除该专辑名下的全部歌曲。")
+        }
     }
 
     private func trackRow(_ trackModel: TrackPresentationModel) -> some View {

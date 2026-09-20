@@ -37,6 +37,7 @@
 | 17 | 已完成：资料库三大核心维度（歌曲/专辑/艺人）与导入预审工作区全量端出 | 框架层（AppFoundation）抽取 AlbumPresentationModel、ArtistPresentationModel、DiscTrackGroup，并在 AppFoundationUI 落地通用 AlbumCardView、ArtistAvatarView 与三级有序带徽标 ApplicationSidebar；应用层（MSRU）全面端出 AlbumsView 与 AlbumDetailView、ArtistsView 与 ArtistDetailView，以及 ImportReviewWorkspaceView；新增 AlbumsFeatureTests、ArtistsFeatureTests 与 ImportWorkflowCoordinatorTests，全量通过，Preview 门禁覆盖 58 视图，架构检查 0 违规 |
 | 18 | 已完成：轻量本地声纹记忆库、目录规则学习引擎、元数据管理中心及在线全链路打通 | LocalFingerprintRegistry（轻量本地声学指纹记忆持久化、0ms 本地秒级识别、容差匹配、增量学习与清空）；PathHeuristicRuleStore（目录路径模式匹配、导入时自动规则学习、规则增删改查）；MusicBrainzCatalogClient（公网实时 HTTP 查询、真实 AcoustID Web API 接入、1.0s/req 速率节流保护与超时回退）；PicardAlbumLookupResolver（解决搜索概要无 tracks 导致置信度 0% 的缺陷，自动 lookupRelease 补全音轨打分）；FileNameHeuristicParser（发烧友/PT 规格标签如 `[FLAC 24bit／48khz]`、`(WAV/Cue)` 智能清洗过滤与目录穿透）；MetadataManagerWorkspaceView（四合一管理中心）；TrackInspectorView（声纹状态胶囊与重新识别）；解决 NAS 沙盒权限拦截与浏览界面 AutoLayout 递归死循环闪退，搜索栏居中吸附分界线；新增 LocalFingerprintRegistryTests 与 PathHeuristicRuleStoreTests，全量通过（框架 82 项 + 应用 203 项 + UI 2 项全部通过），Preview 门禁覆盖 61 视图（100% 覆盖），架构检查 0 违规 |
 | 19 | 已完成：声纹绝对第一生命线、多层级封面提取与端到端封面回填、重复导入 100% 绿色命中 | 确立“声纹先于一切”识别原则：导入音频无论原文件名称为何，第一步先查 LocalFingerprintRegistry 本地声纹记忆库，命中即锁定 100% 置信度（绿色 checkmark），以声纹权威名称覆盖原文件名解决异名冲突，杜绝 0% 或“原样保留”；本地未命中才请求公网 AcoustID/MusicBrainz 唯一 recordingMBID，再次未命中才走本地标签与启发式兜底。新建 LocalArtworkExtractor（多级探测同级目录 cover.jpg/folder.jpg/front.jpg、内嵌 APIC 音频元数据、Cover Art Archive 在线封面），解决 Unknown Album 及无封面问题；artworkData 全链路贯穿 ClusterTrackItem、AcousticFingerprintRecord、LocalTrack、AlbumPresentationModel、ArtistPresentationModel；AlbumCardView、AlbumDetailView、ArtistAvatarView、ArtistDetailView 全面接入真实图片解码渲染与占位回退；排除通用文件夹误匹配（Music/Songs/Downloads等）；全量通过（框架 82 项 + 应用 206 项全部通过），Preview 门禁保持 100%（61 个视图），架构检查 0 违规 |
+| 20 | 已完成：歌曲管理与元数据中心解耦、Apple Music 接入恢复、多选批量操作与专辑/艺人级联删除 | 歌曲管理与元数据中心彻底解耦：LocalLibraryRepository 落地单曲/多曲删除接口与 external_tracks.json 持久化清除；LocalLibraryStore 落地单曲删除、专辑级联删除与艺术家级联删除；LocalTrackTableView 接入原生 SwiftUI Table 多选（Shift/Cmd）与底部悬浮 Liquid Glass 批量操作条（播放/入队/批量删除二次确认）；AlbumsView/AlbumDetailView 与 ArtistsView/ArtistDetailView 落地级联删除（同时清除名下全部专辑及歌曲）与 [+ 添加音乐] 快捷入口；MetadataProviderConfigStore 实现 Apple Music、MusicBrainz、Cover Art Archive、本地内嵌标签提供商的启用开关、优先级拖拽排序与独立持久化；MetadataManagerWorkspaceView 端出独立提供商配置页；AddMusicFeature 将侧栏拆分为「添加音乐」（恢复 Apple Music 官方 MusicKit 导入）与「元数据中心」；新增 LocalLibraryCascadeDeletionTests，全量通过（应用 216 项 + 框架 82 项全部通过），Preview 门禁覆盖 61 视图（100% 覆盖），架构检查 0 违规 |
 
 具体文件和迁移范围见 [迁移路线](../Docs/Roadmap/FoundationRoadmap.md)。不要把本表与该路线维护成两套详细任务拆解。
 
@@ -80,10 +81,11 @@
 | 数据 | 收藏先提交后发布；扫描、导入与收藏写入按序执行。失败、并发、路径别名、同名文件及重启恢复有回归测试。 |
 | 播放 | 统一音量与静音管理（支持 AVPlayer 与 PCM 混音节点双向同步、切歌继承与取消静音恢复）；MiniPlayerBar 标准模式落地音量滑块与静音按钮（图册 15.1）；HoverScrubber 拖拽时实时目标时间预览、松手原子 commit seek 并支持 LIVE 电台停用；本地真实 WAV 与网络电台直播流混合队列连续播放与切换测试全部通过；混合队列保留重复实例，真实静音 AVPlayer 顺播两个 WAV 核对媒体时钟与队列终态；AVPlayer/PCM 失败清理、旧回调隔离和保留队列重试有回归测试。 |
 | FFmpeg | 构建暂存、互斥与发布回滚经过失败探针；完整重建 macOS/iOS/visionOS 切片，两个模拟器均含 arm64+x86_64。visionOS UI API 差异已适配。 |
+| 实体增删、级联删除与元数据解耦 | LocalLibraryRepository 落地物理与记录删除；LocalLibraryStore 落地单曲、专辑、艺术家级联删除；LocalTrackTableView 接入原生 SwiftUI Table 多选（Shift/Cmd）与底部悬浮 Liquid Glass 批量操作条；AlbumsView/Detail 与 ArtistsView/Detail 落地级联删除二次确认及[+ 添加音乐]入口；MetadataProviderConfigStore 支持 Apple Music、MusicBrainz、Cover Art Archive、本地内嵌标签提供商的启用开关、优先级排序与独立持久化；MetadataManagerWorkspaceView 端出独立提供商配置页；AddMusicFeature 拆分为「添加音乐」（恢复 Apple Music 官方集成）与「元数据中心」。经 LocalLibraryCascadeDeletionTests 验证通过。 |
 
 验证基线：
 
-- 应用：全量 **202 项通过**（原 198 项 + 1 项 LocalFingerprintRegistryTests + 3 项 PathHeuristicRuleStoreTests），使用 `MSRUTests`。
+- 应用：全量 **216 项通过**，使用 `MSRUTests`。
 - 框架：**82 项通过**（39 UI + 43 Core）。
 - 构建：macOS 与 iOS 均编译链接通过；关闭签名，不代表设备安装运行验收。
 - UI：开发签名 Runner 的 **2 项通过**，验证前台启动、实际 Cmd+Q／重启、保留打开窗口并排除手动关闭窗口。使用独立恢复域与稳定 scene ID；测试全部通过。

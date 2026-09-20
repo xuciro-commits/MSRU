@@ -164,7 +164,12 @@ struct LocalLibraryView: View {
                             playback:
                                 playback,
                             library:
-                                library
+                                library,
+                            onDeleteTracks: { ids in
+                                Task {
+                                    await store.deleteTracks(withIDs: ids)
+                                }
+                            }
                         )
 
 
@@ -456,6 +461,20 @@ struct LocalLibraryView: View {
                         "plus.circle"
                 )
             }
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            Task {
+                await store.deleteTracks(withIDs: [track.id])
+            }
+        } label: {
+            Label(
+                "从资料库删除",
+                systemImage:
+                    "trash"
+            )
         }
     }
 

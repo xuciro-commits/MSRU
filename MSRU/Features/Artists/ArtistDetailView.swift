@@ -14,6 +14,9 @@ struct ArtistDetailView: View {
     let onBack: () -> Void
     let onSelectTrack: (LocalTrack) -> Void
     let onSelectAlbum: (AlbumPresentationModel) -> Void
+    var onDeleteArtist: (() -> Void)? = nil
+
+    @State private var isDeleteConfirmationPresented: Bool = false
 
     private var albums: [AlbumPresentationModel] {
         LibraryPresentationAggregator.buildAlbums(from: tracks).filter {
@@ -94,6 +97,16 @@ struct ArtistDetailView: View {
                                     .padding(.vertical, 8)
                             }
                             .buttonStyle(.bordered)
+
+                            if onDeleteArtist != nil {
+                                Button(role: .destructive, action: { isDeleteConfirmationPresented = true }) {
+                                    Label("删除艺术家", systemImage: "trash")
+                                        .font(.headline)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                }
+                                .buttonStyle(.bordered)
+                            }
                         }
                         .padding(.top, 4)
                     }
@@ -151,6 +164,18 @@ struct ArtistDetailView: View {
             .padding(.bottom, 40)
         }
         .scrollIndicators(.hidden)
+        .confirmationDialog(
+            "确认删除艺术家「\(artist.name)」？",
+            isPresented: $isDeleteConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("级联删除该艺术家及名下全部内容", role: .destructive) {
+                onDeleteArtist?()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("此操作将执行级联删除，同时从本地资料库中移除该艺术家的所有专辑与全部歌曲。该操作不可撤销。")
+        }
     }
 
     private func trackRow(_ track: LocalTrack, number: Int) -> some View {

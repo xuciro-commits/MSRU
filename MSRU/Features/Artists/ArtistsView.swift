@@ -11,10 +11,13 @@ struct ArtistsView: View {
     @Bindable var localStore: LocalLibraryStore
     @Bindable var playback: PlaybackController
     let onSelectTrack: (LocalTrack) -> Void
+    var onAddMusic: (() -> Void)? = nil
 
     @State private var searchQuery: String = ""
     @State private var selectedArtist: ArtistPresentationModel?
     @State private var selectedAlbum: AlbumPresentationModel?
+    @State private var artistPendingDelete: ArtistPresentationModel?
+    @State private var isDeleteConfirmationPresented: Bool = false
 
     private var allArtists: [ArtistPresentationModel] {
         LibraryPresentationAggregator.buildArtists(from: localStore.tracks)
@@ -57,11 +60,34 @@ struct ArtistsView: View {
                     onSelectTrack: onSelectTrack,
                     onSelectAlbum: { album in
                         selectedAlbum = album
+                    },
+                    onDeleteArtist: {
+                        artistPendingDelete = artist
+                        isDeleteConfirmationPresented = true
                     }
                 )
             } else {
                 mainArtistsGrid
             }
+        }
+        .confirmationDialog(
+            "确认删除艺术家「\(artistPendingDelete?.name ?? "")」？",
+            isPresented: $isDeleteConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("级联删除该艺术家及全部内容", role: .destructive) {
+                if let toDelete = artistPendingDelete {
+                    Task {
+                        await localStore.deleteArtist(name: toDelete.name)
+                        if selectedArtist?.id == toDelete.id {
+                            selectedArtist = nil
+                        }
+                    }
+                }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("此操作将执行级联删除，同时从本地资料库中移除该艺术家的所有专辑与全部歌曲。")
         }
     }
 
@@ -85,6 +111,14 @@ struct ArtistsView: View {
                                     selectedArtist = artist
                                 }
                             )
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    artistPendingDelete = artist
+                                    isDeleteConfirmationPresented = true
+                                } label: {
+                                    Label("删除艺术家 (级联删除)", systemImage: "trash")
+                                }
+                            }
                         }
                     }
                     .padding(28)
@@ -105,6 +139,17 @@ struct ArtistsView: View {
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let onAddMusic {
+                Button {
+                    onAddMusic()
+                } label: {
+                    Label("添加音乐", systemImage: "plus")
+                        .font(.callout.bold())
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
 
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")

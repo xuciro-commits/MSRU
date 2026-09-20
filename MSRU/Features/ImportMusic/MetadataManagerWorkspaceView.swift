@@ -18,6 +18,7 @@ struct MetadataManagerWorkspaceView: View {
 
     enum ManagerTab: String, CaseIterable, Identifiable {
         case importWorkflow = "导入与审核"
+        case providers = "元数据提供商"
         case fingerprints = "声纹记忆库"
         case pathRules = "目录学习规则"
         case cloudCatalog = "MusicBrainz 在线状态"
@@ -27,6 +28,7 @@ struct MetadataManagerWorkspaceView: View {
         var systemImage: String {
             switch self {
             case .importWorkflow: return "tray.and.arrow.down.fill"
+            case .providers: return "slider.horizontal.3"
             case .fingerprints: return "waveform.badge.magnifyingglass"
             case .pathRules: return "folder.badge.gearshape"
             case .cloudCatalog: return "globe.badge.chevron.backward"
@@ -42,6 +44,7 @@ struct MetadataManagerWorkspaceView: View {
 
     private var fingerprintRegistry = LocalFingerprintRegistry.shared
     private var ruleStore = PathHeuristicRuleStore.shared
+    private var providerConfig = MetadataProviderConfigStore.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -56,6 +59,9 @@ struct MetadataManagerWorkspaceView: View {
                     localStore: localStore,
                     onOpenLibrary: onOpenLibrary
                 )
+
+            case .providers:
+                providersConfigView
 
             case .fingerprints:
                 fingerprintsManagementView
@@ -134,6 +140,88 @@ struct MetadataManagerWorkspaceView: View {
             $0.fingerprint.lowercased().contains(q)
         }
     }
+
+    // MARK: - Providers Configuration View
+
+    private var providersConfigView: some View {
+        VStack(spacing: 0) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("元数据提供商配置")
+                        .font(.headline)
+                    Text("启用或禁用各个元数据提供方，系统将按照生效的提供商链式拉取权威元数据与高清唱片封面。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 14)
+
+            Divider()
+
+            ScrollView {
+                VStack(spacing: 16) {
+                    ForEach(providerConfig.providerPriority) { provider in
+                        providerRow(provider)
+                    }
+                }
+                .padding(24)
+            }
+            .scrollIndicators(.hidden)
+        }
+    }
+
+    private func providerRow(_ provider: MetadataProviderType) -> some View {
+        let isEnabled = providerConfig.isEnabled(provider)
+        let priorityIndex = (providerConfig.providerPriority.firstIndex(of: provider) ?? 0) + 1
+
+        return HStack(spacing: 16) {
+            Image(systemName: provider.iconName)
+                .font(.title2)
+                .foregroundStyle(isEnabled ? Color.accentColor : Color.secondary)
+                .frame(width: 36, height: 36)
+                .background(
+                    (isEnabled ? Color.accentColor : Color.secondary).opacity(0.12),
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(provider.displayName)
+                        .font(.headline)
+
+                    Text("第 \(priorityIndex) 优先级")
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.secondary.opacity(0.12), in: Capsule())
+                        .foregroundStyle(.secondary)
+                }
+
+                Text(provider.providerDescription)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Toggle("", isOn: Binding(
+                get: { isEnabled },
+                set: { providerConfig.setEnabled(provider, isEnabled: $0) }
+            ))
+            .labelsHidden()
+            .toggleStyle(.switch)
+        }
+        .padding(16)
+        .background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(isEnabled ? Color.accentColor.opacity(0.25) : Color.secondary.opacity(0.1), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Fingerprints Management View
 
     private var fingerprintsManagementView: some View {
         VStack(spacing: 0) {
