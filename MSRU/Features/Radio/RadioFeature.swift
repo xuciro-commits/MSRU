@@ -21,18 +21,31 @@ enum RadioFeature: Feature {
         fileprivate(set) var searchQuery: String
         fileprivate(set) var stations: [RadioStation]
         fileprivate(set) var featuredStations: [RadioStation]
+        fileprivate(set) var favoriteStations: [RadioStation]
+        fileprivate(set) var recentStations: [RadioStation]
+        fileprivate(set) var favoriteIDs: Set<String>
         fileprivate var hasAppeared = false
 
         init(
             selectedGenre: RadioGenre = .all,
             searchQuery: String = "",
             stations: [RadioStation] = [],
-            featuredStations: [RadioStation] = []
+            featuredStations: [RadioStation] = [],
+            favoriteStations: [RadioStation] = [],
+            recentStations: [RadioStation] = [],
+            favoriteIDs: Set<String> = []
         ) {
             self.selectedGenre = selectedGenre
             self.searchQuery = searchQuery
             self.stations = stations
             self.featuredStations = featuredStations
+            self.favoriteStations = favoriteStations
+            self.recentStations = recentStations
+            self.favoriteIDs = favoriteIDs
+        }
+
+        func isFavorite(_ station: RadioStation) -> Bool {
+            favoriteIDs.contains(station.id)
         }
     }
 
@@ -45,6 +58,9 @@ enum RadioFeature: Feature {
         case playPauseRequested(RadioStation)
         case playNextRequested(RadioStation)
         case addToQueueRequested(RadioStation)
+        case toggleFavoriteRequested(RadioStation)
+        case addCustomStationRequested(RadioStation)
+        case deleteCustomStationRequested(String)
     }
 
     // MARK: Initial State
@@ -81,6 +97,10 @@ enum RadioFeature: Feature {
             playback.state(for: station)
         }
 
+        func isFavorite(_ station: RadioStation) -> Bool {
+            radioStore.isFavorite(id: station.id)
+        }
+
         // MARK: Handle
 
         func handle(_ action: Action, state: State) -> [FeatureTask<Action>] {
@@ -102,7 +122,9 @@ enum RadioFeature: Feature {
                 return []
 
             case .playPauseRequested(let station):
+                radioStore.recordPlayed(station: station)
                 playback.toggle(radio: station, queue: state.stations)
+                refreshStations(state: state)
                 return []
 
             case .playNextRequested(let station):
@@ -112,11 +134,29 @@ enum RadioFeature: Feature {
             case .addToQueueRequested(let station):
                 playback.addToQueue(radio: station)
                 return []
+
+            case .toggleFavoriteRequested(let station):
+                radioStore.toggleFavorite(id: station.id)
+                refreshStations(state: state)
+                return []
+
+            case .addCustomStationRequested(let station):
+                radioStore.addCustomStation(station)
+                refreshStations(state: state)
+                return []
+
+            case .deleteCustomStationRequested(let id):
+                radioStore.deleteCustomStation(id: id)
+                refreshStations(state: state)
+                return []
             }
         }
 
         private func refreshStations(state: State) {
+            state.favoriteIDs = radioStore.favoriteIDs
             state.featuredStations = radioStore.featuredStations
+            state.favoriteStations = radioStore.favoriteStations
+            state.recentStations = radioStore.recentStations
             state.stations = radioStore.filteredStations(
                 genre: state.selectedGenre,
                 query: state.searchQuery
@@ -140,5 +180,9 @@ extension FeatureHost where F == RadioFeature {
 
     func state(for station: RadioStation) -> TrackPlaybackState {
         service.state(for: station)
+    }
+
+    func isFavorite(_ station: RadioStation) -> Bool {
+        state.isFavorite(station)
     }
 }

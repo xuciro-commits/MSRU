@@ -15,6 +15,7 @@ struct RadioView: View {
     var onSelectStation: ((RadioStation) -> Void)? = nil
 
     @Bindable private var state: RadioFeature.State
+    @State private var isShowingAddStationSheet = false
 
     private let columns = [
         GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 18)
@@ -33,17 +34,32 @@ struct RadioView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 24) {
+            LazyVStack(alignment: .leading, spacing: 26) {
                 header
                 genreFilterBar
 
-                if let heroStation = featuredHeroStation {
-                    featuredSection(heroStation)
+                if state.searchQuery.isEmpty {
+                    if !state.favoriteStations.isEmpty {
+                        favoritesSection
+                    }
+
+                    if let heroStation = featuredHeroStation {
+                        featuredSection(heroStation)
+                    }
+
+                    if !state.recentStations.isEmpty {
+                        recentlyPlayedSection
+                    }
                 }
 
                 stationsGridSection
             }
             .padding(28)
+        }
+        .sheet(isPresented: $isShowingAddStationSheet) {
+            AddStationSheetView { newStation in
+                feature.send(.addCustomStationRequested(newStation))
+            }
         }
         .task {
             feature.send(.appeared)
@@ -53,13 +69,26 @@ struct RadioView: View {
     // MARK: - Header
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Radio")
-                .font(.system(size: 32, weight: .bold))
+        HStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Radio")
+                    .font(.system(size: 32, weight: .bold))
 
-            Text("Curated live internet radio stations with lossless and high-bitrate streaming.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                Text("Curated live internet radio stations with lossless and high-bitrate streaming.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button {
+                isShowingAddStationSheet = true
+            } label: {
+                Label("Add Station", systemImage: "plus")
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
         }
     }
 
@@ -93,6 +122,88 @@ struct RadioView: View {
                 }
             }
             .padding(.vertical, 2)
+        }
+    }
+
+    // MARK: - Favorites Section
+
+    private var favoritesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "heart.fill")
+                    .foregroundStyle(.red)
+                Text("Favorites")
+                    .font(.title3.bold())
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(state.favoriteStations) { station in
+                        RadioStationCardView(
+                            station: station,
+                            isSelected: selectedStation?.id == station.id,
+                            isCurrent: feature.isCurrent(station),
+                            playbackState: feature.state(for: station),
+                            isFavorite: true,
+                            onToggleFavorite: {
+                                feature.send(.toggleFavoriteRequested(station))
+                            },
+                            onDelete: station.isCustom ? {
+                                feature.send(.deleteCustomStationRequested(station.id))
+                            } : nil,
+                            onPlayPause: {
+                                feature.send(.playPauseRequested(station))
+                            },
+                            onSelect: {
+                                onSelectStation?(station)
+                            }
+                        )
+                        .frame(width: 200)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
+    }
+
+    // MARK: - Recently Played Section
+
+    private var recentlyPlayedSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .foregroundStyle(.secondary)
+                Text("Recently Played")
+                    .font(.title3.bold())
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(state.recentStations) { station in
+                        RadioStationCardView(
+                            station: station,
+                            isSelected: selectedStation?.id == station.id,
+                            isCurrent: feature.isCurrent(station),
+                            playbackState: feature.state(for: station),
+                            isFavorite: state.isFavorite(station),
+                            onToggleFavorite: {
+                                feature.send(.toggleFavoriteRequested(station))
+                            },
+                            onDelete: station.isCustom ? {
+                                feature.send(.deleteCustomStationRequested(station.id))
+                            } : nil,
+                            onPlayPause: {
+                                feature.send(.playPauseRequested(station))
+                            },
+                            onSelect: {
+                                onSelectStation?(station)
+                            }
+                        )
+                        .frame(width: 200)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
         }
     }
 
@@ -156,6 +267,13 @@ struct RadioView: View {
                             isSelected: selectedStation?.id == station.id,
                             isCurrent: feature.isCurrent(station),
                             playbackState: feature.state(for: station),
+                            isFavorite: state.isFavorite(station),
+                            onToggleFavorite: {
+                                feature.send(.toggleFavoriteRequested(station))
+                            },
+                            onDelete: station.isCustom ? {
+                                feature.send(.deleteCustomStationRequested(station.id))
+                            } : nil,
                             onPlayPause: {
                                 feature.send(.playPauseRequested(station))
                             },

@@ -51,27 +51,98 @@ struct RadioFeatureTests {
 
     @Test
     func radioStoreAddsAndRemovesCustomStation() {
-        let store = RadioStore(stations: [])
-        #expect(store.stations.isEmpty)
+        let store = RadioStore(stations: [], persistenceURL: nil)
+        #expect(store.allStations.isEmpty)
 
         let customStation = RadioStation(
             id: "custom-test-1",
             name: "Test Station",
             description: "Testing custom station insertion",
             genre: .ambient,
-            streamURL: URL(string: "https://example.com/stream.aac")!
+            streamURL: URL(string: "https://example.com/stream.aac")!,
+            isCustom: true
         )
 
-        store.addStation(customStation)
-        #expect(store.stations.count == 1)
-        #expect(store.stations.first?.id == "custom-test-1")
+        store.addCustomStation(customStation)
+        #expect(store.allStations.count == 1)
+        #expect(store.allStations.first?.id == "custom-test-1")
+        #expect(store.isCustomStation(id: "custom-test-1"))
 
         // Duplicate add is idempotent
-        store.addStation(customStation)
-        #expect(store.stations.count == 1)
+        store.addCustomStation(customStation)
+        #expect(store.allStations.count == 1)
 
-        store.removeStation(id: "custom-test-1")
-        #expect(store.stations.isEmpty)
+        store.deleteCustomStation(id: "custom-test-1")
+        #expect(store.allStations.isEmpty)
+        #expect(!store.isCustomStation(id: "custom-test-1"))
+    }
+
+    @Test
+    func radioStoreTogglesFavoriteAndMaintainsFavoritesList() {
+        let store = RadioStore(persistenceURL: nil)
+        let station = store.stations[0]
+
+        #expect(!store.isFavorite(id: station.id))
+        #expect(store.favoriteStations.isEmpty)
+
+        store.toggleFavorite(id: station.id)
+        #expect(store.isFavorite(id: station.id))
+        #expect(store.favoriteStations.map(\.id) == [station.id])
+
+        store.toggleFavorite(id: station.id)
+        #expect(!store.isFavorite(id: station.id))
+        #expect(store.favoriteStations.isEmpty)
+    }
+
+    @Test
+    func radioStoreRecordsPlayedStationHistory() {
+        let store = RadioStore(persistenceURL: nil)
+        let first = store.stations[0]
+        let second = store.stations[1]
+
+        #expect(store.recentStations.isEmpty)
+
+        store.recordPlayed(station: first)
+        #expect(store.recentStations.map(\.id) == [first.id])
+
+        store.recordPlayed(station: second)
+        #expect(store.recentStations.map(\.id) == [second.id, first.id])
+
+        // Re-playing first moves it to the top
+        store.recordPlayed(station: first)
+        #expect(store.recentStations.map(\.id) == [first.id, second.id])
+    }
+
+    @Test
+    func radioPersistenceSurvivesStoreRecreation() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let fileURL = root.appendingPathComponent("radio_test.json")
+        let firstStore = RadioStore(persistenceURL: fileURL)
+
+        let custom = RadioStation(
+            id: "custom-persist-1",
+            name: "Persist Station",
+            description: "Persisted station",
+            genre: .electronic,
+            streamURL: URL(string: "https://example.com/persist.mp3")!,
+            isCustom: true
+        )
+        firstStore.addCustomStation(custom)
+        firstStore.toggleFavorite(id: custom.id)
+        firstStore.recordPlayed(station: custom)
+
+        #expect(firstStore.isFavorite(id: custom.id))
+        #expect(firstStore.isCustomStation(id: custom.id))
+
+        // Recreate store pointing to the same file
+        let reloadedStore = RadioStore(persistenceURL: fileURL)
+        #expect(reloadedStore.isCustomStation(id: custom.id))
+        #expect(reloadedStore.isFavorite(id: custom.id))
+        #expect(reloadedStore.favoriteStations.map(\.id).contains(custom.id))
+        #expect(reloadedStore.recentStations.map(\.id).contains(custom.id))
     }
 
     // MARK: - Playback Provider & Item Tests
@@ -252,5 +323,42 @@ struct RadioFeatureTests {
         } else {
             Issue.record("Expected search item in radio toolbar")
         }
+    }
+
+    @Test
+    func radioFeatureHandlesFavoriteAndCustomStationActions() {
+        let store = RadioStore(persistenceURL: nil)
+        var dependencies = DependencyValues.test
+        dependencies.radioStore = store
+        let playback = PlaybackController()
+        dependencies.playback = playback
+
+        let host = withDependencies(dependencies) {
+            FeatureHost<RadioFeature>(service: RadioFeature.Service())
+        }
+
+        host.send(.appeared)
+        let station = host.state.stations[0]
+
+        #expect(!host.isFavorite(station))
+        host.send(.toggleFavoriteRequested(station))
+        #expect(host.isFavorite(station))
+        #expect(host.state.favoriteStations.map(\.id).contains(station.id))
+
+        // Add custom station via feature
+        let custom = RadioStation(
+            id: "custom-feat-1",
+            name: "Feature Station",
+            description: "Desc",
+            genre: .pop,
+            streamURL: URL(string: "https://example.com/feat.aac")!,
+            isCustom: true
+        )
+        host.send(.addCustomStationRequested(custom))
+        #expect(host.state.stations.map(\.id).contains(custom.id))
+
+        // Delete custom station
+        host.send(.deleteCustomStationRequested(custom.id))
+        #expect(!host.state.stations.map(\.id).contains(custom.id))
     }
 }

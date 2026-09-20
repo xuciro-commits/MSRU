@@ -12,6 +12,9 @@ struct RadioStationCardView: View {
     let isSelected: Bool
     let isCurrent: Bool
     let playbackState: TrackPlaybackState
+    var isFavorite: Bool = false
+    var onToggleFavorite: (() -> Void)? = nil
+    var onDelete: (() -> Void)? = nil
     let onPlayPause: () -> Void
     let onSelect: () -> Void
 
@@ -49,20 +52,52 @@ struct RadioStationCardView: View {
                         .foregroundStyle(.white.opacity(0.18))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
-                    // Live Pill Badge
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(isPlaying ? Color.red : Color.white.opacity(0.8))
-                            .frame(width: 6, height: 6)
-                        Text("LIVE")
-                            .font(.system(size: 9, weight: .heavy))
-                            .tracking(0.5)
+                    // Top Left Badges: Custom tag
+                    HStack {
+                        if station.isCustom {
+                            Text("CUSTOM")
+                                .font(.system(size: 8, weight: .heavy))
+                                .tracking(0.5)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(Color.blue.opacity(0.75))
+                                .clipShape(Capsule())
+                        }
+                        Spacer()
                     }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3.5)
-                    .background(.black.opacity(0.45))
-                    .clipShape(Capsule())
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    // Top Right Controls: Favorite & LIVE pill
+                    HStack(spacing: 6) {
+                        Button {
+                            onToggleFavorite?()
+                        } label: {
+                            Image(systemName: isFavorite ? "heart.fill" : "heart")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(isFavorite ? Color.red : Color.white.opacity(0.85))
+                                .padding(5)
+                                .background(.black.opacity(0.45), in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(isFavorite ? "Remove from Favorites" : "Add to Favorites")
+
+                        // Live Pill Badge
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(isPlaying ? Color.red : Color.white.opacity(0.8))
+                                .frame(width: 6, height: 6)
+                            Text("LIVE")
+                                .font(.system(size: 9, weight: .heavy))
+                                .tracking(0.5)
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3.5)
+                        .background(.black.opacity(0.45))
+                        .clipShape(Capsule())
+                    }
                     .padding(8)
 
                     // Overlay Play/Pause Button
@@ -137,6 +172,20 @@ struct RadioStationCardView: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
+        .contextMenu {
+            Button(isPlaying ? "Pause" : "Play") {
+                onPlayPause()
+            }
+            Button(isFavorite ? "Remove from Favorites" : "Favorite") {
+                onToggleFavorite?()
+            }
+            if station.isCustom, let onDelete {
+                Divider()
+                Button(role: .destructive, action: onDelete) {
+                    Label("Delete Custom Station", systemImage: "trash")
+                }
+            }
+        }
     }
 
     private var cardGradientColors: [Color] {
@@ -166,6 +215,8 @@ struct RadioStationCardView: View {
         isSelected: true,
         isCurrent: true,
         playbackState: .playing,
+        isFavorite: true,
+        onToggleFavorite: {},
         onPlayPause: {},
         onSelect: {}
     )

@@ -18,6 +18,7 @@ struct RadioStation: Identifiable, Hashable, Codable, Sendable {
     let codec: String
     let bitrateKbps: Int?
     let isFeatured: Bool
+    let isCustom: Bool
 
     init(
         id: String,
@@ -31,7 +32,8 @@ struct RadioStation: Identifiable, Hashable, Codable, Sendable {
         language: String = "English",
         codec: String = "AAC",
         bitrateKbps: Int? = 128,
-        isFeatured: Bool = false
+        isFeatured: Bool = false,
+        isCustom: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -45,6 +47,7 @@ struct RadioStation: Identifiable, Hashable, Codable, Sendable {
         self.codec = codec
         self.bitrateKbps = bitrateKbps
         self.isFeatured = isFeatured
+        self.isCustom = isCustom
     }
 }
 

@@ -28,6 +28,14 @@ struct MSRUContextPaneView: View {
                     RadioStationInspectorView(
                         station: station,
                         playback: scene.application.playback,
+                        isFavorite: scene.application.radioStore.isFavorite(id: station.id),
+                        onToggleFavorite: {
+                            scene.application.radioStore.toggleFavorite(id: station.id)
+                        },
+                        onDelete: station.isCustom ? {
+                            scene.application.radioStore.deleteCustomStation(id: station.id)
+                            scene.selectedRadioStation = nil
+                        } : nil,
                         onClose: {
                             scene.isQueuePresented = false
                         }

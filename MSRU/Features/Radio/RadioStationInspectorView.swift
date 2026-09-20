@@ -10,6 +10,9 @@ struct RadioStationInspectorView: View {
 
     let station: RadioStation
     @Bindable var playback: PlaybackController
+    var isFavorite: Bool = false
+    var onToggleFavorite: (() -> Void)? = nil
+    var onDelete: (() -> Void)? = nil
     var onClose: (() -> Void)? = nil
 
     private var isCurrent: Bool {
@@ -114,6 +117,15 @@ struct RadioStationInspectorView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+
+                if let onToggleFavorite {
+                    Button(action: onToggleFavorite) {
+                        Image(systemName: isFavorite ? "heart.fill" : "heart")
+                            .foregroundStyle(isFavorite ? Color.red : Color.primary)
+                    }
+                    .buttonStyle(.bordered)
+                    .help(isFavorite ? "Remove from Favorites" : "Add to Favorites")
+                }
             }
 
             HStack(spacing: 10) {
@@ -135,6 +147,15 @@ struct RadioStationInspectorView: View {
                 }
                 .buttonStyle(.bordered)
             }
+
+            if station.isCustom, let onDelete {
+                Button(role: .destructive, action: onDelete) {
+                    Label("Delete Custom Station", systemImage: "trash")
+                        .font(.caption)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
         }
     }
 
@@ -146,43 +167,74 @@ struct RadioStationInspectorView: View {
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            propertyRow(label: "Genre", value: station.genre.rawValue)
-            propertyRow(label: "Location", value: station.country)
-            propertyRow(label: "Language", value: station.language)
-            propertyRow(label: "Codec", value: station.codec)
-            if let bitrate = station.bitrateKbps {
-                propertyRow(label: "Bitrate", value: "\(bitrate) kbps")
+            VStack(spacing: 8) {
+                propertyRow(title: "Genre", value: station.genre.rawValue)
+                propertyRow(title: "Country / Region", value: station.country)
+                propertyRow(title: "Language", value: station.language)
+                propertyRow(title: "Audio Codec", value: station.codec)
+                if let bitrate = station.bitrateKbps {
+                    propertyRow(title: "Stream Bitrate", value: "\(bitrate) kbps")
+                }
+                if station.isCustom {
+                    propertyRow(title: "Origin", value: "Custom Stream")
+                }
             }
+            .padding(12)
+            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
         }
     }
 
-    // MARK: - Broadcast & Links Section
+    private func propertyRow(title: String, value: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.primary)
+        }
+    }
+
+    // MARK: - Broadcast URL & Homepage
 
     private var broadcastSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Stream & Web")
+            Text("Stream & Web Links")
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Stream URL")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Text(station.streamURL.absoluteString)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .textSelection(.enabled)
-            }
-
-            if let homepage = station.homepageURL {
-                Link(destination: homepage) {
-                    Label("Visit Official Website", systemImage: "safari")
-                        .font(.callout)
+            VStack(spacing: 8) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Stream URL")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(station.streamURL.absoluteString)
+                            .font(.caption2)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    Spacer()
                 }
-                .padding(.top, 4)
+
+                if let homepageURL = station.homepageURL {
+                    Link(destination: homepageURL) {
+                        HStack {
+                            Label("Official Website", systemImage: "safari")
+                                .font(.subheadline)
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.accentColor)
+                }
             }
+            .padding(12)
+            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
         }
     }
 
@@ -191,43 +243,27 @@ struct RadioStationInspectorView: View {
     private var artwork: some View {
         ZStack {
             LinearGradient(
-                colors: [Color.accentColor.opacity(0.8), Color.accentColor.opacity(0.4)],
+                colors: [Color.blue.opacity(0.7), Color.purple.opacity(0.8)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
             Image(systemName: station.genre.systemImage)
-                .font(.system(size: 64, weight: .light))
-                .foregroundStyle(.white)
-        }
-    }
-
-    // MARK: - Helper
-
-    private func propertyRow(label: String, value: String) -> some View {
-        HStack(alignment: .top) {
-            Text(label)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .frame(width: 80, alignment: .leading)
-
-            Text(value)
-                .font(.callout)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .lineLimit(2)
+                .font(.system(size: 60, weight: .light))
+                .foregroundStyle(.white.opacity(0.85))
         }
     }
 }
 
-// MARK: - Preview
-
 #Preview("Radio Station Inspector") {
-    let application = MSRUPreviewData.makeApplication()
+    let playback = MSRUPreviewData.makePlaybackController()
     let station = RadioStation.defaultStations[0]
     return RadioStationInspectorView(
         station: station,
-        playback: application.playback,
+        playback: playback,
+        isFavorite: true,
+        onToggleFavorite: {},
         onClose: {}
     )
-    .frame(width: 320, height: 620)
+    .frame(width: 320, height: 600)
 }
