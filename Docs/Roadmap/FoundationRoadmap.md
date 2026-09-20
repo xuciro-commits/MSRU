@@ -27,5 +27,6 @@
 - App 与测试 target 已使用 Swift 6；macOS、iOS 继续以实际构建和测试作为证据。
 - SwiftUI Shell 已接入同一语义模型；Browse 只有 Shell 搜索入口，macOS 工具栏同结构刷新保留搜索控件身份并验证 enabled。
 - 收藏写入串行化且成功后才发布状态；保存失败保持已提交状态。收藏页面已接入支持来源的播放、下一首和队列操作。
+- NOW 0 阶段收口：旧 MainWindowController/RootSplitViewController 彻底退出；43 个 View/Representable 保持独立同文件 Preview 门禁；统一音量管理、Scrubber 拖拽预览、紧凑自适应排版及真实本地/电台直播流混合顺播通过全量 137 项回归测试。
 
-已通过原生搜索焦点测试和真实 Cmd+Q / 重启的双窗口恢复 XCUITest。仍需继续验收：紧凑宽度下的视觉布局、真实本地/远程音频输出。visionOS 真机及双架构模拟器的 FFmpeg 切片已补齐，平台 API 差异已适配，完整 App 编译链接通过；头显上的交互与媒体运行时仍待验收。
+已通过原生搜索焦点测试和真实 Cmd+Q / 重启的双窗口恢复 XCUITest。MiniPlayerBar 极窄/紧凑/标准三阶自适应与紧凑列表已完成；本地真实 AVPlayer 播放、音量继承、Seek 夹紧与电台直播流切换均已集成验证。visionOS 真机及双架构模拟器的 FFmpeg 切片已补齐，平台 API 差异已适配，完整 App 编译链接通过；头显上的交互与媒体运行时仍待验收。

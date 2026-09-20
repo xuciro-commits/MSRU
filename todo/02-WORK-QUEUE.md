@@ -18,7 +18,7 @@
 
 | 顺序 | 待办 | 依据与退出条件 |
 |---|---|---|
-| 1 | 进行中：目录重构、Preview 覆盖与 Shell / Window 迁移收口 | FoundationRoadmap NOW 0；编译、相关测试与原生窗口验收 |
+| 1 | 已完成：目录重构、Preview 覆盖与 Shell / Window 迁移收口 | FoundationRoadmap NOW 0；旧 MainWindowController/RootSplitViewController 彻底清理、43 视图 100% 同文件独立 Preview、双窗口与 Cmd+Q 退出恢复测试通过、编译与原生窗口验收全部通过 |
 | 2 | 已完成：任务取消后的回传失效、场景关闭后的回调边界 | ConcurrencyModel；FeatureHost 终态 stop、同ID并发任务控制、场景关闭边界与应用启动任务句柄通过可控时序测试 |
 | 3 | 已完成：恢复逐条容错、关闭回调边界及退出恢复 | ConcurrencyModel；单元回归与真实 Cmd+Q / 重启 XCUITest 通过 |
 | 4 | 已完成：App 和测试 target 使用 Swift 6 | Debug/Release 配置已更新；纯 URL command 转换显式 nonisolated；macOS 测试通过 |
