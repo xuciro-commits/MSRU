@@ -131,16 +131,9 @@ final class PCMPlaybackEngine {
         )
 
 
-        audioEngine.connect(
-
-            playerNode,
-
-            to:
-                audioEngine
-                    .mainMixerNode,
-
-            format:
-                audioFormat
+        try connectPlayerNode(
+            to: audioEngine.mainMixerNode,
+            format: audioFormat
         )
 
 
@@ -241,7 +234,7 @@ final class PCMPlaybackEngine {
         if scheduledBufferCount > 0,
            !playerNode.isPlaying {
 
-            playerNode.play()
+            startPlayerNode()
         }
     }
 
@@ -666,6 +659,24 @@ final class PCMPlaybackEngine {
         if wantsToPlay,
            !playerNode.isPlaying {
 
+            startPlayerNode()
+        }
+    }
+
+    // MARK: - Safe Modern Audio Engine Helpers
+
+    private func connectPlayerNode(to mixer: AVAudioNode, format: AVAudioFormat) throws {
+        if #available(macOS 27.0, iOS 27.0, tvOS 27.0, watchOS 27.0, *) {
+            try audioEngine.connectNode(playerNode, to: mixer, format: format)
+        } else {
+            audioEngine.connect(playerNode, to: mixer, format: format)
+        }
+    }
+
+    private func startPlayerNode() {
+        if #available(macOS 27.0, iOS 27.0, tvOS 27.0, watchOS 27.0, *) {
+            try? playerNode.playAudio()
+        } else {
             playerNode.play()
         }
     }
