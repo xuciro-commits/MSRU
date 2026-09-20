@@ -17,6 +17,8 @@ struct ArtistDetailView: View {
     var onDeleteArtist: (() -> Void)? = nil
 
     @State private var isDeleteConfirmationPresented: Bool = false
+    @State private var biographyRecord: ArtistBiographyRecord? = nil
+    @State private var isBioExpanded: Bool = false
 
     private var albums: [AlbumPresentationModel] {
         LibraryPresentationAggregator.buildAlbums(from: tracks).filter {
@@ -116,6 +118,12 @@ struct ArtistDetailView: View {
                 Divider()
                     .padding(.horizontal, 24)
 
+                // Artist Biography & Background Section
+                if let bio = biographyRecord {
+                    artistBiographyCard(bio)
+                        .padding(.horizontal, 24)
+                }
+
                 // Top Tracks Section
                 if !topTracks.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
@@ -164,6 +172,11 @@ struct ArtistDetailView: View {
             .padding(.bottom, 40)
         }
         .scrollIndicators(.hidden)
+        .task {
+            if biographyRecord == nil {
+                biographyRecord = await ArtistBiographyService.shared.fetchBiography(artistName: artist.name)
+            }
+        }
         .confirmationDialog(
             "确认删除艺术家「\(artist.name)」？",
             isPresented: $isDeleteConfirmationPresented,
@@ -176,6 +189,70 @@ struct ArtistDetailView: View {
         } message: {
             Text("此操作将执行级联删除，同时从本地资料库中移除该艺术家的所有专辑与全部歌曲。该操作不可撤销。")
         }
+    }
+
+    private func artistBiographyCard(_ bio: ArtistBiographyRecord) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("艺术家简介")
+                    .font(.headline)
+
+                if let span = bio.lifeSpan {
+                    Text("· \(span)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let country = bio.country {
+                    Text("(\(country))")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+
+                Spacer()
+
+                if let url = bio.sourceURL {
+                    Link(destination: url) {
+                        Label("维基百科", systemImage: "arrow.up.right.square")
+                            .font(.caption)
+                    }
+                }
+            }
+
+            if !bio.genres.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(bio.genres.prefix(4), id: \.self) { genre in
+                        Text(genre.capitalized)
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.accentColor.opacity(0.12), in: Capsule())
+                            .foregroundStyle(Color.accentColor)
+                    }
+                }
+            }
+
+            Text(bio.summary)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .lineSpacing(4)
+                .lineLimit(isBioExpanded ? nil : 3)
+
+            Button(isBioExpanded ? "收起" : "展开全文") {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    isBioExpanded.toggle()
+                }
+            }
+            .buttonStyle(.plain)
+            .font(.caption.bold())
+            .foregroundStyle(Color.accentColor)
+        }
+        .padding(16)
+        .background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+        )
     }
 
     private func trackRow(_ track: LocalTrack, number: Int) -> some View {

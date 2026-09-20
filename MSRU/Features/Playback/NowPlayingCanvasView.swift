@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Observation
+import AppFoundation
 
 /// Fullscreen / large modal immersive canvas for Now Playing media.
 ///
@@ -17,6 +18,8 @@ struct NowPlayingCanvasView: View {
 
     @State private var scrubbingProgress: Double? = nil
     @State private var isQueueDrawerPresented: Bool = false
+    @State private var isLyricsPresented: Bool = false
+    @State private var lyricsStore = LyricsStore.shared
 
     var body: some View {
         ZStack {
@@ -35,8 +38,14 @@ struct NowPlayingCanvasView: View {
 
                 Spacer(minLength: 8)
 
-                centerArtworkAndDetails
-                    .padding(.horizontal, 36)
+                if isLyricsPresented && !playback.isLiveStream {
+                    canvasLyricsView
+                        .frame(maxWidth: 580)
+                        .padding(.horizontal, 36)
+                } else {
+                    centerArtworkAndDetails
+                        .padding(.horizontal, 36)
+                }
 
                 Spacer(minLength: 8)
 
@@ -281,6 +290,33 @@ struct NowPlayingCanvasView: View {
 
                 Spacer()
 
+                // Lyrics toggle
+                if !playback.isLiveStream {
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            isLyricsPresented.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: isLyricsPresented ? "quote.bubble.fill" : "quote.bubble")
+                                .font(.system(size: 13, weight: .medium))
+                            Text("歌词")
+                                .font(.system(size: 13, weight: .medium))
+                        }
+                        .foregroundStyle(isLyricsPresented ? Color.accentColor : Color.white.opacity(0.8))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            isLyricsPresented
+                                ? Color.white.opacity(0.22)
+                                : Color.white.opacity(0.1),
+                            in: Capsule()
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .help("切换歌词视图")
+                }
+
                 // Queue drawer toggle
                 Button {
                     withAnimation {
@@ -307,6 +343,80 @@ struct NowPlayingCanvasView: View {
                 .help("切换队列")
             }
             .padding(.top, 6)
+        }
+    }
+
+    // MARK: - Canvas Synchronized Lyrics
+
+    private var canvasLyricsView: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    if lyricsStore.isLoading && lyricsStore.currentDocument == nil {
+                        VStack(spacing: 12) {
+                            ProgressView()
+                                .tint(.white)
+                            Text("正在同步歌词…")
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 80)
+                    } else if let doc = lyricsStore.currentDocument, doc.isSynced {
+                        VStack(alignment: .leading, spacing: 16) {
+                            ForEach(Array(doc.lines.enumerated()), id: \.offset) { index, line in
+                                let isActive = (index == lyricsStore.activeLineIndex)
+                                Button {
+                                    lyricsStore.seek(to: line, playback: playback)
+                                } label: {
+                                    Text(line.text.isEmpty ? "♫" : line.text)
+                                        .font(.system(size: isActive ? 24 : 18, weight: isActive ? .bold : .medium))
+                                        .foregroundStyle(isActive ? Color.white : Color.white.opacity(0.4))
+                                        .scaleEffect(isActive ? 1.03 : 1.0, anchor: .leading)
+                                        .blur(radius: isActive ? 0 : 0.4)
+                                        .padding(.vertical, 4)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .id(index)
+                            }
+                        }
+                        .padding(.vertical, 24)
+                    } else if let doc = lyricsStore.currentDocument, !doc.plainText.isEmpty {
+                        Text(doc.plainText)
+                            .font(.system(size: 18, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.75))
+                            .lineSpacing(10)
+                            .padding(.vertical, 24)
+                    } else {
+                        VStack(spacing: 12) {
+                            Image(systemName: "music.mic")
+                                .font(.system(size: 44))
+                                .foregroundStyle(.white.opacity(0.4))
+                            Text("暂无歌词")
+                                .font(.title3.bold())
+                                .foregroundStyle(.white)
+                            Text("可将 .lrc 歌词文件与音频放置在同一文件夹，系统将自动加载。")
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.6))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 80)
+                    }
+                }
+            }
+            .scrollIndicators(.hidden)
+            .onChange(of: lyricsStore.activeLineIndex) { _, newIndex in
+                if let newIndex {
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        proxy.scrollTo(newIndex, anchor: .center)
+                    }
+                }
+            }
+        }
+        .task(id: playback.currentTime) {
+            lyricsStore.sync(with: playback)
         }
     }
 

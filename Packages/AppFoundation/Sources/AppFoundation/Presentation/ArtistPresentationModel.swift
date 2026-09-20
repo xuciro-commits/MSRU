@@ -16,6 +16,9 @@ public struct ArtistPresentationModel: Identifiable, Hashable, Sendable {
     public let trackCount: Int
     public let artworkData: Data?
     public let artworkURL: URL?
+    public let biography: String?
+    public let lifeSpan: String?
+    public let genres: [String]
 
     public init(
         id: String,
@@ -25,7 +28,10 @@ public struct ArtistPresentationModel: Identifiable, Hashable, Sendable {
         albumCount: Int = 0,
         trackCount: Int = 0,
         artworkData: Data? = nil,
-        artworkURL: URL? = nil
+        artworkURL: URL? = nil,
+        biography: String? = nil,
+        lifeSpan: String? = nil,
+        genres: [String] = []
     ) {
         self.id = id
         self.name = name
@@ -35,6 +41,9 @@ public struct ArtistPresentationModel: Identifiable, Hashable, Sendable {
         self.trackCount = trackCount
         self.artworkData = artworkData
         self.artworkURL = artworkURL
+        self.biography = biography
+        self.lifeSpan = lifeSpan
+        self.genres = genres
     }
 
     public var displaySubtitle: String {
