@@ -74,6 +74,17 @@ public final class ImportReviewStore {
         self.selectedClusterIDs = Set(pendingReviewClusters.map { $0.id })
     }
 
+    public convenience init(report: ImportPipelineReport) {
+        self.init(
+            totalScannedCount: report.totalDiscovered,
+            autoAcceptedCount: report.autoCommittedCount,
+            pendingReviewClusters: report.pendingReviewClusters,
+            unidentifiedTracks: report.unidentifiedTracks,
+            potentialDuplicatesCount: report.duplicateDetectionsCount,
+            aliasSuggestions: report.aliasSuggestions
+        )
+    }
+
     /// Filtered list of pending clusters based on current UI selection and search text.
     public var filteredClusters: [AlbumClusterLookupResult] {
         var list = pendingReviewClusters

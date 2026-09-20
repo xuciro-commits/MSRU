@@ -38,6 +38,10 @@ where
         Int
 
 
+    public let badge:
+        String?
+
+
     public init(
         id:
             String,
@@ -50,7 +54,9 @@ where
         route:
             Route,
         order:
-            Int = 0
+            Int = 0,
+        badge:
+            String? = nil
     ) {
 
         self.id =
@@ -70,5 +76,8 @@ where
 
         self.order =
             order
+
+        self.badge =
+            badge
     }
 }

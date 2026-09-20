@@ -27,16 +27,16 @@ extension LibraryFeature:
                     group:
                         "Library",
                     title:
-                        "Library",
+                        "Songs",
                     systemImage:
-                        "music.note.house",
+                        "music.note",
                     route:
                         SceneRoute
                             .section(
                                 .library
                             ),
                     order:
-                        10
+                        100
                 )
             ],
 

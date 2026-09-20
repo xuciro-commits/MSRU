@@ -142,19 +142,27 @@ where
     private var groups:
         [SidebarRenderGroup<Route>] {
 
+        var groupOrders: [String: Int] = [:]
+        for item in contributions {
+            let gid = item.group ?? ""
+            let currentMin = groupOrders[gid] ?? Int.max
+            groupOrders[gid] = min(currentMin, item.order)
+        }
+
         let sorted =
             contributions
-                .sorted {
-
-                    if $0.group
-                        == $1.group {
-
-                        return $0.order
-                            < $1.order
+                .sorted { a, b in
+                    let aGroup = a.group ?? ""
+                    let bGroup = b.group ?? ""
+                    if aGroup == bGroup {
+                        return a.order < b.order
                     }
-
-                    return ($0.group ?? "")
-                        < ($1.group ?? "")
+                    let aGroupOrder = groupOrders[aGroup] ?? 0
+                    let bGroupOrder = groupOrders[bGroup] ?? 0
+                    if aGroupOrder != bGroupOrder {
+                        return aGroupOrder < bGroupOrder
+                    }
+                    return aGroup < bGroup
                 }
 
 
@@ -216,18 +224,22 @@ where
         ) {
             item in
 
-            Label {
+            HStack {
+                Label {
+                    Text(item.title)
+                } icon: {
+                    Image(systemName: item.systemImage)
+                }
 
-                Text(
-                    item.title
-                )
-
-            } icon: {
-
-                Image(
-                    systemName:
-                        item.systemImage
-                )
+                if let badge = item.badge {
+                    Spacer()
+                    Text(badge)
+                        .font(.caption2.bold())
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.quaternary, in: Capsule())
+                }
             }
             .tag(
                 item.route

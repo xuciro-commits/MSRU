@@ -42,9 +42,9 @@ extension LibraryFeature:
                         identity:
                             WorkspaceIdentity(
                                 title:
-                                    "Library",
+                                    "Songs",
                                 systemImage:
-                                    "music.note.list"
+                                    "music.note"
                             )
                     ) {
                         _ in

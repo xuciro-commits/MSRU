@@ -31,7 +31,11 @@ nonisolated enum SceneSection:
     case radio
 
     case library
+    case albums
+    case artists
+
     case addMusic
+    case importReview
 
     case settings
 

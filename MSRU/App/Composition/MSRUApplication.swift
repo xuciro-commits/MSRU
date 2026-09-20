@@ -43,6 +43,14 @@ enum MSRUApplication {
             )
 
             builder.add(
+                AlbumsFeature.self
+            )
+
+            builder.add(
+                ArtistsFeature.self
+            )
+
+            builder.add(
                 RadioFeature.self
             )
 

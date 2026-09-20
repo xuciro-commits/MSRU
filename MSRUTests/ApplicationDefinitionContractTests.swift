@@ -44,13 +44,16 @@ struct ApplicationDefinitionContractTests {
         let sidebar = definition.sidebar
         let destinations = definition.routeDestinations
 
-        // Verify all 6 feature routes exist in contributions
+        // Verify feature routes exist in contributions
         let routeIDs = Set(routes.map(\.id))
         #expect(routeIDs.contains("listen-now"))
         #expect(routeIDs.contains("browse"))
         #expect(routeIDs.contains("library"))
+        #expect(routeIDs.contains("albums"))
+        #expect(routeIDs.contains("artists"))
         #expect(routeIDs.contains("radio"))
         #expect(routeIDs.contains("add-music"))
+        #expect(routeIDs.contains("import-review"))
         #expect(routeIDs.contains("settings"))
 
         // Verify sidebar items
@@ -58,6 +61,8 @@ struct ApplicationDefinitionContractTests {
         #expect(sidebarIDs.contains("listen-now"))
         #expect(sidebarIDs.contains("browse"))
         #expect(sidebarIDs.contains("library"))
+        #expect(sidebarIDs.contains("albums"))
+        #expect(sidebarIDs.contains("artists"))
         #expect(sidebarIDs.contains("radio"))
         #expect(sidebarIDs.contains("add-music"))
 
@@ -66,8 +71,11 @@ struct ApplicationDefinitionContractTests {
         #expect(destinationIDs.contains("listen-now"))
         #expect(destinationIDs.contains("browse"))
         #expect(destinationIDs.contains("library"))
+        #expect(destinationIDs.contains("albums"))
+        #expect(destinationIDs.contains("artists"))
         #expect(destinationIDs.contains("radio"))
         #expect(destinationIDs.contains("add-music"))
+        #expect(destinationIDs.contains("import-review"))
         #expect(destinationIDs.contains("settings"))
     }
 }

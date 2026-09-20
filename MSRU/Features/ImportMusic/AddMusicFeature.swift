@@ -16,17 +16,21 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
             sidebar: [
                 SidebarContribution(
                     id: "add-music",
-                    group: "Library",
-                    title: "Add Music",
-                    systemImage: "plus.square.on.square",
+                    group: "Tools",
+                    title: "Import & Review",
+                    systemImage: "tray.and.arrow.down",
                     route: .section(.addMusic),
-                    order: 20
+                    order: 200
                 )
             ],
             routes: [
                 RouteContribution(
                     id: "add-music",
                     route: .section(.addMusic)
+                ),
+                RouteContribution(
+                    id: "import-review",
+                    route: .section(.importReview)
                 )
             ]
         )
@@ -39,13 +43,37 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
                 id: "add-music",
                 route: .section(.addMusic)
             ) { scene in
-                AddMusicView(
-                    localStore: scene.application.localLibrary,
-                    appleMusicStore: scene.application.musicLibrary,
-                    onOpenLibrary: {
-                        scene.send(.navigate(.section(.library)))
-                    }
-                )
+                WorkspacePresentation(
+                    identity: WorkspaceIdentity(
+                        title: "Import & Review",
+                        systemImage: "tray.and.arrow.down"
+                    )
+                ) { _ in
+                    ImportReviewWorkspaceView(
+                        localStore: scene.application.localLibrary,
+                        onOpenLibrary: {
+                            scene.send(.navigate(.section(.library)))
+                        }
+                    )
+                }
+            },
+            RouteDestination(
+                id: "import-review",
+                route: .section(.importReview)
+            ) { scene in
+                WorkspacePresentation(
+                    identity: WorkspaceIdentity(
+                        title: "Import & Review",
+                        systemImage: "tray.and.arrow.down"
+                    )
+                ) { _ in
+                    ImportReviewWorkspaceView(
+                        localStore: scene.application.localLibrary,
+                        onOpenLibrary: {
+                            scene.send(.navigate(.section(.library)))
+                        }
+                    )
+                }
             }
         ]
     }
