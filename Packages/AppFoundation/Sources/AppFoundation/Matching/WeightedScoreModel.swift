@@ -50,12 +50,12 @@ public struct WeightedScoreResult: Sendable, Equatable, Hashable, Codable {
         confidence: Double,
         tier: ConfidenceTier,
         components: [WeightedComponent],
-        totalWeight: Double
+        totalWeight: Double? = nil
     ) {
         self.confidence = confidence
         self.tier = tier
         self.components = components
-        self.totalWeight = totalWeight
+        self.totalWeight = totalWeight ?? components.reduce(0.0) { $0 + $1.weight }
     }
 }
 

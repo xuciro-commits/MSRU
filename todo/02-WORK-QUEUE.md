@@ -32,6 +32,8 @@
 | 12 | 已完成：音乐实体数据库与三层元数据覆盖模型（阶段 1） | IdentityResolutionEngine / 图册 9.2、11.2；框架层（AppFoundation）提取通用三层级联覆盖容器 OverlayValue（raw/canonical/user 三层优先级与细粒度回退）与通用多语言实体别名解析器 EntityAlias/EntityAliasCollection；应用层（MSRU）构建音乐实体知识图谱（ArtistEntity、ArtistCredit、Work、Recording、ReleaseGroup、Release、Medium、MusicTrack、AudioAsset），实现稳定 MBID、多语言别名与声纹资产绑定；新增 TrackMetadataOverlay 驱动单曲字段级元数据管理；新增 MusicEntityGraphTests 与 TrackMetadataOverlayTests，全量通过（框架 61 项 + 应用 158 项全部通过），Preview 门禁 50 视图保持 100%，架构检查 0 违规 |
 | 13 | 已完成：5 类重复判定分类器与 Roon 式多版本归集（阶段 2） | IdentityResolutionEngine 第 3 节 / 图册 9.2；框架层（AppFoundation）提取通用多版本管理容器 VersionGroup<Element> 与查重关系模型 DuplicateRelation；应用层（MSRU）落地 DuplicateCategory 5 类重复判定枚举（A 物理重复 / B 格式不同 / C 音质差异 / D 版本混音差异 / E 演出差异）及处理策略、确定性音频规格打分器 AudioQualityRanker、DuplicateClassifier 查重分类引擎，以及 Roon 式单曲多版本集合 TrackVersions（支持 24/192 > 24/96 > 16/44.1 > 320k 自动优选与手动钉选 Primary）；新增 VersionGroupTests、DuplicateClassifierTests 与 TrackVersionsTests，全量通过（框架 66 项 + 应用 168 项全部通过），Preview 门禁 50 视图保持 100%，架构检查 0 违规 |
 | 14 | 已完成：beets 式加权打分匹配、置信度三级漏斗与 Picard 专辑聚类（阶段 3） | IdentityResolutionEngine 第 4 节 / 图册 9.2；框架层（AppFoundation）提取通用编辑距离/相似度计算器 StringDistance（Levenshtein + 分词 Jaccard + 标点/变音归一化）、通用三级置信度漏斗模型 ConfidenceTier（High >= 0.90 自动应用 / Medium 0.60~0.89 人工复核 / Low < 0.60 丢弃）、加权综合打分模型 WeightedScoreModel 与通用聚类模型 EntityCluster；应用层（MSRU）落地非结构化文件名启发式提取器 FileNameHeuristicParser、beets 式多维加权匹配打分引擎 MatchScorer（MBID 5.0、标题/歌手/专辑 3.0、时长/曲序 2.0、年份 1.0，并支持多别名与前缀清洗）与 Picard 式专辑曲目聚类引擎 AlbumCluster（基于物理目录、曲序连续性与总时长特征聚合）；新增 StringDistanceTests、WeightedScoreModelTests、FileNameHeuristicParserTests、MatchScorerTests 与 AlbumClusterTests（覆盖本地真实音乐目录音频测试用例），全量通过（框架 73 项 + 应用 178 项全部通过），Preview 门禁 50 视图保持 100%，架构检查 0 违规 |
+| 15 | 已完成：声纹识别、MusicBrainz 外部元数据接入与整轨解析（阶段 4） | IdentityResolutionEngine 第 5 节；框架层（AppFoundation）提取声纹协议与模型 AudioFingerprint/AudioFingerprinting、外部目录服务协议与匹配模型 ExternalCatalogService/ExternalRecordingMatch/ExternalReleaseMatch；应用层（MSRU）落地基于 AVAsset 与 PCM 采样数据的确定性声纹提取器 AcoustIDFingerprintExtractor（真实本地音频提取实测 0.126s）、MusicBrainz 外部目录适配客户端 MusicBrainzCatalogClient 与 Picard 风格整轨聚类检索器 PicardAlbumLookupResolver；新增 AcoustIDFingerprintExtractorTests、MusicBrainzCatalogClientTests 与 PicardAlbumLookupResolverTests，全量通过，架构检查 0 违规 |
+| 16 | 已完成：安全文件整理、撤销计划与集中预审工作区（阶段 5） | IdentityResolutionEngine 第 6 节 / 图册 9.2、11.2；框架层（AppFoundation）提取 beets 命名模板引擎 FileNamingTemplate（支持路径变量、APFS/POSIX 非法字符清洗与 255 字节截断）与安全文件移动/重命名器 SafeFileOrganizer（Dry-Run 预检计划、同名自动 (1) 防冲突、事务原子移动与反向 Undo 撤销记录）；应用层（MSRU）构建 11 步导入流水线 ImportPipeline、集中预审状态机 ImportReviewStore、InteractionAtlas 图册 11.2 预审仪表盘 ImportReviewView（置信度高亮胶囊、异名归并卡片、待确认聚类折叠面板、一键安全移动与撤销）与图册 9.2 曲目属性检查器多版本及三层元数据覆盖面板；新增 FileNamingTemplateTests、SafeFileOrganizerTests、ImportPipelineTests 与 ImportReviewStoreTests，全量通过（框架 80 项 + 应用 190 项全部通过），Preview 门禁 51 视图保持 100%，架构检查 0 违规 |
 
 具体文件和迁移范围见 [迁移路线](../Docs/Roadmap/FoundationRoadmap.md)。不要把本表与该路线维护成两套详细任务拆解。
 
@@ -54,16 +56,18 @@
 | 能力 | 实现与验证范围 |
 |---|---|
 | 目录与旧代码 | App / Features / Music / Platform / Shared / PreviewSupport 已落地；旧窗口、实验页、兼容转发及无调用者的诊断/健康/错误定义已删除。封面解码集中到 Platform，Feature 不再直接导入 AppKit/UIKit。 |
-| Preview | 50 个直接 View/Representable 有同文件 Preview，使用隔离数据与依赖；包含空、有内容、混合队列、检查器、曲库表格、Radio Hero 与卡片、自定义电台弹窗、窄布局、音频波形律动、弥散流光渐变、沉浸大画卷、高保真规格徽标、频谱侧栏与歌词侧栏。门禁识别后置协议、extension、枚举，过滤注释和字符串；间接协议仍需代码审查。 |
+| Preview | 51 个直接 View/Representable 有同文件 Preview，使用隔离数据与依赖；包含空、有内容、混合队列、检查器、曲库表格、Radio Hero 与卡片、自定义电台弹窗、窄布局、音频波形律动、弥散流光渐变、沉浸大画卷、高保真规格徽标、频谱侧栏与歌词侧栏，以及导入集中预审仪表盘（ImportReviewView）。门禁识别后置协议、extension、枚举，过滤注释和字符串；间接协议仍需代码审查。 |
 | 生命周期 | token 撤销、FeatureHost 终态 stop 与防重发、同 ID 并行任务与联合取消、场景关闭后的操作边界与回调绝缘、应用级启动任务句柄与 terminate() 均有可控时序测试；恢复逐条容错并备份损坏原文。真实 NSWindow 与进程级退出恢复分别验证。 |
 | Shell & 紧凑布局 | App/测试采用 Swift 6；两种 Shell 共享语义；Browse 与 Radio 保留独立工具栏搜索入口；原生搜索保持控件身份、enabled 和 first responder；NSToolbarAdapter 杜绝重复控件崩溃。MiniPlayerBar 落地图册 15.1 极窄（<400pt）、紧凑（400-600pt）及标准（>=600pt）多级响应式布局；LibraryFilterBar 修复标签折裂并支持窄宽折行；曲库与本地表格在 <500pt 自动退避至图册 7.2 紧凑多行列表；Context 无论曲目/队列面板均支持一致关闭；LayoutRenderProbe 探针自动化覆盖 320/360/480/700/800pt 各尺寸并全部通过。 |
-| Inspector & Context | 支持右侧 Context 区域 `[曲目/电台详情] [队列] [频谱] [歌词]` 4 模态面板切换。选中本地/曲库曲目时自动展现 Track Inspector，选中电台时自动展现 RadioStationInspectorView；切换到 Spectrum 时展示实时波形、详细发烧规格及一键放大画卷；切换到 Lyrics 时展示美学排版歌词及画卷联动。架构无跨界 import，全 Preview 隔离覆盖。 |
+| Inspector & Context | 支持右侧 Context 区域 `[曲目/电台详情] [队列] [频谱] [歌词]` 4 模态面板切换。选中本地/曲库曲目时自动展现 Track Inspector（含图册 9.2 曲目详情、多版本列表、三层元数据覆盖层分段切换），选中电台时自动展现 RadioStationInspectorView；切换到 Spectrum 时展示实时波形、详细发烧规格及一键放大画卷；切换到 Lyrics 时展示美学排版歌词及画卷联动。架构无跨界 import，全 Preview 隔离覆盖。 |
 | Radio 电台专区与最佳实践 | 原占位页全面升级为原生 Radio 专区。接入内置精选公开网络电台（KEXP、SomaFM、BBC Radio 1、WQXR、Jazz24、Ambient 等）；支持流派胶囊筛选与即时搜索；实现精选主打 Hero Banner 与自适应电台卡片网格；打通 PlaybackProvider 直播流无缝接入原生 AVPlayer，MiniPlayerBar 识别 LIVE 广播状态；联动 SceneModel 互斥选中与右侧检查器；参考现代网络电台最佳实践，增加电台收藏（Favorites）置顶专区、最近收听历史（Recently Played）、自定义网络电台添加弹窗（AddStationSheetView，支持 URL 合法性校验及流派/国家定义）与卡片/检查器删除入口，支持原子 JSON 本地持久化与冷启动恢复。 |
 | 曲库集合视图 | 支持资料库曲目与本地曲目原生 `Table`（表头、列排版、封面、时长、爱心及右键上下文菜单）与 `Grid` 双模式切换；顶部提供即时搜索文本过滤、多维度字段排序（添加时间、标题、艺术家、专辑、时长）与正反序切换；单选曲目双向联动 `SceneModel.selectedLibraryTrack` 并自动唤起右侧 Track Inspector；支持直接双击/右键发起播放、下一首与入队。 |
 | 正在播放画卷与发烧规格 | 参照 Apple Music、Bocan、Draft 播放器优秀设计：落地 NowPlayingCanvasView 沉浸大画卷与 AmbientBackdropView 弥散流光动态背景；AudioVisualizerView 提供 9-15 频段动态起伏波形；AudioFormatBadgeView 提供 Lossless/Hi-Res/Codec/Bitrate/SampleRate 发烧级高保真徽标；MiniPlayerBar 接入点击封面展开画卷、歌词与频谱快捷按钮；SceneModel.isNowPlayingPresented 实现多窗口完全隔离控制。 |
 | 实体数据库与三层元数据覆盖 | 对齐 Roon 实体与版本模型、MusicBrainz 身份体系与 beets 三层覆盖；通用能力抽取至 AppFoundation：OverlayValue<T> 泛型三层覆盖结构（raw/canonical/user 三层优先级与细粒度回退，保证物理文件只读原始标签绝对不被篡改）与 EntityAlias/EntityAliasCollection 多语言别名选择器；应用层 MSRU 落地 ArtistEntity、ArtistCredit、Work、Recording、ReleaseGroup、Release、Medium、MusicTrack、AudioAsset 9 大实体知识图谱模型与 TrackMetadataOverlay 覆盖解析器；新增 MusicEntityGraphTests 与 TrackMetadataOverlayTests，全生命周期及 Codable 往返严格验证通过。 |
 | 重复判定与多版本归集 | 落实 A~E 5 类重复判定枚举 DuplicateCategory 与 DeduplicationStrategy 策略指示；开发确定性音频规格打分器 AudioQualityRanker（无损、采样率、位深、码率严格赋权）；开发 DuplicateClassifier 分类引擎（精准识别 SHA256 物理重复、容器格式差异、采样率音质差异、不同后期母带版本以及严格绝非重复的现场录音演出差异）；封装 Roon 式 TrackVersions 容器，实现高品质自动优选、手动指定主版本、优雅退避与徽标展示；经 DuplicateClassifierTests 与 TrackVersionsTests 严格测试验证。 |
 | 启发式识别、置信度漏斗与专辑聚类 | beets 式加权打分匹配、置信度三级漏斗与 Picard 专辑聚类（阶段 3）；通用文本编辑距离（Levenshtein + Token Jaccard）、三级置信度枚举（High/Medium/Low）及加权打分模型抽取至 AppFoundation；应用层实现非侵入式乱名启发式提取器、加权匹配引擎（支持别名与标题前缀净化）及基于目录与曲序特征的 Picard 专辑聚类器；真实本地音频文件与用例全面验证通过。 |
+| 声纹提取与外部目录接入 | 阶段 4：框架层定义 AudioFingerprint 与 ExternalCatalogService 规范；应用层接入 AcoustIDFingerprintExtractor（实测真实音频 PCM 采样生成确定性声纹）与 MusicBrainzCatalogClient 外部元数据查询，实现 Picard 式聚类整轨检索器 PicardAlbumLookupResolver；经真实音频测试通过。 |
+| 安全文件整理与导入预审工作区 | 阶段 5：框架层构建 FileNamingTemplate（beets 语法、非法字符清理与截断）与 SafeFileOrganizer（Dry-Run 预检计划、同名防冲突、原子移动与撤销机制）；应用层串联 11 步导入流水线 ImportPipeline 与状态机 ImportReviewStore，严格落实图册 11.2 集中预审仪表盘 ImportReviewView，支持高/中/低置信度分流、异名归并推荐与安全一键整理。 |
 | 基础架构与并发 | `DependencyKey` 强化 `associatedtype Value: Sendable`，`DependencyValues` 擦除存储收窄为 `[ObjectIdentifier: any Sendable]` 并消除 `@unchecked Sendable`。纯函数式无状态组合器统一由 `ApplicationShellRuntime` 规范更名为 `ApplicationShellResolver`，不留无用兼容别名。NEXT 2 阶段 Command Runtime 边界硬化，直接由 Gate 调度，清除历史废弃标记；`MSRUApplication` 彻底消除 `transitionalHost` 过渡模块代码，`ListenNow`、`AddMusic`、`Settings` 全面模块化遵循 `ApplicationFeaturePresentation`，统一通过 `builder.add(...)` 声明式装配，经契约测试严格验证。 |
 | 数据 | 收藏先提交后发布；扫描、导入与收藏写入按序执行。失败、并发、路径别名、同名文件及重启恢复有回归测试。 |
 | 播放 | 统一音量与静音管理（支持 AVPlayer 与 PCM 混音节点双向同步、切歌继承与取消静音恢复）；MiniPlayerBar 标准模式落地音量滑块与静音按钮（图册 15.1）；HoverScrubber 拖拽时实时目标时间预览、松手原子 commit seek 并支持 LIVE 电台停用；本地真实 WAV 与网络电台直播流混合队列连续播放与切换测试全部通过；混合队列保留重复实例，真实静音 AVPlayer 顺播两个 WAV 核对媒体时钟与队列终态；AVPlayer/PCM 失败清理、旧回调隔离和保留队列重试有回归测试。 |
@@ -71,11 +75,11 @@
 
 验证基线：
 
-- 应用：最近全量 **178 项通过**（原 168 项 + 4 项 FileNameHeuristicParserTests + 3 项 MatchScorerTests + 3 项 AlbumClusterTests），使用 `MSRUTests`。
-- 框架：最近 **73 项通过**（37 UI + 36 Core，新增 4 项 StringDistanceTests + 3 项 WeightedScoreModelTests），包含文本编辑距离与加权置信度打分。
+- 应用：最近全量 **190 项通过**（原 178 项 + 1 项 AcoustIDFingerprintExtractorTests + 3 项 MusicBrainzCatalogClientTests + 2 项 PicardAlbumLookupResolverTests + 2 项 ImportPipelineTests + 4 项 ImportReviewStoreTests），使用 `MSRUTests`。
+- 框架：最近 **80 项通过**（37 UI + 43 Core，新增 4 项 FileNamingTemplateTests + 3 项 SafeFileOrganizerTests），包含安全模板整理与撤销。
 - 构建：macOS 与 iOS 均编译链接通过；关闭签名，不代表设备安装运行验收。
 - UI：开发签名 Runner 的 **2 项通过**，验证前台启动、实际 Cmd+Q／重启、保留打开窗口并排除手动关闭窗口。使用独立恢复域与稳定 scene ID；后续播放改动及旧定义删除后已重新运行并通过。
-- 门禁：架构（0 违规）、Preview（50 个全部覆盖）、diff 检查通过；入口链接须在修改后继续检查。源码检查不能替代渲染或运行时验收。
+- 门禁：架构（0 违规）、Preview（51 个全部覆盖）、diff 检查通过；入口链接须在修改后继续检查。源码检查不能替代渲染或运行时验收。
 
 ## 尚未完成的验收
 

@@ -18,16 +18,23 @@ nonisolated public struct AlbumTrackItem: Identifiable, Sendable, Equatable, Cod
     public let trackNumber: Int?
     public let duration: TimeInterval
     public let acoustID: String?
+    public let trackMBID: String?
+
+    public var fingerprint: String? {
+        acoustID
+    }
 
     public init(
-        id: String,
+        id: String = UUID().uuidString,
         fileURL: URL,
         title: String,
         artist: String? = nil,
         album: String? = nil,
         trackNumber: Int? = nil,
-        duration: TimeInterval = 0.0,
-        acoustID: String? = nil
+        duration: TimeInterval? = 0.0,
+        acoustID: String? = nil,
+        trackMBID: String? = nil,
+        fingerprint: String? = nil
     ) {
         self.id = id
         self.fileURL = fileURL
@@ -35,8 +42,9 @@ nonisolated public struct AlbumTrackItem: Identifiable, Sendable, Equatable, Cod
         self.artist = artist
         self.album = album
         self.trackNumber = trackNumber
-        self.duration = duration
-        self.acoustID = acoustID
+        self.duration = duration ?? 0.0
+        self.acoustID = acoustID ?? fingerprint
+        self.trackMBID = trackMBID
     }
 }
 
@@ -55,6 +63,11 @@ nonisolated public struct AlbumCluster: Identifiable, Sendable, Equatable, Codab
 
     /// Most frequent or consensus album title within the cluster.
     public let candidateAlbumTitle: String?
+
+    /// Backward-compatible album name alias.
+    public var albumName: String? {
+        candidateAlbumTitle
+    }
 
     /// Most frequent or consensus artist within the cluster.
     public let candidateArtist: String?
@@ -85,15 +98,19 @@ nonisolated public struct AlbumCluster: Identifiable, Sendable, Equatable, Codab
         folderURL: URL? = nil,
         candidateAlbumTitle: String? = nil,
         candidateArtist: String? = nil,
+        albumName: String? = nil,
         tracks: [AlbumTrackItem] = []
     ) {
         self.id = id
         self.folderURL = folderURL
-        self.candidateAlbumTitle = candidateAlbumTitle
+        self.candidateAlbumTitle = candidateAlbumTitle ?? albumName
         self.candidateArtist = candidateArtist
         self.tracks = tracks
     }
 }
+
+public typealias ClusterTrackItem = AlbumTrackItem
+public typealias AlbumClusterEngine = AlbumClusterer
 
 /// Picard-style clustering engine.
 nonisolated public enum AlbumClusterer {

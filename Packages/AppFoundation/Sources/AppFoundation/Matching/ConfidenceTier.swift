@@ -50,4 +50,9 @@ public enum ConfidenceTier: String, Sendable, Codable, Equatable, Hashable, Comp
             return .low
         }
     }
+
+    /// Convenience initializer mapping normalized confidence score to tier.
+    public init(confidence: Double) {
+        self = Self.tier(for: confidence)
+    }
 }
