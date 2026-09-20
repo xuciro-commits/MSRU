@@ -27,6 +27,7 @@
 | 7 | 已完成：曲目属性检查器 (Track Inspector) 与上下文面板切换 | 图册 1.2 / 9.1；单元测试、Preview 门禁与架构检查全部通过 |
 | 8 | 已完成：基础框架收敛（DependencyValues 并发硬化与 ShellResolver 命名澄清） | AbstractionAudit / NorthStarArchitecture；Sendable 存储收窄、无状态组合器重命名，全量 53 项框架测试与 113 项应用测试全部通过 |
 | 9 | 已完成：曲库原生 Table / Grid 双模式集合、即时搜索排序与 Inspector 联动 | ExperienceBlueprint 第 5 节 / 图册 7.1、7.3；SwiftUI 原生 Table/Grid，排序过滤与选中单向/双向同步，7 项单元测试、Preview 门禁覆盖 39 视图，全量 120 项测试全部通过 |
+| 10 | 已完成：Radio 直播流网络电台专区、Hero Banner 精选、分类过滤与 Inspector 联动 | 图册 7.6；RadioStation/RadioStore 领域模型、RadioPlaybackProvider 直播流管道接入、Hero Banner 与自适应网格、SceneModel.selectedRadioStation 互斥联动及 RadioStationInspectorView，全量 134 项测试通过，Preview 门禁覆盖 43 视图 |
 
 具体文件和迁移范围见 [迁移路线](../Docs/Roadmap/FoundationRoadmap.md)。不要把本表与该路线维护成两套详细任务拆解。
 
@@ -49,10 +50,11 @@
 | 能力 | 实现与验证范围 |
 |---|---|
 | 目录与旧代码 | App / Features / Music / Platform / Shared / PreviewSupport 已落地；旧窗口、实验页、兼容转发及无调用者的诊断/健康/错误定义已删除。封面解码集中到 Platform，Feature 不再直接导入 AppKit/UIKit。 |
-| Preview | 39 个直接 View/Representable 有同文件 Preview，使用隔离数据与依赖；包含空、有内容、混合队列、检查器、曲库表格及窄布局。门禁识别后置协议、extension、枚举，过滤注释和字符串；间接协议仍需代码审查。 |
+| Preview | 43 个直接 View/Representable 有同文件 Preview，使用隔离数据与依赖；包含空、有内容、混合队列、检查器、曲库表格、Radio Hero 与卡片及窄布局。门禁识别后置协议、extension、枚举，过滤注释和字符串；间接协议仍需代码审查。 |
 | 生命周期 | token 撤销、FeatureHost 终态 stop 与防重发、同 ID 并行任务与联合取消、场景关闭后的操作边界与回调绝缘、应用级启动任务句柄与 terminate() 均有可控时序测试；恢复逐条容错并备份损坏原文。真实 NSWindow 与进程级退出恢复分别验证。 |
-| Shell | App/测试采用 Swift 6；两种 Shell 共享语义，Browse 保留一个搜索入口；原生搜索保持控件身份、enabled 和 first responder；NSToolbarAdapter 杜绝重复控件崩溃。 |
-| Inspector & Context | 支持右侧 Context 区域 `[曲目详情] [队列]` 双面板切换。选中本地/曲库曲目时自动展现 Track Inspector，展示封面、标题、艺术家、专辑、时长、音频格式、文件大小、路径，并支持播放、下一首、队列、收藏和「在访达中显示」。架构无跨界 import，全 Preview 隔离覆盖，新增 TrackInspectorTests 4 项测试全部通过。 |
+| Shell | App/测试采用 Swift 6；两种 Shell 共享语义，Browse 与 Radio 分别保留独立工具栏搜索入口；原生搜索保持控件身份、enabled 和 first responder；NSToolbarAdapter 杜绝重复控件崩溃。 |
+| Inspector & Context | 支持右侧 Context 区域 `[曲目/电台详情] [队列]` 双面板切换。选中本地/曲库曲目时自动展现 Track Inspector，选中电台时自动展现 RadioStationInspectorView，展示电台封面、流派、LIVE 徽标、比特率/编码、国家语言、流地址及官网链接，支持直接收听与播放控制。架构无跨界 import，全 Preview 隔离覆盖。 |
+| Radio 电台专区 | 原占位页全面升级为原生 Radio 专区。接入内置精选公开网络电台（KEXP、SomaFM、BBC Radio 1、WQXR、Jazz24、Ambient 等）；支持流派胶囊筛选与即时搜索；实现精选主打 Hero Banner 与自适应电台卡片网格；打通 PlaybackProvider 直播流无缝接入原生 AVPlayer，MiniPlayerBar 识别 LIVE 广播状态；联动 SceneModel 互斥选中与右侧检查器。 |
 | 曲库集合视图 | 支持资料库曲目与本地曲目原生 `Table`（表头、列排版、封面、时长、爱心及右键上下文菜单）与 `Grid` 双模式切换；顶部提供即时搜索文本过滤、多维度字段排序（添加时间、标题、艺术家、专辑、时长）与正反序切换；单选曲目双向联动 `SceneModel.selectedLibraryTrack` 并自动唤起右侧 Track Inspector；支持直接双击/右键发起播放、下一首与入队。 |
 | 基础架构与并发 | `DependencyKey` 强化 `associatedtype Value: Sendable`，`DependencyValues` 擦除存储收窄为 `[ObjectIdentifier: any Sendable]` 并消除 `@unchecked Sendable`。纯函数式无状态组合器统一由 `ApplicationShellRuntime` 规范更名为 `ApplicationShellResolver`，不留无用兼容别名。AppFoundation 单元测试及应用全量测试完整回归。 |
 | 数据 | 收藏先提交后发布；扫描、导入与收藏写入按序执行。失败、并发、路径别名、同名文件及重启恢复有回归测试。 |
@@ -61,7 +63,7 @@
 
 验证基线：
 
-- 应用：最近全量 **123 项通过**（原 120 项 + 3 项 SceneLifecycleConcurrency 状态与生命周期测试），使用 `MSRU-UnitTests` scheme；包含旧定义删除及 PCM 失败修复。
+- 应用：最近全量 **134 项通过**（原 123 项 + 11 项 RadioFeatureTests 覆盖领域过滤、流解析、播放控制与场景联动），使用 `MSRU-UnitTests` scheme；包含旧定义删除及 PCM 失败修复。
 - 框架：最近 **56 项通过**（37 UI + 19 Core，新增 stop、同ID并发与联合取消测试），包含 SwiftUI Shell 的平台适配。
 - 构建：PCM 清理与旧定义删除后的当前代码已复验，visionOS 真机／模拟器和 iOS Simulator 均编译链接通过；关闭签名，不代表设备安装运行验收。
 - UI：开发签名 Runner 的 **2 项通过**，验证前台启动、实际 Cmd+Q／重启、保留打开窗口并排除手动关闭窗口。使用独立恢复域与稳定 scene ID；后续播放改动及旧定义删除后已重新运行并通过。

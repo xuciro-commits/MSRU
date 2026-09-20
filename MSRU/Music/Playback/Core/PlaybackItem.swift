@@ -12,6 +12,7 @@ enum PlaybackItemSource:
 
     case local
     case openverse
+    case radio
 }
 
 
@@ -26,6 +27,10 @@ struct PlaybackItem:
 
         case openverse(
             OpenverseAudio
+        )
+
+        case radio(
+            RadioStation
         )
     }
 
@@ -71,6 +76,23 @@ struct PlaybackItem:
     }
 
 
+    // MARK: - Radio
+
+    init(
+        radio station:
+            RadioStation
+    ) {
+
+        self.id =
+            "radio:\(station.id)"
+
+        self.payload =
+            .radio(
+                station
+            )
+    }
+
+
     // MARK: - Source
 
     var source:
@@ -83,6 +105,9 @@ struct PlaybackItem:
 
         case .openverse:
             return .openverse
+
+        case .radio:
+            return .radio
         }
     }
 
@@ -106,6 +131,13 @@ struct PlaybackItem:
         ):
 
             return track.title
+
+
+        case .radio(
+            let station
+        ):
+
+            return station.name
         }
     }
 
@@ -127,6 +159,13 @@ struct PlaybackItem:
         ):
 
             return track.creatorTitle
+
+
+        case .radio(
+            let station
+        ):
+
+            return "\(station.genre.rawValue) • \(station.country)"
         }
     }
 
@@ -141,6 +180,9 @@ struct PlaybackItem:
 
         case .openverse:
             return "OPENVERSE"
+
+        case .radio:
+            return "LIVE RADIO"
         }
     }
 
@@ -159,7 +201,7 @@ struct PlaybackItem:
             return track.artworkData
 
 
-        case .openverse:
+        case .openverse, .radio:
             return nil
         }
     }
@@ -179,6 +221,13 @@ struct PlaybackItem:
         ):
 
             return track.thumbnailURL
+
+
+        case .radio(
+            let station
+        ):
+
+            return station.artworkURL
         }
     }
 
@@ -224,6 +273,10 @@ struct PlaybackItem:
                     milliseconds
                 )
                 / 1000
+
+
+        case .radio:
+            return nil
         }
     }
 
@@ -261,6 +314,23 @@ struct PlaybackItem:
 
 
         return track
+    }
+
+
+    var radioStation:
+        RadioStation? {
+
+        guard
+            case .radio(
+                let station
+            ) = payload
+        else {
+
+            return nil
+        }
+
+
+        return station
     }
 
 
@@ -308,6 +378,26 @@ struct PlaybackItem:
                     track.mediaURL,
                 providerHint:
                     .openverse
+            )
+
+
+        case .radio(
+            let station
+        ):
+
+            return PlaybackRequest(
+                itemID:
+                    id,
+                source:
+                    .radio,
+                preferredQuality:
+                    .automatic,
+                localFileURL:
+                    nil,
+                remoteURL:
+                    station.streamURL,
+                providerHint:
+                    .radio
             )
         }
     }

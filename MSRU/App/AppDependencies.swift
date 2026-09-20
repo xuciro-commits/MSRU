@@ -247,4 +247,49 @@ extension DependencyValues {
                 newValue
         }
     }
+
+
+    // MARK: Radio Store
+
+    @MainActor
+    var radioStore:
+        RadioStore {
+
+        get {
+
+            self[
+                RadioStoreDependencyKey
+                    .self
+            ]
+        }
+
+
+        set {
+
+            self[
+                RadioStoreDependencyKey
+                    .self
+            ] =
+                newValue
+        }
+    }
+}
+
+
+// MARK: - Radio Store Key
+
+private enum RadioStoreDependencyKey:
+    DependencyKey {
+
+    @MainActor
+    static let liveValue =
+        RadioStore()
+
+    @MainActor
+    static let previewValue =
+        RadioStore()
+
+    @MainActor
+    static let testValue =
+        RadioStore()
 }

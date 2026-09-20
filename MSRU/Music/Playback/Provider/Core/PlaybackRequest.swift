@@ -27,6 +27,7 @@ struct PlaybackRequest:
 
         case local
         case openverse
+        case radio
     }
 
 

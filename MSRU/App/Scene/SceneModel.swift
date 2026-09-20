@@ -76,6 +76,10 @@ final class SceneModel:
         LibraryTrack?
 
 
+    var selectedRadioStation:
+        RadioStation?
+
+
     // MARK: - Presentation
 
     enum ContextPane: String, CaseIterable, Identifiable, Codable, Sendable {
@@ -103,6 +107,7 @@ final class SceneModel:
         if localTrack != nil {
             self.selectedLibraryTrack = nil
             self.selectedMusicContent = nil
+            self.selectedRadioStation = nil
             self.activeContextPane = .inspector
             self.isQueuePresented = true
         }
@@ -114,6 +119,7 @@ final class SceneModel:
         if musicContent != nil {
             self.selectedLocalTrack = nil
             self.selectedLibraryTrack = nil
+            self.selectedRadioStation = nil
             self.activeContextPane = .inspector
             self.isQueuePresented = true
         }
@@ -124,6 +130,19 @@ final class SceneModel:
         self.selectedLibraryTrack = libraryTrack
         if libraryTrack != nil {
             self.selectedLocalTrack = nil
+            self.selectedMusicContent = nil
+            self.selectedRadioStation = nil
+            self.activeContextPane = .inspector
+            self.isQueuePresented = true
+        }
+    }
+
+    func select(radioStation: RadioStation?) {
+        guard !isClosed else { return }
+        self.selectedRadioStation = radioStation
+        if radioStation != nil {
+            self.selectedLocalTrack = nil
+            self.selectedLibraryTrack = nil
             self.selectedMusicContent = nil
             self.activeContextPane = .inspector
             self.isQueuePresented = true
@@ -155,6 +174,10 @@ final class SceneModel:
         FeatureHost<LibraryFeature>
 
 
+    let radioFeature:
+        FeatureHost<RadioFeature>
+
+
     private(set) var isClosed = false
 
     /// Closing is terminal; temporary scene inactivity must not call this.
@@ -163,6 +186,7 @@ final class SceneModel:
         isClosed = true
         browse.stop()
         libraryFeature.stop()
+        radioFeature.stop()
     }
 
     // MARK: - New Scene
@@ -218,6 +242,19 @@ final class SceneModel:
                 FeatureHost<LibraryFeature>(
                     service:
                         LibraryFeature
+                            .Service()
+                )
+            }
+
+
+        self.radioFeature =
+            withDependencies(
+                application.dependencies
+            ) {
+
+                FeatureHost<RadioFeature>(
+                    service:
+                        RadioFeature
                             .Service()
                 )
             }

@@ -69,6 +69,15 @@ final class PlaybackProviderKernel:
         )
 
 
+        /*
+         Radio live streaming.
+         */
+
+        registry.register(
+            RadioPlaybackProvider()
+        )
+
+
         return PlaybackProviderKernel(
             registry:
                 registry

@@ -70,6 +70,12 @@ final class ApplicationModel {
         ProviderManagerStore
 
 
+    // MARK: - Radio
+
+    let radioStore:
+        RadioStore
+
+
     // MARK: - Dependencies
 
     /*
@@ -124,7 +130,9 @@ final class ApplicationModel {
             providerManager:
                 ProviderManagerStore(),
             openverseSearch:
-                .live
+                .live,
+            radioStore:
+                RadioStore()
         )
     }
 
@@ -156,7 +164,9 @@ final class ApplicationModel {
         providerManager:
             ProviderManagerStore,
         openverseSearch:
-            OpenverseSearchClient
+            OpenverseSearchClient,
+        radioStore:
+            RadioStore? = nil
     ) {
 
         self.musicCatalog =
@@ -183,6 +193,13 @@ final class ApplicationModel {
             providerManager
 
 
+        let resolvedRadioStore =
+            radioStore ?? RadioStore()
+
+        self.radioStore =
+            resolvedRadioStore
+
+
         // MARK: Dependency Composition
 
         var dependencies =
@@ -200,6 +217,10 @@ final class ApplicationModel {
 
         dependencies.openverseSearch =
             openverseSearch
+
+
+        dependencies.radioStore =
+            resolvedRadioStore
 
 
         self.dependencies =

@@ -24,17 +24,27 @@ struct MSRUContextPaneView: View {
 
             switch scene.activeContextPane {
             case .inspector:
-                TrackInspectorView(
-                    libraryTrack: scene.selectedLibraryTrack,
-                    localTrack: scene.selectedLocalTrack,
-                    musicContent: scene.selectedMusicContent,
-                    playback: scene.application.playback,
-                    library: scene.application.library,
-                    onRevealInFinder: onRevealInFinder,
-                    onClose: {
-                        scene.isQueuePresented = false
-                    }
-                )
+                if let station = scene.selectedRadioStation {
+                    RadioStationInspectorView(
+                        station: station,
+                        playback: scene.application.playback,
+                        onClose: {
+                            scene.isQueuePresented = false
+                        }
+                    )
+                } else {
+                    TrackInspectorView(
+                        libraryTrack: scene.selectedLibraryTrack,
+                        localTrack: scene.selectedLocalTrack,
+                        musicContent: scene.selectedMusicContent,
+                        playback: scene.application.playback,
+                        library: scene.application.library,
+                        onRevealInFinder: onRevealInFinder,
+                        onClose: {
+                            scene.isQueuePresented = false
+                        }
+                    )
+                }
 
             case .queue:
                 QueuePaneView(
@@ -49,6 +59,14 @@ struct MSRUContextPaneView: View {
 #Preview("Context Pane · Inspector") {
     let scene = MSRUPreviewData.makeScene()
     scene.selectedLocalTrack = MSRUPreviewData.localTracks[0]
+    scene.activeContextPane = .inspector
+    return MSRUContextPaneView(scene: scene)
+        .frame(width: 320, height: 600)
+}
+
+#Preview("Context Pane · Radio Inspector") {
+    let scene = MSRUPreviewData.makeScene()
+    scene.selectedRadioStation = RadioStation.defaultStations[0]
     scene.activeContextPane = .inspector
     return MSRUContextPaneView(scene: scene)
         .frame(width: 320, height: 600)

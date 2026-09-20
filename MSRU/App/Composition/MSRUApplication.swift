@@ -40,6 +40,11 @@ enum MSRUApplication {
             )
 
 
+            builder.add(
+                RadioFeature.self
+            )
+
+
             // MARK: Transitional Host Module
 
             builder.addHost(
@@ -103,24 +108,6 @@ enum MSRUApplication {
 
                 SidebarContribution(
                     id:
-                        "radio",
-                    group:
-                        "Discover",
-                    title:
-                        "Radio",
-                    systemImage:
-                        "dot.radiowaves.left.and.right",
-                    route:
-                        .section(
-                            .radio
-                        ),
-                    order:
-                        30
-                ),
-
-
-                SidebarContribution(
-                    id:
                         "add-music",
                     group:
                         "Library",
@@ -145,16 +132,6 @@ enum MSRUApplication {
                     route:
                         .section(
                             .listenNow
-                        )
-                ),
-
-
-                RouteContribution(
-                    id:
-                        "radio",
-                    route:
-                        .section(
-                            .radio
                         )
                 ),
 
@@ -219,37 +196,6 @@ enum MSRUApplication {
                             .selectedMusicContent =
                             item
                     }
-                )
-            },
-
-
-            // MARK: Radio
-
-            RouteDestination(
-                id:
-                    "radio",
-                route:
-                    SceneRoute
-                        .section(
-                            .radio
-                        )
-            ) {
-                _ in
-
-                ContentUnavailableView(
-                    "Radio",
-                    systemImage:
-                        "dot.radiowaves.left.and.right",
-                    description:
-                        Text(
-                            "Radio providers and continuous playback will land in a later milestone."
-                        )
-                )
-                .frame(
-                    maxWidth:
-                        .infinity,
-                    maxHeight:
-                        .infinity
                 )
             },
 

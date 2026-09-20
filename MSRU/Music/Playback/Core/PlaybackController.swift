@@ -132,6 +132,21 @@ import Observation
         }
     }
 
+    // MARK: - Radio Station Projection
+
+    var radioCurrentStation: RadioStation? {
+
+        currentItem?.radioStation
+    }
+
+    var radioQueue: [RadioStation] {
+
+        playbackQueue.allItems.compactMap { queueItem in
+
+            queueItem.item.radioStation
+        }
+    }
+
     // MARK: - Queue State
 
     var unifiedCanPrevious: Bool {
@@ -230,6 +245,26 @@ import Observation
         return isPlaying ? .playing : .paused
     }
 
+    func state(for station: RadioStation) -> TrackPlaybackState {
+
+        if resolvingItem?.radioStation?.id == station.id {
+
+            return .resolving
+        }
+
+        if failedItem?.radioStation?.id == station.id, let playbackErrorMessage {
+
+            return .failed(playbackErrorMessage)
+        }
+
+        guard radioCurrentStation?.id == station.id else {
+
+            return .idle
+        }
+
+        return isPlaying ? .playing : .paused
+    }
+
     // MARK: - Generic Play
 
     func play(_ item: PlaybackItem, context: [PlaybackItem]? = nil) {
@@ -278,6 +313,20 @@ import Observation
         let context = queue?.map { track in
 
             PlaybackItem(openverse: track)
+        }
+
+        play(item, context: context)
+    }
+
+    // MARK: - Radio Play
+
+    func play(radio station: RadioStation, queue: [RadioStation]? = nil) {
+
+        let item = PlaybackItem(radio: station)
+
+        let context = queue?.map { station in
+
+            PlaybackItem(radio: station)
         }
 
         play(item, context: context)
@@ -392,6 +441,36 @@ import Observation
         toggle(openverse: track, queue: effectiveQueue)
     }
 
+    // MARK: - Toggle Radio
+
+    func toggle(radio station: RadioStation, queue: [RadioStation]) {
+
+        let item = PlaybackItem(radio: station)
+
+        if currentItem?.id == item.id {
+
+            playbackQueue.start(
+                item,
+                context: queue.map {
+
+                    PlaybackItem(radio: $0)
+                })
+
+            toggle()
+
+            return
+        }
+
+        play(radio: station, queue: queue)
+    }
+
+    func toggle(radio station: RadioStation) {
+
+        let effectiveQueue = radioQueue.isEmpty ? [station] : radioQueue
+
+        toggle(radio: station, queue: effectiveQueue)
+    }
+
     // MARK: - Toggle Library
 
     func toggle(library track: LibraryTrack, queue: [LibraryTrack]? = nil) {
@@ -458,6 +537,18 @@ import Observation
     func addToQueue(openverse track: OpenverseAudio) {
 
         addToQueue(PlaybackItem(openverse: track))
+    }
+
+    // MARK: - Radio Queue Actions
+
+    func playNext(radio station: RadioStation) {
+
+        playNext(PlaybackItem(radio: station))
+    }
+
+    func addToQueue(radio station: RadioStation) {
+
+        addToQueue(PlaybackItem(radio: station))
     }
 
     // MARK: - Library Queue Actions

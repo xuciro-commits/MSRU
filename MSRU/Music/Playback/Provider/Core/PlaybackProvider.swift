@@ -17,6 +17,8 @@ enum PlaybackProviderID:
     case local
 
     case openverse
+
+    case radio
 }
 
 

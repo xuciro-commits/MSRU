@@ -576,6 +576,12 @@ extension MSRUPreviewData {
             )
         }
     }
+
+    @MainActor
+    static func makeRadioFeature() -> FeatureHost<RadioFeature> {
+        let scene = makeScene(section: .radio)
+        return scene.radioFeature
+    }
 }
 
 
