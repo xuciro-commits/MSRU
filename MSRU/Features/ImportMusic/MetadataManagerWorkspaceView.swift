@@ -187,22 +187,22 @@ struct MetadataManagerWorkspaceView: View {
                 Image(systemName: "key.fill")
                     .font(.headline)
                     .foregroundStyle(Color.accentColor)
-                Text("AcoustID 声学指纹服务授权 (API Key)")
+                Text("AcoustID 声学指纹服务授权 (Application Client Key)")
                     .font(.headline)
                 Spacer()
                 if let status = acoustIDTestStatus {
                     Text(status)
                         .font(.caption)
-                        .foregroundStyle(status.contains("成功") ? .green : .secondary)
+                        .foregroundStyle(status.contains("成功") ? .green : .red)
                 }
             }
 
-            Text("用于通过 Chromaprint 提取的声音特征查询全球 MusicBrainz 录音实体。系统已预设你的专属 API Key，亦可随时修改或测试连通性。")
+            Text("用于通过 Chromaprint 提取的声音特征查询全球 MusicBrainz 录音实体。\n注意：AcoustID 区分「应用客户端密钥 (Application Key)」与「个人用户密钥 (User Key)」。查询服务必须使用 Application Key。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 10) {
-                TextField("AcoustID API Key", text: $acoustIDApiKey)
+                TextField("AcoustID Client API Key", text: $acoustIDApiKey)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(.body, design: .monospaced))
                     .onChange(of: acoustIDApiKey) { _, newValue in
@@ -233,6 +233,35 @@ struct MetadataManagerWorkspaceView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
                 .disabled(isVerifyingAcoustID || acoustIDApiKey.isEmpty)
+
+                Button("恢复默认") {
+                    Task {
+                        await AcoustIDConfiguration.shared.resetToDefault()
+                        acoustIDApiKey = await AcoustIDConfiguration.shared.apiKey
+                        acoustIDTestStatus = nil
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .help("恢复为系统内置已验证的客户端 Application Key")
+            }
+
+            HStack(spacing: 16) {
+                Link(destination: URL(string: "https://acoustid.org/new-application")!) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.right.square")
+                        Text("前往 AcoustID 注册新应用获取专属 Key")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(Color.accentColor)
+                }
+
+                Text("·")
+                    .foregroundStyle(.secondary)
+
+                Text("默认内置可用 Key: cSpUJKpD")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(16)
