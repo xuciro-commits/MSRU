@@ -22,7 +22,7 @@
 | 2 | 已完成：任务取消后的回传失效、场景关闭后的回调边界 | ConcurrencyModel；FeatureHost 终态 stop、同ID并发任务控制、场景关闭边界与应用启动任务句柄通过可控时序测试 |
 | 3 | 已完成：恢复逐条容错、关闭回调边界及退出恢复 | ConcurrencyModel；单元回归与真实 Cmd+Q / 重启 XCUITest 通过 |
 | 4 | 已完成：App 和测试 target 使用 Swift 6 | Debug/Release 配置已更新；纯 URL command 转换显式 nonisolated；macOS 测试通过 |
-| 5 | 进行中：双平台 Shell 与搜索同步已实现 | ExperienceBlueprint / 图册；构建与状态测试通过，原生焦点测试通过，紧凑布局视觉待验收 |
+| 5 | 已完成：双平台 Shell 与紧凑布局自适应适配 | ExperienceBlueprint 第 2 节 / 图册 2.1、2.2、7.2、15.1；MiniPlayerBar 极窄/紧凑/展开三级断点自适应、曲库 Table/List 紧凑多行自适应、FilterBar 标签消除折裂与两行自适应、Context 面板全时可关闭、SwiftUIApplicationShell 列折叠支持，全量 134 项测试（含 LayoutRenderProbe 7 个尺寸探针）全部通过，43 Preview 门禁通过 |
 | 6 | 进行中：收藏事务、重启和播放入口已实现 | 图册；保存失败、并发、重启、混合队列测试通过，真实媒体待验收 |
 | 7 | 已完成：曲目属性检查器 (Track Inspector) 与上下文面板切换 | 图册 1.2 / 9.1；单元测试、Preview 门禁与架构检查全部通过 |
 | 8 | 已完成：基础框架收敛（DependencyValues 并发硬化与 ShellResolver 命名澄清） | AbstractionAudit / NorthStarArchitecture；Sendable 存储收窄、无状态组合器重命名，全量 53 项框架测试与 113 项应用测试全部通过 |
@@ -52,7 +52,7 @@
 | 目录与旧代码 | App / Features / Music / Platform / Shared / PreviewSupport 已落地；旧窗口、实验页、兼容转发及无调用者的诊断/健康/错误定义已删除。封面解码集中到 Platform，Feature 不再直接导入 AppKit/UIKit。 |
 | Preview | 43 个直接 View/Representable 有同文件 Preview，使用隔离数据与依赖；包含空、有内容、混合队列、检查器、曲库表格、Radio Hero 与卡片及窄布局。门禁识别后置协议、extension、枚举，过滤注释和字符串；间接协议仍需代码审查。 |
 | 生命周期 | token 撤销、FeatureHost 终态 stop 与防重发、同 ID 并行任务与联合取消、场景关闭后的操作边界与回调绝缘、应用级启动任务句柄与 terminate() 均有可控时序测试；恢复逐条容错并备份损坏原文。真实 NSWindow 与进程级退出恢复分别验证。 |
-| Shell | App/测试采用 Swift 6；两种 Shell 共享语义，Browse 与 Radio 分别保留独立工具栏搜索入口；原生搜索保持控件身份、enabled 和 first responder；NSToolbarAdapter 杜绝重复控件崩溃。 |
+| Shell & 紧凑布局 | App/测试采用 Swift 6；两种 Shell 共享语义；Browse 与 Radio 保留独立工具栏搜索入口；原生搜索保持控件身份、enabled 和 first responder；NSToolbarAdapter 杜绝重复控件崩溃。MiniPlayerBar 落地图册 15.1 极窄（<400pt）、紧凑（400-600pt）及标准（>=600pt）多级响应式布局；LibraryFilterBar 修复标签折裂并支持窄宽折行；曲库与本地表格在 <500pt 自动退避至图册 7.2 紧凑多行列表；Context 无论曲目/队列面板均支持一致关闭；LayoutRenderProbe 探针自动化覆盖 320/360/480/700/800pt 各尺寸并全部通过。 |
 | Inspector & Context | 支持右侧 Context 区域 `[曲目/电台详情] [队列]` 双面板切换。选中本地/曲库曲目时自动展现 Track Inspector，选中电台时自动展现 RadioStationInspectorView，展示电台封面、流派、LIVE 徽标、比特率/编码、国家语言、流地址及官网链接，支持直接收听与播放控制。架构无跨界 import，全 Preview 隔离覆盖。 |
 | Radio 电台专区 | 原占位页全面升级为原生 Radio 专区。接入内置精选公开网络电台（KEXP、SomaFM、BBC Radio 1、WQXR、Jazz24、Ambient 等）；支持流派胶囊筛选与即时搜索；实现精选主打 Hero Banner 与自适应电台卡片网格；打通 PlaybackProvider 直播流无缝接入原生 AVPlayer，MiniPlayerBar 识别 LIVE 广播状态；联动 SceneModel 互斥选中与右侧检查器。 |
 | 曲库集合视图 | 支持资料库曲目与本地曲目原生 `Table`（表头、列排版、封面、时长、爱心及右键上下文菜单）与 `Grid` 双模式切换；顶部提供即时搜索文本过滤、多维度字段排序（添加时间、标题、艺术家、专辑、时长）与正反序切换；单选曲目双向联动 `SceneModel.selectedLibraryTrack` 并自动唤起右侧 Track Inspector；支持直接双击/右键发起播放、下一首与入队。 |

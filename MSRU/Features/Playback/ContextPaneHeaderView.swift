@@ -30,17 +30,17 @@ struct ContextPaneHeaderView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-            } else {
-                Button {
-                    scene.isQueuePresented = false
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.caption.bold())
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .help("Close Details")
             }
+
+            Button {
+                scene.isQueuePresented = false
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.bold())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("Close Details")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

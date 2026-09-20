@@ -13,101 +13,127 @@ struct LibraryFilterBar: View {
     @Binding var searchQuery: String
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Search Input
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
+        ViewThatFits(in: .horizontal) {
+            // Wide layout (single row)
+            HStack(spacing: 12) {
+                searchInput
+                    .frame(maxWidth: 260)
 
-                TextField("Filter tracks…", text: $searchQuery)
-                    .textFieldStyle(.plain)
-                    .font(.callout)
+                Spacer()
 
-                if !searchQuery.isEmpty {
-                    Button {
-                        searchQuery = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
-                    .buttonStyle(.plain)
+                sortMenu
+                viewModePicker
+            }
+
+            // Compact layout (adaptive two rows)
+            VStack(spacing: 8) {
+                searchInput
+                    .frame(maxWidth: .infinity)
+
+                HStack {
+                    sortMenu
+                    Spacer()
+                    viewModePicker
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Color.secondary.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .frame(maxWidth: 260)
-
-            Spacer()
-
-            // Sort Menu
-            Menu {
-                Section("Sort By") {
-                    ForEach(LibrarySortField.allCases) { field in
-                        Button {
-                            if sortField == field {
-                                sortAscending.toggle()
-                            } else {
-                                sortField = field
-                                sortAscending = field == .dateAdded ? false : true
-                            }
-                        } label: {
-                            HStack {
-                                Text(field.title)
-                                if sortField == field {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Section("Order") {
-                    Button {
-                        sortAscending = true
-                    } label: {
-                        HStack {
-                            Text("Ascending")
-                            if sortAscending {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-
-                    Button {
-                        sortAscending = false
-                    } label: {
-                        HStack {
-                            Text("Descending")
-                            if !sortAscending {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                Label(sortField.title, systemImage: sortAscending ? "arrow.up" : "arrow.down")
-                    .font(.callout)
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-
-            // View Mode Picker
-            Picker("View", selection: $viewMode) {
-                ForEach(LibraryViewMode.allCases) { mode in
-                    Image(systemName: mode.systemImage)
-                        .tag(mode)
-                        .help(mode.title)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 80)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
+    }
+
+    // MARK: - Subviews
+
+    private var searchInput: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+
+            TextField("Filter tracks…", text: $searchQuery)
+                .textFieldStyle(.plain)
+                .font(.callout)
+
+            if !searchQuery.isEmpty {
+                Button {
+                    searchQuery = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.secondary.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Section("Sort By") {
+                ForEach(LibrarySortField.allCases) { field in
+                    Button {
+                        if sortField == field {
+                            sortAscending.toggle()
+                        } else {
+                            sortField = field
+                            sortAscending = field == .dateAdded ? false : true
+                        }
+                    } label: {
+                        HStack {
+                            Text(field.title)
+                            if sortField == field {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+
+            Section("Order") {
+                Button {
+                    sortAscending = true
+                } label: {
+                    HStack {
+                        Text("Ascending")
+                        if sortAscending {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+
+                Button {
+                    sortAscending = false
+                } label: {
+                    HStack {
+                        Text("Descending")
+                        if !sortAscending {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            Label(sortField.title, systemImage: sortAscending ? "arrow.up" : "arrow.down")
+                .font(.callout)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+
+    private var viewModePicker: some View {
+        Picker("View", selection: $viewMode) {
+            ForEach(LibraryViewMode.allCases) { mode in
+                Image(systemName: mode.systemImage)
+                    .tag(mode)
+                    .help(mode.title)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(width: 80)
     }
 }
 
@@ -142,3 +168,19 @@ struct LibraryFilterBar: View {
     )
     .frame(width: 700)
 }
+
+#Preview("Library Filter Bar · Compact") {
+    @Previewable @State var viewMode: LibraryViewMode = .table
+    @Previewable @State var sortField: LibrarySortField = .dateAdded
+    @Previewable @State var sortAscending = false
+    @Previewable @State var query = ""
+
+    LibraryFilterBar(
+        viewMode: $viewMode,
+        sortField: $sortField,
+        sortAscending: $sortAscending,
+        searchQuery: $query
+    )
+    .frame(width: 360)
+}
+

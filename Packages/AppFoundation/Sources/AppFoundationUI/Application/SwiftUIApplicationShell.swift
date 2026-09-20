@@ -8,10 +8,13 @@ public struct SwiftUIApplicationShell<Navigation: View>: View {
     private let shell: ResolvedApplicationShell
     @Binding private var isContextPresented: Bool
     private let navigation: Navigation
+    private let externalColumnVisibility: Binding<NavigationSplitViewVisibility>?
+    @State private var internalColumnVisibility: NavigationSplitViewVisibility = .automatic
 
     public init(
         shell: ResolvedApplicationShell,
         isContextPresented: Binding<Bool>,
+        columnVisibility: Binding<NavigationSplitViewVisibility>? = nil,
         @ViewBuilder navigation: () -> Navigation
     ) {
         precondition(shell.toolbar.items.filter {
@@ -20,11 +23,16 @@ public struct SwiftUIApplicationShell<Navigation: View>: View {
         }.count <= 1, "SwiftUI shell supports one native search field per workspace")
         self.shell = shell
         self._isContextPresented = isContextPresented
+        self.externalColumnVisibility = columnVisibility
         self.navigation = navigation()
     }
 
+    private var resolvedColumnVisibility: Binding<NavigationSplitViewVisibility> {
+        externalColumnVisibility ?? $internalColumnVisibility
+    }
+
     public var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: resolvedColumnVisibility) {
             navigation
         } detail: {
             searchableWorkspace
@@ -120,4 +128,21 @@ public struct SwiftUIApplicationShell<Navigation: View>: View {
     }
     .frame(minWidth: 700, minHeight: 500)
 }
+
+#Preview("SwiftUI Application Shell · Compact") {
+    @Previewable @State var showsContext = false
+    let shell = ApplicationShellResolver<String, String, String>(
+        shell: ApplicationShellPresentation(),
+        workspace: { _, _ in
+            WorkspacePresentation(identity: WorkspaceIdentity(title: "Library")) { (_: String) in
+                List(["Northern Lights", "Quiet Geometry"], id: \.self) { Text($0) }
+            }
+        }
+    ).resolve(route: "library", workspaceContext: "", shellContext: "")
+    SwiftUIApplicationShell(shell: shell, isContextPresented: $showsContext) {
+        List { Label("Library", systemImage: "music.note.list") }
+    }
+    .frame(width: 360, height: 600)
+}
 #endif
+

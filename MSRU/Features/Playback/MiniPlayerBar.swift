@@ -46,15 +46,54 @@ struct MiniPlayerBar: View {
 
     @ViewBuilder
     private func playerContent(width: CGFloat) -> some View {
-        if width < 600 {
-            HStack(spacing: 10) {
-                nowPlayingCenter
-                transportControls
+        if width < 400 {
+            // Ultra-compact layout (InteractionAtlas 15.1 & 2.1)
+            // [Artwork] [Title · Artist] [Play/Pause] [Queue]
+            HStack(spacing: 8) {
+                artwork(size: 34)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(playback.unifiedTitle)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    Text(playback.unifiedSubtitle)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                playPauseButton(size: 15)
+
+                queueButton
+            }
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if width < 600 {
+            // Mid-compact layout
+            // [Artwork] [Title/Subtitle/Scrubber] [Prev Play Next] [Queue]
+            HStack(spacing: 12) {
+                artwork(size: 38)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    metadata
+                    Spacer(minLength: 2)
+                    scrubber
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                compactTransportControls
+
                 trailingUtilities(compact: true)
             }
             .padding(.horizontal, 14)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
+            // Standard / Expanded layout
             ZStack {
                 HStack(spacing: 0) {
                     transportControls
@@ -70,169 +109,105 @@ struct MiniPlayerBar: View {
 
     // MARK: - Leading Transport
 
-    private var transportControls:
-        some View {
-
-        HStack(
-            alignment: .center,
-            spacing: 22
-        ) {
-
-            Button {
-
-                playback.previous()
-
-            } label: {
-
-                Image(
-                    systemName:
-                        "backward.fill"
-                )
-                .frame(
-                    width: 18,
-                    height: 24
-                )
-            }
-            .disabled(
-                !playback.unifiedCanPrevious
-            )
-            .help(
-                "Previous"
-            )
-
-
-            Button {
-
-                playback.toggle()
-
-            } label: {
-
-                Group {
-
-                    if playback.isResolving {
-
-                        ProgressView()
-                            .controlSize(
-                                .small
-                            )
-
-                    } else {
-
-                        Image(
-                            systemName:
-                                playback.isPlaying
-                                ? "pause.fill"
-                                : "play.fill"
-                        )
-                    }
-                }
-                .frame(
-                    width: 22,
-                    height: 28
-                )
-            }
-            .disabled(
-                !playback.unifiedHasTrack
-                || playback.isResolving
-            )
-            .help(
-                playback.isPlaying
-                ? "Pause"
-                : "Play"
-            )
-
-
-            Button {
-
-                playback.next()
-
-            } label: {
-
-                Image(
-                    systemName:
-                        "forward.fill"
-                )
-                .frame(
-                    width: 18,
-                    height: 24
-                )
-            }
-            .disabled(
-                !playback.unifiedCanNext
-            )
-            .help(
-                "Next"
-            )
+    private var previousButton: some View {
+        Button {
+            playback.previous()
+        } label: {
+            Image(systemName: "backward.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .frame(width: 18, height: 24)
+                .contentShape(Rectangle())
         }
-        .buttonStyle(
-            .plain
-        )
-        .font(
-            .system(
-                size: 17,
-                weight: .semibold
-            )
-        )
-        .foregroundStyle(
-            .primary
-        )
+        .buttonStyle(.plain)
+        .foregroundStyle(playback.unifiedCanPrevious ? Color.primary : Color.secondary.opacity(0.35))
+        .disabled(!playback.unifiedCanPrevious)
+        .help("Previous")
         .fixedSize()
     }
 
+    private func playPauseButton(size: CGFloat = 17) -> some View {
+        Button {
+            playback.toggle()
+        } label: {
+            Group {
+                if playback.isResolving {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: size, weight: .semibold))
+                }
+            }
+            .frame(width: 28, height: 28)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(playback.unifiedHasTrack ? Color.primary : Color.secondary.opacity(0.35))
+        .disabled(!playback.unifiedHasTrack || playback.isResolving)
+        .help(playback.isPlaying ? "Pause" : "Play")
+        .fixedSize()
+    }
+
+    private var nextButton: some View {
+        Button {
+            playback.next()
+        } label: {
+            Image(systemName: "forward.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .frame(width: 18, height: 24)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(playback.unifiedCanNext ? Color.primary : Color.secondary.opacity(0.35))
+        .disabled(!playback.unifiedCanNext)
+        .help("Next")
+        .fixedSize()
+    }
+
+    private var compactTransportControls: some View {
+        HStack(alignment: .center, spacing: 14) {
+            previousButton
+            playPauseButton(size: 16)
+            nextButton
+        }
+        .fixedSize()
+    }
+
+    private var transportControls: some View {
+        HStack(alignment: .center, spacing: 22) {
+            previousButton
+            playPauseButton(size: 17)
+            nextButton
+        }
+        .fixedSize()
+    }
 
     // MARK: - Center Now Playing
 
-    private var nowPlayingCenter:
-        some View {
+    private var nowPlayingCenter: some View {
+        HStack(alignment: .center, spacing: 11) {
+            artwork(size: 42)
 
-        HStack(
-            alignment: .center,
-            spacing: 11
-        ) {
-
-            artwork
-
-
-            VStack(
-                alignment: .leading,
-                spacing: 0
-            ) {
-
+            VStack(alignment: .leading, spacing: 0) {
                 metadata
-
-
-                Spacer(
-                    minLength: 2
-                )
-
-
-                HoverScrubber(
-                    progress:
-                        playbackProgress,
-                    isEnabled:
-                        playback.unifiedHasTrack
-                        && playback.duration > 0,
-                    onSeek: {
-                        progress in
-
-                        playback.seek(
-                            toProgress:
-                                progress
-                        )
-                    }
-                )
+                Spacer(minLength: 2)
+                scrubber
             }
-            .frame(
-                maxWidth:
-                    .infinity,
-                alignment:
-                    .leading
-            )
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(
-            height: 44
-        )
+        .frame(height: 44)
         .clipped()
+    }
+
+    private var scrubber: some View {
+        HoverScrubber(
+            progress: playbackProgress,
+            isEnabled: playback.unifiedHasTrack && playback.duration > 0,
+            onSeek: { progress in
+                playback.seek(toProgress: progress)
+            }
+        )
+        .frame(height: 10)
     }
 
 
@@ -283,11 +258,8 @@ struct MiniPlayerBar: View {
 
     // MARK: - Artwork
 
-    private var artwork:
-        some View {
-
+    private func artwork(size: CGFloat = 42) -> some View {
         Group {
-
             if let data = playback.unifiedArtworkData,
                let image = Image(artworkData: data) {
                 image.resizable().scaledToFill()
@@ -296,110 +268,67 @@ struct MiniPlayerBar: View {
                     if case .success(let image) = phase {
                         image.resizable().scaledToFill()
                     } else {
-                        artworkPlaceholder
+                        artworkPlaceholder(size: size)
                     }
                 }
             } else {
-                artworkPlaceholder
+                artworkPlaceholder(size: size)
             }
         }
-        /*
-         先约束尺寸，再裁剪内容。
-
-         之前的溢出问题不能再出现。
-         */
-        .frame(
-            width: 42,
-            height: 42
-        )
+        .frame(width: size, height: size)
         .clipped()
         .clipShape(
             RoundedRectangle(
-                cornerRadius: 7,
+                cornerRadius: size > 36 ? 7 : 6,
                 style: .continuous
             )
         )
         .fixedSize()
     }
 
-
-    private var artworkPlaceholder:
-        some View {
-
+    private func artworkPlaceholder(size: CGFloat = 42) -> some View {
         ZStack {
-
             RoundedRectangle(
-                cornerRadius: 7,
+                cornerRadius: size > 36 ? 7 : 6,
                 style: .continuous
             )
-            .fill(
-                Color.primary
-                    .opacity(0.08)
-            )
+            .fill(Color.primary.opacity(0.08))
 
-
-            Image(
-                systemName:
-                    "music.note"
-            )
-            .font(
-                .system(
-                    size: 15,
-                    weight: .medium
-                )
-            )
-            .foregroundStyle(
-                .secondary
-            )
+            Image(systemName: "music.note")
+                .font(.system(size: size * 0.38, weight: .medium))
+                .foregroundStyle(.secondary)
         }
     }
 
-
     // MARK: - Trailing
+
+    private var queueButton: some View {
+        Button(action: onToggleQueue) {
+            Image(systemName: "list.bullet")
+                .font(.system(size: 16, weight: .medium))
+                .frame(width: 24, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Color.primary)
+        .help("Up Next")
+        .fixedSize()
+    }
 
     @ViewBuilder
     private func trailingUtilities(
         compact: Bool
     ) -> some View {
-
         HStack(
             alignment: .center,
             spacing: 14
         ) {
-
             if !compact,
                playback.unifiedHasTrack {
-
                 providerBadge
             }
 
-
-            Button(
-                action:
-                    onToggleQueue
-            ) {
-
-                Image(
-                    systemName:
-                        "list.bullet"
-                )
-                .font(
-                    .system(
-                        size: 16,
-                        weight: .medium
-                    )
-                )
-                .frame(
-                    width: 24,
-                    height: 28
-                )
-            }
-            .buttonStyle(
-                .plain
-            )
-            .help(
-                "Up Next"
-            )
+            queueButton
         }
         .fixedSize()
     }
@@ -776,3 +705,11 @@ private struct HoverScrubber:
     MiniPlayerBar(playback: playback, onToggleQueue: {})
         .frame(width: 320).padding()
 }
+
+#Preview("Mini Player · Mid-Compact") {
+    let playback = MSRUPreviewData.makePlaybackController()
+    let _ = playback.playbackQueue.start(PlaybackItem(local: MSRUPreviewData.localTracks[0]))
+    MiniPlayerBar(playback: playback, onToggleQueue: {})
+        .frame(width: 480).padding()
+}
+
