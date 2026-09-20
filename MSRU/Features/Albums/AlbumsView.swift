@@ -22,9 +22,9 @@ struct AlbumsView: View {
 
         var displayTitle: String {
             switch self {
-            case .title: return "标题"
-            case .artist: return "艺术家"
-            case .year: return "年份"
+            case .title: return "Title"
+            case .artist: return "Artist"
+            case .year: return "Year"
             }
         }
     }
@@ -82,11 +82,11 @@ struct AlbumsView: View {
             }
         }
         .confirmationDialog(
-            "确认删除专辑「\(albumPendingDelete?.title ?? "")」？",
+            "Delete album \"\(albumPendingDelete?.title ?? "")\"?",
             isPresented: $isDeleteConfirmationPresented,
             titleVisibility: .visible
         ) {
-            Button("级联删除该专辑及全部歌曲", role: .destructive) {
+            Button("Cascade delete album and all songs", role: .destructive) {
                 if let toDelete = albumPendingDelete {
                     Task {
                         await localStore.deleteAlbum(title: toDelete.title, artist: toDelete.artist)
@@ -96,9 +96,9 @@ struct AlbumsView: View {
                     }
                 }
             }
-            Button("取消", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("此操作将执行级联删除，从本地资料库中移除该专辑名下的全部歌曲。")
+            Text("This operation will perform a cascade delete, removing all songs under this album from the local library.")
         }
     }
 
@@ -126,13 +126,13 @@ struct AlbumsView: View {
                                 }
                             )
                             .contextMenu {
-                                Button("播放专辑") { playAlbum(album) }
+                                Button("Play Album") { playAlbum(album) }
                                 Divider()
                                 Button(role: .destructive) {
                                     albumPendingDelete = album
                                     isDeleteConfirmationPresented = true
                                 } label: {
-                                    Label("删除专辑 (级联删除)", systemImage: "trash")
+                                    Label("Delete Album (Cascade)", systemImage: "trash")
                                 }
                             }
                         }
@@ -147,10 +147,10 @@ struct AlbumsView: View {
     private var header: some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("专辑")
+                Text("Albums")
                     .font(.largeTitle.bold())
 
-                Text("\(allAlbums.count) 张专辑")
+                Text("\(allAlbums.count) Albums")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -160,7 +160,7 @@ struct AlbumsView: View {
                 Button {
                     onAddMusic()
                 } label: {
-                    Label("添加音乐", systemImage: "plus")
+                    Label("Add Music", systemImage: "plus")
                         .font(.callout.bold())
                 }
                 .buttonStyle(.borderedProminent)
@@ -171,7 +171,7 @@ struct AlbumsView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
 
-                TextField("筛选专辑…", text: $searchQuery)
+                TextField("Filter albums…", text: $searchQuery)
                     .textFieldStyle(.plain)
 
                 if !searchQuery.isEmpty {
@@ -191,9 +191,9 @@ struct AlbumsView: View {
 
             HStack {
                 Spacer()
-                Picker("排序", selection: $sortField) {
+                Picker("Sort", selection: $sortField) {
                     ForEach(AlbumSortField.allCases) { field in
-                        Text(field.displayTitle).tag(field)
+                        Text(LocalizedStringKey(field.rawValue)).tag(field)
                     }
                 }
                 .frame(width: 110)
@@ -210,10 +210,10 @@ struct AlbumsView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary.opacity(0.4))
 
-            Text("未找到专辑")
+            Text("No albums found")
                 .font(.headline)
 
-            Text("导入音乐或调整搜索条件以查看专辑资料库。")
+            Text("Import music or adjust search terms to see albums.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

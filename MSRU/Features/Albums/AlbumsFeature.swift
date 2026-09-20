@@ -16,8 +16,8 @@ enum AlbumsFeature: ApplicationFeaturePresentation {
             sidebar: [
                 SidebarContribution(
                     id: "albums",
-                    group: "资料库",
-                    title: "专辑",
+                    group: "Library",
+                    title: "Albums",
                     systemImage: "square.stack",
                     route: .section(.albums),
                     order: 110
@@ -41,7 +41,7 @@ enum AlbumsFeature: ApplicationFeaturePresentation {
             ) { scene in
                 WorkspacePresentation(
                     identity: WorkspaceIdentity(
-                        title: "专辑",
+                        title: String(localized: "Albums"),
                         systemImage: "square.stack"
                     )
                 ) { _ in

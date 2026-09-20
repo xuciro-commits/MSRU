@@ -51,7 +51,7 @@ struct RadioHeroBannerView: View {
                             Circle()
                                 .fill(isCurrent && isPlaying ? Color.red : Color.white)
                                 .frame(width: 7, height: 7)
-                            Text("精选直播")
+                            Text("Featured Live")
                                 .font(.system(size: 10, weight: .bold))
                                 .tracking(1.0)
                         }
@@ -60,7 +60,7 @@ struct RadioHeroBannerView: View {
                         .background(.ultraThinMaterial)
                         .clipShape(Capsule())
 
-                        Text(station.genre.displayTitle)
+                        Text(LocalizedStringKey(station.genre.rawValue))
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.85))
                             .padding(.horizontal, 8)
@@ -97,7 +97,7 @@ struct RadioHeroBannerView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: isCurrent && isPlaying ? "pause.fill" : "play.fill")
                                     .font(.system(size: 13, weight: .semibold))
-                                Text(isCurrent && isPlaying ? "暂停流媒体" : "现在收听")
+                                Text(LocalizedStringKey(isCurrent && isPlaying ? "Pause Stream" : "Listen Now"))
                                     .font(.system(size: 13, weight: .semibold))
                             }
                             .foregroundStyle(.black)

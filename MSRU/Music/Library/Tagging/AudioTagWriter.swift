@@ -70,13 +70,13 @@ public enum AudioTagWriterError: LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .fileNotFound(let url):
-            return "音频文件未找到: \(url.path)"
+            return String(localized: "Audio file not found: \(url.path)")
         case .unsupportedFormat(let ext):
-            return "不支持的音频格式标签写入: .\(ext)"
+            return String(localized: "Unsupported format for tag writing: .\(ext)")
         case .atomicWriteFailed(let msg):
-            return "物理文件原子写入失败: \(msg)"
+            return String(localized: "Atomic write to file failed: \(msg)")
         case .corruptedAudioHeader:
-            return "音频文件头校验失败，已自动回滚以保护原文件"
+            return String(localized: "Audio header validation failed; rolled back to protect the original file")
         }
     }
 }

@@ -71,11 +71,11 @@ struct ArtistsView: View {
             }
         }
         .confirmationDialog(
-            "确认删除艺术家「\(artistPendingDelete?.name ?? "")」？",
+            "Delete artist \"\(artistPendingDelete?.name ?? "")\"?",
             isPresented: $isDeleteConfirmationPresented,
             titleVisibility: .visible
         ) {
-            Button("级联删除该艺术家及全部内容", role: .destructive) {
+            Button("Cascade delete artist and all content", role: .destructive) {
                 if let toDelete = artistPendingDelete {
                     Task {
                         await localStore.deleteArtist(name: toDelete.name)
@@ -85,9 +85,9 @@ struct ArtistsView: View {
                     }
                 }
             }
-            Button("取消", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("此操作将执行级联删除，同时从本地资料库中移除该艺术家的所有专辑与全部歌曲。")
+            Text("This operation will perform a cascade delete, removing all albums and songs of this artist from the local library.")
         }
     }
 
@@ -116,7 +116,7 @@ struct ArtistsView: View {
                                     artistPendingDelete = artist
                                     isDeleteConfirmationPresented = true
                                 } label: {
-                                    Label("删除艺术家 (级联删除)", systemImage: "trash")
+                                    Label("Delete Artist (Cascade)", systemImage: "trash")
                                 }
                             }
                         }
@@ -131,10 +131,10 @@ struct ArtistsView: View {
     private var header: some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("艺术家")
+                Text("Artists")
                     .font(.largeTitle.bold())
 
-                Text("\(allArtists.count) 位艺术家")
+                Text("\(allArtists.count) Artists")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -144,7 +144,7 @@ struct ArtistsView: View {
                 Button {
                     onAddMusic()
                 } label: {
-                    Label("添加音乐", systemImage: "plus")
+                    Label("Add Music", systemImage: "plus")
                         .font(.callout.bold())
                 }
                 .buttonStyle(.borderedProminent)
@@ -155,7 +155,7 @@ struct ArtistsView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
 
-                TextField("筛选艺术家…", text: $searchQuery)
+                TextField("Filter artists…", text: $searchQuery)
                     .textFieldStyle(.plain)
 
                 if !searchQuery.isEmpty {
@@ -188,10 +188,10 @@ struct ArtistsView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary.opacity(0.4))
 
-            Text("未找到艺术家")
+            Text("No artists found")
                 .font(.headline)
 
-            Text("导入音乐后，你喜爱的艺术家会显示在这里。")
+            Text("Imported artists will appear here.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

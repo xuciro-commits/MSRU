@@ -76,6 +76,12 @@ final class ApplicationModel {
         RadioStore
 
 
+    // MARK: - Language
+
+    let languageSettings:
+        LanguageSettings
+
+
     // MARK: - Dependencies
 
     /*
@@ -132,7 +138,9 @@ final class ApplicationModel {
             openverseSearch:
                 .live,
             radioStore:
-                RadioStore()
+                RadioStore(),
+            languageSettings:
+                LanguageSettings()
         )
     }
 
@@ -166,7 +174,9 @@ final class ApplicationModel {
         openverseSearch:
             OpenverseSearchClient,
         radioStore:
-            RadioStore? = nil
+            RadioStore? = nil,
+        languageSettings:
+            LanguageSettings? = nil
     ) {
 
         self.musicCatalog =
@@ -198,6 +208,10 @@ final class ApplicationModel {
 
         self.radioStore =
             resolvedRadioStore
+
+
+        self.languageSettings =
+            languageSettings ?? LanguageSettings()
 
 
         // MARK: Dependency Composition

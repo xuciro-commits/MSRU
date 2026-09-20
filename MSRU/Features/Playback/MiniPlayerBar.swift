@@ -61,13 +61,13 @@ struct MiniPlayerBar: View {
                 artwork(size: 34)
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(playback.unifiedTitle)
+                    Text(LocalizedStringKey(playback.unifiedTitle))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .truncationMode(.tail)
 
-                    Text(playback.unifiedSubtitle)
+                    Text(LocalizedStringKey(playback.unifiedSubtitle))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -129,7 +129,7 @@ struct MiniPlayerBar: View {
         .buttonStyle(.plain)
         .foregroundStyle(playback.unifiedCanPrevious ? Color.primary : Color.secondary.opacity(0.35))
         .disabled(!playback.unifiedCanPrevious)
-        .help("上一首")
+        .help("Previous")
         .fixedSize()
     }
 
@@ -152,7 +152,7 @@ struct MiniPlayerBar: View {
         .buttonStyle(.plain)
         .foregroundStyle(playback.unifiedHasTrack ? Color.primary : Color.secondary.opacity(0.35))
         .disabled(!playback.unifiedHasTrack || playback.isResolving)
-        .help(playback.isPlaying ? "暂停" : "播放")
+        .help(playback.isPlaying ? "Pause" : "Play")
         .fixedSize()
     }
 
@@ -168,7 +168,7 @@ struct MiniPlayerBar: View {
         .buttonStyle(.plain)
         .foregroundStyle(playback.unifiedCanNext ? Color.primary : Color.secondary.opacity(0.35))
         .disabled(!playback.unifiedCanNext)
-        .help("下一首")
+        .help("Next")
         .fixedSize()
     }
 
@@ -226,7 +226,7 @@ struct MiniPlayerBar: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             } else if playback.radioCurrentStation != nil {
-                Text("直播")
+                Text("Live")
                     .font(.system(size: 8, weight: .bold))
                     .foregroundStyle(.red)
                     .padding(.horizontal, 4)
@@ -266,7 +266,7 @@ struct MiniPlayerBar: View {
 
             HStack(spacing: 6) {
                 Text(
-                    playback.unifiedTitle
+                    LocalizedStringKey(playback.unifiedTitle)
                 )
                 .font(
                     .system(
@@ -289,7 +289,7 @@ struct MiniPlayerBar: View {
 
 
             Text(
-                playback.unifiedSubtitle
+                LocalizedStringKey(playback.unifiedSubtitle)
             )
             .font(
                 .system(
@@ -316,7 +316,7 @@ struct MiniPlayerBar: View {
             artworkImage(size: size)
         }
         .buttonStyle(.plain)
-        .help("打开正在播放画布")
+        .help("Open Now Playing Canvas")
     }
 
     private func artworkImage(size: CGFloat = 42) -> some View {
@@ -374,7 +374,7 @@ struct MiniPlayerBar: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(Color.secondary)
-        .help("歌词")
+        .help("Lyrics")
         .fixedSize()
     }
 
@@ -389,7 +389,7 @@ struct MiniPlayerBar: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(Color.secondary)
-        .help("频谱可视化")
+        .help("Visualizer")
         .fixedSize()
     }
 
@@ -402,7 +402,7 @@ struct MiniPlayerBar: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(Color.primary)
-        .help("接下来播放")
+        .help("Up Next")
         .fixedSize()
     }
 
@@ -417,7 +417,7 @@ struct MiniPlayerBar: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(Color.secondary)
-        .help("完整画布")
+        .help("Full Canvas")
         .fixedSize()
     }
 
@@ -465,7 +465,7 @@ struct MiniPlayerBar: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(playback.isMuted ? "取消静音" : "静音")
+            .help(playback.isMuted ? "Unmute" : "Mute")
 
             Slider(
                 value: Binding(

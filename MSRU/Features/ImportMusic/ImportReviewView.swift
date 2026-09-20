@@ -54,7 +54,7 @@ struct ImportReviewView: View {
     private var headerView: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("导入审核 (Import Review)")
+                Text("Import Review")
                     .font(.title2.bold())
 
                 Spacer()
@@ -71,7 +71,7 @@ struct ImportReviewView: View {
                 }
             }
 
-            Text("扫描共 \(store.totalScannedCount) 首 · 自动入库 \(store.autoAcceptedCount) 首 (高置信度) · 待确认 \(store.pendingReviewClusters.reduce(0) { $0 + $1.cluster.tracks.count }) 首 · 未识别 \(store.unidentifiedTracks.count) 首 · 多版本/潜在重复 \(store.potentialDuplicatesCount) 首")
+            Text("Scanned \(store.totalScannedCount) · Auto-added \(store.autoAcceptedCount) (High Confidence) · Pending \(store.pendingReviewClusters.reduce(0) { $0 + $1.cluster.tracks.count }) · Unidentified \(store.unidentifiedTracks.count) · Potential Duplicates \(store.potentialDuplicatesCount) ")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
@@ -84,9 +84,9 @@ struct ImportReviewView: View {
     private var filterAndSearchBar: some View {
         HStack(spacing: 14) {
             HStack {
-                Picker("筛选", selection: $store.selectedFilter) {
+                Picker("Filter", selection: $store.selectedFilter) {
                     ForEach(ReviewFilterOption.allCases) { opt in
-                        Text(opt.rawValue).tag(opt)
+                        Text(LocalizedStringKey(opt.rawValue)).tag(opt)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -98,7 +98,7 @@ struct ImportReviewView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField("搜索待审核…", text: $store.searchText)
+                TextField("Search pending items…", text: $store.searchText)
                     .textFieldStyle(.plain)
             }
             .padding(.horizontal, 10)
@@ -126,10 +126,10 @@ struct ImportReviewView: View {
                         .foregroundStyle(Color.accentColor)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("发现 \(suggestion.variantNames.count) 种异名写法: \(suggestion.variantNames.joined(separator: " / "))")
+                        Text("Found \(suggestion.variantNames.count) variants: \(suggestion.variantNames.joined(separator: " / "))")
                             .font(.subheadline.bold())
 
-                        Text("建议统一归并至: 实体 \(suggestion.canonicalArtistName) (MBID: \(suggestion.canonicalMBID))")
+                        Text("Recommend merging to: Entity \(suggestion.canonicalArtistName) (MBID: \(suggestion.canonicalMBID))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -139,7 +139,7 @@ struct ImportReviewView: View {
                     Button {
                         store.mergeAliasSuggestion(id: suggestion.id)
                     } label: {
-                        Text("一键归并")
+                        Text("One-Click Merge")
                             .font(.callout.bold())
                     }
                     .buttonStyle(.borderedProminent)
@@ -161,22 +161,22 @@ struct ImportReviewView: View {
         VStack(alignment: .leading, spacing: 12) {
             // Table Header
             HStack {
-                Text("候选专辑 / 曲目")
+                Text("Candidate Album / Track")
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                Text("声纹匹配置信度")
+                Text("Fingerprint Confidence")
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
                     .frame(width: 140, alignment: .leading)
 
-                Text("匹配候选 (MusicBrainz)")
+                Text("Matching Candidate (MusicBrainz)")
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
                     .frame(width: 220, alignment: .leading)
 
-                Text("操作")
+                Text("Action")
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
                     .frame(width: 60, alignment: .trailing)
@@ -185,9 +185,9 @@ struct ImportReviewView: View {
 
             if store.filteredClusters.isEmpty {
                 ContentUnavailableView {
-                    Label("无待审核曲目", systemImage: "checkmark.seal")
+                    Label("No Pending Tracks", systemImage: "checkmark.seal")
                 } description: {
-                    Text("所有导入曲目均已完成高置信度归并或已审核。")
+                    Text("All imported tracks have been resolved with high confidence or reviewed.")
                 }
                 .frame(maxWidth: .infinity, minHeight: 200)
             } else {
@@ -220,12 +220,13 @@ struct ImportReviewView: View {
                 .buttonStyle(.plain)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    let albumTitle = clusterResult.matchedRelease?.title ?? clusterResult.cluster.albumName ?? "未知专辑"
-                    let artistTitle = clusterResult.matchedRelease?.artist ?? clusterResult.cluster.tracks.compactMap(\.artist).first ?? "未知歌手"
+                    let albumTitle = clusterResult.matchedRelease?.title ?? clusterResult.cluster.albumName ?? String(localized: "Unknown Album")
+                    let artistTitle = clusterResult.matchedRelease?.artist ?? clusterResult.cluster.tracks.compactMap(\.artist).first ?? String(localized: "Unknown Artist")
                     Text("\(albumTitle) - \(artistTitle)")
                         .font(.subheadline.bold())
 
-                    Text("\(clusterResult.cluster.tracks.count) 首 · 目录: \(clusterResult.cluster.folderURL?.lastPathComponent ?? "未归档")")
+                    let folderName = clusterResult.cluster.folderURL?.lastPathComponent ?? String(localized: "Unarchived")
+                    Text("\(clusterResult.cluster.tracks.count) tracks · Directory: \(folderName)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -236,7 +237,7 @@ struct ImportReviewView: View {
                     .frame(width: 140, alignment: .leading)
 
                 // Release info
-                Text(clusterResult.matchedRelease?.date.map { "Release: \($0)" } ?? "使用本地标签导入")
+                Text(clusterResult.matchedRelease?.date.map { "Release: \($0)" } ?? String(localized: "Import with local tags"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(width: 220, alignment: .leading)
@@ -262,7 +263,7 @@ struct ImportReviewView: View {
             if isExpanded {
                 if clusterResult.scoredCandidates.count > 1 {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("发现多个匹配发行版本 (点击切换)：")
+                        Text("Multiple matching releases found (click to switch):")
                             .font(.caption2.bold())
                             .foregroundStyle(.secondary)
 
@@ -340,7 +341,7 @@ struct ImportReviewView: View {
             confidenceMeter(trackMatch.score.confidence)
                 .frame(width: 140, alignment: .leading)
 
-            Text(trackMatch.candidate?.title ?? "原样保留")
+            Text(trackMatch.candidate?.title ?? String(localized: "Keep Original"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .frame(width: 220, alignment: .leading)
@@ -371,7 +372,7 @@ struct ImportReviewView: View {
 
     private var bottomActionBar: some View {
         HStack(spacing: 14) {
-            Button("放弃未确认项") {
+            Button("Discard Unconfirmed") {
                 store.discardUnconfirmed()
             }
             .buttonStyle(.plain)
@@ -379,13 +380,13 @@ struct ImportReviewView: View {
 
             Spacer()
 
-            Button("以原始文件导入") {
+            Button("Import as Original Files") {
                 let tracks = store.importAsOriginalFiles()
                 onCommit?(tracks)
             }
             .buttonStyle(.bordered)
 
-            Button("写入物理Tag并安全入库 (\(store.selectedClusterIDs.count))") {
+            Button("Write Tags and Import (\(store.selectedClusterIDs.count))") {
                 Task {
                     let tracks = await store.commitSelectedMatches(writePhysicalTags: true, exportCompanionCover: true)
                     onCommit?(tracks)

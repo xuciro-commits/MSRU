@@ -3,6 +3,7 @@
 //  MSRU
 //
 
+import Foundation
 import AppFoundation
 
 // MARK: - Application Contribution
@@ -16,8 +17,8 @@ extension RadioFeature: ApplicationFeature {
             sidebar: [
                 SidebarContribution(
                     id: "radio",
-                    group: "发现",
-                    title: "电台",
+                    group: "Discover",
+                    title: "Radio",
                     systemImage: "dot.radiowaves.left.and.right",
                     route: SceneRoute.section(.radio),
                     order: 30

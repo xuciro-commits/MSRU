@@ -111,13 +111,13 @@ struct AddMusicView: View {
 
                     actionCard(
                         title:
-                            "文件",
+                            "Files",
                         description:
-                            "将音频文件导入 MSRU 资料库。",
+                            "Import audio files into MSRU Library.",
                         systemImage:
                             "doc.badge.plus",
                         status:
-                            "可用",
+                            "Available",
                         isEnabled:
                             true
                     ) {
@@ -129,13 +129,13 @@ struct AddMusicView: View {
 
                     actionCard(
                         title:
-                            "文件夹",
+                            "Folders",
                         description:
-                            "添加文件夹并将其作为资料库来源。",
+                            "Add folders to use as library sources.",
                         systemImage:
                             "folder.badge.plus",
                         status:
-                            "可用",
+                            "Available",
                         isEnabled:
                             true
                     ) {
@@ -148,11 +148,11 @@ struct AddMusicView: View {
                         title:
                             "Apple Music",
                         description:
-                            "通过官方 Apple Music 途径连接或导入专辑、艺术家和歌曲。",
+                            "Connect or import albums, artists, and songs via Apple Music.",
                         systemImage:
                             "apple.logo",
                         status:
-                            "官方集成",
+                            "Official Integration",
                         isEnabled:
                             true
                     ) {
@@ -164,13 +164,13 @@ struct AddMusicView: View {
 
                     actionCard(
                         title:
-                            "服务提供方资料库",
+                            "Provider Library",
                         description:
-                            "将已连接服务提供方中的已保存音乐导入统一资料库。",
+                            "Import saved music from connected providers into the unified library.",
                         systemImage:
                             "rectangle.stack.badge.plus",
                         status:
-                            "需要服务提供方",
+                            "Requires Provider",
                         isEnabled:
                             false
                     ) {}
@@ -190,11 +190,11 @@ struct AddMusicView: View {
             spacing: 5
         ) {
 
-            Text("添加音乐")
+            Text("Add Music")
                 .font(.largeTitle.bold())
 
             Text(
-                "导入本地媒体，或从已连接的服务中导入音乐。"
+                "Import local media, or import music from connected services."
             )
             .font(.callout)
             .foregroundStyle(.secondary)
@@ -219,7 +219,7 @@ struct AddMusicView: View {
                 } label: {
 
                     Label(
-                        "添加音乐",
+                        "Add Music",
                         systemImage:
                             "chevron.left"
                     )
@@ -277,7 +277,11 @@ struct AddMusicView: View {
                     Spacer()
 
 
-                    Text(status)
+                    Text(
+                        LocalizedStringKey(
+                            status
+                        )
+                    )
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 9)
@@ -294,10 +298,18 @@ struct AddMusicView: View {
                     spacing: 5
                 ) {
 
-                    Text(title)
+                    Text(
+                        LocalizedStringKey(
+                            title
+                        )
+                    )
                         .font(.title3.bold())
 
-                    Text(description)
+                    Text(
+                        LocalizedStringKey(
+                            description
+                        )
+                    )
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.leading)
@@ -307,9 +319,11 @@ struct AddMusicView: View {
                 HStack {
 
                     Text(
-                        isEnabled
-                        ? "打开"
-                        : "暂不可用"
+                        LocalizedStringKey(
+                            isEnabled
+                            ? "Open"
+                            : "Unavailable"
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)

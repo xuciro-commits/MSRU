@@ -34,16 +34,16 @@ nonisolated enum ManagedProviderCapability:
     var title: String {
         switch self {
         case .catalog:
-            return "目录"
+            return String(localized: "Catalog")
 
         case .metadata:
-            return "元数据"
+            return String(localized: "Metadata")
 
         case .playback:
-            return "播放"
+            return String(localized: "Playback")
 
         case .library:
-            return "资料库"
+            return String(localized: "Library")
         }
     }
 }
@@ -135,18 +135,18 @@ nonisolated struct ManagedProvider:
 
     var healthTitle: String {
         if !isEnabled {
-            return "已停用"
+            return String(localized: "Disabled")
         }
 
         switch health {
         case .unknown:
-            return "未测试"
+            return String(localized: "Untested")
 
         case .available:
-            return "可用"
+            return String(localized: "Available")
 
         case .unavailable:
-            return "不可用"
+            return String(localized: "Unavailable")
         }
     }
 }

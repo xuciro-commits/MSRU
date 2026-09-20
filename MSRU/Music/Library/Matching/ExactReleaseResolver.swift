@@ -195,8 +195,8 @@ public struct ExactReleaseResolver: Sendable {
             }
 
             let pct = Int(round(total * 100))
-            let yearInfo = candidate.date?.prefix(4).description ?? "未知年份"
-            let reason = "置信度 \(pct)% · \(candidate.artist) - 《\(candidate.title)》 (\(yearInfo)) · \(candidate.trackCount) 首"
+            let yearInfo = candidate.date?.prefix(4).description ?? String(localized: "Unknown Year")
+            let reason = "\(String(localized: "Confidence")) \(pct)% · \(candidate.artist) - 《\(candidate.title)》 (\(yearInfo)) · \(candidate.trackCount) \(String(localized: "tracks"))"
 
             scored.append(ScoredReleaseCandidate(
                 release: candidate,

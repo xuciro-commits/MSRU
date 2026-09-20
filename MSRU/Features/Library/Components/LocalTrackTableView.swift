@@ -36,17 +36,17 @@ struct LocalTrackTableView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: selectedTrackIDs.count)
         .confirmationDialog(
-            "确认删除所选歌曲？",
+            "Delete selected songs?",
             isPresented: $isDeleteConfirmationPresented,
             titleVisibility: .visible
         ) {
-            Button("从资料库移除 (\(selectedTrackIDs.count) 首)", role: .destructive) {
+            Button("Remove from Library (\(selectedTrackIDs.count) items)", role: .destructive) {
                 onDeleteTracks?(selectedTrackIDs)
                 selectedTrackIDs.removeAll()
             }
-            Button("取消", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("所选歌曲将从本地资料库中移除。原始音频文件将保留在磁盘上。")
+            Text("Selected songs will be removed from local library. Original files will remain on disk.")
         }
         .onChange(of: selectedTrackIDs) { _, newIDs in
             if let firstID = newIDs.first, let found = tracks.first(where: { $0.id == firstID }) {
@@ -96,7 +96,7 @@ struct LocalTrackTableView: View {
             .width(min: 32, ideal: 36, max: 44)
 
             // Title column (Artwork + Title)
-            TableColumn("标题") { track in
+            TableColumn("Title") { track in
                 HStack(spacing: 10) {
                     trackArtwork(track)
                         .frame(width: 28, height: 28)
@@ -116,7 +116,7 @@ struct LocalTrackTableView: View {
             .width(min: 180, ideal: 240)
 
             // Artist column
-            TableColumn("艺术家") { track in
+            TableColumn("Artist") { track in
                 Text(track.artist)
                     .font(.body)
                     .foregroundStyle(.secondary)
@@ -125,7 +125,7 @@ struct LocalTrackTableView: View {
             .width(min: 120, ideal: 160)
 
             // Album column
-            TableColumn("专辑") { track in
+            TableColumn("Album") { track in
                 Text(track.album ?? "—")
                     .font(.body)
                     .foregroundStyle(.secondary)
@@ -134,7 +134,7 @@ struct LocalTrackTableView: View {
             .width(min: 120, ideal: 160)
 
             // Duration column
-            TableColumn("时长") { track in
+            TableColumn("Duration") { track in
                 Text(durationString(track.duration))
                     .font(.callout.monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -142,7 +142,7 @@ struct LocalTrackTableView: View {
             .width(min: 50, ideal: 60, max: 70)
 
             // Favorite column
-            TableColumn("收藏") { track in
+            TableColumn("Favorite") { track in
                 let isSaved = library.contains(local: track)
                 Button {
                     Task {
@@ -158,7 +158,7 @@ struct LocalTrackTableView: View {
                         .font(.callout)
                 }
                 .buttonStyle(.plain)
-                .help(isSaved ? "从资料库移除" : "加入资料库")
+                .help(isSaved ? "Remove from Library" : "Add to Library")
             }
             .width(min: 32, ideal: 36, max: 40)
         }
@@ -239,7 +239,7 @@ struct LocalTrackTableView: View {
                     .font(.callout)
             }
             .buttonStyle(.plain)
-            .help(isSaved ? "从资料库移除" : "加入资料库")
+            .help(isSaved ? "Remove from Library" : "Add to Library")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -280,7 +280,7 @@ struct LocalTrackTableView: View {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(Color.accentColor)
 
-            Text("已选择 \(selectedTrackIDs.count) 首歌曲")
+            Text("\(selectedTrackIDs.count) songs")
                 .font(.callout.weight(.medium))
 
             Spacer()
@@ -291,7 +291,7 @@ struct LocalTrackTableView: View {
                     playback.toggle(track: first, queue: selected)
                 }
             } label: {
-                Label("播放所选", systemImage: "play.fill")
+                Label("Play Selected", systemImage: "play.fill")
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
@@ -302,7 +302,7 @@ struct LocalTrackTableView: View {
                     playback.addToQueue(t)
                 }
             } label: {
-                Label("加入队列", systemImage: "text.badge.plus")
+                Label("Add to Queue", systemImage: "text.badge.plus")
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
@@ -310,12 +310,12 @@ struct LocalTrackTableView: View {
             Button(role: .destructive) {
                 isDeleteConfirmationPresented = true
             } label: {
-                Label("从资料库删除", systemImage: "trash")
+                Label("Delete from Library", systemImage: "trash")
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
 
-            Button("取消选择") {
+            Button("Deselect All") {
                 selectedTrackIDs.removeAll()
             }
             .buttonStyle(.plain)
@@ -371,20 +371,20 @@ struct LocalTrackTableView: View {
         Button {
             playback.toggle(track: track, queue: tracks)
         } label: {
-            Label(isCurrentTrack(track) && playback.isPlaying ? "暂停" : "播放",
+            Label(isCurrentTrack(track) && playback.isPlaying ? "Pause" : "Play",
                   systemImage: isCurrentTrack(track) && playback.isPlaying ? "pause.fill" : "play.fill")
         }
 
         Button {
             playback.playNext(track)
         } label: {
-            Label("下一首播放", systemImage: "text.line.first.and.arrowtriangle.forward")
+            Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
         }
 
         Button {
             playback.addToQueue(track)
         } label: {
-            Label("加入队列", systemImage: "text.badge.plus")
+            Label("Add to Queue", systemImage: "text.badge.plus")
         }
 
         Divider()
@@ -399,7 +399,7 @@ struct LocalTrackTableView: View {
                 }
             }
         } label: {
-            Label(isSaved ? "从资料库移除" : "加入资料库",
+            Label(isSaved ? "Remove from Library" : "Add to Library",
                   systemImage: isSaved ? "heart.slash" : "heart")
         }
 
@@ -407,7 +407,7 @@ struct LocalTrackTableView: View {
             Button {
                 onRevealInFinder(track.fileURL)
             } label: {
-                Label("在访达中显示", systemImage: "arrow.up.forward.square")
+                Label("Reveal in Finder", systemImage: "arrow.up.forward.square")
             }
         }
 
@@ -422,8 +422,8 @@ struct LocalTrackTableView: View {
             } label: {
                 Label(
                     selectedTrackIDs.contains(track.id) && selectedTrackIDs.count > 1
-                        ? "从资料库删除所选 (\(selectedTrackIDs.count) 首)"
-                        : "从资料库删除",
+                        ? "Delete selected from Library (\(selectedTrackIDs.count) items)"
+                        : "Delete from Library",
                     systemImage: "trash"
                 )
             }

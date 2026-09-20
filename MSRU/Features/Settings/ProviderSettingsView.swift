@@ -16,8 +16,8 @@ struct ProviderSettingsView: View {
         VStack(alignment: .leading, spacing: 24) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("已配置的服务提供方").font(.title3.bold())
-                    Text("分别配置目录、元数据、资料库和播放能力。")
+                    Text("Configured Providers").font(.title3.bold())
+                    Text("Configure catalog, metadata, library, and playback capabilities separately.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -25,7 +25,7 @@ struct ProviderSettingsView: View {
                 Button {
                     isAddingProvider = true
                 } label: {
-                    Label("添加服务提供方", systemImage: "plus")
+                    Label("Add Provider", systemImage: "plus")
                 }
                 .buttonStyle(.borderedProminent)
             }
@@ -43,20 +43,20 @@ struct ProviderSettingsView: View {
                                     .frame(width: 32)
                                 VStack(alignment: .leading, spacing: 7) {
                                     HStack {
-                                        Text(provider.name).font(.headline)
-                                        Text(provider.healthTitle)
+                                        Text(LocalizedStringKey(provider.name)).font(.headline)
+                                        Text(LocalizedStringKey(provider.healthTitle))
                                             .font(.caption.weight(.medium))
                                             .foregroundStyle(.secondary)
                                             .padding(.horizontal, 8)
                                             .padding(.vertical, 4)
                                             .background(.quaternary, in: Capsule())
                                     }
-                                    Text(provider.summary)
+                                    Text(LocalizedStringKey(provider.summary))
                                         .font(.callout)
                                         .foregroundStyle(.secondary)
                                     HStack(spacing: 6) {
                                         ForEach(provider.capabilities.sorted { $0.rawValue < $1.rawValue }) { capability in
-                                            Text(capability.title)
+                                            Text(LocalizedStringKey(capability.title))
                                                 .font(.caption2)
                                                 .foregroundStyle(.secondary)
                                                 .padding(.horizontal, 7)
@@ -75,7 +75,7 @@ struct ProviderSettingsView: View {
                         .buttonStyle(.plain)
 
                         Toggle(
-                            "已启用",
+                            "Enabled",
                             isOn: Binding(
                                 get: { provider.isEnabled },
                                 set: { store.setEnabled($0, id: provider.id) }
@@ -95,7 +95,7 @@ struct ProviderSettingsView: View {
             )
 
             VStack(alignment: .leading, spacing: 12) {
-                Text("播放优先级").font(.title3.bold())
+                Text("Playback Priority").font(.title3.bold())
                 let playback = store.playbackProviders
                 VStack(spacing: 0) {
                     ForEach(playback) { provider in
@@ -105,9 +105,9 @@ struct ProviderSettingsView: View {
                                 .foregroundStyle(.secondary)
                                 .frame(width: 32, alignment: .trailing)
                             Image(systemName: provider.systemImage).frame(width: 24)
-                            Text(provider.name)
+                            Text(LocalizedStringKey(provider.name))
                             Spacer()
-                            Text(provider.isEnabled ? "已启用" : "已停用")
+                            Text(provider.isEnabled ? LocalizedStringKey("Enabled") : LocalizedStringKey("Disabled"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }

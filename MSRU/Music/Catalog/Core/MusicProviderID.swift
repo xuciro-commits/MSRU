@@ -75,10 +75,10 @@ enum MusicProviderID:
         switch self {
 
         case .appleMusic:
-            "需要 Apple Music 开发者权限"
+            String(localized: "Apple Music developer credentials required")
 
         case .jamendo:
-            "需要 Jamendo 客户端 ID"
+            String(localized: "Jamendo client ID required")
 
         case .musicBrainz:
             nil

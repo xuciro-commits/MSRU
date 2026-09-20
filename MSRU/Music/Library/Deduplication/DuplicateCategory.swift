@@ -54,17 +54,17 @@ nonisolated public enum DuplicateCategory: String, Sendable, Codable, Equatable,
     public var title: String {
         switch self {
         case .fileDuplicate:
-            return "物理重复 (File Duplicate)"
+            return String(localized: "File Duplicate")
         case .differentEncoding:
-            return "格式不同 (Different Encoding)"
+            return String(localized: "Different Encoding")
         case .qualityDifference:
-            return "音质差异 (Different Quality)"
+            return String(localized: "Different Quality")
         case .differentMaster:
-            return "版本/混音差异 (Different Master)"
+            return String(localized: "Different Master")
         case .differentPerformance:
-            return "演出差异 (Different Performance)"
+            return String(localized: "Different Performance")
         case .none:
-            return "独立曲目 (Distinct Tracks)"
+            return String(localized: "Distinct Tracks")
         }
     }
 

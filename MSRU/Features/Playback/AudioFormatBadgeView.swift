@@ -78,7 +78,7 @@ struct AudioFormatBadgeView: View {
                 HStack(spacing: 3) {
                     Image(systemName: info.isHiRes ? "sparkles" : "waveform.badge.magnifyingglass")
                         .font(.system(size: 11, weight: .bold))
-                    Text(info.isHiRes ? "HI-RES LOSSLESS" : "LOSSLESS")
+                    Text(info.isHiRes ? LocalizedStringKey("HI-RES LOSSLESS") : LocalizedStringKey("LOSSLESS"))
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                 }
                 .padding(.horizontal, 8)

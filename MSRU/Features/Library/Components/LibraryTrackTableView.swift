@@ -71,7 +71,7 @@ struct LibraryTrackTableView: View {
             .width(min: 32, ideal: 36, max: 44)
 
             // Title column (Artwork + Title)
-            TableColumn("标题") { track in
+            TableColumn("Title") { track in
                 HStack(spacing: 10) {
                     trackArtwork(track)
                         .frame(width: 28, height: 28)
@@ -91,7 +91,7 @@ struct LibraryTrackTableView: View {
             .width(min: 180, ideal: 240)
 
             // Artist column
-            TableColumn("艺术家") { track in
+            TableColumn("Artist") { track in
                 Text(track.artist)
                     .font(.body)
                     .foregroundStyle(.secondary)
@@ -100,7 +100,7 @@ struct LibraryTrackTableView: View {
             .width(min: 120, ideal: 160)
 
             // Album column
-            TableColumn("专辑") { track in
+            TableColumn("Album") { track in
                 Text(track.album ?? "—")
                     .font(.body)
                     .foregroundStyle(.secondary)
@@ -109,7 +109,7 @@ struct LibraryTrackTableView: View {
             .width(min: 120, ideal: 160)
 
             // Duration column
-            TableColumn("时长") { track in
+            TableColumn("Duration") { track in
                 Text(durationString(track.duration))
                     .font(.callout.monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -117,7 +117,7 @@ struct LibraryTrackTableView: View {
             .width(min: 50, ideal: 60, max: 70)
 
             // Favorite column
-            TableColumn("收藏") { track in
+            TableColumn("Favorite") { track in
                 let isSaved = library.contains(id: track.id)
                 Button {
                     Task {
@@ -133,7 +133,7 @@ struct LibraryTrackTableView: View {
                         .font(.callout)
                 }
                 .buttonStyle(.plain)
-                .help(isSaved ? "从资料库移除" : "加入资料库")
+                .help(isSaved ? "Remove from Library" : "Add to Library")
             }
             .width(min: 32, ideal: 36, max: 40)
         }
@@ -214,7 +214,7 @@ struct LibraryTrackTableView: View {
                     .font(.callout)
             }
             .buttonStyle(.plain)
-            .help(isSaved ? "从资料库移除" : "加入资料库")
+            .help(isSaved ? "Remove from Library" : "Add to Library")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -296,20 +296,20 @@ struct LibraryTrackTableView: View {
         Button {
             playback.toggle(library: track, queue: tracks)
         } label: {
-            Label(isCurrentTrack(track) && playback.isPlaying ? "暂停" : "播放",
+            Label(isCurrentTrack(track) && playback.isPlaying ? "Pause" : "Play",
                   systemImage: isCurrentTrack(track) && playback.isPlaying ? "pause.fill" : "play.fill")
         }
 
         Button {
             playback.playNext(track)
         } label: {
-            Label("下一首播放", systemImage: "text.line.first.and.arrowtriangle.forward")
+            Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
         }
 
         Button {
             playback.addToQueue(track)
         } label: {
-            Label("加入队列", systemImage: "text.badge.plus")
+            Label("Add to Queue", systemImage: "text.badge.plus")
         }
 
         Divider()
@@ -324,7 +324,7 @@ struct LibraryTrackTableView: View {
                 }
             }
         } label: {
-            Label(isSaved ? "从资料库移除" : "加入资料库",
+            Label(isSaved ? "Remove from Library" : "Add to Library",
                   systemImage: isSaved ? "heart.slash" : "heart")
         }
 
@@ -333,7 +333,7 @@ struct LibraryTrackTableView: View {
             Button {
                 onRevealInFinder(localURL)
             } label: {
-                Label("在访达中显示", systemImage: "arrow.up.forward.square")
+                Label("Reveal in Finder", systemImage: "arrow.up.forward.square")
             }
         }
     }

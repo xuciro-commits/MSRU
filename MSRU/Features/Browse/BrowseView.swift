@@ -108,7 +108,7 @@ struct BrowseView: View {
             ) {
 
                 Text(
-                    "浏览"
+                    "Browse"
                 )
                 .font(
                     .largeTitle.bold()
@@ -116,7 +116,7 @@ struct BrowseView: View {
 
 
                 Text(
-                    "搜索已连接目录中的开放许可音频。"
+                    "Search open-licensed audio in connected catalogs."
                 )
                 .font(
                     .callout
@@ -185,7 +185,7 @@ struct BrowseView: View {
 
 
                 Text(
-                    "目录 · 封面 · 许可元数据 · 播放"
+                    "Catalog · Cover · License Metadata · Playback"
                 )
                 .font(
                     .caption
@@ -200,7 +200,7 @@ struct BrowseView: View {
 
 
             Text(
-                "目录与播放"
+                "Catalog & Playback"
             )
             .font(
                 .caption2.weight(
@@ -248,12 +248,12 @@ struct BrowseView: View {
         } else if state.results.isEmpty {
 
             ContentUnavailableView(
-                "未找到音频",
+                "No audio found",
                 systemImage:
                     "music.note",
                 description:
                     Text(
-                        "请尝试其他 Openverse 搜索词。"
+                        "Please try other Openverse search terms."
                     )
             )
             .frame(
@@ -284,7 +284,7 @@ struct BrowseView: View {
 
 
             Text(
-                "正在搜索 Openverse…"
+                "Searching Openverse…"
             )
             .foregroundStyle(
                 .secondary
@@ -309,7 +309,7 @@ struct BrowseView: View {
         ContentUnavailableView {
 
             Label(
-                "Openverse 暂不可用",
+                "Openverse is temporarily unavailable",
                 systemImage:
                     "wifi.exclamationmark"
             )
@@ -323,7 +323,7 @@ struct BrowseView: View {
         } actions: {
 
             Button(
-                "重试"
+                "Retry"
             ) {
 
                 feature
@@ -356,7 +356,7 @@ struct BrowseView: View {
             HStack {
 
                 Text(
-                    "Openverse 搜索结果"
+                    "Openverse Search Results"
                 )
                 .font(
                     .title2.bold()
@@ -367,7 +367,7 @@ struct BrowseView: View {
 
 
                 Text(
-                    "\(state.results.count) 项"
+                    "\(state.results.count) items"
                 )
                 .font(
                     .caption
@@ -499,8 +499,8 @@ struct BrowseView: View {
                     Label(
                         isCurrent
                             && feature.isPlaying
-                            ? "暂停"
-                            : "播放",
+                            ? "Pause"
+                            : "Play",
                         systemImage:
                             isCurrent
                             && feature.isPlaying
@@ -613,7 +613,7 @@ struct BrowseView: View {
         } label: {
 
             Label(
-                "下一首播放",
+                "Play Next",
                 systemImage:
                     "text.line.first.and.arrowtriangle.forward"
             )
@@ -632,7 +632,7 @@ struct BrowseView: View {
         } label: {
 
             Label(
-                "加入队列",
+                "Add to Queue",
                 systemImage:
                     "text.badge.plus"
             )
@@ -658,7 +658,7 @@ struct BrowseView: View {
             } label: {
 
                 Label(
-                    "从资料库移除",
+                    "Remove from Library",
                     systemImage:
                         "minus.circle"
                 )
@@ -678,7 +678,7 @@ struct BrowseView: View {
             } label: {
 
                 Label(
-                    "加入资料库",
+                    "Add to Library",
                     systemImage:
                         "plus.circle"
                 )

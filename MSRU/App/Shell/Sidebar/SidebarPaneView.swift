@@ -32,6 +32,12 @@ struct SidebarPaneView:
             maxHeight:
                 .infinity
         )
+        .applyLocaleOverride(
+            scene
+                .application
+                .languageSettings
+                .resolvedLocale
+        )
     }
 
 

@@ -72,7 +72,7 @@ struct ListenNowView: View {
             ) {
 
                 Text(
-                    "现在收听"
+                    "Listen Now"
                 )
                 .font(
                     .largeTitle.bold()
@@ -80,7 +80,7 @@ struct ListenNowView: View {
 
 
                 Text(
-                    "发现来自 \(store.selectedProvider.title) 的音乐"
+                    "Discover music from \(store.selectedProvider.title)"
                 )
                 .font(
                     .callout
@@ -115,7 +115,7 @@ struct ListenNowView: View {
         Menu {
 
             Section(
-                "目录来源"
+                "Catalog Source"
             ) {
 
                 ForEach(
@@ -184,7 +184,7 @@ struct ListenNowView: View {
         } label: {
 
             Label(
-                "目录：\(store.selectedProvider.title)",
+                "Catalog: \(store.selectedProvider.title)",
                 systemImage:
                     store
                         .selectedProvider
@@ -253,7 +253,7 @@ struct ListenNowView: View {
 
 
             Text(
-                "正在加载音乐…"
+                "Loading music…"
             )
             .foregroundStyle(
                 .secondary
@@ -280,7 +280,7 @@ struct ListenNowView: View {
         ContentUnavailableView {
 
             Label(
-                "无法加载音乐",
+                "Unable to load music",
                 systemImage:
                     "wifi.exclamationmark"
             )
@@ -304,7 +304,7 @@ struct ListenNowView: View {
             } label: {
 
                 Text(
-                    "重试"
+                    "Retry"
                 )
             }
         }

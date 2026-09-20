@@ -5,6 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "AppFoundation",
+    defaultLocalization: "en",
 
     platforms: [
         .macOS("27.0"),
@@ -41,7 +42,10 @@ let package = Package(
         // MARK: - Core
 
         .target(
-            name: "AppFoundation"
+            name: "AppFoundation",
+            resources: [
+                .process("Resources")
+            ]
         ),
 
 
@@ -51,6 +55,9 @@ let package = Package(
             name: "AppFoundationUI",
             dependencies: [
                 "AppFoundation"
+            ],
+            resources: [
+                .process("Resources")
             ]
         ),
 

@@ -1212,7 +1212,7 @@ import Observation
             statusObserver = item.observe(\.status, options: [.initial, .new]) {
                 [weak self, weak player] item, _ in
                 guard item.status == .failed else { return }
-                let message = item.error?.localizedDescription ?? "无法播放此音频。"
+                let message = item.error?.localizedDescription ?? String(localized: "Unable to play this audio.")
                 Task { @MainActor [weak self, weak player] in
                     guard let self, let player, self.player === player else { return }
                     self.handleTransportFailure(message)
@@ -1223,7 +1223,7 @@ import Observation
             ) { [weak self, weak player] notification in
                 let message =
                     (notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error)?
-                    .localizedDescription ?? "音频播放中断。"
+                    .localizedDescription ?? String(localized: "Audio playback interrupted.")
                 Task { @MainActor [weak self, weak player] in
                     guard let self, let player, self.player === player else { return }
                     self.handleTransportFailure(message)

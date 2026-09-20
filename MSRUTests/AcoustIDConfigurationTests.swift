@@ -55,7 +55,7 @@ struct AcoustIDConfigurationTests {
 
         let result = await config.verifyConnectivity()
         #expect(result.success == false)
-        #expect(result.message.contains("API Key 无效"))
+        #expect(result.message.contains("Invalid API Key") || result.message.contains("API Key 无效"))
         #expect(result.message.contains("User Key"))
     }
 }

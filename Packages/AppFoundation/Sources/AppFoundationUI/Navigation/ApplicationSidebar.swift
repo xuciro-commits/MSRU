@@ -116,7 +116,9 @@ where
                     } header: {
 
                         Text(
-                            title
+                            LocalizedStringKey(
+                                title
+                            )
                         )
                     }
 
@@ -226,7 +228,11 @@ where
 
             HStack {
                 Label {
-                    Text(item.title)
+                    Text(
+                        LocalizedStringKey(
+                            item.title
+                        )
+                    )
                 } icon: {
                     Image(systemName: item.systemImage)
                 }

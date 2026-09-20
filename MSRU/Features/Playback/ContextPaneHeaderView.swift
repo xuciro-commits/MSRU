@@ -19,7 +19,7 @@ struct ContextPaneHeaderView: View {
                     Button {
                         scene.activeContextPane = pane
                     } label: {
-                        Text(pane.title)
+                        Text(LocalizedStringKey(pane.title))
                             .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
                             .lineLimit(1)
                             .padding(.vertical, 5)
@@ -41,7 +41,7 @@ struct ContextPaneHeaderView: View {
                 Button {
                     onClearQueue()
                 } label: {
-                    Text("清除")
+                    Text("Clear")
                         .font(.caption.bold())
                         .foregroundStyle(Color.accentColor)
                 }
@@ -58,7 +58,7 @@ struct ContextPaneHeaderView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("关闭详情")
+            .help("Close Details")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

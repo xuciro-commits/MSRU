@@ -65,7 +65,7 @@ struct ImportReviewWorkspaceView: View {
                             }
 
                             state = .success(
-                                message: "已成功将 \(tracks.count) 首曲目加入资料库，并已记录至本地声纹库与目录规则中（纯路径就地只读引用，原文件保持原样）。",
+                                message: "Successfully added \(tracks.count) tracks to the library.",
                                 undoEntries: []
                             )
                         }
@@ -100,10 +100,10 @@ struct ImportReviewWorkspaceView: View {
     private var dropZoneView: some View {
         VStack(spacing: 32) {
             VStack(spacing: 8) {
-                Text("音乐导入与审核中心")
+                Text("Music Import & Review Center")
                     .font(.system(size: 28, weight: .bold))
 
-                Text("导入本地音乐，进行声纹识别、实体归并和置信度审核。")
+                Text("Import local music, perform fingerprinting, entity resolution, and confidence review.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -127,10 +127,10 @@ struct ImportReviewWorkspaceView: View {
                         .foregroundStyle(isDropTargeted ? Color.accentColor : .secondary)
 
                     VStack(spacing: 4) {
-                        Text("将音乐文件夹或音频文件拖放到这里")
+                        Text("Drag and drop music folders or audio files here")
                             .font(.headline)
 
-                        Text("支持 FLAC、MP3、M4A、ALAC、WAV、AAC、AIFF")
+                        Text("Supports FLAC, MP3, M4A, ALAC, WAV, AAC, AIFF")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -138,7 +138,7 @@ struct ImportReviewWorkspaceView: View {
                     Button {
                         isFileImporterPresented = true
                     } label: {
-                        Label("选择文件或文件夹…", systemImage: "plus.circle.fill")
+                        Label("Select Files or Folders…", systemImage: "plus.circle.fill")
                             .font(.headline)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
@@ -156,18 +156,18 @@ struct ImportReviewWorkspaceView: View {
             HStack(spacing: 32) {
                 engineHighlight(
                     icon: "waveform.badge.magnifyingglass",
-                    title: "AcoustID 声纹",
-                    desc: "基于音频波形的确定性识别"
+                    title: "AcoustID Fingerprint",
+                    desc: "Deterministic recognition based on audio waveforms"
                 )
                 engineHighlight(
                     icon: "books.vertical.fill",
-                    title: "MusicBrainz 实体",
-                    desc: "标准化的发行版与艺术家权威身份"
+                    title: "MusicBrainz Entity",
+                    desc: "Standardized releases and canonical artist identities"
                 )
                 engineHighlight(
                     icon: "arrow.triangle.2.circlepath",
-                    title: "安全文件整理器",
-                    desc: "先模拟验证，支持一键撤销"
+                    title: "Safe File Organizer",
+                    desc: "Dry-run verification first, supports one-click undo"
                 )
             }
             .padding(.horizontal, 40)
@@ -182,10 +182,10 @@ struct ImportReviewWorkspaceView: View {
                 .font(.title2)
                 .foregroundStyle(Color.accentColor)
 
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.subheadline.bold())
 
-            Text(desc)
+            Text(LocalizedStringKey(desc))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -202,10 +202,10 @@ struct ImportReviewWorkspaceView: View {
                 .frame(width: 320)
 
             VStack(spacing: 6) {
-                Text(step)
+                Text(LocalizedStringKey(step))
                     .font(.headline)
 
-                Text("正在运行 11 步实体归并流程…")
+                Text("Running 11-step entity resolution pipeline…")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -221,7 +221,7 @@ struct ImportReviewWorkspaceView: View {
                 .font(.system(size: 56))
                 .foregroundStyle(.green)
 
-            Text("导入完成")
+            Text("Import Completed")
                 .font(.title2.bold())
 
             Text(message)
@@ -230,17 +230,17 @@ struct ImportReviewWorkspaceView: View {
 
             HStack(spacing: 16) {
                 if !undoEntries.isEmpty {
-                    Button("撤销整理") {
+                    Button("Undo Organization") {
                         try? SafeFileOrganizer.undo(executedItems: undoEntries)
                         Task {
                             await localStore.reload()
-                            state = .success(message: "撤销完成：文件已还原。", undoEntries: [])
+                            state = .success(message: "Undo complete: Files restored.", undoEntries: [])
                         }
                     }
                     .buttonStyle(.bordered)
                 }
 
-                Button("打开资料库") {
+                Button("Open Library") {
                     onOpenLibrary()
                 }
                 .buttonStyle(.borderedProminent)
@@ -258,7 +258,7 @@ struct ImportReviewWorkspaceView: View {
                 .font(.system(size: 56))
                 .foregroundStyle(.secondary)
 
-            Text("未找到可导入的音频")
+            Text("No importable audio found")
                 .font(.title2.bold())
 
             Text(message)
@@ -267,7 +267,7 @@ struct ImportReviewWorkspaceView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 420)
 
-            Button("重新选择") {
+            Button("Reselect") {
                 state = .idle
                 isFileImporterPresented = true
             }
@@ -302,7 +302,7 @@ struct ImportReviewWorkspaceView: View {
     }
 
     private func startImportPipeline(urls: [URL]) {
-        state = .processing(step: "正在收集音频文件…", progress: 0.1)
+        state = .processing(step: "Collecting audio files…", progress: 0.1)
 
         Task {
             var accessedURLs: [URL] = []
@@ -319,21 +319,21 @@ struct ImportReviewWorkspaceView: View {
 
             let audioURLs = collectAudioFiles(from: urls)
             guard !audioURLs.isEmpty else {
-                state = .empty(message: "在所选位置未发现受支持的音频文件（支持 FLAC、WAV、MP3、M4A、AAC、AIFF、DTS 等格式）。")
+                state = .empty(message: "No supported audio files found in the selected location (supports FLAC, WAV, MP3, M4A, AAC, AIFF, DTS, etc.).")
                 return
             }
 
-            state = .processing(step: "正在提取 AcoustID 声纹并进行 Picard 聚类…", progress: 0.4)
+            state = .processing(step: "Extracting AcoustID and performing Picard clustering…", progress: 0.4)
 
             let pipeline = ImportPipeline()
             do {
                 let report = try await pipeline.process(audioURLs: audioURLs)
-                state = .processing(step: "正在准备审核面板…", progress: 0.9)
+                state = .processing(step: "Preparing review panel…", progress: 0.9)
 
                 let reviewStore = ImportReviewStore(report: report)
                 state = .review(reviewStore)
             } catch {
-                state = .empty(message: "处理导入文件时发生错误：\(error.localizedDescription)")
+                state = .empty(message: "Error processing import files: \(error.localizedDescription)")
             }
         }
     }

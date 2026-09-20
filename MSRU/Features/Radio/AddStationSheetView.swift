@@ -34,29 +34,29 @@ struct AddStationSheetView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("电台详情") {
-                    TextField("电台名称", text: $name, prompt: Text("例如：我喜欢的电台"))
+                Section("Station Details") {
+                    TextField("Station Name", text: $name, prompt: Text("e.g. My Favorite Station"))
 
-                    TextField("流媒体 URL", text: $streamURLString, prompt: Text("https://example.com/stream.mp3"))
+                    TextField("Stream URL", text: $streamURLString, prompt: Text("https://example.com/stream.mp3"))
                         #if os(iOS)
                         .keyboardType(.URL)
                         .autocapitalization(.none)
                         #endif
 
                     if !streamURLString.isEmpty && !isValidURL {
-                        Text("请输入有效的 HTTP 或 HTTPS 流媒体 URL。")
+                        Text("Please enter a valid HTTP or HTTPS stream URL.")
                             .font(.caption)
                             .foregroundStyle(.red)
                     }
 
-                    Picker("类型", selection: $genre) {
+                    Picker("Genre", selection: $genre) {
                         ForEach(RadioGenre.allCases.filter { $0 != .all }) { item in
-                            Text(item.displayTitle).tag(item)
+                            Text(LocalizedStringKey(item.rawValue)).tag(item)
                         }
                     }
 
-                    TextField("国家/地区", text: $country, prompt: Text("例如：全球、中国、美国"))
-                    TextField("描述（可选）", text: $descriptionText, prompt: Text("可选备注或标语"))
+                    TextField("Country/Region", text: $country, prompt: Text("e.g. Global, China, USA"))
+                    TextField("Description (Optional)", text: $descriptionText, prompt: Text("Optional notes or tagline"))
                 }
 
                 if let errorMessage {
@@ -68,19 +68,19 @@ struct AddStationSheetView: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("添加自定义电台")
+            .navigationTitle("Add Custom Station")
             #if os(macOS)
             .frame(minWidth: 420, minHeight: 340)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
+                    Button("Cancel") {
                         dismiss()
                     }
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") {
+                    Button("Save") {
                         save()
                     }
                     .disabled(!canSave)
@@ -92,7 +92,7 @@ struct AddStationSheetView: View {
     private func save() {
         guard canSave,
               let url = URL(string: streamURLString.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-            errorMessage = "流媒体 URL 无效或缺少电台名称。"
+            errorMessage = "Invalid stream URL or missing station name."
             return
         }
 
@@ -100,7 +100,7 @@ struct AddStationSheetView: View {
             id: "custom-\(UUID().uuidString.prefix(8).lowercased())",
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
             description: descriptionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? "用户添加的自定义流媒体。"
+                ? "User-added custom stream."
                 : descriptionText.trimmingCharacters(in: .whitespacesAndNewlines),
             genre: genre,
             streamURL: url,

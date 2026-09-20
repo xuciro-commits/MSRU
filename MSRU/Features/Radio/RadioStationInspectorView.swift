@@ -43,7 +43,7 @@ struct RadioStationInspectorView: View {
                             Circle()
                                 .fill(isPlaying ? Color.red : Color.secondary)
                                 .frame(width: 7, height: 7)
-                            Text(isPlaying ? "直播广播" : "互联网电台")
+                            Text(LocalizedStringKey(isPlaying ? "Live Broadcast" : "Internet Radio"))
                                 .font(.system(size: 10, weight: .bold))
                                 .tracking(0.8)
                                 .foregroundStyle(isPlaying ? Color.red : Color.secondary)
@@ -54,7 +54,7 @@ struct RadioStationInspectorView: View {
                             .multilineTextAlignment(.center)
                             .lineLimit(2)
 
-                            Text(station.genre.displayTitle + " · " + station.country)
+                        Text("\(LocalizedStringKey(station.genre.rawValue)) · \(station.country)")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -71,7 +71,7 @@ struct RadioStationInspectorView: View {
 
                 // Description
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("关于电台")
+                    Text("About Station")
                         .font(.headline)
                         .foregroundStyle(.secondary)
 
@@ -114,7 +114,7 @@ struct RadioStationInspectorView: View {
                                 .padding(.trailing, 4)
                         }
                         Label(
-                            isPlaying ? "暂停流媒体" : "调入电台",
+                            isPlaying ? "Pause Stream" : "Tune In",
                             systemImage: isPlaying ? "pause.fill" : "play.fill"
                         )
                     }
@@ -130,7 +130,7 @@ struct RadioStationInspectorView: View {
                     }
                     .buttonStyle(.bordered)
                     .tint(Color.accentColor)
-                    .help(isFavorite ? "取消收藏" : "加入收藏")
+                    .help(isFavorite ? "Remove from Favorites" : "Add to Favorites")
                 }
             }
 
@@ -139,7 +139,7 @@ struct RadioStationInspectorView: View {
                     Button {
                         playback.playNext(radio: station)
                     } label: {
-                        Label("下一首播放", systemImage: "text.line.first.and.arrowtriangle.forward")
+                        Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
                             .font(.caption)
                             .frame(maxWidth: .infinity)
                     }
@@ -149,7 +149,7 @@ struct RadioStationInspectorView: View {
                     Button {
                         playback.addToQueue(radio: station)
                     } label: {
-                        Label("加入队列", systemImage: "text.badge.plus")
+                        Label("Add to Queue", systemImage: "text.badge.plus")
                             .font(.caption)
                             .frame(maxWidth: .infinity)
                     }
@@ -161,7 +161,7 @@ struct RadioStationInspectorView: View {
                     Button {
                         playback.playNext(radio: station)
                     } label: {
-                        Label("下一首播放", systemImage: "text.line.first.and.arrowtriangle.forward")
+                        Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
                             .font(.caption)
                             .frame(maxWidth: .infinity)
                     }
@@ -171,7 +171,7 @@ struct RadioStationInspectorView: View {
                     Button {
                         playback.addToQueue(radio: station)
                     } label: {
-                        Label("加入队列", systemImage: "text.badge.plus")
+                        Label("Add to Queue", systemImage: "text.badge.plus")
                             .font(.caption)
                             .frame(maxWidth: .infinity)
                     }
@@ -182,7 +182,7 @@ struct RadioStationInspectorView: View {
 
             if station.isCustom, let onDelete {
                 Button(role: .destructive, action: onDelete) {
-                    Label("删除自定义电台", systemImage: "trash")
+                    Label("Delete Custom Station", systemImage: "trash")
                         .font(.caption)
                         .frame(maxWidth: .infinity)
                 }
@@ -195,20 +195,20 @@ struct RadioStationInspectorView: View {
 
     private var propertiesSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("广播详情")
+            Text("Broadcast Details")
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
             VStack(spacing: 8) {
-                propertyRow(title: "类型", value: station.genre.displayTitle)
-                propertyRow(title: "国家/地区", value: station.country)
-                propertyRow(title: "语言", value: station.language)
-                propertyRow(title: "音频编码", value: station.codec)
+                propertyRow(title: "Genre", value: station.genre.rawValue)
+                propertyRow(title: "Country/Region", value: station.country)
+                propertyRow(title: "Language", value: station.language)
+                propertyRow(title: "Audio Codec", value: station.codec)
                 if let bitrate = station.bitrateKbps {
-                    propertyRow(title: "流媒体码率", value: "\(bitrate) kbps")
+                    propertyRow(title: "Stream Bitrate", value: "\(bitrate) kbps")
                 }
                 if station.isCustom {
-                    propertyRow(title: "来源", value: "自定义流媒体")
+                    propertyRow(title: "Source", value: "Custom Stream")
                 }
             }
             .padding(12)
@@ -218,11 +218,11 @@ struct RadioStationInspectorView: View {
 
     private func propertyRow(title: String, value: String) -> some View {
         HStack {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             Spacer()
-            Text(value)
+            Text(LocalizedStringKey(value))
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.primary)
         }
@@ -232,14 +232,14 @@ struct RadioStationInspectorView: View {
 
     private var broadcastSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("流媒体与网页链接")
+            Text("Stream & Web Links")
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
             VStack(spacing: 8) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("流媒体 URL")
+                        Text("Stream URL")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text(station.streamURL.absoluteString)
@@ -254,7 +254,7 @@ struct RadioStationInspectorView: View {
                 if let homepageURL = station.homepageURL {
                     Link(destination: homepageURL) {
                         HStack {
-                            Label("官方网站", systemImage: "safari")
+                            Label("Official Website", systemImage: "safari")
                                 .font(.subheadline)
                             Spacer()
                             Image(systemName: "arrow.up.right")

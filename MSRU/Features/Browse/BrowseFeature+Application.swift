@@ -3,6 +3,7 @@
 //  MSRU
 //
 
+import Foundation
 import AppFoundation
 
 
@@ -25,9 +26,9 @@ extension BrowseFeature:
                     id:
                         "browse",
                     group:
-                        "发现",
+                        "Discover",
                     title:
-                        "浏览",
+                        "Browse",
                     systemImage:
                         "sparkles",
                     route:

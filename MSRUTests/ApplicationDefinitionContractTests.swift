@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import AppFoundation
 import AppFoundationUI
@@ -26,7 +27,7 @@ struct ApplicationDefinitionContractTests {
         } else {
             Issue.record("Search disappeared after updating text")
         }
-        #expect(secondSession.resolve().workspace?.identity?.title == "浏览")
+        #expect(secondSession.resolve().workspace?.identity?.title == String(localized: "Browse"))
         first.send(.navigate(.section(.library)))
         #expect(firstSession.resolve().toolbar.item(id: "browse.search") == nil)
     }

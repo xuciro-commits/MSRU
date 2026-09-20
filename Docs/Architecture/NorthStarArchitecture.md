@@ -23,6 +23,7 @@
 | Dependency | 构造时交付的能力或资源引用；容器负责传递，不负责决定资源寿命。 |
 | Service | 完成具体业务操作的对象/值。当前 `FeatureService` 实际是状态转换处理器，不要求再套领域 Service。 |
 | Provider | 同一领域能力的不同来源/后端，如 CatalogProvider、PlaybackProvider；不是所有服务的共同父协议。 |
+| Localization | 国际化基础能力下沉框架层，具体文案与语言由应用层定义。框架层（AppFoundation）提供 `LanguageSettings`、`SupportedLanguage`、包资源与动态 `Locale` 解析；应用层（MSRU）定义 String Catalog（`.xcstrings`）、支持语言（英语、汉语、藏语）及设置联动，支持系统默认跟随与用户偏好自选。 |
 
 ## 模块与依赖方向
 
@@ -71,6 +72,20 @@ flowchart TD
 应用组合根负责装配服务、启动/停止、场景注册和外部命令分发；场景负责导航、FeatureHost、恢复与面板状态；ShellResolver 只组合呈现。Search/Selection 属于对应 Feature；Focus 由平台维护，必要时暴露类型化操作；没有证据需要通用 SearchRuntime、SelectionRuntime、FocusRuntime。
 
 当前 `ApplicationCommand` 主要是导航/窗口命令。不要直接把它扩成承载所有业务 action 的全局总线。工具栏与菜单需要共享动作时，先共享具体操作及其可用条件，目标场景取自焦点场景。应用、工作区项目的重复 ID 在组合时拒绝，不能悄悄覆盖。
+
+## 多语言与国际化架构 (Localization Architecture)
+
+遵循“框架层提供基础设施，应用层定义具体文案与语言”的原则，严格采用 Apple 原生最佳实践（Xcode String Catalogs `.xcstrings`）：
+
+1. **框架层（AppFoundation / AppFoundationUI）**：
+   - `SupportedLanguage` 枚举：统一管理系统默认（`.system`）、英语（`.english`）、简体中文（`.chinese`）与藏语（`.tibetan`），具备动态 `locale` 推导。
+   - `LanguageSettings` 服务：应用级 `@Observable` 响应式对象，持久化用户选定语言至 `UserDefaults`，计算并向外提供 `resolvedLocale: Locale?`（为 `nil` 时无缝继承宿主 macOS/iOS 系统语言）。
+   - SPM 资源包支持：Package 声明 `defaultLocalization: "en"` 与 `.process("Resources")`，框架 UI 基础组件文案独立于应用。
+
+2. **应用层（MSRU）**：
+   - 集中式 String Catalog：根目录 `Localizable.xcstrings` 作为权威多语言目录，代码中采用开发语言英文直接调用（如 `Text("Listen Now")` 或 `String(localized: "Radio")`），编译器与运行时自动建立映射。
+   - 动态环境注入：`SwiftUISceneRootView`（iOS/visionOS）与 `MSRUMacWindowComposition`（macOS）顶层侦听 `languageSettings.resolvedLocale`，注入 `.applyLocaleOverride()` 驱动界面与导航栏全局即时响应切换。
+   - 用户偏好自选：在“设置 - 通用 - 语言”提供可视化分段选择器，设置变动即刻生效，无需重启应用。
 
 ## 为什么当前方向大体可保留
 

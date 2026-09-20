@@ -16,8 +16,8 @@ enum ListenNowFeature: ApplicationFeaturePresentation {
             sidebar: [
                 SidebarContribution(
                     id: "listen-now",
-                    group: "发现",
-                    title: "现在收听",
+                    group: "Discover",
+                    title: "Listen Now",
                     systemImage: "play.circle",
                     route: .section(.listenNow),
                     order: 10

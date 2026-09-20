@@ -16,16 +16,16 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
             sidebar: [
                 SidebarContribution(
                     id: "add-music",
-                    group: "来源与导入",
-                    title: "添加音乐",
+                    group: "Source & Import",
+                    title: "Add Music",
                     systemImage: "plus.circle",
                     route: .section(.addMusic),
                     order: 200
                 ),
                 SidebarContribution(
                     id: "metadata-center",
-                    group: "元数据",
-                    title: "元数据中心",
+                    group: "Metadata",
+                    title: "Metadata Center",
                     systemImage: "sparkles.rectangle.stack",
                     route: .section(.importReview),
                     order: 300
@@ -53,7 +53,7 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
             ) { scene in
                 WorkspacePresentation(
                     identity: WorkspaceIdentity(
-                        title: "添加音乐",
+                        title: "Add Music",
                         systemImage: "plus.circle"
                     )
                 ) { _ in
@@ -72,7 +72,7 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
             ) { scene in
                 WorkspacePresentation(
                     identity: WorkspaceIdentity(
-                        title: "元数据中心",
+                        title: "Metadata Center",
                         systemImage: "sparkles.rectangle.stack"
                     )
                 ) { _ in

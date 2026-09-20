@@ -99,8 +99,8 @@ public enum PicardAlbumLookupResolver {
 
             let matchedRelease: ExternalReleaseMatch?
             if avgConfidence >= 0.7 {
-                let repTitle = cluster.albumName ?? cluster.tracks.compactMap(\.matchedMemory?.album).first ?? "本地匹配专辑"
-                let repArtist = cluster.tracks.compactMap(\.artist).first ?? cluster.tracks.compactMap(\.matchedMemory?.artist).first ?? "本地艺术家"
+                let repTitle = cluster.albumName ?? cluster.tracks.compactMap(\.matchedMemory?.album).first ?? String(localized: "Locally Matched Album")
+                let repArtist = cluster.tracks.compactMap(\.artist).first ?? cluster.tracks.compactMap(\.matchedMemory?.artist).first ?? String(localized: "Local Artist")
                 matchedRelease = ExternalReleaseMatch(
                     releaseMBID: cluster.tracks.compactMap(\.matchedMemory?.releaseMBID).first ?? "local_acoustic_\(cluster.id)",
                     title: repTitle,
@@ -214,8 +214,8 @@ public enum PicardAlbumLookupResolver {
             bestTrackMatches = fallbackMatches
 
             if avgConfidence >= 0.7 {
-                let repTitle = cluster.albumName ?? cluster.tracks.compactMap(\.matchedMemory?.album).first ?? "本地匹配专辑"
-                let repArtist = cluster.tracks.compactMap(\.artist).first ?? cluster.tracks.compactMap(\.matchedMemory?.artist).first ?? "本地艺术家"
+                let repTitle = cluster.albumName ?? cluster.tracks.compactMap(\.matchedMemory?.album).first ?? String(localized: "Locally Matched Album")
+                let repArtist = cluster.tracks.compactMap(\.artist).first ?? cluster.tracks.compactMap(\.matchedMemory?.artist).first ?? String(localized: "Local Artist")
                 bestRelease = ExternalReleaseMatch(
                     releaseMBID: cluster.tracks.compactMap(\.matchedMemory?.releaseMBID).first ?? "local_acoustic_\(cluster.id)",
                     title: repTitle,
@@ -266,7 +266,7 @@ public enum PicardAlbumLookupResolver {
                     confidence: 1.0,
                     tier: .high,
                     components: [
-                        WeightedComponent(name: "本地声纹记忆", weight: 1.0, similarity: 1.0)
+                        WeightedComponent(name: String(localized: "Local Acoustic Memory"), weight: 1.0, similarity: 1.0)
                     ]
                 )
             )
@@ -288,7 +288,7 @@ public enum PicardAlbumLookupResolver {
                     confidence: 0.95,
                     tier: .high,
                     components: [
-                        WeightedComponent(name: "AcoustID 声学指纹", weight: 1.0, similarity: 0.95)
+                        WeightedComponent(name: String(localized: "AcoustID Fingerprint"), weight: 1.0, similarity: 0.95)
                     ]
                 )
             )

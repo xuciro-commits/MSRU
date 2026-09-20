@@ -37,13 +37,13 @@ struct LibraryView:
             case .saved:
 
                 return
-                    "资料库"
+                    "Library"
 
 
             case .local:
 
                 return
-                    "本地文件"
+                    "Local Files"
             }
         }
     }
@@ -147,7 +147,7 @@ struct LibraryView:
             if let error = feature.errorMessage {
                 VStack(alignment: .leading, spacing: 8) {
                     Label(error, systemImage: "exclamationmark.triangle")
-                    Button("重新加载资料库") { Task { await feature.libraryStore.load() } }
+                    Button("Reload Library") { Task { await feature.libraryStore.load() } }
                 }.font(.callout).padding()
             }
             if let error = playback.playbackErrorMessage {
@@ -191,21 +191,21 @@ struct LibraryView:
 
     private var libraryTitle: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("资料库").font(.largeTitle.bold())
+            Text("Library").font(.largeTitle.bold())
             Text(librarySubtitle).font(.callout).foregroundStyle(.secondary)
         }
     }
 
     private var scopePicker: some View {
-        Picker("资料库视图", selection: $scope) {
-            ForEach(Scope.allCases) { scope in Text(scope.title).tag(scope) }
+        Picker("LibraryView", selection: $scope) {
+            ForEach(Scope.allCases) { scope in Text(LocalizedStringKey(scope.title)).tag(scope) }
         }
         .pickerStyle(.segmented)
         .labelsHidden()
     }
 
     private var importButton: some View {
-        Button(action: onAddMusic) { Label("添加音乐", systemImage: "plus") }
+        Button(action: onAddMusic) { Label("Add Music", systemImage: "plus") }
     }
 
     private var librarySubtitle:
@@ -216,13 +216,13 @@ struct LibraryView:
         case .saved:
 
             return
-                "\(feature.tracks.count) 首已保存歌曲"
+                "\(feature.tracks.count) saved songs"
 
 
         case .local:
 
             return
-                "\(localStore.tracks.count) 首本地歌曲"
+                "\(localStore.tracks.count) local songs"
         }
     }
 
@@ -276,7 +276,7 @@ struct LibraryView:
 
 
                 Text(
-                    "正在加载资料库…"
+                    "Loading library…"
                 )
                 .foregroundStyle(
                     .secondary
@@ -298,7 +298,7 @@ struct LibraryView:
             ContentUnavailableView {
 
                 Label(
-                    "资料库为空",
+                    "Library is empty",
                     systemImage:
                         "music.note.house"
                 )
@@ -306,13 +306,13 @@ struct LibraryView:
             } description: {
 
                 Text(
-                    "从浏览或本地文件中添加歌曲。"
+                    "Add songs from Browse or local files."
                 )
 
             } actions: {
 
                 Button(
-                    "添加音乐"
+                    "Add Music"
                 ) {
 
                     onAddMusic()
@@ -516,10 +516,10 @@ struct LibraryView:
     @ViewBuilder
     private func playbackActions(_ track: LibraryTrack) -> some View {
         let supported = PlaybackItem(library: track) != nil
-        Button("下一首播放", systemImage: "text.line.first.and.arrowtriangle.forward") {
+        Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") {
             feature.send(.playNextRequested(id: track.id))
         }.disabled(!supported)
-        Button("加入队列", systemImage: "text.badge.plus") {
+        Button("Add to Queue", systemImage: "text.badge.plus") {
             feature.send(.enqueueRequested(id: track.id))
         }.disabled(!supported)
     }
@@ -547,7 +547,7 @@ struct LibraryView:
         } label: {
 
             Label(
-                "从资料库移除",
+                "Remove from Library",
                 systemImage:
                     "trash"
             )

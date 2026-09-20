@@ -18,9 +18,9 @@ public enum MetadataProviderType: String, CaseIterable, Codable, Identifiable, S
     public var displayName: String {
         switch self {
         case .appleMusic: return "Apple Music (MusicKit)"
-        case .musicBrainz: return "MusicBrainz 权威维基"
-        case .coverArtArchive: return "Cover Art Archive (官方无损封面)"
-        case .localEmbedded: return "本地内嵌音频标签 (ID3/Vorbis/APIC)"
+        case .musicBrainz: return String(localized: "MusicBrainz Authority")
+        case .coverArtArchive: return String(localized: "Cover Art Archive (Hi-Res Covers)")
+        case .localEmbedded: return String(localized: "Embedded Audio Tags (ID3/Vorbis/APIC)")
         }
     }
 
@@ -35,10 +35,10 @@ public enum MetadataProviderType: String, CaseIterable, Codable, Identifiable, S
 
     public var providerDescription: String {
         switch self {
-        case .appleMusic: return "官方 Apple 音乐目录，包含高品质官方专辑大图与权威艺术家信息。"
-        case .musicBrainz: return "全球最大的开放音乐维基数据库，涵盖录音、发行版、流派标签与关系网络。"
-        case .coverArtArchive: return "MetaBrainz 与互联网档案馆联合托管的全球官方唱片超清封面库。"
-        case .localEmbedded: return "从本地音频文件自带的 ID3/Vorbis 标签和 APIC 封面图片中读取提取。"
+        case .appleMusic: return String(localized: "Official Apple Music catalog with high quality artwork and artist information.")
+        case .musicBrainz: return String(localized: "World's largest open music encyclopedia covering recordings, releases, and relationships.")
+        case .coverArtArchive: return String(localized: "Global repository of high-resolution album art hosted by MetaBrainz and Internet Archive.")
+        case .localEmbedded: return String(localized: "Read from ID3/Vorbis tags and APIC cover art embedded in local files.")
         }
     }
 }

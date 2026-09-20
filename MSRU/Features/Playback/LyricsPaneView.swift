@@ -20,10 +20,10 @@ struct LyricsPaneView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     // Header
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(playback.unifiedTitle)
+                        Text(LocalizedStringKey(playback.unifiedTitle))
                             .font(.headline)
                             .lineLimit(1)
-                        Text(playback.unifiedSubtitle)
+                        Text(LocalizedStringKey(playback.unifiedSubtitle))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -52,7 +52,7 @@ struct LyricsPaneView: View {
                         Button(action: onExpandCanvas) {
                             HStack {
                                 Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                Text("完整歌词画布")
+                                Text("Full Lyrics Canvas")
                             }
                             .font(.system(size: 13, weight: .medium))
                             .frame(maxWidth: .infinity)
@@ -131,7 +131,7 @@ struct LyricsPaneView: View {
         VStack(spacing: 12) {
             ProgressView()
                 .controlSize(.small)
-            Text("正在寻找歌词…")
+            Text("Finding lyrics…")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -145,9 +145,9 @@ struct LyricsPaneView: View {
             Image(systemName: "music.mic")
                 .font(.system(size: 36))
                 .foregroundStyle(.secondary)
-            Text("未找到歌词")
+            Text("No lyrics found")
                 .font(.headline)
-            Text("可在音频同级目录放置同名 .lrc 文件，或稍后重试。")
+            Text("Place a .lrc file with the same name in the audio directory, or try again later.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -162,9 +162,9 @@ struct LyricsPaneView: View {
             Image(systemName: "antenna.radiowaves.left.and.right")
                 .font(.system(size: 36))
                 .foregroundStyle(.secondary)
-            Text("直播电台")
+            Text("Live Radio")
                 .font(.headline)
-            Text("连续直播音频不提供歌词。")
+            Text("Lyrics are not available for live audio.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -179,9 +179,9 @@ struct LyricsPaneView: View {
             Image(systemName: "music.mic")
                 .font(.system(size: 36))
                 .foregroundStyle(.secondary)
-            Text("当前没有播放曲目")
+            Text("No track playing")
                 .font(.headline)
-            Text("选择一首曲目以查看歌词。")
+            Text("Select a track to view lyrics.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

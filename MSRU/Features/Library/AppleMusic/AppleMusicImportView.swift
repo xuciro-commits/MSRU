@@ -58,7 +58,7 @@ struct AppleMusicImportView: View {
         ) {
 
             Text(
-                "导入 Apple Music"
+                "Import Apple Music"
             )
             .font(
                 .largeTitle.bold()
@@ -66,7 +66,7 @@ struct AppleMusicImportView: View {
 
 
             Text(
-                "将你的 Apple Music 资料库导入 MSRU。"
+                "Import your Apple Music library into MSRU."
             )
             .foregroundStyle(
                 .secondary
@@ -90,9 +90,9 @@ struct AppleMusicImportView: View {
 
             importOption(
                 title:
-                    "导入 Apple Music 艺术家",
+                    "Import Apple Music Artists",
                 description:
-                    "包含 Apple Music 资料库中的艺术家。",
+                    "Include artists from Apple Music library.",
                 isOn:
                     $options.importsArtists
             )
@@ -103,9 +103,9 @@ struct AppleMusicImportView: View {
 
             importOption(
                 title:
-                    "导入 Apple Music 歌曲",
+                    "Import Apple Music Songs",
                 description:
-                    "包含 Apple Music 资料库中的歌曲。",
+                    "Include songs from Apple Music library.",
                 isOn:
                     $options.importsSongs
             )
@@ -116,9 +116,9 @@ struct AppleMusicImportView: View {
 
             importOption(
                 title:
-                    "导入 Apple Music 专辑",
+                    "Import Apple Music Albums",
                 description:
-                    "包含 Apple Music 资料库中的专辑。",
+                    "Include albums from Apple Music library.",
                 isOn:
                     $options.importsAlbums
             )
@@ -143,13 +143,13 @@ struct AppleMusicImportView: View {
                 spacing: 5
             ) {
 
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(
                         .headline
                     )
 
 
-                Text(description)
+                Text(LocalizedStringKey(description))
                     .font(
                         .callout
                     )
@@ -197,7 +197,7 @@ struct AppleMusicImportView: View {
 
 
                 Text(
-                    "正在导入 Apple Music 资料库…"
+                    "Importing Apple Music library…"
                 )
                 .foregroundStyle(
                     .secondary
@@ -234,7 +234,7 @@ struct AppleMusicImportView: View {
             if store.hasContent {
 
                 Text(
-                    "\(store.albumCount) 张专辑 · \(store.artistCount) 位艺术家 · \(store.songCount) 首歌曲"
+                    "\(store.albumCount) Albums · \(store.artistCount) Artists · \(store.songCount) Songs"
                 )
                 .font(.callout)
                 .foregroundStyle(
@@ -265,8 +265,8 @@ struct AppleMusicImportView: View {
 
                 Text(
                     store.isImporting
-                    ? "正在导入…"
-                    : "开始导入"
+                    ? "Importing…"
+                    : "Start Import"
                 )
             }
             .buttonStyle(

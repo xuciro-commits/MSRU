@@ -79,8 +79,8 @@ struct ArtistsFeatureTests {
         let contributions = ArtistsFeature.contributions
         #expect(contributions.sidebar.count == 1)
         #expect(contributions.sidebar.first?.id == "artists")
-        #expect(contributions.sidebar.first?.group == "资料库")
-        #expect(contributions.sidebar.first?.title == "艺术家")
+        #expect(contributions.sidebar.first?.group == "Library")
+        #expect(contributions.sidebar.first?.title == "Artists")
         #expect(contributions.routes.first?.id == "artists")
     }
 }

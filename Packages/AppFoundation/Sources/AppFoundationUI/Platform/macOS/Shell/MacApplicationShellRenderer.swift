@@ -54,6 +54,22 @@ public final class MacApplicationShellRenderer {
         MacSplitAccessoryHostingController<AnyView>?
 
 
+    // MARK: - Locale
+
+    public var locale:
+        Locale? {
+        didSet {
+            guard oldValue != locale else { return }
+            if let lastShell {
+                apply(lastShell)
+            }
+        }
+    }
+
+    private var lastShell:
+        ResolvedApplicationShell?
+
+
     // MARK: - Configuration
 
     private let configuration:
@@ -84,9 +100,14 @@ public final class MacApplicationShellRenderer {
             ResolvedApplicationShell,
         configuration:
             MacApplicationShellConfiguration,
+        locale:
+            Locale? = nil,
         isContextPresented:
             Bool = true
     ) {
+
+        self.locale =
+            locale
 
         self.configuration =
             configuration
@@ -288,6 +309,10 @@ public final class MacApplicationShellRenderer {
             ResolvedApplicationShell
     ) {
 
+        lastShell =
+            shell
+
+
         // ----------------------------------------------------
         // Workspace
         // ----------------------------------------------------
@@ -299,12 +324,14 @@ public final class MacApplicationShellRenderer {
 
 
         workspaceHost.rootView =
-            shell
-                .workspace?
-                .content
-            ??
-            AnyView(
-                EmptyView()
+            wrapWithLocale(
+                shell
+                    .workspace?
+                    .content
+                ??
+                AnyView(
+                    EmptyView()
+                )
             )
 
 
@@ -330,11 +357,13 @@ public final class MacApplicationShellRenderer {
 
             contextHost?
                 .rootView =
-                    selectedContext?
-                        .content
-                    ??
-                    AnyView(
-                        EmptyView()
+                    wrapWithLocale(
+                        selectedContext?
+                            .content
+                        ??
+                        AnyView(
+                            EmptyView()
+                        )
                     )
 
 
@@ -376,11 +405,13 @@ public final class MacApplicationShellRenderer {
             applicationAccessoryHost?
                 .update(
                     rootView:
-                        accessory?
-                            .content
-                        ??
-                        AnyView(
-                            EmptyView()
+                        wrapWithLocale(
+                            accessory?
+                                .content
+                            ??
+                            AnyView(
+                                EmptyView()
+                            )
                         )
                 )
 
@@ -409,13 +440,36 @@ public final class MacApplicationShellRenderer {
         workspaceAccessoryHost?
             .update(
                 rootView:
-                    workspaceAccessory?
-                        .content
-                    ??
-                    AnyView(
-                        EmptyView()
+                    wrapWithLocale(
+                        workspaceAccessory?
+                            .content
+                        ??
+                        AnyView(
+                            EmptyView()
+                        )
                     )
             )
+    }
+
+
+    // MARK: - Locale Wrapping Helper
+
+    private func wrapWithLocale(
+        _ view:
+            AnyView
+    ) -> AnyView {
+
+        if let locale {
+
+            return AnyView(
+                view.environment(
+                    \.locale,
+                    locale
+                )
+            )
+        }
+
+        return view
     }
 
 

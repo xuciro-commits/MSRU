@@ -65,7 +65,13 @@ public struct SwiftUIApplicationShell<Navigation: View>: View {
                     VStack(spacing: 0) {
                         HStack {
                             Spacer()
-                            Button("完成", systemImage: "checkmark") { isContextPresented = false }
+                            Button(
+                                String(
+                                    localized: "shell.done",
+                                    bundle: .module
+                                ),
+                                systemImage: "checkmark"
+                            ) { isContextPresented = false }
                         }
                         .padding()
                         contextContent
@@ -107,7 +113,13 @@ public struct SwiftUIApplicationShell<Navigation: View>: View {
         if let workspace = shell.workspace {
             workspace.content
         } else {
-            ContentUnavailableView("目标不可用", systemImage: "questionmark.square.dashed")
+            ContentUnavailableView(
+                String(
+                    localized: "shell.destination_unavailable",
+                    bundle: .module
+                ),
+                systemImage: "questionmark.square.dashed"
+            )
         }
     }
 }

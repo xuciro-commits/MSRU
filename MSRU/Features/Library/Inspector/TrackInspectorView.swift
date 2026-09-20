@@ -20,15 +20,15 @@ struct TrackInspectorView: View {
     var onClose: (() -> Void)? = nil
 
     @State private var inspectorTab: InspectorTab = .details
-    @State private var titleOverlayTier: String = "权威 Canonical"
-    @State private var artistOverlayTier: String = "多语言 Alias"
-    @State private var albumOverlayTier: String = "权威 Canonical"
-    @State private var tagOverlayTier: String = "原始 Original"
+    @State private var titleOverlayTier: String = "Canonical"
+    @State private var artistOverlayTier: String = "Multi-language Alias"
+    @State private var albumOverlayTier: String = "Canonical"
+    @State private var tagOverlayTier: String = "Original"
 
     enum InspectorTab: String, CaseIterable, Identifiable {
-        case details = "曲目详情"
-        case versions = "版本列表 (3)"
-        case overlay = "元数据覆盖层"
+        case details = "Track Details"
+        case versions = "Versions (3)"
+        case overlay = "Metadata Override Layers"
         var id: String { rawValue }
     }
 
@@ -57,7 +57,7 @@ struct TrackInspectorView: View {
                 Button {
                     inspectorTab = tab
                 } label: {
-                    Text(tab.rawValue)
+                    Text(LocalizedStringKey(tab.rawValue))
                         .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
                         .lineLimit(1)
                         .padding(.vertical, 5)
@@ -153,7 +153,7 @@ struct TrackInspectorView: View {
                 Button {
                     playback.toggle(library: track)
                 } label: {
-                        Label(isPlaying ? "暂停" : "播放", systemImage: isPlaying ? "pause.fill" : "play.fill")
+                        Label(isPlaying ? "Pause" : "Play", systemImage: isPlaying ? "pause.fill" : "play.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -175,7 +175,7 @@ struct TrackInspectorView: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(Color.accentColor)
-                .help(isSaved ? "从资料库移除" : "加入资料库")
+                .help(isSaved ? "Remove from Library" : "Add to Library")
             }
 
             ViewThatFits(in: .horizontal) {
@@ -183,7 +183,7 @@ struct TrackInspectorView: View {
                     Button {
                         playback.playNext(track)
                     } label: {
-                        Label("下一首播放", systemImage: "text.line.first.and.arrowtriangle.forward")
+                        Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
                             .font(.caption)
                             .frame(maxWidth: .infinity)
                     }
@@ -194,7 +194,7 @@ struct TrackInspectorView: View {
                     Button {
                         playback.addToQueue(track)
                     } label: {
-                        Label("加入队列", systemImage: "text.badge.plus")
+                        Label("Add to Queue", systemImage: "text.badge.plus")
                             .font(.caption)
                             .frame(maxWidth: .infinity)
                     }
@@ -207,7 +207,7 @@ struct TrackInspectorView: View {
                     Button {
                         playback.playNext(track)
                     } label: {
-                        Label("下一首播放", systemImage: "text.line.first.and.arrowtriangle.forward")
+                        Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
                             .font(.caption)
                             .frame(maxWidth: .infinity)
                     }
@@ -218,7 +218,7 @@ struct TrackInspectorView: View {
                     Button {
                         playback.addToQueue(track)
                     } label: {
-                        Label("加入队列", systemImage: "text.badge.plus")
+                        Label("Add to Queue", systemImage: "text.badge.plus")
                             .font(.caption)
                             .frame(maxWidth: .infinity)
                     }
@@ -232,22 +232,22 @@ struct TrackInspectorView: View {
 
     private func propertiesSection(_ track: LibraryTrack) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("属性")
+            Text("Properties")
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            propertyRow(label: "标题", value: track.title)
-            propertyRow(label: "艺术家", value: track.artist)
+            propertyRow(label: "Title", value: track.title)
+            propertyRow(label: "Artist", value: track.artist)
             if let album = track.album {
-                propertyRow(label: "专辑", value: album)
+                propertyRow(label: "Album", value: album)
             }
             if let duration = track.duration {
-                propertyRow(label: "时长", value: durationString(duration))
+                propertyRow(label: "Duration", value: durationString(duration))
             }
-            propertyRow(label: "添加时间", value: track.dateAdded.formatted(date: .abbreviated, time: .shortened))
+            propertyRow(label: "Date Added", value: track.dateAdded.formatted(date: .abbreviated, time: .shortened))
             let sourceSummary = track.sources.map { $0.kind.rawValue.capitalized }.joined(separator: ", ")
             if !sourceSummary.isEmpty {
-                propertyRow(label: "来源", value: sourceSummary)
+                propertyRow(label: "Source", value: sourceSummary)
             }
         }
     }
@@ -255,7 +255,7 @@ struct TrackInspectorView: View {
     private func sourceSection(_ track: LibraryTrack) -> some View {
         let localSource = track.sources.first { $0.kind == .local && $0.localFileURL != nil }
         return VStack(alignment: .leading, spacing: 10) {
-            Text("来源（只读）")
+            Text("Source (Read-only)")
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
@@ -267,7 +267,7 @@ struct TrackInspectorView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("位置")
+                    Text("Location")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
@@ -282,7 +282,7 @@ struct TrackInspectorView: View {
                     Button {
                         onRevealInFinder(fileURL)
                     } label: {
-                        Label("在访达中显示", systemImage: "arrow.up.forward.square")
+                        Label("Reveal in Finder", systemImage: "arrow.up.forward.square")
                             .font(.callout)
                     }
                     .buttonStyle(.plain)
@@ -370,14 +370,14 @@ struct TrackInspectorView: View {
     private func versionsContent(title: String) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("当前首选版本 (Primary Version):")
+                Text("Current Primary Version:")
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 8) {
                     Image(systemName: "star.fill")
                         .foregroundStyle(Color.yellow)
-                    Text("2020 Remaster · FLAC 24-bit/96kHz (母带)")
+                    Text("2020 Remaster · FLAC 24-bit/96kHz (Master)")
                         .font(.callout.bold())
                 }
                 .padding(10)
@@ -388,54 +388,54 @@ struct TrackInspectorView: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 10) {
-                Text("所有可用版本 (Versions):")
+                Text("All Available Versions:")
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
 
-                versionItemRow(isPrimary: true, tag: "[★ 首选]", desc: "2020 Remaster (FLAC 24/96)", size: "104.2 MB")
-                versionItemRow(isPrimary: false, tag: "[备选]", desc: "2003 Taiwan CD (FLAC 16/44.1)", size: "28.6 MB")
-                versionItemRow(isPrimary: false, tag: "[便携]", desc: "Digital Release (AAC 256k)", size: "8.4 MB")
+                versionItemRow(isPrimary: true, tag: "[★ Primary]", desc: "2020 Remaster (FLAC 24/96)", size: "104.2 MB")
+                versionItemRow(isPrimary: false, tag: "[Alternate]", desc: "2003 Taiwan CD (FLAC 16/44.1)", size: "28.6 MB")
+                versionItemRow(isPrimary: false, tag: "[Portable]", desc: "Digital Release (AAC 256k)", size: "8.4 MB")
             }
 
             Divider()
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("操作：")
+                Text("Actions:")
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
 
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 8) {
-                        Button("设为首选版本") {}
+                        Button("Set as Primary") {}
                             .buttonStyle(.borderedProminent)
                             .tint(Color.accentColor)
                             .controlSize(.small)
 
-                        Button("在访达中显示") {}
+                        Button("Reveal in Finder") {}
                             .buttonStyle(.bordered)
                             .tint(Color.accentColor)
                             .controlSize(.small)
 
-                        Button("移出本组版本") {}
+                        Button("Remove from Group") {}
                             .buttonStyle(.bordered)
                             .tint(Color.accentColor)
                             .controlSize(.small)
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Button("设为首选版本") {}
+                        Button("Set as Primary") {}
                             .buttonStyle(.borderedProminent)
                             .tint(Color.accentColor)
                             .controlSize(.small)
                             .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Button("在访达中显示") {}
+                        Button("Reveal in Finder") {}
                             .buttonStyle(.bordered)
                             .tint(Color.accentColor)
                             .controlSize(.small)
                             .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Button("移出本组版本") {}
+                        Button("Remove from Group") {}
                             .buttonStyle(.bordered)
                             .tint(Color.accentColor)
                             .controlSize(.small)
@@ -476,29 +476,29 @@ struct TrackInspectorView: View {
 
     private func overlayContent(title: String, artist: String, album: String?) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("三层元数据覆盖设置：")
+            Text("Three-layer Metadata Override Settings:")
                 .font(.caption.bold())
                 .foregroundStyle(.secondary)
 
-            overlaySelectorRow(field: "• 标题：", selection: $titleOverlayTier, value: "(\(title))", options: ["权威 Canonical", "用户 User", "原始 Original"])
-            overlaySelectorRow(field: "• 歌手：", selection: $artistOverlayTier, value: "(\(artist))", options: ["权威 Canonical", "多语言 Alias", "原始 Original"])
-            overlaySelectorRow(field: "• 专辑：", selection: $albumOverlayTier, value: "(\(album ?? "未设置"))", options: ["权威 Canonical", "用户 User", "原始 Original"])
-            overlaySelectorRow(field: "• 标签：", selection: $tagOverlayTier, value: "(绝不篡改原文件)", options: ["原始 Original", "锁定不可写"])
+            overlaySelectorRow(field: "• Title：", selection: $titleOverlayTier, value: "(\(title))", options: ["Canonical", "User", "Original"])
+            overlaySelectorRow(field: "• Artist: ", selection: $artistOverlayTier, value: "(\(artist))", options: ["Canonical", "Multi-language Alias", "Original"])
+            overlaySelectorRow(field: "• Album：", selection: $albumOverlayTier, value: "(\(album ?? "Not Set"))", options: ["Canonical", "User", "Original"])
+            overlaySelectorRow(field: "• Tags: ", selection: $tagOverlayTier, value: "(Never modifies original files)", options: ["Original", "Locked / Read-only"])
 
             Divider()
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("声纹与外部目录：")
+                Text("Fingerprint & External Catalog:")
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 8) {
                     Image(systemName: "waveform.badge.magnifyingglass")
                         .foregroundStyle(Color.accentColor)
-                    Text("本地声学指纹记忆")
+                    Text("Local Acoustic Fingerprint Memory")
                         .font(.callout.bold())
                     Spacer()
-                    Text("已激活")
+                    Text("Active")
                         .font(.caption2.bold())
                         .foregroundStyle(.green)
                         .padding(.horizontal, 6)
@@ -513,7 +513,7 @@ struct TrackInspectorView: View {
                         _ = try? await MusicBrainzCatalogClient.shared.searchReleases(artist: artist, album: album ?? "")
                     }
                 } label: {
-                    Label("在线重新识别 (MusicBrainz)", systemImage: "arrow.clockwise")
+                    Label("Online Re-identification (MusicBrainz)", systemImage: "arrow.clockwise")
                         .font(.caption)
                 }
                 .buttonStyle(.bordered)
@@ -525,10 +525,10 @@ struct TrackInspectorView: View {
 
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 10) {
-                    Button("重置所有覆盖为权威") {
-                        titleOverlayTier = "权威 Canonical"
-                        artistOverlayTier = "权威 Canonical"
-                        albumOverlayTier = "权威 Canonical"
+                    Button("Reset All Overrides to Canonical") {
+                        titleOverlayTier = "Canonical"
+                        artistOverlayTier = "Canonical"
+                        albumOverlayTier = "Canonical"
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Color.accentColor)
@@ -536,10 +536,10 @@ struct TrackInspectorView: View {
 
                     Spacer()
 
-                    Button("回退至文件原始标签") {
-                        titleOverlayTier = "原始 Original"
-                        artistOverlayTier = "原始 Original"
-                        albumOverlayTier = "原始 Original"
+                    Button("Revert to Original File Tags") {
+                        titleOverlayTier = "Original"
+                        artistOverlayTier = "Original"
+                        albumOverlayTier = "Original"
                     }
                     .buttonStyle(.bordered)
                     .tint(Color.accentColor)
@@ -547,20 +547,20 @@ struct TrackInspectorView: View {
                 }
 
                 VStack(spacing: 8) {
-                    Button("重置所有覆盖为权威") {
-                        titleOverlayTier = "权威 Canonical"
-                        artistOverlayTier = "权威 Canonical"
-                        albumOverlayTier = "权威 Canonical"
+                    Button("Reset All Overrides to Canonical") {
+                        titleOverlayTier = "Canonical"
+                        artistOverlayTier = "Canonical"
+                        albumOverlayTier = "Canonical"
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Color.accentColor)
                     .controlSize(.small)
                     .frame(maxWidth: .infinity)
 
-                    Button("回退至文件原始标签") {
-                        titleOverlayTier = "原始 Original"
-                        artistOverlayTier = "原始 Original"
-                        albumOverlayTier = "原始 Original"
+                    Button("Revert to Original File Tags") {
+                        titleOverlayTier = "Original"
+                        artistOverlayTier = "Original"
+                        albumOverlayTier = "Original"
                     }
                     .buttonStyle(.bordered)
                     .tint(Color.accentColor)
@@ -576,14 +576,14 @@ struct TrackInspectorView: View {
         VStack(alignment: .leading, spacing: 4) {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 6) {
-                    Text(field)
+                    Text(LocalizedStringKey(field))
                         .font(.caption.bold())
                         .frame(width: 55, alignment: .leading)
                         .lineLimit(1)
 
                     Picker("", selection: selection) {
                         ForEach(options, id: \.self) { opt in
-                            Text(opt).tag(opt)
+                            Text(LocalizedStringKey(opt)).tag(opt)
                         }
                     }
                     .labelsHidden()
@@ -594,12 +594,12 @@ struct TrackInspectorView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(field)
+                    Text(LocalizedStringKey(field))
                         .font(.caption.bold())
 
                     Picker("", selection: selection) {
                         ForEach(options, id: \.self) { opt in
-                            Text(opt).tag(opt)
+                            Text(LocalizedStringKey(opt)).tag(opt)
                         }
                     }
                     .labelsHidden()
@@ -607,7 +607,7 @@ struct TrackInspectorView: View {
                 }
             }
 
-            Text(value)
+            Text(LocalizedStringKey(value))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .padding(.leading, 8)
@@ -627,7 +627,7 @@ struct TrackInspectorView: View {
                 Button {
                     playback.toggle(track: track, queue: [track])
                 } label: {
-                    Label(isPlaying ? "暂停" : "播放", systemImage: isPlaying ? "pause.fill" : "play.fill")
+                    Label(isPlaying ? "Pause" : "Play", systemImage: isPlaying ? "pause.fill" : "play.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -648,7 +648,7 @@ struct TrackInspectorView: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(Color.accentColor)
-                .help(isSaved ? "从资料库移除" : "加入资料库")
+                .help(isSaved ? "Remove from Library" : "Add to Library")
             }
 
             ViewThatFits(in: .horizontal) {
@@ -656,7 +656,7 @@ struct TrackInspectorView: View {
                     Button {
                         playback.playNext(track)
                     } label: {
-                        Label("下一首播放", systemImage: "text.line.first.and.arrowtriangle.forward")
+                        Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
                             .font(.caption)
                             .frame(maxWidth: .infinity)
                     }
@@ -666,7 +666,7 @@ struct TrackInspectorView: View {
                     Button {
                         playback.addToQueue(track)
                     } label: {
-                        Label("加入队列", systemImage: "text.badge.plus")
+                        Label("Add to Queue", systemImage: "text.badge.plus")
                             .font(.caption)
                             .frame(maxWidth: .infinity)
                     }
@@ -678,7 +678,7 @@ struct TrackInspectorView: View {
                     Button {
                         playback.playNext(track)
                     } label: {
-                        Label("下一首播放", systemImage: "text.line.first.and.arrowtriangle.forward")
+                        Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
                             .font(.caption)
                             .frame(maxWidth: .infinity)
                     }
@@ -688,7 +688,7 @@ struct TrackInspectorView: View {
                     Button {
                         playback.addToQueue(track)
                     } label: {
-                        Label("加入队列", systemImage: "text.badge.plus")
+                        Label("Add to Queue", systemImage: "text.badge.plus")
                             .font(.caption)
                             .frame(maxWidth: .infinity)
                     }
@@ -703,19 +703,19 @@ struct TrackInspectorView: View {
 
     private func propertiesSection(_ track: LocalTrack) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("属性")
+            Text("Properties")
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            propertyRow(label: "标题", value: track.title)
-            propertyRow(label: "艺术家", value: track.artist)
+            propertyRow(label: "Title", value: track.title)
+            propertyRow(label: "Artist", value: track.artist)
             if let album = track.album {
-                propertyRow(label: "专辑", value: album)
+                propertyRow(label: "Album", value: album)
             }
-            propertyRow(label: "时长", value: durationString(track.duration))
-            propertyRow(label: "格式", value: track.fileURL.pathExtension.uppercased())
+            propertyRow(label: "Duration", value: durationString(track.duration))
+            propertyRow(label: "Format", value: track.fileURL.pathExtension.uppercased())
             if let fileSize = fileSizeString(for: track.fileURL) {
-                propertyRow(label: "大小", value: fileSize)
+                propertyRow(label: "Size", value: fileSize)
             }
         }
     }
@@ -724,14 +724,14 @@ struct TrackInspectorView: View {
 
     private func sourceSection(_ track: LocalTrack) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("来源（只读）")
+            Text("Source (Read-only)")
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            propertyRow(label: "类型", value: "本地音频文件")
+            propertyRow(label: "Genre", value: "Local Audio File")
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("位置")
+                Text("Location")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -746,7 +746,7 @@ struct TrackInspectorView: View {
                 Button {
                     onRevealInFinder(track.fileURL)
                 } label: {
-                    Label("在访达中显示", systemImage: "arrow.up.forward.square")
+                    Label("Reveal in Finder", systemImage: "arrow.up.forward.square")
                         .font(.callout)
                 }
                 .buttonStyle(.plain)
@@ -794,16 +794,16 @@ struct TrackInspectorView: View {
                 Divider()
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("详情")
+                    Text("Details")
                         .font(.headline)
                         .foregroundStyle(.secondary)
 
-                    propertyRow(label: "标题", value: content.title)
+                    propertyRow(label: "Title", value: content.title)
                     if let subtitle = content.subtitle {
-                        propertyRow(label: "副标题", value: subtitle)
+                        propertyRow(label: "Subtitle", value: subtitle)
                     }
-                    propertyRow(label: "服务提供方", value: content.provider.title)
-                    propertyRow(label: "类型", value: content.kind.rawValue.capitalized)
+                    propertyRow(label: "Providers", value: content.provider.title)
+                    propertyRow(label: "Genre", value: content.kind.rawValue.capitalized)
                 }
             }
             .padding(18)
@@ -816,9 +816,9 @@ struct TrackInspectorView: View {
 
     private var emptySelectionView: some View {
         ContentUnavailableView {
-            Label("未选择曲目", systemImage: "music.note")
+            Label("No Track Selected", systemImage: "music.note")
         } description: {
-            Text("从资料库或浏览页面选择一首曲目，以查看属性和音频详情。")
+            Text("Select a track from Library or Browse to view properties and audio details.")
         }
     }
 
@@ -826,12 +826,12 @@ struct TrackInspectorView: View {
 
     private func propertyRow(label: String, value: String) -> some View {
         HStack(alignment: .top) {
-            Text(label)
+            Text(LocalizedStringKey(label))
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .frame(width: 70, alignment: .leading)
 
-            Text(value)
+            Text(LocalizedStringKey(value))
                 .font(.callout)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .lineLimit(2)

@@ -73,10 +73,10 @@ struct RadioView: View {
     private var header: some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("电台")
+                Text("Radio")
                     .font(.system(size: 32, weight: .bold))
 
-                Text("精选互联网直播电台，支持无损和高码率播放。")
+                Text("Featured internet live radio stations, supporting lossless and high-bitrate playback.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -86,7 +86,7 @@ struct RadioView: View {
             Button {
                 isShowingAddStationSheet = true
             } label: {
-                Label("添加电台", systemImage: "plus")
+                Label("Add Station", systemImage: "plus")
                     .font(.system(size: 13, weight: .semibold))
             }
             .buttonStyle(.borderedProminent)
@@ -107,7 +107,7 @@ struct RadioView: View {
                         HStack(spacing: 6) {
                             Image(systemName: genre.systemImage)
                                 .font(.system(size: 11, weight: .semibold))
-                            Text(genre.displayTitle)
+                            Text(LocalizedStringKey(genre.rawValue))
                                 .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
                         }
                         .padding(.horizontal, 12)
@@ -135,7 +135,7 @@ struct RadioView: View {
             HStack(spacing: 6) {
                 Image(systemName: "heart.fill")
                     .foregroundStyle(.red)
-                Text("收藏")
+                Text("Favorite")
                     .font(.title3.bold())
             }
 
@@ -177,7 +177,7 @@ struct RadioView: View {
             HStack(spacing: 6) {
                 Image(systemName: "clock.arrow.circlepath")
                     .foregroundStyle(.secondary)
-                Text("最近播放")
+                Text("Recently Played")
                     .font(.title3.bold())
             }
 
@@ -225,7 +225,7 @@ struct RadioView: View {
 
     private func featuredSection(_ station: RadioStation) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("精选广播")
+            Text("Featured Broadcast")
                 .font(.title3.bold())
 
             RadioHeroBannerView(
@@ -247,21 +247,26 @@ struct RadioView: View {
     private var stationsGridSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text(state.selectedGenre == .all ? "全部电台" : "\(state.selectedGenre.displayTitle) 电台")
-                    .font(.title3.bold())
+                if state.selectedGenre == .all {
+                    Text("All Stations")
+                        .font(.title3.bold())
+                } else {
+                    Text("\(LocalizedStringKey(state.selectedGenre.rawValue)) Radio")
+                        .font(.title3.bold())
+                }
 
                 Spacer()
 
-                Text("\(state.stations.count) 个电台")
+                Text("\(state.stations.count) Stations")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             if state.stations.isEmpty {
                 ContentUnavailableView(
-                    "未找到电台",
+                    "No stations found",
                     systemImage: "dot.radiowaves.left.and.right",
-                    description: Text("请尝试选择其他类型或调整搜索关键词。")
+                    description: Text("Please try selecting a different genre or adjusting search terms.")
                 )
                 .frame(maxWidth: .infinity, minHeight: 200)
             } else {

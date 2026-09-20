@@ -9,6 +9,7 @@ import AppKit
 import Observation
 import SwiftUI
 
+import AppFoundation
 import AppFoundationUI
 
 
@@ -227,6 +228,11 @@ final class MSRUMacWindowComposition {
                         rendersWorkspaceAccessory:
                             true
                     ),
+                locale:
+                    scene
+                        .application
+                        .languageSettings
+                        .resolvedLocale,
                 isContextPresented:
                     scene
                         .isQueuePresented
@@ -280,6 +286,10 @@ final class MSRUMacWindowComposition {
             MacSplitAccessoryHostingController(
                 rootView:
                     SidebarBottomAccessoryView(
+                        languageSettings:
+                            scene
+                                .application
+                                .languageSettings,
                         onOpenSettings: {
                             [weak scene]
                             in
@@ -378,6 +388,7 @@ final class MSRUMacWindowComposition {
             _ = scene.isQueuePresented
             _ = scene.activeContextPane
             _ = scene.isNowPlayingPresented
+            _ = scene.application.languageSettings.selectedLanguage
 
         } onChange: {
             [weak self]
@@ -409,6 +420,12 @@ final class MSRUMacWindowComposition {
                  There is no second route-resolution path.
                  */
 
+                shellRenderer.locale =
+                    scene
+                        .application
+                        .languageSettings
+                        .resolvedLocale
+
                 shellRenderer
                     .apply(
                         shell
@@ -436,6 +453,12 @@ final class MSRUMacWindowComposition {
                     onClose: { [weak self] in
                         self?.scene.setNowPlaying(presented: false)
                     }
+                )
+                .applyLocaleOverride(
+                    scene
+                        .application
+                        .languageSettings
+                        .resolvedLocale
                 )
                 let hosting = NSHostingController(rootView: AnyView(canvas))
                 canvasHostingController = hosting

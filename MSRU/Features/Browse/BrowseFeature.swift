@@ -258,7 +258,7 @@ enum BrowseFeature:
                  Preview 可以预先注入 results。
 
                  如果已有结果，
-                 appeared 不应该再启动搜索。
+                 appeared 不应该再启动Search。
                  */
 
                 guard
@@ -450,7 +450,7 @@ enum BrowseFeature:
             ):
 
                 /*
-                 debounce 完成时 query 可能已经改变。
+                 debounce Done时 query 可能已经改变。
 
                  只有它仍然对应当前输入，
                  才允许真正发起 request。
@@ -493,7 +493,7 @@ enum BrowseFeature:
 
                 /*
                  防止已经过期的网络响应
-                 覆盖更新后的搜索结果。
+                 覆盖更新后的Search结果。
                  */
 
                 guard

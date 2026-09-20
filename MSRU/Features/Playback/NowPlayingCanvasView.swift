@@ -74,7 +74,7 @@ struct NowPlayingCanvasView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 14, weight: .bold))
-                    Text("收起")
+                    Text("Collapse")
                         .font(.system(size: 13, weight: .medium))
                 }
                 .foregroundStyle(.white.opacity(0.85))
@@ -83,13 +83,13 @@ struct NowPlayingCanvasView: View {
                 .background(Color.white.opacity(0.12), in: Capsule())
             }
             .buttonStyle(.plain)
-            .help("收起到播放器栏（ESC）")
+            .help("Collapse to player bar (ESC)")
             .keyboardShortcut(.cancelAction)
 
             Spacer()
 
             VStack(spacing: 2) {
-                Text("正在播放")
+                Text("Now Playing")
                     .font(.system(size: 11, weight: .bold))
                     .tracking(1.5)
                     .foregroundStyle(.white.opacity(0.6))
@@ -103,7 +103,7 @@ struct NowPlayingCanvasView: View {
                     .foregroundStyle(.white.opacity(0.65))
             }
             .buttonStyle(.plain)
-            .help("关闭")
+            .help("Close")
         }
     }
 
@@ -116,13 +116,13 @@ struct NowPlayingCanvasView: View {
                 .shadow(color: .black.opacity(0.45), radius: 28, x: 0, y: 16)
 
             VStack(spacing: 8) {
-                Text(playback.unifiedTitle)
+                Text(LocalizedStringKey(playback.unifiedTitle))
                     .font(.system(size: 24, weight: .bold))
                     .foregroundStyle(.white)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
 
-                Text(playback.unifiedSubtitle)
+                Text(LocalizedStringKey(playback.unifiedSubtitle))
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.white.opacity(0.78))
                     .lineLimit(1)
@@ -132,7 +132,7 @@ struct NowPlayingCanvasView: View {
                         Circle()
                             .fill(Color.red)
                             .frame(width: 7, height: 7)
-                        Text("直播电台")
+                        Text("Live Radio")
                             .font(.system(size: 11, weight: .bold))
                             .tracking(1.0)
                     }
@@ -216,7 +216,7 @@ struct NowPlayingCanvasView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!playback.unifiedCanPrevious)
-                .help("上一首")
+                .help("Previous")
 
                 // Play / Pause Hero button
                 Button {
@@ -242,7 +242,7 @@ struct NowPlayingCanvasView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!playback.unifiedHasTrack || playback.isResolving)
-                .help(playback.isPlaying ? "暂停（空格）" : "播放（空格）")
+                .help(playback.isPlaying ? "Pause (Space)" : "Play (Space)")
                 .keyboardShortcut(.space, modifiers: [])
 
                 // Next button
@@ -255,7 +255,7 @@ struct NowPlayingCanvasView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!playback.unifiedCanNext)
-                .help("下一首")
+                .help("Next")
             }
 
             // Volume and Queue actions row
@@ -270,7 +270,7 @@ struct NowPlayingCanvasView: View {
                         .frame(width: 20)
                 }
                 .buttonStyle(.plain)
-                .help(playback.isMuted ? "取消静音" : "静音")
+                .help(playback.isMuted ? "Unmute" : "Mute")
 
                 // Volume slider
                 Slider(
@@ -300,7 +300,7 @@ struct NowPlayingCanvasView: View {
                         HStack(spacing: 6) {
                             Image(systemName: isLyricsPresented ? "quote.bubble.fill" : "quote.bubble")
                                 .font(.system(size: 13, weight: .medium))
-                            Text("歌词")
+                            Text("Lyrics")
                                 .font(.system(size: 13, weight: .medium))
                         }
                         .foregroundStyle(isLyricsPresented ? Color.accentColor : Color.white.opacity(0.8))
@@ -314,7 +314,7 @@ struct NowPlayingCanvasView: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    .help("切换歌词视图")
+                    .help("Toggle Lyrics")
                 }
 
                 // Queue drawer toggle
@@ -326,7 +326,7 @@ struct NowPlayingCanvasView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "list.bullet")
                             .font(.system(size: 14, weight: .medium))
-                        Text("队列")
+                        Text("Queue")
                             .font(.system(size: 13, weight: .medium))
                     }
                     .foregroundStyle(isQueueDrawerPresented ? Color.accentColor : Color.white.opacity(0.8))
@@ -340,7 +340,7 @@ struct NowPlayingCanvasView: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .help("切换队列")
+                .help("Toggle Queue")
             }
             .padding(.top, 6)
         }
@@ -356,7 +356,7 @@ struct NowPlayingCanvasView: View {
                         VStack(spacing: 12) {
                             ProgressView()
                                 .tint(.white)
-                            Text("正在同步歌词…")
+                            Text("Syncing lyrics…")
                                 .font(.caption)
                                 .foregroundStyle(.white.opacity(0.7))
                         }
@@ -394,10 +394,10 @@ struct NowPlayingCanvasView: View {
                             Image(systemName: "music.mic")
                                 .font(.system(size: 44))
                                 .foregroundStyle(.white.opacity(0.4))
-                            Text("暂无歌词")
+                            Text("No lyrics available")
                                 .font(.title3.bold())
                                 .foregroundStyle(.white)
-                            Text("可将 .lrc 歌词文件与音频放置在同一文件夹，系统将自动加载。")
+                            Text("Place a .lrc file in the same folder as the audio, and it will be loaded automatically.")
                                 .font(.caption)
                                 .foregroundStyle(.white.opacity(0.6))
                         }
@@ -429,7 +429,7 @@ struct NowPlayingCanvasView: View {
                     Spacer()
                     HStack(spacing: 6) {
                         Image(systemName: "dot.radiowaves.left.and.right")
-                        Text("连续广播 · 直播音频")
+                        Text("Continuous Broadcast · Live Audio")
                     }
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.white.opacity(0.65))
@@ -530,7 +530,7 @@ struct NowPlayingCanvasView: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Text("接下来播放")
+                    Text("Up Next")
                         .font(.headline)
                         .foregroundStyle(.white)
 

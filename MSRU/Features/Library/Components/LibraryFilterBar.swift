@@ -55,7 +55,7 @@ struct LibraryFilterBar: View {
                 .foregroundStyle(.secondary)
                 .font(.caption)
 
-            TextField("筛选歌曲…", text: $searchQuery)
+            TextField("Filter songs…", text: $searchQuery)
                 .textFieldStyle(.plain)
                 .font(.callout)
 
@@ -78,7 +78,7 @@ struct LibraryFilterBar: View {
 
     private var sortMenu: some View {
         Menu {
-            Section("排序方式") {
+            Section("Sort By") {
                 ForEach(LibrarySortField.allCases) { field in
                     Button {
                         if sortField == field {
@@ -89,7 +89,7 @@ struct LibraryFilterBar: View {
                         }
                     } label: {
                         HStack {
-                            Text(field.title)
+                            Text(LocalizedStringKey(field.title))
                             if sortField == field {
                                 Image(systemName: "checkmark")
                             }
@@ -98,12 +98,12 @@ struct LibraryFilterBar: View {
                 }
             }
 
-            Section("顺序") {
+            Section("Order") {
                 Button {
                     sortAscending = true
                 } label: {
                     HStack {
-                        Text("升序")
+                        Text("Ascending")
                         if sortAscending {
                             Image(systemName: "checkmark")
                         }
@@ -114,7 +114,7 @@ struct LibraryFilterBar: View {
                     sortAscending = false
                 } label: {
                     HStack {
-                        Text("降序")
+                        Text("Descending")
                         if !sortAscending {
                             Image(systemName: "checkmark")
                         }
@@ -122,7 +122,7 @@ struct LibraryFilterBar: View {
                 }
             }
         } label: {
-            Label(sortField.title, systemImage: sortAscending ? "arrow.up" : "arrow.down")
+            Label(LocalizedStringKey(sortField.title), systemImage: sortAscending ? "arrow.up" : "arrow.down")
                 .font(.callout)
         }
         .menuStyle(.borderlessButton)
@@ -130,7 +130,7 @@ struct LibraryFilterBar: View {
     }
 
     private var viewModePicker: some View {
-        Picker("视图", selection: $viewMode) {
+        Picker("View", selection: $viewMode) {
             ForEach(LibraryViewMode.allCases) { mode in
                 Image(systemName: mode.systemImage)
                     .tag(mode)

@@ -18,13 +18,13 @@ enum RadioGenre: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var displayTitle: String {
         switch self {
-        case .all: return "全部"
-        case .indie: return "独立与另类"
-        case .electronic: return "电子与氛围"
-        case .classical: return "古典"
-        case .jazz: return "爵士与蓝调"
-        case .pop: return "流行与热门"
-        case .ambient: return "环境与无人机音乐"
+        case .all: return String(localized: "All")
+        case .indie: return String(localized: "Indie & Alternative")
+        case .electronic: return String(localized: "Electronic & Chill")
+        case .classical: return String(localized: "Classical")
+        case .jazz: return String(localized: "Jazz & Blues")
+        case .pop: return String(localized: "Pop & Hits")
+        case .ambient: return String(localized: "Ambient & Drone")
         }
     }
 

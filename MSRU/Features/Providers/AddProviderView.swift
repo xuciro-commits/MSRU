@@ -21,30 +21,30 @@ struct AddProviderView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("添加服务提供方").font(.title2.bold())
-                Text("注册远程 HTTP/JSON 服务提供方配置。")
+                Text("Add Provider").font(.title2.bold())
+                Text("Register remote HTTP/JSON provider config.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
 
             Form {
-                Section("服务提供方") {
-                    TextField("名称", text: $name)
-                    TextField("服务提供方或清单 URL", text: $endpoint)
+                Section("Provider") {
+                    TextField("Name", text: $name)
+                    TextField("Provider or Manifest URL", text: $endpoint)
                 }
-                Section("能力") {
-                    Toggle("目录", isOn: $catalog)
-                    Toggle("元数据", isOn: $metadata)
-                    Toggle("播放", isOn: $playback)
-                    Toggle("资料库", isOn: $library)
+                Section("Capabilities") {
+                    Toggle("Catalog", isOn: $catalog)
+                    Toggle("Metadata", isOn: $metadata)
+                    Toggle("Playback", isOn: $playback)
+                    Toggle("Library", isOn: $library)
                 }
             }
             .formStyle(.grouped)
 
             HStack {
                 Spacer()
-                Button("取消") { dismiss() }
-                Button("添加服务提供方") {
+                Button("Cancel") { dismiss() }
+                Button("Add Provider") {
                     let id = store.addRemoteProvider(
                         name: name,
                         endpoint: endpoint,

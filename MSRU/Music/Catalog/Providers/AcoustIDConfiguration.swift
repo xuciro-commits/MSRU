@@ -57,7 +57,7 @@ public actor AcoustIDConfiguration {
         let referenceTrackId = "9ff43b6a-4f16-427c-93c2-92307ca505e0"
         let endpoint = "https://api.acoustid.org/v2/lookup?client=\(currentKey)&trackid=\(referenceTrackId)"
         guard let url = URL(string: endpoint) else {
-            return (false, "无效的 API 请求地址")
+            return (false, String(localized: "Invalid API request URL"))
         }
 
         var req = URLRequest(url: url, timeoutInterval: 8.0)
@@ -66,27 +66,27 @@ public actor AcoustIDConfiguration {
         do {
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse else {
-                return (false, "未收到服务器响应")
+                return (false, String(localized: "No response from server"))
             }
 
             if http.statusCode == 200 {
-                return (true, "连接成功 (Status 200 OK)")
+                return (true, String(localized: "Connection successful (Status 200 OK)"))
             } else if http.statusCode == 401 || http.statusCode == 400 {
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let error = json["error"] as? [String: Any],
                    let code = error["code"] as? Int,
                    let msg = error["message"] as? String {
                     if code == 4 {
-                        return (false, "AcoustID 报错: API Key 无效。提示：个人用户 User Key (用于上传声纹) 无法用于查询，请使用应用 Client Key (前往 acoustid.org/new-application 获取)")
+                        return (false, String(localized: "AcoustID error: Invalid API Key. Note: Personal User Key cannot query; use an Application Client Key from acoustid.org/new-application"))
                     }
-                    return (false, "AcoustID 报错: \(msg) (代码 \(code))")
+                    return (false, "\(String(localized: "AcoustID error:")) \(msg) (\(code))")
                 }
-                return (false, "AcoustID 响应异常 (HTTP \(http.statusCode))")
+                return (false, "\(String(localized: "AcoustID anomalous response")) (HTTP \(http.statusCode))")
             } else {
-                return (false, "HTTP 状态码 \(http.statusCode)")
+                return (false, "HTTP \(http.statusCode)")
             }
         } catch {
-            return (false, "网络请求失败: \(error.localizedDescription)")
+            return (false, "\(String(localized: "Network request failed:")) \(error.localizedDescription)")
         }
     }
 }

@@ -17,11 +17,11 @@ struct MetadataManagerWorkspaceView: View {
     let onOpenLibrary: () -> Void
 
     enum ManagerTab: String, CaseIterable, Identifiable {
-        case importWorkflow = "导入与审核"
-        case providers = "元数据提供商"
-        case fingerprints = "声纹记忆库"
-        case pathRules = "目录学习规则"
-        case cloudCatalog = "MusicBrainz 在线状态"
+        case importWorkflow = "Import & Review"
+        case providers = "Metadata Providers"
+        case fingerprints = "Fingerprint Memory"
+        case pathRules = "Folder Learning Rules"
+        case cloudCatalog = "MusicBrainz Online Status"
 
         var id: String { rawValue }
 
@@ -94,7 +94,7 @@ struct MetadataManagerWorkspaceView: View {
                     Button {
                         selectedTab = tab
                     } label: {
-                        Label(tab.rawValue, systemImage: tab.systemImage)
+                        Label(LocalizedStringKey(tab.rawValue), systemImage: tab.systemImage)
                             .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
@@ -112,13 +112,13 @@ struct MetadataManagerWorkspaceView: View {
 
             // Badge Metrics Summary
             HStack(spacing: 12) {
-                Text("声纹 \(fingerprintRegistry.records.count) 首")
+                Text("Fingerprints \(fingerprintRegistry.records.count) tracks")
                     .font(.caption2.bold())
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Color.secondary.opacity(0.12), in: Capsule())
 
-                Text("规则 \(ruleStore.rules.count) 条")
+                Text("Rules \(ruleStore.rules.count) entries")
                     .font(.caption2.bold())
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -151,9 +151,9 @@ struct MetadataManagerWorkspaceView: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("元数据提供商配置")
+                    Text("Metadata Provider Configuration")
                         .font(.headline)
-                    Text("启用或禁用各个元数据提供方，系统将按照生效的提供商链式拉取权威元数据与高清唱片封面。")
+                    Text("Enable or disable metadata providers. The system will chain-fetch authoritative metadata and HD cover art through active providers.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -187,17 +187,17 @@ struct MetadataManagerWorkspaceView: View {
                 Image(systemName: "key.fill")
                     .font(.headline)
                     .foregroundStyle(Color.accentColor)
-                Text("AcoustID 声学指纹服务授权 (Application Client Key)")
+                Text("AcoustID Application Client Key")
                     .font(.headline)
                 Spacer()
                 if let status = acoustIDTestStatus {
                     Text(status)
                         .font(.caption)
-                        .foregroundStyle(status.contains("成功") ? .green : .red)
+                        .foregroundStyle(status.contains("Success") ? .green : .red)
                 }
             }
 
-            Text("用于通过 Chromaprint 提取的声音特征查询全球 MusicBrainz 录音实体。\n注意：AcoustID 区分「应用客户端密钥 (Application Key)」与「个人用户密钥 (User Key)」。查询服务必须使用 Application Key。")
+            Text("Used for querying global MusicBrainz recordings via Chromaprint.\nNote: AcoustID distinguishes between Application Key and User Key. Query service must use Application Key.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -214,10 +214,10 @@ struct MetadataManagerWorkspaceView: View {
                 Button(action: {
                     Task {
                         isVerifyingAcoustID = true
-                        acoustIDTestStatus = "正在验证…"
+                        acoustIDTestStatus = "Verifying…"
                         let res = await AcoustIDConfiguration.shared.verifyConnectivity()
                         isVerifyingAcoustID = false
-                        acoustIDTestStatus = res.success ? "✓ 验证成功" : "✕ \(res.message)"
+                        acoustIDTestStatus = res.success ? "✓ Verification successful" : "✕ \(res.message)"
                     }
                 }) {
                     HStack(spacing: 4) {
@@ -227,14 +227,14 @@ struct MetadataManagerWorkspaceView: View {
                         } else {
                             Image(systemName: "checkmark.shield.fill")
                         }
-                        Text("验证连接")
+                        Text("Verify Connection")
                     }
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
                 .disabled(isVerifyingAcoustID || acoustIDApiKey.isEmpty)
 
-                Button("恢复默认") {
+                Button("Restore Default") {
                     Task {
                         await AcoustIDConfiguration.shared.resetToDefault()
                         acoustIDApiKey = await AcoustIDConfiguration.shared.apiKey
@@ -243,14 +243,14 @@ struct MetadataManagerWorkspaceView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
-                .help("恢复为系统内置已验证的客户端 Application Key")
+                .help("Restore to system built-in verified Application Key")
             }
 
             HStack(spacing: 16) {
                 Link(destination: URL(string: "https://acoustid.org/new-application")!) {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.up.right.square")
-                        Text("前往 AcoustID 注册新应用获取专属 Key")
+                        Text("Visit AcoustID to register and get your own Key")
                     }
                     .font(.caption)
                     .foregroundStyle(Color.accentColor)
@@ -259,7 +259,7 @@ struct MetadataManagerWorkspaceView: View {
                 Text("·")
                     .foregroundStyle(.secondary)
 
-                Text("默认内置可用 Key: cSpUJKpD")
+                Text("Default built-in Key: cSpUJKpD")
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
             }
@@ -291,7 +291,7 @@ struct MetadataManagerWorkspaceView: View {
                     Text(provider.displayName)
                         .font(.headline)
 
-                    Text("第 \(priorityIndex) 优先级")
+                    Text("Priority \(priorityIndex)")
                         .font(.caption2.bold())
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -330,7 +330,7 @@ struct MetadataManagerWorkspaceView: View {
                 HStack {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
-                    TextField("搜索声纹、歌曲或歌手…", text: $fingerprintSearchText)
+                    TextField("Search fingerprints, songs, or artists…", text: $fingerprintSearchText)
                         .textFieldStyle(.plain)
                 }
                 .padding(.horizontal, 10)
@@ -347,9 +347,9 @@ struct MetadataManagerWorkspaceView: View {
                 }
 
                 if !fingerprintRegistry.records.isEmpty {
-                    Button("清理未引用声纹") {
+                    Button("Clean orphaned fingerprints") {
                         let cleaned = fingerprintRegistry.cleanOrphanRecords(activeTracks: localStore.tracks)
-                        orphanCleanFeedback = cleaned > 0 ? "已清理 \(cleaned) 条未引用声纹" : "暂无孤立声纹"
+                        orphanCleanFeedback = cleaned > 0 ? "Cleaned \(cleaned) orphaned fingerprints" : "No orphaned fingerprints"
                         Task {
                             try? await Task.sleep(for: .seconds(3))
                             orphanCleanFeedback = nil
@@ -362,9 +362,9 @@ struct MetadataManagerWorkspaceView: View {
                     Text("·")
                         .foregroundStyle(.secondary)
 
-                    Button("清空声纹记忆") {
+                    Button("Clear all fingerprints") {
                         fingerprintRegistry.removeAll()
-                        orphanCleanFeedback = "已清空全部声纹"
+                        orphanCleanFeedback = "All fingerprints cleared"
                         Task {
                             try? await Task.sleep(for: .seconds(3))
                             orphanCleanFeedback = nil
@@ -382,9 +382,9 @@ struct MetadataManagerWorkspaceView: View {
 
             if filteredRecords.isEmpty {
                 ContentUnavailableView {
-                    Label("暂无已学习的声纹", systemImage: "waveform.badge.magnifyingglass")
+                    Label("No learned fingerprints", systemImage: "waveform.badge.magnifyingglass")
                 } description: {
-                    Text("通过“导入与审核”中心导入或在右侧检查器中标记歌曲后，其 PCM 声纹将永久保存在本地，下次导入时秒级命中。")
+                    Text("After importing songs via Import & Review or tagging them in the inspector, their PCM acoustic fingerprints are saved locally for instant recognition on future imports.")
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -425,19 +425,19 @@ struct MetadataManagerWorkspaceView: View {
                 }
 
                 HStack(spacing: 10) {
-                    Text("指纹: \(record.fingerprint.prefix(16))…")
+                    Text("Fingerprint: \(record.fingerprint.prefix(16))…")
                         .font(.caption2.monospaced())
                         .foregroundStyle(.secondary)
 
-                    Text("时长: \(durationString(record.duration))")
+                    Text("Duration: \(durationString(record.duration))")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
 
-                    Text("命中: \(record.matchCount) 次")
+                    Text("Hits: \(record.matchCount) times")
                         .font(.caption2.bold())
                         .foregroundStyle(Color.accentColor)
 
-                    Text("学习时间: \(record.dateLearned.formatted(date: .abbreviated, time: .omitted))")
+                    Text("Learned: \(record.dateLearned.formatted(date: .abbreviated, time: .omitted))")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -467,7 +467,7 @@ struct MetadataManagerWorkspaceView: View {
     private var pathRulesManagementView: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("目录匹配规则让系统根据文件夹名称（如“男歌手/王力宏”）自动归属歌手，无需在线查询。")
+                Text("Folder heuristic rules let the system automatically attribute artists based on directory patterns without online queries.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -476,7 +476,7 @@ struct MetadataManagerWorkspaceView: View {
                 Button {
                     isAddRulePresented = true
                 } label: {
-                    Label("添加新规则…", systemImage: "plus")
+                    Label("Add New Rule…", systemImage: "plus")
                         .font(.callout.bold())
                 }
                 .buttonStyle(.borderedProminent)
@@ -489,9 +489,9 @@ struct MetadataManagerWorkspaceView: View {
 
             if ruleStore.rules.isEmpty {
                 ContentUnavailableView {
-                    Label("暂无目录学习规则", systemImage: "folder.badge.gearshape")
+                    Label("No Folder Learning Rules", systemImage: "folder.badge.gearshape")
                 } description: {
-                    Text("当导入分类文件夹（如“男歌手/王力宏”）时，系统会自动提炼并学习目录特征；你也可以点击上方手动添加。")
+                    Text("When importing organized music folders, the system automatically learns path features, or you can add custom rules above.")
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -517,32 +517,32 @@ struct MetadataManagerWorkspaceView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
-                    Text("路径包含: \"\(rule.pathPattern)\"")
+                    Text("Path: \"\(rule.pathPattern)\"")
                         .font(.headline.monospaced())
 
                     Image(systemName: "arrow.right")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    Text("归属歌手: \(rule.targetArtist)")
+                    Text("Artist: \(rule.targetArtist)")
                         .font(.headline)
                         .foregroundStyle(Color.accentColor)
 
                     if let album = rule.targetAlbum, !album.isEmpty {
                         Text("•")
                             .foregroundStyle(.secondary)
-                        Text("专辑: \(album)")
+                        Text("Album: \(album)")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                 }
 
                 HStack(spacing: 12) {
-                    Text("累计生效: \(rule.matchCount) 次")
+                    Text("Matches: \(rule.matchCount) times")
                         .font(.caption2.bold())
                         .foregroundStyle(.secondary)
 
-                    Text("添加时间: \(rule.dateAdded.formatted(date: .abbreviated, time: .omitted))")
+                    Text("Added: \(rule.dateAdded.formatted(date: .abbreviated, time: .omitted))")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -576,19 +576,19 @@ struct MetadataManagerWorkspaceView: View {
                 .foregroundStyle(Color.accentColor)
 
             VStack(spacing: 6) {
-                Text("MusicBrainz 官方在线目录服务")
+                Text("MusicBrainz Online Catalog Service")
                     .font(.title2.bold())
 
-                Text("全局权威音乐元数据与发行版数据库 (https://musicbrainz.org)")
+                Text("Global authoritative music metadata and release database (https://musicbrainz.org)")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
 
             VStack(alignment: .leading, spacing: 14) {
-                statusRow(title: "连接状态", value: "已接入 (HTTP Web Service 2.0)", icon: "checkmark.circle.fill", color: .green)
-                statusRow(title: "开源合规速率限制", value: "内置 1.0 秒/请求安全节流阀 (防止 IP 拦截)", icon: "gauge.with.needle.fill", color: .blue)
-                statusRow(title: "缓存策略", value: "首次在线命中后自动持久化至本地声纹库，二次查询 0ms", icon: "bolt.shield.fill", color: .orange)
-                statusRow(title: "封面来源", value: "Cover Art Archive 官方归档服务", icon: "photo.stack.fill", color: .purple)
+                statusRow(title: "Connection Status", value: "Connected (HTTP Web Service 2.0)", icon: "checkmark.circle.fill", color: .green)
+                statusRow(title: "Rate Limiting", value: "Built-in 1.0s/req safety throttle", icon: "gauge.with.needle.fill", color: .blue)
+                statusRow(title: "Cache Strategy", value: "Cached locally after first online lookup", icon: "bolt.shield.fill", color: .orange)
+                statusRow(title: "Cover Art Source", value: "Cover Art Archive official archive", icon: "photo.stack.fill", color: .purple)
             }
             .padding(20)
             .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -606,11 +606,11 @@ struct MetadataManagerWorkspaceView: View {
                 .foregroundStyle(color)
                 .frame(width: 24)
 
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.subheadline.bold())
                 .frame(width: 140, alignment: .leading)
 
-            Text(value)
+            Text(LocalizedStringKey(value))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -621,35 +621,35 @@ struct MetadataManagerWorkspaceView: View {
 
     private var addRuleSheet: some View {
         VStack(spacing: 20) {
-            Text("添加目录学习规则")
+            Text("Add Folder Learning Rule")
                 .font(.headline)
 
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("路径关键词 (例如：男歌手/王力宏)")
+                    Text("Path keyword (e.g. Pop/Artist)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    TextField("路径特征", text: $newRulePath)
+                    TextField("Path pattern", text: $newRulePath)
                         .textFieldStyle(.roundedBorder)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("对应歌手实体名")
+                    Text("Target Artist Name")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    TextField("歌手名称", text: $newRuleArtist)
+                    TextField("Artist Name", text: $newRuleArtist)
                         .textFieldStyle(.roundedBorder)
                 }
             }
             .frame(width: 320)
 
             HStack(spacing: 12) {
-                Button("取消") {
+                Button("Cancel") {
                     isAddRulePresented = false
                 }
                 .buttonStyle(.bordered)
 
-                Button("保存规则") {
+                Button("Save Rule") {
                     ruleStore.addRule(pathPattern: newRulePath, targetArtist: newRuleArtist)
                     newRulePath = ""
                     newRuleArtist = ""

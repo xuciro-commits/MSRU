@@ -104,7 +104,7 @@ struct AmbientBackdropView: View {
             Image(systemName: "music.note")
                 .font(.system(size: 64))
                 .foregroundStyle(.white)
-            Text("正在播放：环境预览")
+            Text("Now Playing: Ambient Preview")
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(.white)
         }

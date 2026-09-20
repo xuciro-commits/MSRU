@@ -209,8 +209,8 @@ struct LocalLibraryView: View {
 
             Text(
                 isDropTargeted
-                ? "拖放以导入"
-                : "没有本地音乐"
+                ? "Drop to Import"
+                : "No Local Music"
             )
             .font(
                 .title2.bold()
@@ -218,7 +218,7 @@ struct LocalLibraryView: View {
 
 
             Text(
-                "导入音频文件，或将文件拖到 MSRU 中。"
+                "Import audio files, or drag files into MSRU."
             )
             .foregroundStyle(
                 .secondary
@@ -232,7 +232,7 @@ struct LocalLibraryView: View {
             } label: {
 
                 Label(
-                    "添加音乐",
+                    "Add Music",
                     systemImage:
                         "plus"
                 )
@@ -307,7 +307,7 @@ struct LocalLibraryView: View {
                 .overlay {
 
                     Label(
-                        "拖放以导入",
+                        "Drop to Import",
                         systemImage:
                             "arrow.down.circle.fill"
                     )
@@ -388,7 +388,7 @@ struct LocalLibraryView: View {
         } label: {
 
             Label(
-                "下一首播放",
+                "Play Next",
                 systemImage:
                     "text.line.first.and.arrowtriangle.forward"
             )
@@ -405,7 +405,7 @@ struct LocalLibraryView: View {
         } label: {
 
             Label(
-                "加入队列",
+                "Add to Queue",
                 systemImage:
                     "text.badge.plus"
             )
@@ -434,7 +434,7 @@ struct LocalLibraryView: View {
             } label: {
 
                 Label(
-                    "从资料库移除",
+                    "Remove from Library",
                     systemImage:
                         "minus.circle"
                 )
@@ -456,7 +456,7 @@ struct LocalLibraryView: View {
             } label: {
 
                 Label(
-                    "加入资料库",
+                    "Add to Library",
                     systemImage:
                         "plus.circle"
                 )
@@ -471,7 +471,7 @@ struct LocalLibraryView: View {
             }
         } label: {
             Label(
-                "从资料库删除",
+                "Delete from Library",
                 systemImage:
                     "trash"
             )

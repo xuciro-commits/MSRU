@@ -123,7 +123,10 @@ enum MSRUApplicationShellPresentation {
                             id:
                                 ID.toggleQueue,
                             title:
-                                "检查器",
+                                String(
+                                    localized:
+                                        "Inspector"
+                                ),
                             systemImage:
                                 "sidebar.right",
                             perform: {

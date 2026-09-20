@@ -15,8 +15,8 @@ struct ImportWorkflowCoordinatorTests {
     func addMusicFeatureProvidesImportReviewContributions() {
         let contributions = AddMusicFeature.contributions
         #expect(contributions.sidebar.count == 2)
-        #expect(contributions.sidebar.contains(where: { $0.id == "add-music" && $0.title == "添加音乐" }))
-        #expect(contributions.sidebar.contains(where: { $0.id == "metadata-center" && $0.title == "元数据中心" }))
+        #expect(contributions.sidebar.contains(where: { $0.id == "add-music" && $0.title == "Add Music" }))
+        #expect(contributions.sidebar.contains(where: { $0.id == "metadata-center" && $0.title == "Metadata Center" }))
 
         let routeIDs = Set(contributions.routes.map(\.id))
         #expect(routeIDs.contains("add-music"))

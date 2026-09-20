@@ -11,11 +11,19 @@ import AppFoundation
 
 /// Filter criterion for items in the Import Review dashboard.
 public enum ReviewFilterOption: String, CaseIterable, Identifiable, Sendable {
-    case allPending = "全部待确认"
-    case byCluster = "按候选专辑聚类"
-    case unidentified = "未识别"
+    case allPending = "All Pending"
+    case byCluster = "Cluster by Candidate Album"
+    case unidentified = "Unidentified"
 
     public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .allPending: return String(localized: "All Pending")
+        case .byCluster: return String(localized: "Cluster by Candidate Album")
+        case .unidentified: return String(localized: "Unidentified")
+        }
+    }
 }
 
 /// An artist alias merge proposal detecting variations of the same underlying artist entity.

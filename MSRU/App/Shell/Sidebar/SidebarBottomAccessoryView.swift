@@ -1,8 +1,13 @@
 import SwiftUI
+import AppFoundation
 
 
 struct SidebarBottomAccessoryView:
     View {
+
+    @Bindable
+    var languageSettings:
+        LanguageSettings
 
     let onOpenSettings:
         () -> Void
@@ -31,6 +36,10 @@ struct SidebarBottomAccessoryView:
         .padding(
             .vertical,
             10
+        )
+        .applyLocaleOverride(
+            languageSettings
+                .resolvedLocale
         )
     }
 
@@ -110,6 +119,8 @@ struct SidebarBottomAccessoryView:
 #Preview {
 
     SidebarBottomAccessoryView(
+        languageSettings:
+            LanguageSettings(),
         onOpenSettings: {}
     )
     .frame(

@@ -107,6 +107,11 @@ struct SwiftUISceneRootView:
                 ProgressView()
             }
         }
+        .applyLocaleOverride(
+            application
+                .languageSettings
+                .resolvedLocale
+        )
         .task {
 
             bootstrapIfNeeded()

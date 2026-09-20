@@ -107,7 +107,7 @@ public actor ArtistBiographyService {
 
         let record = ArtistBiographyRecord(
             artistName: cleanName,
-            summary: wikiSummary ?? "暂无详细传记。",
+            summary: wikiSummary ?? String(localized: "No biography available."),
             sourceURL: wikiSourceURL,
             thumbnailURL: thumbnailURL,
             genres: genres,
@@ -193,7 +193,7 @@ public actor ArtistBiographyService {
             let begin = span["begin"] as? String
             let end = span["end"] as? String
             if let begin {
-                lifeSpan = end != nil ? "\(begin) - \(end!)" : "\(begin) 至今"
+                lifeSpan = end != nil ? "\(begin) - \(end!)" : "\(begin) - \(String(localized: "Present"))"
             }
         }
 

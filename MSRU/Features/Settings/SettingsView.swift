@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Observation
+import AppFoundation
 
 
 struct SettingsView:
@@ -16,6 +17,10 @@ struct SettingsView:
 
     @Bindable var providerManager:
         ProviderManagerStore
+
+
+    @Bindable var languageSettings:
+        LanguageSettings
 
 
     @State private var selection:
@@ -201,7 +206,9 @@ struct SettingsView:
     ) -> some View {
 
         Label(
-            category.title,
+            LocalizedStringKey(
+                category.title
+            ),
             systemImage:
                 category.systemImage
         )
@@ -221,7 +228,9 @@ struct SettingsView:
         ) {
 
             Text(
-                selection.title
+                LocalizedStringKey(
+                    selection.title
+                )
             )
             .font(
                 .largeTitle.bold()
@@ -229,7 +238,9 @@ struct SettingsView:
 
 
             Text(
-                selection.subtitle
+                LocalizedStringKey(
+                    selection.subtitle
+                )
             )
             .font(
                 .callout
@@ -251,43 +262,50 @@ struct SettingsView:
 
         case .general:
 
-            settingsCard(
-                title:
-                    "应用",
-                rows: [
-                    (
-                        "外观",
-                        "系统"
-                    ),
-                    (
-                        "窗口",
-                        platformWindowDescription
-                    ),
-                    (
-                        "语言",
-                        "系统"
-                    )
-                ]
-            )
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    16
+            ) {
+
+                settingsCard(
+                    title:
+                        "App",
+                    rows: [
+                        (
+                            "Appearance",
+                            "System"
+                        ),
+                        (
+                            "Window",
+                            platformWindowDescription
+                        )
+                    ]
+                )
+
+
+                languagePicker
+            }
 
 
         case .library:
 
             settingsCard(
                 title:
-                    "资料库",
+                    "Library",
                 rows: [
                     (
-                        "当前来源",
-                        "本地文件"
+                        "Current Source",
+                        "Local Files"
                     ),
                     (
-                        "已导入媒体",
+                        "Imported Media",
                         "Application Support / MSRU"
                     ),
                     (
-                        "统一资料库",
-                        "计划支持远程来源"
+                        "Unified Library",
+                        "Remote sources planned"
                     )
                 ]
             )
@@ -297,23 +315,23 @@ struct SettingsView:
 
             settingsCard(
                 title:
-                    "播放",
+                    "Playback",
                 rows: [
                     (
-                        "首选音质",
-                        "自动"
+                        "Preferred Quality",
+                        "Auto"
                     ),
                     (
-                        "当前服务提供方",
+                        "Current Provider",
                         playback
                             .currentProviderID?
                             .rawValue
                         ??
-                        "无"
+                        "None"
                     ),
                     (
-                        "解析度",
-                        "服务提供方内核 v1"
+                        "Resolution",
+                        "Provider Core v1"
                     )
                 ]
             )
@@ -338,26 +356,26 @@ struct SettingsView:
 
                 settingsCard(
                     title:
-                        "诊断",
+                        "Diagnostics",
                     rows: [
                         (
-                            "播放诊断",
-                            "内核已提供"
+                            "Playback Diagnostics",
+                            "Core Provided"
                         ),
                         (
-                            "服务提供方状态",
-                            "基础层已就绪"
+                            "Provider Status",
+                            "Base Layer Ready"
                         ),
                         (
-                            "目录缓存",
-                            "已启用"
+                            "Catalog Cache",
+                            "Enabled"
                         )
                     ]
                 )
 
 
                 Text(
-                    "前端信息架构稳定后，将接入可交互的诊断控制。"
+                    "Interactive diagnostic controls will be added once frontend info architecture is stable."
                 )
                 .font(
                     .callout
@@ -377,11 +395,11 @@ struct SettingsView:
 
 #if os(macOS)
 
-        "原生 macOS 分栏视图"
+        "Native macOS Split View"
 
 #else
 
-        "原生 Apple 场景布局"
+        "Native Apple Scene Layout"
 
 #endif
     }
@@ -409,7 +427,9 @@ struct SettingsView:
         ) {
 
             Text(
-                title
+                LocalizedStringKey(
+                    title
+                )
             )
             .font(
                 .title3.bold()
@@ -433,7 +453,9 @@ struct SettingsView:
                 HStack {
 
                     Text(
-                        row.0
+                        LocalizedStringKey(
+                            row.0
+                        )
                     )
 
 
@@ -441,7 +463,9 @@ struct SettingsView:
 
 
                     Text(
-                        row.1
+                        LocalizedStringKey(
+                            row.1
+                        )
                     )
                     .foregroundStyle(
                         .secondary
@@ -460,6 +484,67 @@ struct SettingsView:
                     Divider()
                 }
             }
+        }
+        .padding(
+            16
+        )
+        .background(
+            .quaternary,
+            in:
+                RoundedRectangle(
+                    cornerRadius:
+                        14,
+                    style:
+                        .continuous
+                )
+        )
+    }
+
+
+    // MARK: - Language Picker
+
+    private var languagePicker:
+        some View {
+
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                4
+        ) {
+
+            Text(
+                "Language"
+            )
+            .font(
+                .headline
+            )
+
+
+            Picker(
+                "Language",
+                selection:
+                    $languageSettings
+                        .selectedLanguage
+            ) {
+
+                ForEach(
+                    SupportedLanguage
+                        .allCases
+                ) { language in
+
+                    Text(
+                        language.displayName
+                    )
+                    .tag(
+                        language
+                    )
+                }
+            }
+            .pickerStyle(
+                .segmented
+            )
+            .labelsHidden()
         }
         .padding(
             16
@@ -510,27 +595,27 @@ private enum SettingsCategory:
 
         case .general:
 
-            "通用"
+            "General"
 
 
         case .library:
 
-            "资料库"
+            "Library"
 
 
         case .playback:
 
-            "播放"
+            "Playback"
 
 
         case .providers:
 
-            "服务提供方"
+            "Providers"
 
 
         case .advanced:
 
-            "高级"
+            "Advanced"
         }
     }
 
@@ -542,27 +627,27 @@ private enum SettingsCategory:
 
         case .general:
 
-            "应用行为与外观。"
+            "App behavior and appearance."
 
 
         case .library:
 
-            "存储、导入和统一资料库行为。"
+            "Storage, import, and unified library behavior."
 
 
         case .playback:
 
-            "播放音质与解析行为。"
+            "Playback quality and resolution behavior."
 
 
         case .providers:
 
-            "目录、元数据和播放服务提供方。"
+            "Catalog, metadata, and playback providers."
 
 
         case .advanced:
 
-            "诊断、状态和开发工具。"
+            "Diagnostics, status, and developer tools."
         }
     }
 
@@ -606,7 +691,9 @@ private enum SettingsCategory:
         playback:
             MSRUPreviewData.makePlaybackController(),
         providerManager:
-            MSRUPreviewData.makeProviderStore()
+            MSRUPreviewData.makeProviderStore(),
+        languageSettings:
+            LanguageSettings()
     )
     .frame(
         width:

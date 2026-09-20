@@ -3,6 +3,7 @@
 //  MSRU
 //
 
+import Foundation
 import AppFoundation
 
 
@@ -25,9 +26,9 @@ extension LibraryFeature:
                     id:
                         "library",
                     group:
-                        "资料库",
+                        "Library",
                     title:
-                        "歌曲",
+                        "Songs",
                     systemImage:
                         "music.note",
                     route:

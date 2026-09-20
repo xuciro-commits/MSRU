@@ -5,6 +5,7 @@
 
 import Foundation
 import Observation
+import SwiftUI
 
 @MainActor
 @Observable
@@ -91,7 +92,7 @@ final class ProviderManagerStore {
         let provider = ManagedProvider(
             key: "custom.\(UUID().uuidString.lowercased())",
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-            summary: "自定义远程服务提供方。",
+            summary: String(localized: "Custom remote service provider."),
             systemImage: "network",
             kind: .remote,
             endpoint: endpoint.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -105,8 +106,18 @@ final class ProviderManagerStore {
         return provider.id
     }
 
-    func setEnabled(_ value: Bool, id: UUID) {
-        update(id: id) { $0.isEnabled = value }
+    func removeCustomProvider(id: UUID) {
+        guard let index = providers.firstIndex(where: { $0.id == id && $0.isRemovable }) else {
+            return
+        }
+        providers.remove(at: index)
+        persist()
+    }
+
+    func setEnabled(_ isEnabled: Bool, id: UUID) {
+        guard let index = providers.firstIndex(where: { $0.id == id }) else { return }
+        providers[index].isEnabled = isEnabled
+        persist()
     }
 
     func setPriority(_ value: Int, id: UUID) {
@@ -152,18 +163,46 @@ final class ProviderManagerStore {
         persist()
     }
 
+    func updateCustomProvider(
+        id: UUID,
+        name: String,
+        endpoint: String,
+        capabilities: [ManagedProviderCapability]
+    ) {
+        guard let index = providers.firstIndex(where: { $0.id == id && $0.isRemovable }) else {
+            return
+        }
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedEndpoint = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        providers[index].name = trimmedName
+        providers[index].endpoint = trimmedEndpoint
+        providers[index].capabilities = Set(capabilities)
+        providers[index].health = .unknown
+        providers[index].lastTestedAt = nil
+        providers[index].lastTestMessage = nil
+        persist()
+    }
+
+    func moveProviders(fromOffsets offsets: IndexSet, toOffset destination: Int) {
+        providers.move(fromOffsets: offsets, toOffset: destination)
+        for (index, provider) in providers.enumerated() {
+            providers[index].priority = (index + 1) * 10
+        }
+        persist()
+    }
+
     func testConnection(id: UUID) async {
         guard let item = provider(id: id) else { return }
 
         if item.kind == .builtIn && item.endpoint == nil {
-            setHealth(.available, message: "内置服务提供方在本地可用。", id: id)
+            setHealth(.available, message: String(localized: "Built-in provider is available locally."), id: id)
             return
         }
 
         guard let endpoint = item.endpoint,
               let url = Self.validHTTPURL(endpoint)
         else {
-            setHealth(.unavailable, message: "请输入有效的 http:// 或 https:// URL。", id: id)
+            setHealth(.unavailable, message: String(localized: "Please enter a valid http:// or https:// URL."), id: id)
             return
         }
 
@@ -181,18 +220,18 @@ final class ProviderManagerStore {
                 if http.statusCode < 500 {
                     setHealth(
                         .available,
-                        message: "端点可访问（HTTP \(http.statusCode)）。",
+                        message: "\(String(localized: "Endpoint reachable")) (HTTP \(http.statusCode)).",
                         id: id
                     )
                 } else {
                     setHealth(
                         .unavailable,
-                        message: "服务提供方返回 HTTP \(http.statusCode)。",
+                        message: "\(String(localized: "Provider returned")) HTTP \(http.statusCode).",
                         id: id
                     )
                 }
             } else {
-                setHealth(.available, message: "服务提供方端点可访问。", id: id)
+                setHealth(.available, message: String(localized: "Provider endpoint is reachable."), id: id)
             }
         } catch {
             setHealth(.unavailable, message: error.localizedDescription, id: id)
@@ -240,7 +279,7 @@ final class ProviderManagerStore {
             name:
                 "Openverse",
             summary:
-                "开放许可音频目录，提供封面、元数据和直接媒体播放。",
+                "Open-license audio catalog providing artwork, metadata, and direct media playback.",
             systemImage:
                 "globe",
             kind:
@@ -259,7 +298,7 @@ final class ProviderManagerStore {
             health:
                 .available,
             lastTestMessage:
-                "Openverse 已配置为浏览目录和远程播放服务。",
+                "Openverse is configured for catalog browsing and remote playback.",
             isRemovable:
                 false
         )
@@ -270,21 +309,21 @@ final class ProviderManagerStore {
         [
             ManagedProvider(
                 key: "local",
-                name: "本地文件",
-                summary: "通过 MSRU 播放服务提供方内核进行本地播放。",
+                name: "Local Files",
+                summary: "Local playback via the MSRU playback engine.",
                 systemImage: "internaldrive",
                 kind: .builtIn,
                 capabilities: [.playback, .library],
                 isEnabled: true,
                 priority: 10,
                 health: .available,
-                lastTestMessage: "内置本地服务提供方可用。",
+                lastTestMessage: "Built-in local provider is available.",
                 isRemovable: false
             ),
             ManagedProvider(
                 key: "musicbrainz",
                 name: "MusicBrainz",
-                summary: "元数据实体与发现目录。",
+                summary: "Metadata entity and discovery catalog.",
                 systemImage: "music.note.list",
                 kind: .builtIn,
                 endpoint: "https://musicbrainz.org/ws/2/",
@@ -292,13 +331,13 @@ final class ProviderManagerStore {
                 isEnabled: true,
                 priority: 20,
                 health: .available,
-                lastTestMessage: "目录服务提供方已配置。",
+                lastTestMessage: "Catalog provider configured.",
                 isRemovable: false
             ),
             ManagedProvider(
                 key: "jamendo",
                 name: "Jamendo",
-                summary: "配置 API 访问后提供目录与授权远程播放。",
+                summary: "Catalog and authorized remote playback with API access.",
                 systemImage: "music.note.house",
                 kind: .builtIn,
                 endpoint: "https://api.jamendo.com/v3.0/",
@@ -310,7 +349,7 @@ final class ProviderManagerStore {
             ManagedProvider(
                 key: "apple-music",
                 name: "Apple Music",
-                summary: "官方 Apple Music 目录、资料库和原生播放集成。",
+                summary: "Official Apple Music catalog, library, and native playback integration.",
                 systemImage: "apple.logo",
                 kind: .builtIn,
                 endpoint: "https://api.music.apple.com/v1/",

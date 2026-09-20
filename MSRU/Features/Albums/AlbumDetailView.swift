@@ -24,7 +24,7 @@ struct AlbumDetailView: View {
                 Button(action: onBack) {
                     HStack(spacing: 6) {
                         Image(systemName: "chevron.backward")
-                        Text("专辑")
+                        Text("Album")
                     }
                     .font(.subheadline.bold())
                 }
@@ -52,7 +52,7 @@ struct AlbumDetailView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
-                            Text("专辑")
+                            Text("Album")
                             .font(.caption.bold())
                             .foregroundStyle(.secondary)
 
@@ -69,14 +69,14 @@ struct AlbumDetailView: View {
                                 Text("\(year)")
                                 Text("•")
                             }
-                            Text("\(album.trackCount) 首歌曲，\(album.formattedDuration)")
+                            Text("\(album.trackCount) songs, \(album.formattedDuration)")
                         }
                         .font(.callout)
                         .foregroundStyle(.tertiary)
 
                         HStack(spacing: 12) {
                             Button(action: playAll) {
-                                Label("播放", systemImage: "play.fill")
+                                Label("Play", systemImage: "play.fill")
                                     .font(.headline)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
@@ -84,7 +84,7 @@ struct AlbumDetailView: View {
                             .buttonStyle(.borderedProminent)
 
                             Button(action: shuffleAll) {
-                                Label("随机播放", systemImage: "shuffle")
+                                Label("Shuffle", systemImage: "shuffle")
                                     .font(.headline)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
@@ -93,7 +93,7 @@ struct AlbumDetailView: View {
 
                             if onDeleteAlbum != nil {
                                 Button(role: .destructive, action: { isDeleteConfirmationPresented = true }) {
-                                    Label("删除专辑", systemImage: "trash")
+                                    Label("Delete Album", systemImage: "trash")
                                         .font(.headline)
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 8)
@@ -113,7 +113,7 @@ struct AlbumDetailView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     ForEach(album.discs) { disc in
                         if album.discs.count > 1 {
-                            Text(disc.discTitle ?? "第 \(disc.discNumber) 张碟")
+                            Text(disc.discTitle ?? "Disc \(disc.discNumber)")
                                 .font(.headline)
                                 .foregroundStyle(.secondary)
                                 .padding(.horizontal, 24)
@@ -132,16 +132,16 @@ struct AlbumDetailView: View {
         }
         .scrollIndicators(.hidden)
         .confirmationDialog(
-            "确认删除专辑「\(album.title)」？",
+            "Delete album \"\(album.title)\"?",
             isPresented: $isDeleteConfirmationPresented,
             titleVisibility: .visible
         ) {
-            Button("级联删除该专辑及全部 \(album.trackCount) 首歌曲", role: .destructive) {
+            Button("Cascade delete album and all \(album.trackCount) songs", role: .destructive) {
                 onDeleteAlbum?()
             }
-            Button("取消", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("此操作将执行级联删除，从本地资料库中移除该专辑名下的全部歌曲。")
+            Text("This operation will perform a cascade delete, removing all songs under this album from the local library.")
         }
     }
 
@@ -207,10 +207,10 @@ struct AlbumDetailView: View {
         }
         .contextMenu {
             if let local = matchingLocal {
-                Button("下一首播放") {
+                Button("Play Next") {
                     playback.playNext(local)
                 }
-                Button("加入队列") {
+                Button("Add to Queue") {
                     playback.addToQueue(local)
                 }
             }

@@ -32,7 +32,8 @@ enum SettingsFeature: ApplicationFeaturePresentation {
             ) { scene in
                 SettingsView(
                     playback: scene.application.playback,
-                    providerManager: scene.application.providerManager
+                    providerManager: scene.application.providerManager,
+                    languageSettings: scene.application.languageSettings
                 )
             }
         ]

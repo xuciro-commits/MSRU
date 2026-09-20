@@ -7,19 +7,19 @@ struct QueuePaneView: View {
 
     var body: some View {
         if playback.playbackQueue.current == nil && playback.playbackQueue.upcoming.isEmpty {
-            ContentUnavailableView("队列为空", systemImage: "music.note.list",
-                description: Text("请从资料库或浏览页面播放一首曲目。"))
+            ContentUnavailableView("Queue is empty", systemImage: "music.note.list",
+                description: Text("Please play a track from the library or browse page."))
         } else {
             List {
                 if let current = playback.playbackQueue.current {
-                    Section("正在播放") { row(current, isCurrent: true) }
+                    Section("Now Playing") { row(current, isCurrent: true) }
                 }
                 if !playback.playbackQueue.upcoming.isEmpty {
-                    Section("接下来播放") {
+                    Section("Up Next") {
                         ForEach(playback.playbackQueue.upcoming) { item in
                             row(item, isCurrent: false)
                                 .contextMenu {
-                                    Button("从队列移除", role: .destructive) {
+                                    Button("Remove from Queue", role: .destructive) {
                                         playback.removeUpcoming(id: item.id)
                                     }
                                 }

@@ -37,7 +37,7 @@ struct ArtistDetailView: View {
                 Button(action: onBack) {
                     HStack(spacing: 6) {
                         Image(systemName: "chevron.backward")
-                        Text("艺术家")
+                        Text("Artist")
                     }
                     .font(.subheadline.bold())
                 }
@@ -54,7 +54,7 @@ struct ArtistDetailView: View {
                         .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("艺术家")
+                        Text("Artist")
                             .font(.caption.bold())
                             .foregroundStyle(.secondary)
 
@@ -65,7 +65,7 @@ struct ArtistDetailView: View {
                         // Aliases tags
                         if !artist.aliases.isEmpty {
                             HStack(spacing: 6) {
-                                Text("别名：")
+                                Text("Aliases: ")
                                     .font(.caption)
                                     .foregroundStyle(.tertiary)
 
@@ -85,7 +85,7 @@ struct ArtistDetailView: View {
 
                         HStack(spacing: 12) {
                             Button(action: playAll) {
-                                Label("播放", systemImage: "play.fill")
+                                Label("Play", systemImage: "play.fill")
                                     .font(.headline)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
@@ -93,7 +93,7 @@ struct ArtistDetailView: View {
                             .buttonStyle(.borderedProminent)
 
                             Button(action: shuffleAll) {
-                                Label("随机播放", systemImage: "shuffle")
+                                Label("Shuffle", systemImage: "shuffle")
                                     .font(.headline)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
@@ -102,7 +102,7 @@ struct ArtistDetailView: View {
 
                             if onDeleteArtist != nil {
                                 Button(role: .destructive, action: { isDeleteConfirmationPresented = true }) {
-                                    Label("删除艺术家", systemImage: "trash")
+                                    Label("Delete Artist", systemImage: "trash")
                                         .font(.headline)
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 8)
@@ -127,7 +127,7 @@ struct ArtistDetailView: View {
                 // Top Tracks Section
                 if !topTracks.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("热门歌曲")
+                        Text("Top Songs")
                             .font(.title2.bold())
                             .padding(.horizontal, 24)
 
@@ -143,7 +143,7 @@ struct ArtistDetailView: View {
                 // Discography Section
                 if !albums.isEmpty {
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("专辑")
+                        Text("Albums")
                             .font(.title2.bold())
                             .padding(.horizontal, 24)
 
@@ -178,23 +178,23 @@ struct ArtistDetailView: View {
             }
         }
         .confirmationDialog(
-            "确认删除艺术家「\(artist.name)」？",
+            "Delete artist \"\(artist.name)\"?",
             isPresented: $isDeleteConfirmationPresented,
             titleVisibility: .visible
         ) {
-            Button("级联删除该艺术家及名下全部内容", role: .destructive) {
+            Button("Cascade delete artist and all content", role: .destructive) {
                 onDeleteArtist?()
             }
-            Button("取消", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("此操作将执行级联删除，同时从本地资料库中移除该艺术家的所有专辑与全部歌曲。该操作不可撤销。")
+            Text("This operation will perform a cascade delete, removing all albums and songs of this artist from the local library. This action cannot be undone.")
         }
     }
 
     private func artistBiographyCard(_ bio: ArtistBiographyRecord) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("艺术家简介")
+                Text("Artist Bio")
                     .font(.headline)
 
                 if let span = bio.lifeSpan {
@@ -213,7 +213,7 @@ struct ArtistDetailView: View {
 
                 if let url = bio.sourceURL {
                     Link(destination: url) {
-                        Label("维基百科", systemImage: "arrow.up.right.square")
+                        Label("Wikipedia", systemImage: "arrow.up.right.square")
                             .font(.caption)
                     }
                 }
@@ -238,7 +238,7 @@ struct ArtistDetailView: View {
                 .lineSpacing(4)
                 .lineLimit(isBioExpanded ? nil : 3)
 
-            Button(isBioExpanded ? "收起" : "展开全文") {
+            Button(isBioExpanded ? "Show Less" : "Read More") {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                     isBioExpanded.toggle()
                 }
