@@ -19,8 +19,6 @@ public struct UnifiedTrackCardView<Artwork: View, ActionsMenu: View>: View {
     public let artwork: Artwork
     public let actionsMenu: ActionsMenu?
 
-    @State private var isHovered: Bool = false
-
     public init(
         title: String,
         subtitle: String,
@@ -73,62 +71,31 @@ public struct UnifiedTrackCardView<Artwork: View, ActionsMenu: View>: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Artwork Container
-            ZStack(alignment: .bottomTrailing) {
-                artwork
-                    .aspectRatio(1, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .shadow(
-                        color: .black.opacity(isHovered ? 0.16 : 0.06),
-                        radius: isHovered ? 10 : 5,
-                        y: isHovered ? 6 : 2
-                    )
-
-                if let qualityBadge {
-                    VStack {
-                        HStack {
-                            Text(qualityBadge)
-                                .font(.system(size: 9, weight: .bold))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 3)
-                                .background(.ultraThinMaterial, in: Capsule())
-                                .padding(8)
-                            Spacer()
-                        }
-                        Spacer()
-                    }
-                }
-
-                if isHovered || isPlaying {
-                    Button(action: onPlay) {
-                        Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 36, height: 36)
-                            .background(Circle().fill(Color.accentColor))
-                            .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 2)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(8)
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                }
+        FoundationCard(
+            aspectRatio: 1.0,
+            cornerRadius: 10,
+            isSelected: isSelected,
+            onSelect: onSelect
+        ) {
+            artwork
+        } topLeadingBadges: {
+            if let qualityBadge {
+                FoundationCardBadge(qualityBadge)
             }
-
-            // Title & Subtitle
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.callout.weight(.semibold))
-                    .lineLimit(1)
-                    .foregroundStyle(.primary)
-
-                Text(subtitle)
-                    .font(.caption)
-                    .lineLimit(1)
-                    .foregroundStyle(.secondary)
-            }
-
-            // Footer / Metadata / Menu
+        } actionOverlay: {
+            FoundationCardActionButton(
+                systemImage: isPlaying ? "pause.fill" : "play.fill",
+                action: onPlay
+            )
+        } title: {
+            Text(title)
+                .font(.callout.weight(.semibold))
+                .lineLimit(1)
+        } subtitle: {
+            Text(subtitle)
+                .font(.caption)
+                .lineLimit(1)
+        } footer: {
             HStack(spacing: 6) {
                 if let secondaryText {
                     Text(secondaryText)
@@ -148,24 +115,6 @@ public struct UnifiedTrackCardView<Artwork: View, ActionsMenu: View>: View {
                 if let actionsMenu {
                     actionsMenu
                 }
-            }
-        }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
-        )
-        .contentShape(Rectangle())
-        .onTapGesture {
-            onSelect()
-        }
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovered = hovering
             }
         }
     }

@@ -11,8 +11,6 @@ public struct AlbumCardView: View {
     public let onSelect: () -> Void
     public let onPlay: () -> Void
 
-    @State private var isHovered: Bool = false
-
     public init(
         album: AlbumPresentationModel,
         onSelect: @escaping () -> Void,
@@ -24,62 +22,19 @@ public struct AlbumCardView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .bottomTrailing) {
-                coverImageView
-                    .aspectRatio(1, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .shadow(color: .black.opacity(isHovered ? 0.15 : 0.06), radius: isHovered ? 10 : 5, y: isHovered ? 6 : 2)
-
-                if let badge = album.audioQualityBadge {
-                    Text(badge)
-                        .font(.system(size: 9, weight: .bold))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .padding(8)
-                }
-
-                if isHovered {
-                    Button(action: onPlay) {
-                        Image(systemName: "play.circle.fill")
-                            .font(.system(size: 38))
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.white, Color.accentColor)
-                            .shadow(radius: 4)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(8)
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                }
+        FoundationCard(
+            titleText: album.title,
+            subtitleText: album.artist,
+            footerText: album.year != nil ? String(album.year!) : nil,
+            onSelect: onSelect
+        ) {
+            coverImageView
+        } topTrailingBadges: {
+            if let badge = album.audioQualityBadge {
+                FoundationCardBadge(badge)
             }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(album.title)
-                    .font(.headline)
-                    .lineLimit(1)
-                    .foregroundStyle(.primary)
-
-                Text(album.artist)
-                    .font(.subheadline)
-                    .lineLimit(1)
-                    .foregroundStyle(.secondary)
-
-                if let year = album.year {
-                    Text(String(year))
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            onSelect()
-        }
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovered = hovering
-            }
+        } actionOverlay: {
+            FoundationCardActionButton(systemImage: "play.fill", action: onPlay)
         }
     }
 

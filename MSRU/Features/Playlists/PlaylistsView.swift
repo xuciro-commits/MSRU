@@ -5,6 +5,7 @@
 
 import SwiftUI
 import AppFoundation
+import AppFoundationUI
 
 enum PlaylistSortField: String, CaseIterable, Identifiable {
     case title = "Title"
@@ -170,35 +171,35 @@ struct PlaylistsView: View {
     // MARK: - Playlist Card
 
     private func playlistCard(_ playlist: Playlist) -> some View {
-        Button {
-            selectedPlaylist = playlist
-        } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                // Card Artwork
-                cardArtwork(for: playlist)
-                    .aspectRatio(1, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .shadow(color: .black.opacity(0.1), radius: 6, y: 3)
-
-                // Title & Subtitle
-                Text(playlist.title)
-                    .font(.headline)
-                    .lineLimit(1)
-                    .foregroundStyle(.primary)
-
-                HStack(spacing: 4) {
-                    Text("\(playlist.trackCount) songs")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    if playlist.isPinned {
-                        Image(systemName: "pin.fill")
-                            .font(.caption2)
-                            .foregroundStyle(Color.accentColor)
-                    }
+        FoundationCard(
+            aspectRatio: 1.0,
+            cornerRadius: 10,
+            isSelected: selectedPlaylist?.id == playlist.id,
+            onSelect: { selectedPlaylist = playlist }
+        ) {
+            cardArtwork(for: playlist)
+        } topTrailingBadges: {
+            if playlist.isPinned {
+                FoundationCardBadge("Pinned", systemImage: "pin.fill", foregroundStyle: Color.accentColor)
+            }
+        } actionOverlay: {
+            FoundationCardActionButton(systemImage: "play.fill") {
+                let resolved = playlist.trackIDs.compactMap { id in
+                    localStore.tracks.first { $0.id == id }
+                }
+                if let first = resolved.first {
+                    playback.play(first, queue: resolved)
                 }
             }
+        } title: {
+            Text(playlist.title)
+                .font(.headline)
+                .lineLimit(1)
+        } subtitle: {
+            Text("\(playlist.trackCount) songs")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
-        .buttonStyle(.plain)
         .contextMenu {
             Button {
                 let resolved = playlist.trackIDs.compactMap { id in
