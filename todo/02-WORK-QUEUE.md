@@ -23,7 +23,7 @@
 | 3 | 已完成：恢复逐条容错、关闭回调边界及退出恢复 | ConcurrencyModel；单元回归与真实 Cmd+Q / 重启 XCUITest 通过 |
 | 4 | 已完成：App 和测试 target 使用 Swift 6 | Debug/Release 配置已更新；纯 URL command 转换显式 nonisolated；macOS 测试通过 |
 | 5 | 已完成：双平台 Shell 与紧凑布局自适应适配 | ExperienceBlueprint 第 2 节 / 图册 2.1、2.2、7.2、15.1；MiniPlayerBar 极窄/紧凑/展开三级断点自适应、曲库 Table/List 紧凑多行自适应、FilterBar 标签消除折裂与两行自适应、Context 面板全时可关闭、SwiftUIApplicationShell 列折叠支持，全量 134 项测试（含 LayoutRenderProbe 7 个尺寸探针）全部通过，43 Preview 门禁通过 |
-| 6 | 进行中：收藏事务、重启和播放入口已实现 | 图册；保存失败、并发、重启、混合队列测试通过，真实媒体待验收 |
+| 6 | 已完成：真实播放链路、统一音量架构与混合队列收口 | 图册 15.1、15.2；音量/静音双向绑定与跨切歌继承、Scrubber 拖拽时间预览与原子 seek、本地 WAV 到直播流混合队列切换、媒体时钟终态与失败重试，全量 137 项测试全部通过 |
 | 7 | 已完成：曲目属性检查器 (Track Inspector) 与上下文面板切换 | 图册 1.2 / 9.1；单元测试、Preview 门禁与架构检查全部通过 |
 | 8 | 已完成：基础框架收敛（DependencyValues 并发硬化与 ShellResolver 命名澄清） | AbstractionAudit / NorthStarArchitecture；Sendable 存储收窄、无状态组合器重命名，全量 53 项框架测试与 113 项应用测试全部通过 |
 | 9 | 已完成：曲库原生 Table / Grid 双模式集合、即时搜索排序与 Inspector 联动 | ExperienceBlueprint 第 5 节 / 图册 7.1、7.3；SwiftUI 原生 Table/Grid，排序过滤与选中单向/双向同步，7 项单元测试、Preview 门禁覆盖 39 视图，全量 120 项测试全部通过 |
@@ -58,12 +58,12 @@
 | 曲库集合视图 | 支持资料库曲目与本地曲目原生 `Table`（表头、列排版、封面、时长、爱心及右键上下文菜单）与 `Grid` 双模式切换；顶部提供即时搜索文本过滤、多维度字段排序（添加时间、标题、艺术家、专辑、时长）与正反序切换；单选曲目双向联动 `SceneModel.selectedLibraryTrack` 并自动唤起右侧 Track Inspector；支持直接双击/右键发起播放、下一首与入队。 |
 | 基础架构与并发 | `DependencyKey` 强化 `associatedtype Value: Sendable`，`DependencyValues` 擦除存储收窄为 `[ObjectIdentifier: any Sendable]` 并消除 `@unchecked Sendable`。纯函数式无状态组合器统一由 `ApplicationShellRuntime` 规范更名为 `ApplicationShellResolver`，不留无用兼容别名。AppFoundation 单元测试及应用全量测试完整回归。 |
 | 数据 | 收藏先提交后发布；扫描、导入与收藏写入按序执行。失败、并发、路径别名、同名文件及重启恢复有回归测试。 |
-| 播放 | 混合队列保留重复实例；真实静音 AVPlayer 顺播两个 WAV，核对媒体时钟与队列终态。AVPlayer/PCM 失败清理、旧回调隔离和保留队列重试有测试。 |
+| 播放 | 统一音量与静音管理（支持 AVPlayer 与 PCM 混音节点双向同步、切歌继承与取消静音恢复）；MiniPlayerBar 标准模式落地音量滑块与静音按钮（图册 15.1）；HoverScrubber 拖拽时实时目标时间预览、松手原子 commit seek 并支持 LIVE 电台停用；本地真实 WAV 与网络电台直播流混合队列连续播放与切换测试全部通过；混合队列保留重复实例，真实静音 AVPlayer 顺播两个 WAV 核对媒体时钟与队列终态；AVPlayer/PCM 失败清理、旧回调隔离和保留队列重试有回归测试。 |
 | FFmpeg | 构建暂存、互斥与发布回滚经过失败探针；完整重建 macOS/iOS/visionOS 切片，两个模拟器均含 arm64+x86_64。visionOS UI API 差异已适配。 |
 
 验证基线：
 
-- 应用：最近全量 **134 项通过**（原 123 项 + 11 项 RadioFeatureTests 覆盖领域过滤、流解析、播放控制与场景联动），使用 `MSRU-UnitTests` scheme；包含旧定义删除及 PCM 失败修复。
+- 应用：最近全量 **137 项通过**（原 134 项 + 3 项真实音量继承、电台与本地媒体混合队列顺播及 Seek 交互集成测试），使用 `MSRU-UnitTests` scheme；包含旧定义删除及 PCM 失败修复。
 - 框架：最近 **56 项通过**（37 UI + 19 Core，新增 stop、同ID并发与联合取消测试），包含 SwiftUI Shell 的平台适配。
 - 构建：PCM 清理与旧定义删除后的当前代码已复验，visionOS 真机／模拟器和 iOS Simulator 均编译链接通过；关闭签名，不代表设备安装运行验收。
 - UI：开发签名 Runner 的 **2 项通过**，验证前台启动、实际 Cmd+Q／重启、保留打开窗口并排除手动关闭窗口。使用独立恢复域与稳定 scene ID；后续播放改动及旧定义删除后已重新运行并通过。

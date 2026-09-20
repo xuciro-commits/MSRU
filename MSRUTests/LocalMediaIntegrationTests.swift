@@ -196,6 +196,161 @@ struct LocalMediaIntegrationTests {
         }
     }
 
+    @Test
+    func volumeAndMuteStatePreservedAcrossTracksAndPlayers() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let items = try ["TrackA", "TrackB"].map { name in
+            let url = root.appendingPathComponent(name + ".wav")
+            try waveData().write(to: url)
+            return PlaybackItem(local: LocalTrack(fileURL: url, title: name, artist: "Fixture",
+                album: nil, duration: 0.2, artworkData: nil))
+        }
+
+        var players: [AVPlayer] = []
+        let controller = PlaybackController(makePlayer: { url in
+            let player = AVPlayer(url: url)
+            players.append(player)
+            return player
+        })
+        defer { controller.stop() }
+
+        // Start first track
+        controller.play(items[0], context: items)
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while controller.isResolving && ContinuousClock.now < deadline { await Task.yield() }
+        #expect(!controller.isResolving)
+
+        let firstPlayer = try #require(players.first)
+        #expect(controller.volume == 1.0)
+        #expect(!controller.isMuted)
+        #expect(firstPlayer.volume == 1.0)
+        #expect(!firstPlayer.isMuted)
+
+        // Adjust volume and toggle mute
+        controller.setVolume(0.45)
+        #expect(abs(controller.volume - 0.45) < 0.001)
+        #expect(abs(firstPlayer.volume - 0.45) < 0.001)
+
+        controller.toggleMute()
+        #expect(controller.isMuted)
+        #expect(firstPlayer.isMuted)
+        #expect(firstPlayer.volume == 0.0)
+
+        // Transition to next track: new player MUST inherit volume & mute state
+        controller.next()
+        let nextDeadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while controller.isResolving && ContinuousClock.now < nextDeadline { await Task.yield() }
+        #expect(!controller.isResolving)
+        #expect(players.count == 2)
+
+        let secondPlayer = players[1]
+        #expect(controller.isMuted)
+        #expect(secondPlayer.isMuted)
+        #expect(secondPlayer.volume == 0.0)
+        #expect(abs(controller.volume - 0.45) < 0.001)
+
+        // Adjusting volume while muted automatically un-mutes
+        controller.setVolume(0.8)
+        #expect(!controller.isMuted)
+        #expect(!secondPlayer.isMuted)
+        #expect(abs(secondPlayer.volume - 0.8) < 0.001)
+    }
+
+    @Test
+    func mixedQueueAdvancesFromLocalWAVToRadioLiveStream() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let localURL = root.appendingPathComponent("Local.wav")
+        try waveData().write(to: localURL)
+        let localItem = PlaybackItem(local: LocalTrack(fileURL: localURL, title: "Local Song", artist: "Artist",
+            album: nil, duration: 0.2, artworkData: nil))
+
+        let radioStation = RadioStation(
+            id: "classic-fm-test",
+            name: "Classic FM Test",
+            description: "Test radio description",
+            genre: .classical,
+            streamURL: URL(string: "https://media-ssl.musicradio.com/ClassicFM")!,
+            country: "UK",
+            language: "English",
+            codec: "AAC",
+            bitrateKbps: 128
+        )
+        let radioItem = PlaybackItem(radio: radioStation)
+
+        var players: [AVPlayer] = []
+        let controller = PlaybackController(makePlayer: { url in
+            let player = AVPlayer(url: url)
+            player.isMuted = true
+            players.append(player)
+            return player
+        })
+        defer { controller.stop() }
+
+        // Start mixed queue: [localItem, radioItem]
+        controller.play(localItem, context: [localItem, radioItem])
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while controller.isResolving && ContinuousClock.now < deadline { await Task.yield() }
+        #expect(!controller.isResolving)
+        #expect(controller.currentItem?.id == localItem.id)
+        #expect(controller.unifiedProviderLabel == "LOCAL")
+        #expect(controller.duration > 0)
+
+        // Advance to radio stream
+        controller.next()
+        let radioDeadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while controller.isResolving && ContinuousClock.now < radioDeadline { await Task.yield() }
+        #expect(!controller.isResolving)
+        #expect(controller.currentItem?.id == radioItem.id)
+        #expect(controller.radioCurrentStation?.name == "Classic FM Test")
+        #expect(controller.unifiedProviderLabel == "LIVE RADIO")
+        #expect(controller.duration == 0)
+        #expect(controller.playbackQueue.history.map(\.item.id) == [localItem.id])
+        #expect(players.count == 2)
+    }
+
+    @Test
+    func scrubbingPreviewAndSeekBehavior() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let localURL = root.appendingPathComponent("SeekTest.wav")
+        try waveData().write(to: localURL)
+        let item = PlaybackItem(local: LocalTrack(fileURL: localURL, title: "Seek", artist: "Artist",
+            album: nil, duration: 0.2, artworkData: nil))
+
+        var players: [AVPlayer] = []
+        let controller = PlaybackController(makePlayer: { url in
+            let player = AVPlayer(url: url)
+            player.isMuted = true
+            players.append(player)
+            return player
+        })
+        defer { controller.stop() }
+
+        controller.play(item)
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while controller.isResolving && ContinuousClock.now < deadline { await Task.yield() }
+        #expect(!controller.isResolving)
+
+        // Seek to 50%
+        controller.seek(toProgress: 0.5)
+        #expect(abs(controller.currentTime - 0.1) < 0.01)
+
+        // Clamping check
+        controller.seek(toProgress: -0.5)
+        #expect(controller.currentTime == 0.0)
+
+        controller.seek(toProgress: 1.5)
+        #expect(abs(controller.currentTime - 0.2) < 0.01)
+    }
+
     /// 0.2 seconds of real PCM WAV data; tests decode it without producing sound.
     private func waveData() -> Data {
         let sampleCount: UInt32 = 8_820

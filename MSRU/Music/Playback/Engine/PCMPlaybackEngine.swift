@@ -164,6 +164,11 @@ final class PCMPlaybackEngine {
         ?? 0
     }
 
+    var volume: Float {
+        get { playerNode.volume }
+        set { playerNode.volume = newValue }
+    }
+
 
     var currentTime:
         TimeInterval {

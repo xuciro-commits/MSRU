@@ -35,6 +35,12 @@ import Observation
 
     private(set) var playbackErrorMessage: String?
 
+    // MARK: - Volume & Mute State
+
+    private(set) var volume: Float = 1.0
+
+    private(set) var isMuted: Bool = false
+
     // MARK: - Resolution State
 
     private var resolvingItem: PlaybackItem?
@@ -712,6 +718,34 @@ import Observation
         }
     }
 
+    // MARK: - Volume & Mute Controls
+
+    func setVolume(_ newVolume: Float) {
+        let clamped = min(max(newVolume, 0.0), 1.0)
+        volume = clamped
+        if isMuted && clamped > 0 {
+            isMuted = false
+        }
+        applyVolumeToActiveTransport()
+    }
+
+    func toggleMute() {
+        isMuted.toggle()
+        applyVolumeToActiveTransport()
+    }
+
+    func setMuted(_ muted: Bool) {
+        isMuted = muted
+        applyVolumeToActiveTransport()
+    }
+
+    private func applyVolumeToActiveTransport() {
+        let effectiveVolume = isMuted ? 0.0 : volume
+        player?.volume = effectiveVolume
+        player?.isMuted = isMuted
+        pcmEngine?.volume = effectiveVolume
+    }
+
     // MARK: - Restart
 
     func restart() {
@@ -900,6 +934,8 @@ import Observation
         case .avPlayerURL(let resolvedURL):
 
             let newPlayer = makePlayer(resolvedURL)
+            newPlayer.volume = isMuted ? 0.0 : volume
+            newPlayer.isMuted = isMuted
 
             player = newPlayer
 
@@ -922,6 +958,7 @@ import Observation
         case .decodedPCM(let pcmResource):
 
             let engine = try PCMPlaybackEngine(resource: pcmResource)
+            engine.volume = isMuted ? 0.0 : volume
 
             engine.onEnded = { [weak self, weak engine] in
                 guard let self, let engine, self.pcmEngine === engine else { return }

@@ -11,6 +11,8 @@ struct MiniPlayerBar: View {
     let onToggleQueue:
         () -> Void
 
+    @State private var scrubbingProgress: Double? = nil
+
 
     var body: some View {
 
@@ -200,14 +202,51 @@ struct MiniPlayerBar: View {
     }
 
     private var scrubber: some View {
-        HoverScrubber(
-            progress: playbackProgress,
-            isEnabled: playback.unifiedHasTrack && playback.duration > 0,
-            onSeek: { progress in
-                playback.seek(toProgress: progress)
+        HStack(spacing: 6) {
+            HoverScrubber(
+                progress: playbackProgress,
+                isEnabled: playback.unifiedHasTrack && playback.duration > 0,
+                onScrubbingChanged: { preview in
+                    scrubbingProgress = preview
+                },
+                onSeek: { progress in
+                    playback.seek(toProgress: progress)
+                }
+            )
+
+            if playback.duration > 0 {
+                Text(timeDisplayString)
+                    .font(.system(size: 8.5, weight: .regular, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            } else if playback.radioCurrentStation != nil {
+                Text("LIVE")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 3))
             }
-        )
+        }
         .frame(height: 10)
+    }
+
+    private var timeDisplayString: String {
+        let currentSeconds: TimeInterval
+        if let preview = scrubbingProgress {
+            currentSeconds = preview * playback.duration
+        } else {
+            currentSeconds = playback.currentTime
+        }
+        return "\(formatTime(currentSeconds)) / \(formatTime(playback.duration))"
+    }
+
+    private func formatTime(_ seconds: TimeInterval) -> String {
+        guard seconds.isFinite && seconds >= 0 else { return "0:00" }
+        let total = Int(seconds)
+        let mins = total / 60
+        let secs = total % 60
+        return String(format: "%d:%02d", mins, secs)
     }
 
 
@@ -321,16 +360,56 @@ struct MiniPlayerBar: View {
     ) -> some View {
         HStack(
             alignment: .center,
-            spacing: 14
+            spacing: 12
         ) {
-            if !compact,
-               playback.unifiedHasTrack {
-                providerBadge
+            if !compact {
+                volumeControl
+                if playback.unifiedHasTrack {
+                    providerBadge
+                }
             }
 
             queueButton
         }
         .fixedSize()
+    }
+
+    private var volumeControl: some View {
+        HStack(spacing: 6) {
+            Button(action: {
+                playback.toggleMute()
+            }) {
+                Image(systemName: volumeIconName)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16, height: 16)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(playback.isMuted ? "Unmute" : "Mute")
+
+            Slider(
+                value: Binding(
+                    get: { Double(playback.volume) },
+                    set: { playback.setVolume(Float($0)) }
+                ),
+                in: 0.0...1.0
+            )
+            .frame(width: 72)
+            .controlSize(.mini)
+        }
+    }
+
+    private var volumeIconName: String {
+        if playback.isMuted || playback.volume == 0 {
+            return "speaker.slash.fill"
+        } else if playback.volume < 0.33 {
+            return "speaker.wave.1.fill"
+        } else if playback.volume < 0.66 {
+            return "speaker.wave.2.fill"
+        } else {
+            return "speaker.wave.3.fill"
+        }
     }
 
 
@@ -406,6 +485,21 @@ private struct HoverScrubber:
 
     let onSeek:
         (Double) -> Void
+
+    var onScrubbingChanged:
+        ((Double?) -> Void)? = nil
+
+    init(
+        progress: Double,
+        isEnabled: Bool,
+        onScrubbingChanged: ((Double?) -> Void)? = nil,
+        onSeek: @escaping (Double) -> Void
+    ) {
+        self.progress = progress
+        self.isEnabled = isEnabled
+        self.onScrubbingChanged = onScrubbingChanged
+        self.onSeek = onSeek
+    }
 
 
     @State private var isHovering =
@@ -554,10 +648,8 @@ private struct HoverScrubber:
                         return
                     }
 
-
                     isDragging =
                         true
-
 
                     let progress =
                         normalizedProgress(
@@ -567,12 +659,10 @@ private struct HoverScrubber:
                                 width
                         )
 
-
                     dragProgress =
                         progress
 
-
-                    onSeek(
+                    onScrubbingChanged?(
                         progress
                     )
                 }
@@ -581,16 +671,18 @@ private struct HoverScrubber:
 
                     guard isEnabled
                     else {
-
                         isDragging =
                             false
 
                         dragProgress =
                             nil
 
+                        onScrubbingChanged?(
+                            nil
+                        )
+
                         return
                     }
-
 
                     let progress =
                         normalizedProgress(
@@ -600,17 +692,19 @@ private struct HoverScrubber:
                                 width
                         )
 
-
                     onSeek(
                         progress
                     )
-
 
                     isDragging =
                         false
 
                     dragProgress =
                         nil
+
+                    onScrubbingChanged?(
+                        nil
+                    )
                 }
             )
         }
