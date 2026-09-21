@@ -7,6 +7,7 @@ import SwiftUI
 import Observation
 import UniformTypeIdentifiers
 import AppFoundation
+import AppFoundationUI
 
 
 struct SettingsView:
@@ -81,7 +82,7 @@ struct SettingsView:
                         .leading
                 )
             }
-            .scrollIndicators(.hidden)
+            .hideScrollIndicatorsCompletely()
         }
         .frame(
             maxWidth:
@@ -123,9 +124,7 @@ struct SettingsView:
         .listStyle(
             .sidebar
         )
-        .scrollIndicators(
-            .hidden
-        )
+        .hideScrollIndicatorsCompletely()
         .frame(
             width:
                 190
@@ -197,9 +196,7 @@ struct SettingsView:
         .listStyle(
             .sidebar
         )
-        .scrollIndicators(
-            .hidden
-        )
+        .hideScrollIndicatorsCompletely()
         .frame(
             width:
                 210

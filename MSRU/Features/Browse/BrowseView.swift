@@ -79,7 +79,7 @@ struct BrowseView: View {
             }
             .padding(28)
         }
-        .scrollIndicators(.hidden)
+        .hideScrollIndicatorsCompletely()
         .task {
 
             feature

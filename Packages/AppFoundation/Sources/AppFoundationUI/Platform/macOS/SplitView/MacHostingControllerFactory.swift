@@ -9,6 +9,15 @@ import AppKit
 import SwiftUI
 
 
+@MainActor
+public final class MacSplitHostingController<Content: View>: NSHostingController<Content> {
+
+    public override func viewDidLayout() {
+        super.viewDidLayout()
+        MacScrollIndicatorSuppressor.suppressScrollIndicators(in: view)
+    }
+}
+
 // MARK: - SwiftUI Hosting
 
 /// Creates SwiftUI hosting controllers suitable for AppKit-managed
@@ -28,7 +37,7 @@ public enum MacHostingControllerFactory {
     ) -> NSHostingController<Content> {
 
         let controller =
-            NSHostingController(
+            MacSplitHostingController(
                 rootView:
                     rootView
             )

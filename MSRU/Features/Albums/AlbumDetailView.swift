@@ -130,7 +130,7 @@ struct AlbumDetailView: View {
             }
             .padding(.bottom, 40)
         }
-        .scrollIndicators(.hidden)
+        .hideScrollIndicatorsCompletely()
         .confirmationDialog(
             "Delete album \"\(album.title)\"?",
             isPresented: $isDeleteConfirmationPresented,

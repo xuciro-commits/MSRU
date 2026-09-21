@@ -30,7 +30,9 @@ public final class MacSplitAccessoryHostingController<
         rootView:
             Content,
         height:
-            CGFloat? = nil
+            CGFloat? = nil,
+        automaticallyAppliesContentInsets:
+            Bool = false
     ) {
 
         let host =
@@ -58,8 +60,8 @@ public final class MacSplitAccessoryHostingController<
         )
 
 
-        automaticallyAppliesContentInsets =
-            true
+        self.automaticallyAppliesContentInsets =
+            automaticallyAppliesContentInsets
 
         preferredScrollEdgeEffectStyle =
             .soft

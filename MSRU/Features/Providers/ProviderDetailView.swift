@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Observation
+import AppFoundationUI
 
 struct ProviderDetailView: View {
 
@@ -141,7 +142,7 @@ struct ProviderDetailView: View {
                     }
                     .padding(24)
                 }
-                .scrollIndicators(.hidden)
+                .hideScrollIndicatorsCompletely()
             } else {
                 ContentUnavailableView("Provider Removed", systemImage: "network.slash")
             }

@@ -136,6 +136,7 @@ where
         .listStyle(
             .sidebar
         )
+        .hideScrollIndicatorsCompletely()
     }
 
 

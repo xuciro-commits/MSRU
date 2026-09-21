@@ -123,7 +123,7 @@ struct ArtistsView: View {
                     }
                     .padding(28)
                 }
-                .scrollIndicators(.hidden)
+                .hideScrollIndicatorsCompletely()
             }
         }
     }
