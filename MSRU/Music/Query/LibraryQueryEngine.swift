@@ -82,13 +82,17 @@ public actor LibraryQueryEngine {
 
             // 2. Album summaries directly aggregated in SQLite
             let albumRows = try Row.fetchAll(db, sql: """
-                SELECT rel.id, rel.title, COALESCE(a.name, 'Unknown Artist') as artist,
-                       rel.release_year, COUNT(rt.id) as track_count, rel.artwork_asset_id
+                SELECT rel.id, rel.title,
+                       COALESCE((
+                           SELECT a.name FROM artist_credits ac
+                           JOIN artists a ON a.id = ac.artist_id
+                           WHERE ac.entity_id = rel.id AND ac.entity_type = 'release'
+                           LIMIT 1
+                       ), 'Unknown Artist') as artist,
+                       rel.release_year,
+                       (SELECT COUNT(*) FROM release_tracks rt WHERE rt.release_id = rel.id) as track_count,
+                       rel.artwork_asset_id
                 FROM releases rel
-                LEFT JOIN artist_credits ac ON ac.entity_id = rel.id AND ac.entity_type = 'release'
-                LEFT JOIN artists a ON a.id = ac.artist_id
-                LEFT JOIN release_tracks rt ON rt.release_id = rel.id
-                GROUP BY rel.id
                 ORDER BY rel.sort_title ASC
             """)
 
@@ -117,12 +121,10 @@ public actor LibraryQueryEngine {
 
             // 3. Artist summaries directly aggregated in SQLite
             let artistRows = try Row.fetchAll(db, sql: """
-                SELECT a.id, a.name, COUNT(DISTINCT r.id) as track_count, COUNT(DISTINCT ac_rel.entity_id) as album_count
+                SELECT a.id, a.name,
+                       (SELECT COUNT(*) FROM artist_credits ac WHERE ac.artist_id = a.id AND ac.entity_type = 'recording') as track_count,
+                       (SELECT COUNT(DISTINCT ac.entity_id) FROM artist_credits ac WHERE ac.artist_id = a.id AND ac.entity_type = 'release') as album_count
                 FROM artists a
-                LEFT JOIN artist_credits ac_rec ON ac_rec.artist_id = a.id AND ac_rec.entity_type = 'recording'
-                LEFT JOIN recordings r ON r.id = ac_rec.entity_id
-                LEFT JOIN artist_credits ac_rel ON ac_rel.artist_id = a.id AND ac_rel.entity_type = 'release'
-                GROUP BY a.id
                 ORDER BY a.sort_name ASC
             """)
 

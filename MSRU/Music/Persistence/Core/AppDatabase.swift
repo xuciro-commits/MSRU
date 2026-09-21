@@ -66,8 +66,7 @@ nonisolated public final class AppDatabase: Sendable {
         migrator.eraseDatabaseOnSchemaChange = false
         #endif
 
-        Schema_v1.register(to: &migrator)
-        Schema_v2.register(to: &migrator)
+        AppDatabaseMigrations.register(to: &migrator)
         return migrator
     }
 

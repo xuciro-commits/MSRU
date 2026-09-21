@@ -1,16 +1,25 @@
 //
-//  Schema_v1.swift
+//  AppDatabaseMigrations.swift
 //  MSRU
 //
-//  SQLite Schema v1 Migrations using GRDB schema DSL and explicit SQL statements.
+//  Canonical SQLite database migrations using GRDB schema DSL and explicit SQL statements.
+//  Maintains deterministic schema progression for identity, assets, and multi-lingual FTS5 search.
 //
 
 import Foundation
 import AppFoundation
+import GRDB
 
-nonisolated public enum Schema_v1 {
+nonisolated enum AppDatabaseMigrations {
 
-    nonisolated public static func register(to migrator: inout DatabaseMigrator) {
+    nonisolated static func register(to migrator: inout DatabaseMigrator) {
+        registerV1(to: &migrator)
+        registerV2(to: &migrator)
+    }
+
+    // MARK: - Initial Identity & Asset Schema (v1)
+
+    private static func registerV1(to migrator: inout DatabaseMigrator) {
         migrator.registerMigration("v1_create_music_identity_schema") { db in
             // 1. Sources (Storage locations and capabilities)
             try db.create(table: "sources") { t in
@@ -137,6 +146,7 @@ nonisolated public enum Schema_v1 {
                 t.column("role", .text).notNull().defaults(to: "primary")
             }
             try db.create(index: "idx_artist_credits_entity", on: "artist_credits", columns: ["entity_type", "entity_id"])
+            try db.create(index: "idx_artist_credits_artist", on: "artist_credits", columns: ["artist_id", "entity_type"])
 
             // 10. External Identifiers (MusicBrainz, AcoustID, Apple Music, etc.)
             try db.create(table: "external_identifiers") { t in
@@ -206,6 +216,98 @@ nonisolated public enum Schema_v1 {
                 catalog_number,
                 tokenize='unicode61 remove_diacritics 2'
             );
+            """)
+        }
+    }
+
+    // MARK: - Release Groups, File Assets, and Metadata Resolutions (v2)
+
+    private static func registerV2(to migrator: inout DatabaseMigrator) {
+        migrator.registerMigration("v2_release_groups_file_assets_and_metadata_resolutions") { db in
+            // 1. Release Groups (Abstract grouping of product release editions)
+            try db.create(table: "release_groups") { t in
+                t.column("id", .text).primaryKey()
+                t.column("title", .text).notNull()
+                t.column("sort_title", .text).notNull().indexed()
+                t.column("primary_type", .text).notNull().defaults(to: "album")
+                t.column("secondary_types", .text)
+                t.column("first_release_date", .text)
+                t.column("mbid", .text).unique()
+                t.column("created_at", .datetime).notNull()
+            }
+
+            // 2. Add release_group_id to releases table if not present
+            if try !db.columns(in: "releases").contains(where: { $0.name == "release_group_id" }) {
+                try db.alter(table: "releases") { t in
+                    t.add(column: "release_group_id", .text).references("release_groups", onDelete: .setNull)
+                }
+            }
+
+            // 3. File Assets (Detailed physical file attributes decoupled from generic Asset)
+            try db.create(table: "file_assets") { t in
+                t.column("asset_id", .text).primaryKey().references("assets", onDelete: .cascade)
+                t.column("relative_path", .text).notNull()
+                t.column("file_size", .integer).notNull()
+                t.column("mtime", .double).notNull()
+                t.column("physical_signature", .text)
+                t.column("inode", .integer)
+            }
+            try db.create(index: "idx_file_assets_path", on: "file_assets", columns: ["relative_path", "file_size", "mtime"])
+
+            // Backfill file_assets from existing assets if any exist
+            try db.execute(sql: """
+                INSERT OR IGNORE INTO file_assets (asset_id, relative_path, file_size, mtime, physical_signature)
+                SELECT id, relative_path, file_size, mtime, sha256 FROM assets
+                WHERE relative_path IS NOT NULL AND file_size IS NOT NULL
+            """)
+
+            // 4. Stream Assets (For streaming / remote / provider media)
+            try db.create(table: "stream_assets") { t in
+                t.column("asset_id", .text).primaryKey().references("assets", onDelete: .cascade)
+                t.column("provider_id", .text).notNull()
+                t.column("remote_item_id", .text).notNull()
+                t.column("stream_url", .text)
+                t.column("is_hls", .boolean).notNull().defaults(to: false)
+                t.column("expires_at", .datetime)
+            }
+            try db.create(index: "idx_stream_assets_provider", on: "stream_assets", columns: ["provider_id", "remote_item_id"])
+
+            // 5. Entity Redirects (For stable provisional-to-canonical ID tracking and merges)
+            try db.create(table: "entity_redirects") { t in
+                t.column("source_id", .text).primaryKey()
+                t.column("canonical_id", .text).notNull()
+                t.column("entity_type", .text).notNull()
+                t.column("reason", .text).notNull().defaults(to: "merge")
+                t.column("created_at", .datetime).notNull()
+            }
+            try db.create(index: "idx_entity_redirects_canonical", on: "entity_redirects", columns: ["canonical_id"])
+
+            // 6. Metadata Resolutions (Consolidated truth value with provenance and confidence score)
+            try db.create(table: "metadata_resolutions") { t in
+                t.column("id", .text).primaryKey()
+                t.column("entity_type", .text).notNull()
+                t.column("entity_id", .text).notNull()
+                t.column("field_name", .text).notNull()
+                t.column("resolved_value", .text).notNull()
+                t.column("winning_claim_id", .text).references("metadata_claims", onDelete: .setNull)
+                t.column("source_name", .text).notNull()
+                t.column("confidence", .double).notNull().defaults(to: 1.0)
+                t.column("resolved_at", .datetime).notNull()
+            }
+            try db.create(index: "idx_resolutions_entity", on: "metadata_resolutions", columns: ["entity_type", "entity_id", "field_name"], unique: true)
+
+            // 7. Add search token columns to library_fts
+            try db.execute(sql: """
+                DROP TABLE IF EXISTS library_fts;
+                CREATE VIRTUAL TABLE library_fts USING fts5(
+                    recording_id UNINDEXED,
+                    track_title,
+                    artist_name,
+                    release_title,
+                    catalog_number,
+                    search_tokens,
+                    tokenize = 'unicode61 remove_diacritics 2'
+                );
             """)
         }
     }
