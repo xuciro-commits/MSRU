@@ -6,6 +6,7 @@ import AppFoundation
 @Observable
 final class LocalLibraryStore {
     private(set) var tracks: [LocalTrack] = []
+    private(set) var querySnapshot: LibraryQuerySnapshot = LibraryQuerySnapshot()
     private(set) var isImporting = false
     private(set) var errorMessage: String?
     private var didLoad = false
@@ -13,6 +14,24 @@ final class LocalLibraryStore {
     private var operationID: UUID?
     private var pendingImports = 0
     private let repository: any LocalLibraryRepository
+
+    var albums: [AlbumPresentationModel] {
+        querySnapshot.albumSummaries
+    }
+
+    var artists: [ArtistPresentationModel] {
+        querySnapshot.artistSummaries
+    }
+
+    var positionLookup: [String: Int] {
+        querySnapshot.positionLookup
+    }
+
+    private func refreshQuerySnapshot() async {
+        _ = await LibraryQueryEngine.shared.setSourceLocalTracks(tracks)
+        let snapshot = await LibraryQueryEngine.shared.querySnapshot()
+        self.querySnapshot = snapshot
+    }
 
     convenience init() {
         self.init(repository: FileLocalLibraryRepository())
@@ -39,6 +58,8 @@ final class LocalLibraryStore {
 
             printArtworkMemoryDiagnostics()
 
+            await refreshQuerySnapshot()
+
             didLoad = true
             errorMessage = nil
         } catch {
@@ -59,6 +80,7 @@ final class LocalLibraryStore {
                 }
             }
             self.tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+            await self.refreshQuerySnapshot()
             await LocalLibraryIndexingService.shared.enqueue(newTracks)
         }
     }
@@ -78,6 +100,7 @@ final class LocalLibraryStore {
             }
             try? await self.repository.deleteTracks(withIDs: ids, deletePhysicalFiles: deletePhysical)
             self.deregisterTracks(deletedTracks)
+            await self.refreshQuerySnapshot()
         }
     }
 
@@ -155,6 +178,7 @@ final class LocalLibraryStore {
                 }
             }
             tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+            await refreshQuerySnapshot()
             await LocalLibraryIndexingService.shared.enqueue(newlyImported)
         } catch {
             errorMessage = error.localizedDescription

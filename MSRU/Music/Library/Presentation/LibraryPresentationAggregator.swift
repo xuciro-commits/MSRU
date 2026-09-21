@@ -30,15 +30,13 @@ final class LibraryPresentationAggregator {
 
             let totalDuration = tracks.reduce(0.0) { $0 + $1.duration }
 
-            // Extract tracks with trackNumber heuristic
+            // Extract tracks with normalized trackNumber and title
             let presentationTracks = tracks.enumerated().map { index, track in
-                let heuristic = FileNameHeuristicParser.parse(fileName: track.title)
-                let trackNum = heuristic.trackNumber ?? (index + 1)
-                let displayTitle = heuristic.title.isEmpty ? track.title : heuristic.title
+                let trackNum = track.trackNumber ?? (index + 1)
                 return TrackPresentationModel(
                     id: track.id,
                     trackNumber: trackNum,
-                    title: displayTitle,
+                    title: track.title,
                     artist: track.artist,
                     duration: track.duration,
                     formatBadge: track.fileURL.pathExtension.uppercased(),
@@ -48,8 +46,8 @@ final class LibraryPresentationAggregator {
                 a.trackNumber < b.trackNumber
             }
 
-            // Try to deduce year
-            let year = tracks.compactMap { FileNameHeuristicParser.parse(fileName: $0.title).year }.first
+            // Deduce year from normalized LocalTrack
+            let year = tracks.compactMap(\.year).first
 
             let disc = DiscTrackGroup(discNumber: 1, discTitle: nil, tracks: presentationTracks)
             let albumArtworkRef = tracks.compactMap(\.artworkReference).first

@@ -38,13 +38,24 @@ nonisolated public struct ParsedFileNameCandidate: Sendable, Equatable, Codable 
 /// Converts messy filenames into structured metadata clues without hallucination.
 nonisolated public enum FileNameHeuristicParser {
 
+    // Precompiled static regular expressions
+    private static let yearRegex = try? NSRegularExpression(pattern: #"[\(\[\{](\d{4})[\)\]\}]"#)
+    private static let specRegexes: [NSRegularExpression] = [
+        #"(?i)\[[^\]]*(FLAC|WAV|MP3|APE|DSD|AAC|AIFF|ALAC|Hi-Res|24bit|48khz|96khz|192khz|24-96|24-192|金碟|限量|头版)[^\]]*\]"#,
+        #"(?i)\([^\)]*(WAV[/／\\]Cue|FLAC[/／\\]Cue|Cue|APE|FLAC|24K金碟|头版|限量|金碟)[^\)]*\)"#,
+        #"(?i)\s*\[[^\]]*(FLAC|WAV|MP3|APE|DSD|AAC|AIFF|ALAC|Hi-Res|24bit|48khz|96khz|192khz|24-96|24-192|金碟|限量|头版)[^\]]*$"#,
+        #"(?i)\s*\([^\)]*(WAV|FLAC|Cue|APE|24K金碟|头版|限量|金碟)[^\)]*$"#
+    ].compactMap { try? NSRegularExpression(pattern: $0) }
+    private static let dashRegex = try? NSRegularExpression(pattern: #"\s*[–—－]\s*"#)
+    private static let prefixRegex = try? NSRegularExpression(pattern: #"^(?:茶壶专辑|精选|华语|欧美|1\.歌曲)\s*-\s*"#)
+    private static let trackRegex = try? NSRegularExpression(pattern: #"^(\d{1,3})[\s\.\-_]+\s*"#)
+
     /// Cleans and extracts structured clues (artist, album, year) from a folder name that may contain release specs or format tags.
     public static func parseFolderMetadata(_ folderName: String) -> (artist: String?, album: String?, year: Int?) {
         var working = folderName.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // 1. Extract optional 4-digit year like (2020) or [2020]
         var detectedYear: Int? = nil
-        let yearRegex = try? NSRegularExpression(pattern: #"[\(\[\{](\d{4})[\)\]\}]"#)
         if let match = yearRegex?.firstMatch(in: working, range: NSRange(working.startIndex..., in: working)),
            let yearRange = Range(match.range(at: 1), in: working),
            let yearInt = Int(working[yearRange]),
@@ -55,27 +66,16 @@ nonisolated public enum FileNameHeuristicParser {
             }
         }
 
-        // 2. Strip technical audio specs, format tags, and release descriptors:
-        // e.g. [FLAC 24bit／48khz], [FLAC], [APE], [DSD], [WAV], [Hi-Res], (WAV/Cue), (FLAC/Cue), (24K金碟头版限量), etc.
-        let specPatterns = [
-            #"(?i)\[[^\]]*(FLAC|WAV|MP3|APE|DSD|AAC|AIFF|ALAC|Hi-Res|24bit|48khz|96khz|192khz|24-96|24-192|金碟|限量|头版)[^\]]*\]"#,
-            #"(?i)\([^\)]*(WAV[/／\\]Cue|FLAC[/／\\]Cue|Cue|APE|FLAC|24K金碟|头版|限量|金碟)[^\)]*\)"#,
-            // Trailing unclosed tags (e.g. if path components split on slash or truncated):
-            #"(?i)\s*\[[^\]]*(FLAC|WAV|MP3|APE|DSD|AAC|AIFF|ALAC|Hi-Res|24bit|48khz|96khz|192khz|24-96|24-192|金碟|限量|头版)[^\]]*$"#,
-            #"(?i)\s*\([^\)]*(WAV|FLAC|Cue|APE|24K金碟|头版|限量|金碟)[^\)]*$"#
-        ]
-        for pat in specPatterns {
-            if let regex = try? NSRegularExpression(pattern: pat) {
-                working = regex.stringByReplacingMatches(
-                    in: working,
-                    range: NSRange(working.startIndex..., in: working),
-                    withTemplate: ""
-                )
-            }
+        // 2. Strip technical audio specs, format tags, and release descriptors
+        for regex in specRegexes {
+            working = regex.stringByReplacingMatches(
+                in: working,
+                range: NSRange(working.startIndex..., in: working),
+                withTemplate: ""
+            )
         }
 
         // 3. Normalize all unicode dashes to standard " - "
-        let dashRegex = try? NSRegularExpression(pattern: #"\s*[–—－]\s*"#)
         if let regex = dashRegex {
             working = regex.stringByReplacingMatches(
                 in: working,
@@ -87,7 +87,6 @@ nonisolated public enum FileNameHeuristicParser {
 
         // 4. Strip generic categorization prefixes if present at beginning:
         // e.g. "茶壶专辑 - ", "精选 - ", "1.歌曲 - "
-        let prefixRegex = try? NSRegularExpression(pattern: #"^(?:茶壶专辑|精选|华语|欧美|1\.歌曲)\s*-\s*"#)
         if let regex = prefixRegex {
             working = regex.stringByReplacingMatches(
                 in: working,
@@ -218,7 +217,6 @@ nonisolated public enum FileNameHeuristicParser {
 
         // 1. Extract optional year like (2003) or [2020]
         var detectedYear: Int? = nil
-        let yearRegex = try? NSRegularExpression(pattern: #"[\(\[\{](\d{4})[\)\]\}]"#)
         if let match = yearRegex?.firstMatch(in: working, range: NSRange(working.startIndex..., in: working)) {
             if let yearRange = Range(match.range(at: 1), in: working), let yearInt = Int(working[yearRange]) {
                 if yearInt >= 1900 && yearInt <= 2099 {
@@ -233,7 +231,6 @@ nonisolated public enum FileNameHeuristicParser {
 
         // 2. Extract leading track number like "04 ", "04 - ", "04. ", "04_"
         var detectedTrack: Int? = nil
-        let trackRegex = try? NSRegularExpression(pattern: #"^(\d{1,3})[\s\.\-_]+\s*"#)
         if let match = trackRegex?.firstMatch(in: working, range: NSRange(working.startIndex..., in: working)) {
             if let numRange = Range(match.range(at: 1), in: working), let num = Int(working[numRange]) {
                 detectedTrack = num

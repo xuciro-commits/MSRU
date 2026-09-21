@@ -68,7 +68,7 @@ struct LibraryPerformanceBenchmarkTests {
     func auditBuildAlbumsLatency() {
         print("\n=== AUDIT 2: buildAlbums Latency ===")
 
-        for count in [2_000, 10_000, 50_000] {
+        for count in [2_000, 10_000, 50_000, 100_000] {
             let tracks = Self.generateSyntheticTracks(count: count)
 
             let start = CFAbsoluteTimeGetCurrent()
@@ -83,7 +83,7 @@ struct LibraryPerformanceBenchmarkTests {
     func auditBuildArtistsLatency() {
         print("\n=== AUDIT 3: buildArtists Latency ===")
 
-        for count in [2_000, 10_000, 50_000] {
+        for count in [2_000, 10_000, 50_000, 100_000] {
             let tracks = Self.generateSyntheticTracks(count: count)
 
             let start = CFAbsoluteTimeGetCurrent()
@@ -100,7 +100,7 @@ struct LibraryPerformanceBenchmarkTests {
     func auditSortingAndFiltering() {
         print("\n=== AUDIT 4: filterAndSort Latency ===")
 
-        for count in [2_000, 10_000, 50_000] {
+        for count in [2_000, 10_000, 50_000, 100_000] {
             let tracks = Self.generateSyntheticTracks(count: count)
 
             // 1. Sort by title (localizedStandardCompare)
@@ -122,27 +122,68 @@ struct LibraryPerformanceBenchmarkTests {
         }
     }
 
-    // MARK: - 4. Table Linear Indexing Hotspot Benchmark
+    // MARK: - 4. Table Linear Indexing Hotspot vs O(1) Position Lookup Benchmark
 
-    @Test("Audit 5: Table row index linear search tracks.firstIndex hotspot")
+    @Test("Audit 5: Table row index O(N) linear search tracks.firstIndex vs O(1) positionLookup")
     func auditTableRowIndexingHotspot() {
-        print("\n=== AUDIT 5: Table Column # tracks.firstIndex Hotspot ===")
+        print("\n=== AUDIT 5: Table Column # tracks.firstIndex Hotspot vs O(1) positionLookup ===")
 
-        for count in [2_000, 10_000, 50_000] {
+        for count in [2_000, 10_000, 50_000, 100_000] {
             let tracks = Self.generateSyntheticTracks(count: count)
             // Simulate 50 visible rows in viewport querying their index
             let visibleIndices = (0..<50).map { ($0 * (count / 50)) }
             let visibleTracks = visibleIndices.map { tracks[$0] }
 
-            let start = CFAbsoluteTimeGetCurrent()
-            var sum = 0
+            // 1. Legacy O(N) firstIndex
+            let startLinear = CFAbsoluteTimeGetCurrent()
+            var sumLinear = 0
             for track in visibleTracks {
                 if let idx = tracks.firstIndex(where: { $0.id == track.id }) {
-                    sum += idx
+                    sumLinear += idx
                 }
             }
+            let elapsedLinear = (CFAbsoluteTimeGetCurrent() - startLinear) * 1000.0
+
+            // 2. Optimized O(1) positionLookup dictionary
+            var lookup: [String: Int] = [:]
+            lookup.reserveCapacity(count)
+            for (idx, track) in tracks.enumerated() {
+                lookup[track.id] = idx + 1
+            }
+
+            let startO1 = CFAbsoluteTimeGetCurrent()
+            var sumO1 = 0
+            for track in visibleTracks {
+                if let pos = lookup[track.id] {
+                    sumO1 += pos
+                }
+            }
+            let elapsedO1 = (CFAbsoluteTimeGetCurrent() - startO1) * 1000.0
+
+            let speedup = elapsedLinear / max(0.001, elapsedO1)
+            print("[\(count) tracks] 50 visible rows lookup: O(N) firstIndex: \(String(format: "%.2f", elapsedLinear)) ms | O(1) positionLookup: \(String(format: "%.4f", elapsedO1)) ms (\(String(format: "%.1f", speedup))x faster)")
+        }
+    }
+
+    // MARK: - 5. LibraryQueryEngine Async Snapshot Benchmark Across 4 Scales
+
+    @Test("Audit 7: LibraryQueryEngine snapshot latency and MainActor decoupling across 4 scales")
+    func auditLibraryQueryEngineSnapshots() async {
+        print("\n=== AUDIT 7: LibraryQueryEngine Background Snapshot Across 4 Scales ===")
+        let engine = LibraryQueryEngine()
+
+        for count in [2_000, 10_000, 50_000, 100_000] {
+            let tracks = Self.generateSyntheticTracks(count: count)
+            let items = tracks.map { QueryTrackItem(localTrack: $0) }
+
+            let start = CFAbsoluteTimeGetCurrent()
+            await engine.setSourceTracks(items)
+            let snapshot = await engine.querySnapshot()
             let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000.0
-            print("[\(count) tracks] 50 visible rows firstIndex lookup: \(String(format: "%.2f", elapsed)) ms (sum: \(sum))")
+
+            print("[\(count) tracks] QueryEngine async snapshot: \(String(format: "%.2f", elapsed)) ms (orderedIDs: \(snapshot.orderedIDs.count), albums: \(snapshot.albumSummaries.count), artists: \(snapshot.artistSummaries.count), positionLookup entries: \(snapshot.positionLookup.count))")
+            #expect(snapshot.orderedIDs.count == count)
+            #expect(!snapshot.positionLookup.isEmpty)
         }
     }
 

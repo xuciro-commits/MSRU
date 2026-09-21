@@ -17,6 +17,8 @@ nonisolated public struct LocalTrack:
     public let album: String?
     public let duration: TimeInterval
     public let artworkReference: String?
+    public let trackNumber: Int?
+    public let year: Int?
 
     public init(
         fileURL: URL,
@@ -25,13 +27,17 @@ nonisolated public struct LocalTrack:
         album: String? = nil,
         duration: TimeInterval = 0,
         artworkReference: String? = nil,
-        artworkData: Data? = nil
+        artworkData: Data? = nil,
+        trackNumber: Int? = nil,
+        year: Int? = nil
     ) {
         self.fileURL = fileURL
         self.title = title
         self.artist = artist
         self.album = album
         self.duration = duration
+        self.trackNumber = trackNumber
+        self.year = year
         if let artworkReference, !artworkReference.isEmpty {
             self.artworkReference = artworkReference
         } else if let artworkData, !artworkData.isEmpty {
@@ -61,6 +67,8 @@ nonisolated public struct LocalTrack:
         case duration
         case artworkReference
         case artworkData
+        case trackNumber
+        case year
     }
 
     public init(from decoder: Decoder) throws {
@@ -70,6 +78,8 @@ nonisolated public struct LocalTrack:
         artist = try container.decode(String.self, forKey: .artist)
         album = try container.decodeIfPresent(String.self, forKey: .album)
         duration = try container.decode(TimeInterval.self, forKey: .duration)
+        trackNumber = try container.decodeIfPresent(Int.self, forKey: .trackNumber)
+        year = try container.decodeIfPresent(Int.self, forKey: .year)
 
         if let ref = try container.decodeIfPresent(String.self, forKey: .artworkReference), !ref.isEmpty {
             artworkReference = ref
@@ -88,5 +98,7 @@ nonisolated public struct LocalTrack:
         try container.encodeIfPresent(album, forKey: .album)
         try container.encode(duration, forKey: .duration)
         try container.encodeIfPresent(artworkReference, forKey: .artworkReference)
+        try container.encodeIfPresent(trackNumber, forKey: .trackNumber)
+        try container.encodeIfPresent(year, forKey: .year)
     }
 }

@@ -10,6 +10,7 @@ import AppFoundationUI
 struct LocalTrackTableView: View {
 
     let tracks: [LocalTrack]
+    let positionLookup: [String: Int]
     @Binding var selectedTrack: LocalTrack?
     @Bindable var playback: PlaybackController
     @Bindable var library: LibraryStore
@@ -19,6 +20,33 @@ struct LocalTrackTableView: View {
 
     @State private var selectedTrackIDs: Set<String> = []
     @State private var isDeleteConfirmationPresented: Bool = false
+
+    init(
+        tracks: [LocalTrack],
+        positionLookup: [String: Int]? = nil,
+        selectedTrack: Binding<LocalTrack?>,
+        playback: PlaybackController,
+        library: LibraryStore,
+        onRevealInFinder: ((URL) -> Void)? = nil,
+        onDeleteTracks: ((Set<String>) -> Void)? = nil
+    ) {
+        self.tracks = tracks
+        if let positionLookup {
+            self.positionLookup = positionLookup
+        } else {
+            var lookup: [String: Int] = [:]
+            lookup.reserveCapacity(tracks.count)
+            for (idx, track) in tracks.enumerated() {
+                lookup[track.id] = idx + 1
+            }
+            self.positionLookup = lookup
+        }
+        self._selectedTrack = selectedTrack
+        self.playback = playback
+        self.library = library
+        self.onRevealInFinder = onRevealInFinder
+        self.onDeleteTracks = onDeleteTracks
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -76,29 +104,17 @@ struct LocalTrackTableView: View {
 
     private var tableView: some View {
         Table(tracks, selection: $selectedTrackIDs) {
-            // Playing indicator / Index column
+            // Playing indicator / Index column (O(1) position lookup, isolated invalidation)
             TableColumn("#") { track in
-                let isCurrent = isCurrentTrack(track)
-                HStack(spacing: 4) {
-                    if isCurrent && playback.isPlaying {
-                        Image(systemName: "speaker.wave.2.fill")
-                            .foregroundStyle(Color.accentColor)
-                            .font(.caption)
-                    } else if isCurrent {
-                        Image(systemName: "pause.fill")
-                            .foregroundStyle(Color.accentColor)
-                            .font(.caption2)
-                    } else if let index = tracks.firstIndex(where: { $0.id == track.id }) {
-                        Text("\(index + 1)")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-                .frame(width: 32, alignment: .center)
+                TrackIndexIndicatorView(
+                    trackID: track.id,
+                    position: positionLookup[track.id],
+                    playback: playback
+                )
             }
             .width(min: 32, ideal: 36, max: 44)
 
-            // Title column (Artwork + Title)
+            // Title column (Artwork + Title, isolated playback highlight)
             TableColumn("Title") { track in
                 HStack(spacing: 10) {
                     trackArtwork(track)
@@ -106,10 +122,11 @@ struct LocalTrackTableView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(track.title)
-                            .font(.body)
-                            .lineLimit(1)
-                            .foregroundStyle(isCurrentTrack(track) ? Color.accentColor : Color.primary)
+                        TrackTitleView(
+                            trackID: track.id,
+                            title: track.title,
+                            playback: playback
+                        )
                     }
                 }
                 .contextMenu {
@@ -144,24 +161,9 @@ struct LocalTrackTableView: View {
             }
             .width(min: 45, ideal: 55, max: 65)
 
-            // Favorite column
+            // Favorite column (isolated favorite store observation)
             TableColumn("Favorite") { track in
-                let isSaved = library.contains(local: track)
-                Button {
-                    Task {
-                        if isSaved {
-                            await library.remove(local: track)
-                        } else {
-                            await library.add(local: track)
-                        }
-                    }
-                } label: {
-                    Image(systemName: isSaved ? "heart.fill" : "heart")
-                        .foregroundStyle(isSaved ? Color.red : Color.secondary)
-                        .font(.callout)
-                }
-                .buttonStyle(.plain)
-                .help(isSaved ? "Remove from Library" : "Add to Library")
+                TrackFavoriteButton(track: track, library: library)
             }
             .width(min: 32, ideal: 36, max: 40)
         }
@@ -186,8 +188,6 @@ struct LocalTrackTableView: View {
 
     private func compactRow(index: Int, track: LocalTrack) -> some View {
         let isSelected = selectedTrackIDs.contains(track.id)
-        let isCurrent = isCurrentTrack(track)
-        let isSaved = library.contains(local: track)
 
         return HStack(spacing: 10) {
             // Artwork / Playing state
@@ -196,12 +196,12 @@ struct LocalTrackTableView: View {
                     .frame(width: 32, height: 32)
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
-                if isCurrent {
+                if playback.isCurrent(trackID: track.id) {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(Color.black.opacity(0.4))
                         .frame(width: 32, height: 32)
 
-                    Image(systemName: playback.isPlaying ? "speaker.wave.2.fill" : "pause.fill")
+                    Image(systemName: playback.isPlaying(trackID: track.id) ? "speaker.wave.2.fill" : "pause.fill")
                         .font(.caption2)
                         .foregroundStyle(.white)
                 }
@@ -209,10 +209,7 @@ struct LocalTrackTableView: View {
 
             // Title & Subtitle (Artist · Album)
             VStack(alignment: .leading, spacing: 2) {
-                Text(track.title)
-                    .font(.body)
-                    .lineLimit(1)
-                    .foregroundStyle(isCurrent ? Color.accentColor : Color.primary)
+                TrackTitleView(trackID: track.id, title: track.title, playback: playback)
 
                 Text(trackSubtitle(track))
                     .font(.caption)
@@ -227,22 +224,8 @@ struct LocalTrackTableView: View {
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.secondary)
 
-            // Favorite Button
-            Button {
-                Task {
-                    if isSaved {
-                        await library.remove(local: track)
-                    } else {
-                        await library.add(local: track)
-                    }
-                }
-            } label: {
-                Image(systemName: isSaved ? "heart.fill" : "heart")
-                    .foregroundStyle(isSaved ? Color.red : Color.secondary)
-                    .font(.callout)
-            }
-            .buttonStyle(.plain)
-            .help(isSaved ? "Remove from Library" : "Add to Library")
+            // Favorite Button (isolated)
+            TrackFavoriteButton(track: track, library: library)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -422,6 +405,74 @@ struct LocalTrackTableView: View {
                 )
             }
         }
+    }
+}
+
+// MARK: - Isolated Cell Components (Sub-tree Invalidation Firewalls)
+
+private struct TrackIndexIndicatorView: View {
+    let trackID: String
+    let position: Int?
+    @Bindable var playback: PlaybackController
+
+    var body: some View {
+        let isCurrent = playback.isCurrent(trackID: trackID)
+        let isPlaying = playback.isPlaying(trackID: trackID)
+
+        HStack(spacing: 4) {
+            if isCurrent && isPlaying {
+                Image(systemName: "speaker.wave.2.fill")
+                    .foregroundStyle(Color.accentColor)
+                    .font(.caption)
+            } else if isCurrent {
+                Image(systemName: "pause.fill")
+                    .foregroundStyle(Color.accentColor)
+                    .font(.caption2)
+            } else if let position {
+                Text("\(position)")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .frame(width: 32, alignment: .center)
+    }
+}
+
+private struct TrackTitleView: View {
+    let trackID: String
+    let title: String
+    @Bindable var playback: PlaybackController
+
+    var body: some View {
+        let isCurrent = playback.isCurrent(trackID: trackID)
+        Text(title)
+            .font(.body)
+            .lineLimit(1)
+            .foregroundStyle(isCurrent ? Color.accentColor : Color.primary)
+    }
+}
+
+private struct TrackFavoriteButton: View {
+    let track: LocalTrack
+    @Bindable var library: LibraryStore
+
+    var body: some View {
+        let isSaved = library.contains(local: track)
+        Button {
+            Task {
+                if isSaved {
+                    await library.remove(local: track)
+                } else {
+                    await library.add(local: track)
+                }
+            }
+        } label: {
+            Image(systemName: isSaved ? "heart.fill" : "heart")
+                .foregroundStyle(isSaved ? Color.red : Color.secondary)
+                .font(.callout)
+        }
+        .buttonStyle(.plain)
+        .help(isSaved ? "Remove from Library" : "Add to Library")
     }
 }
 

@@ -159,6 +159,8 @@ struct LocalLibraryView: View {
                         LocalTrackTableView(
                             tracks:
                                 tracks,
+                            positionLookup:
+                                store.positionLookup,
                             selectedTrack:
                                 $selectedTrack,
                             playback:
@@ -338,47 +340,20 @@ struct LocalLibraryView: View {
         _ track:
             LocalTrack
     ) -> some View {
-
-        let isSelected =
-            selectedTrack?.id == track.id
-
-        return UnifiedTrackCardView(
-            title: track.title,
-            subtitle: track.artist,
-            secondaryText: track.album,
-            durationText: durationText(track.duration),
-            qualityBadge: track.fileURL.pathExtension.uppercased(),
-            isPlaying: isPlaying(track),
-            isSelected: isSelected,
+        LocalLibraryTrackCardView(
+            track: track,
+            isSelected: selectedTrack?.id == track.id,
+            playback: playback,
+            library: library,
             onSelect: {
                 selectedTrack = track
             },
             onPlay: {
                 playback.toggle(track: track, queue: store.tracks)
-            }
-        ) {
-            artwork(track)
-        } actionsMenu: {
-            HStack(spacing: 4) {
-                if library.contains(local: track) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color.accentColor)
-                        .font(.caption)
-                }
-
-                Menu {
-                    trackActions(track)
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .frame(width: 22, height: 18)
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-            }
-        }
-        .contextMenu {
-            trackActions(track)
-        }
+            },
+            artwork: { AnyView(artwork(track)) },
+            actions: { AnyView(trackActions(track)) }
+        )
     }
 
 
@@ -541,41 +516,62 @@ struct LocalLibraryView: View {
 
     // MARK: - Helpers
 
-    private func isPlaying(
-        _ track:
-            LocalTrack
-    ) -> Bool {
+}
 
-        playback
-            .currentTrack?
-            .id
-        == track.id
-        &&
-        playback.isPlaying
+// MARK: - Isolated Track Card Component (Sub-tree Invalidation Firewall)
+
+private struct LocalLibraryTrackCardView: View {
+    let track: LocalTrack
+    let isSelected: Bool
+    @Bindable var playback: PlaybackController
+    @Bindable var library: LibraryStore
+    let onSelect: () -> Void
+    let onPlay: () -> Void
+    let artwork: () -> AnyView
+    let actions: () -> AnyView
+
+    var body: some View {
+        let isPlaying = playback.isPlaying(trackID: track.id)
+        let isSaved = library.contains(local: track)
+
+        UnifiedTrackCardView(
+            title: track.title,
+            subtitle: track.artist,
+            secondaryText: track.album,
+            durationText: durationText(track.duration),
+            qualityBadge: track.fileURL.pathExtension.uppercased(),
+            isPlaying: isPlaying,
+            isSelected: isSelected,
+            onSelect: onSelect,
+            onPlay: onPlay
+        ) {
+            artwork()
+        } actionsMenu: {
+            HStack(spacing: 4) {
+                if isSaved {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color.accentColor)
+                        .font(.caption)
+                }
+
+                Menu {
+                    actions()
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .frame(width: 22, height: 18)
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+            }
+        }
+        .contextMenu {
+            actions()
+        }
     }
 
-
-    private func durationText(
-        _ duration:
-            TimeInterval
-    ) -> String {
-
-        let seconds =
-            max(
-                0,
-                Int(
-                    duration
-                        .rounded()
-                )
-            )
-
-
-        return String(
-            format:
-                "%d:%02d",
-            seconds / 60,
-            seconds % 60
-        )
+    private func durationText(_ duration: TimeInterval) -> String {
+        let seconds = max(0, Int(duration.rounded()))
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 }
 

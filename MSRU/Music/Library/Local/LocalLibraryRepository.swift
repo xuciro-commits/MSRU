@@ -45,6 +45,8 @@ nonisolated private struct PersistedTrackRecord: Codable {
     let duration: TimeInterval
     let artworkRelativePath: String?
     let artworkData: Data?
+    let trackNumber: Int?
+    let year: Int?
 
     init(
         fileURL: URL,
@@ -54,7 +56,9 @@ nonisolated private struct PersistedTrackRecord: Codable {
         album: String?,
         duration: TimeInterval,
         artworkRelativePath: String?,
-        artworkData: Data? = nil
+        artworkData: Data? = nil,
+        trackNumber: Int? = nil,
+        year: Int? = nil
     ) {
         self.fileURL = fileURL
         self.bookmarkData = bookmarkData
@@ -64,6 +68,8 @@ nonisolated private struct PersistedTrackRecord: Codable {
         self.duration = duration
         self.artworkRelativePath = artworkRelativePath
         self.artworkData = artworkData
+        self.trackNumber = trackNumber
+        self.year = year
     }
 
     func toLocalTrack() -> LocalTrack {
@@ -74,7 +80,9 @@ nonisolated private struct PersistedTrackRecord: Codable {
             album: album,
             duration: duration,
             artworkReference: artworkRelativePath,
-            artworkData: nil
+            artworkData: nil,
+            trackNumber: trackNumber,
+            year: year
         )
     }
 }
@@ -197,7 +205,9 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
                 album: track.album,
                 duration: track.duration,
                 artworkRelativePath: relPath,
-                artworkData: nil
+                artworkData: nil,
+                trackNumber: track.trackNumber,
+                year: track.year
             )
             if let existingIdx = recordMap[key] {
                 existingRecords[existingIdx] = newRecord
@@ -315,7 +325,9 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
                 album: record.album,
                 duration: record.duration,
                 artworkReference: record.artworkRelativePath,
-                artworkData: nil
+                artworkData: nil,
+                trackNumber: record.trackNumber,
+                year: record.year
             ))
         }
         return tracks
@@ -411,7 +423,9 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
                 artist: artist,
                 album: album,
                 duration: dsfMeta.duration,
-                artworkData: artworkData
+                artworkData: artworkData,
+                trackNumber: parsed.trackNumber,
+                year: parsed.year
             )
         }
 
@@ -563,18 +577,14 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
 
 
         return LocalTrack(
-            fileURL:
-                url,
-            title:
-                title,
-            artist:
-                artist,
-            album:
-                album,
-            duration:
-                duration,
-            artworkData:
-                artworkData
+            fileURL: url,
+            title: title,
+            artist: artist,
+            album: album,
+            duration: duration,
+            artworkData: artworkData,
+            trackNumber: parsed.trackNumber,
+            year: parsed.year
         )
     }
 

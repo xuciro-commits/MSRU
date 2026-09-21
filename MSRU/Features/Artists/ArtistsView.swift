@@ -20,7 +20,7 @@ struct ArtistsView: View {
     @State private var isDeleteConfirmationPresented: Bool = false
 
     private var allArtists: [ArtistPresentationModel] {
-        LibraryPresentationAggregator.buildArtists(from: localStore.tracks)
+        localStore.artists
     }
 
     private var filteredArtists: [ArtistPresentationModel] {

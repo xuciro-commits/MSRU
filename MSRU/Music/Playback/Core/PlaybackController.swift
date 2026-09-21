@@ -7,6 +7,18 @@ import AVFoundation
 import Foundation
 import Observation
 
+// MARK: - Playback Identity State (Low-frequency, isolated for UI collection/card observation)
+
+public struct PlaybackIdentityState: Sendable, Equatable {
+    public let currentTrackID: String?
+    public let isPlaying: Bool
+
+    public init(currentTrackID: String? = nil, isPlaying: Bool = false) {
+        self.currentTrackID = currentTrackID
+        self.isPlaying = isPlaying
+    }
+}
+
 // MARK: - Playback Session Observer Protocol
 
 @MainActor
@@ -21,6 +33,19 @@ private struct WeakSessionObserver {
 }
 
 @MainActor @Observable final class PlaybackController {
+
+    // MARK: - Identity State Projection
+    public var identityState: PlaybackIdentityState {
+        PlaybackIdentityState(currentTrackID: currentTrack?.id, isPlaying: isPlaying)
+    }
+
+    public func isPlaying(trackID: String) -> Bool {
+        isPlaying && currentTrack?.id == trackID
+    }
+
+    public func isCurrent(trackID: String) -> Bool {
+        currentTrack?.id == trackID
+    }
 
     // MARK: - Provider Kernel
 

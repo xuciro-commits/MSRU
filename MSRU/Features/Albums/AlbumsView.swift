@@ -36,14 +36,22 @@ struct AlbumsView: View {
     @State private var isDeleteConfirmationPresented: Bool = false
 
     private var allAlbums: [AlbumPresentationModel] {
-        LibraryPresentationAggregator.buildAlbums(from: localStore.tracks)
+        localStore.albums
     }
 
     private var filteredAlbums: [AlbumPresentationModel] {
         let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let matching = allAlbums.filter { album in
-            guard !query.isEmpty else { return true }
-            return album.title.lowercased().contains(query) || album.artist.lowercased().contains(query)
+        let matching: [AlbumPresentationModel]
+        if query.isEmpty {
+            matching = allAlbums
+        } else {
+            matching = allAlbums.filter { album in
+                album.title.lowercased().contains(query) || album.artist.lowercased().contains(query)
+            }
+        }
+
+        if sortField == .title {
+            return matching
         }
 
         return matching.sorted { a, b in
