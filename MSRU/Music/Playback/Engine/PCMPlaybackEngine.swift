@@ -539,99 +539,62 @@ final class PCMPlaybackEngine {
         }
 
 
-        guard
-            block.left.count
-                >= block.frameCount,
-            block.right.count
-                >= block.frameCount
-        else {
-
-            throw PCMPlaybackEngineError
-                .invalidPCMBlock
+        let channelCount = min(Int(audioFormat.channelCount), block.channels.count)
+        guard channelCount > 0 else {
+            throw PCMPlaybackEngineError.invalidPCMBlock
         }
 
+        for ch in 0..<channelCount {
+            guard block.channels[ch].count >= block.frameCount else {
+                throw PCMPlaybackEngineError.invalidPCMBlock
+            }
+        }
 
         guard
             let buffer =
                 AVAudioPCMBuffer(
-
                     pcmFormat:
                         audioFormat,
-
                     frameCapacity:
                         AVAudioFrameCount(
                             block.frameCount
                         )
                 ),
-
-            let channels =
+            let floatChannelData =
                 buffer
                     .floatChannelData
         else {
-
             throw PCMPlaybackEngineError
                 .bufferAllocationFailed
         }
-
 
         buffer.frameLength =
             AVAudioFrameCount(
                 block.frameCount
             )
 
+        for ch in 0..<channelCount {
+            block.channels[ch]
+                .withUnsafeBufferPointer {
+                    source in
 
-        block.left
-            .withUnsafeBufferPointer {
-                source in
+                    guard
+                        let baseAddress =
+                            source.baseAddress
+                    else {
+                        return
+                    }
 
-                guard
-                    let baseAddress =
-                        source.baseAddress
-                else {
-
-                    return
+                    memcpy(
+                        floatChannelData[ch],
+                        baseAddress,
+                        block.frameCount
+                        *
+                        MemoryLayout<Float>
+                            .size
+                    )
                 }
-
-
-                memcpy(
-
-                    channels[0],
-
-                    baseAddress,
-
-                    block.frameCount
-                    *
-                    MemoryLayout<Float>
-                        .size
-                )
-            }
-
-
-        block.right
-            .withUnsafeBufferPointer {
-                source in
-
-                guard
-                    let baseAddress =
-                        source.baseAddress
-                else {
-
-                    return
-                }
-
-
-                memcpy(
-
-                    channels[1],
-
-                    baseAddress,
-
-                    block.frameCount
-                    *
-                    MemoryLayout<Float>
-                        .size
-                )
-            }
+        }
 
 
         scheduledBufferCount +=

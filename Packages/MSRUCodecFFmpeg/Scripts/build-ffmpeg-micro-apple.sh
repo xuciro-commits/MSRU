@@ -344,16 +344,18 @@ build_target() {
         \
         --disable-avdevice \
         --disable-avfilter \
-        --disable-avformat \
         --disable-swscale \
         \
         --enable-avcodec \
+        --enable-avformat \
         --enable-avutil \
         --enable-swresample \
         \
         --disable-everything \
         \
-        --enable-decoder=dca \
+        --enable-protocol=file \
+        --enable-demuxer=dts,dtshd,ape,dsf,iff \
+        --enable-decoder=dca,ape,dsd_lsbf,dsd_msbf,dsd_lsbf_planar,dsd_msbf_planar \
         --enable-parser=dca \
         \
         $extra_config \
@@ -401,6 +403,10 @@ build_target() {
 
 
     test \
+        -f "$install_dir/lib/libavformat.a"
+
+
+    test \
         -f "$install_dir/lib/libavutil.a"
 
 
@@ -420,6 +426,7 @@ build_target() {
     xcrun libtool \
         -static \
         -o "$combined_library" \
+        "$install_dir/lib/libavformat.a" \
         "$install_dir/lib/libavcodec.a" \
         "$install_dir/lib/libswresample.a" \
         "$install_dir/lib/libavutil.a"
@@ -440,6 +447,11 @@ build_target() {
 
     cp -R \
         "$install_dir/include/libavcodec" \
+        "$headers_dir/"
+
+
+    cp -R \
+        "$install_dir/include/libavformat" \
         "$headers_dir/"
 
 
@@ -465,6 +477,9 @@ build_target() {
 #include <libavcodec/codec.h>
 #include <libavcodec/codec_id.h>
 #include <libavcodec/packet.h>
+
+#include <libavformat/avformat.h>
+#include <libavformat/avio.h>
 
 #include <libavutil/avutil.h>
 #include <libavutil/channel_layout.h>
@@ -766,7 +781,7 @@ do
         2>/dev/null \
         |
         grep -E \
-            'ff_dca_decoder|avpriv_dca_convert_bitstream' \
+            'ff_dca_decoder|ff_ape_decoder|ff_dsd_lsbf_decoder|ff_dsf_demuxer|ff_iff_demuxer' \
         |
         head \
             -10 \

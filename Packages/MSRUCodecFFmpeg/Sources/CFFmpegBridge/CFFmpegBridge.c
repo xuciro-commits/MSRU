@@ -5,6 +5,7 @@
 #include <string.h>
 #include <math.h>
 
+#include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libavutil/avutil.h>
 #include <libavutil/channel_layout.h>
@@ -13,59 +14,45 @@
 #include <libswresample/swresample.h>
 
 
-#define MSRU_INPUT_BUFFER_SIZE 32768
-
-
 typedef struct {
 
-    FILE *file;
-
-    int64_t file_size;
-
-
-    AVCodecParserContext *parser;
+    AVFormatContext *format_context;
 
     AVCodecContext *codec_context;
+
+    SwrContext *swr_context;
 
     AVPacket *packet;
 
     AVFrame *frame;
 
-    SwrContext *swr_context;
-
-
-    uint8_t input_buffer[
-        MSRU_INPUT_BUFFER_SIZE
-        + AV_INPUT_BUFFER_PADDING_SIZE
-    ];
-
-    uint8_t *input_data;
-
-    int input_size;
+    int stream_index;
 
 
     int source_sample_rate;
 
-    enum AVSampleFormat source_sample_format;
-
     int source_channels;
+
+    AVChannelLayout source_channel_layout;
+
+    enum AVSampleFormat source_sample_format;
 
 
     int output_sample_rate;
 
-    int64_t bit_rate;
+    int output_channels;
+
+    AVChannelLayout output_channel_layout;
 
 
-    int reached_file_eof;
+    int is_dsd;
 
-    int sent_decoder_flush;
+    int reached_eof;
 
-    int reached_decoder_eof;
+    int sent_flush;
 
 
-    float *pending_left;
-
-    float *pending_right;
+    float **pending_buffers;
 
     int pending_capacity;
 
@@ -76,7 +63,7 @@ typedef struct {
 } MSRUFFmpegDecoder;
 
 
-// MARK: - Error
+// MARK: - Error Helpers
 
 static void
 msru_write_error(
@@ -84,14 +71,9 @@ msru_write_error(
     int32_t buffer_size,
     const char *message
 ) {
-
-    if (
-        buffer == NULL
-        || buffer_size <= 0
-    ) {
+    if (buffer == NULL || buffer_size <= 0) {
         return;
     }
-
 
     snprintf(
         buffer,
@@ -101,7 +83,6 @@ msru_write_error(
     );
 }
 
-
 static void
 msru_write_ffmpeg_error(
     char *buffer,
@@ -109,11 +90,7 @@ msru_write_ffmpeg_error(
     const char *prefix,
     int error_code
 ) {
-
-    char error_text[
-        AV_ERROR_MAX_STRING_SIZE
-    ] = { 0 };
-
+    char error_text[AV_ERROR_MAX_STRING_SIZE] = { 0 };
 
     av_strerror(
         error_code,
@@ -121,14 +98,9 @@ msru_write_ffmpeg_error(
         sizeof(error_text)
     );
 
-
-    if (
-        buffer == NULL
-        || buffer_size <= 0
-    ) {
+    if (buffer == NULL || buffer_size <= 0) {
         return;
     }
-
 
     snprintf(
         buffer,
@@ -140,741 +112,115 @@ msru_write_ffmpeg_error(
 }
 
 
-// MARK: - Pending PCM
+// MARK: - Pending Buffer Management
 
 static int
 msru_ensure_pending_capacity(
     MSRUFFmpegDecoder *decoder,
     int frames
 ) {
-
-    if (
-        decoder->pending_capacity
-        >= frames
-    ) {
+    if (decoder->pending_capacity >= frames && decoder->pending_buffers != NULL) {
         return 0;
     }
 
-
-    int new_capacity =
-        frames;
-
-
-    float *new_left =
-        realloc(
-            decoder->pending_left,
-            sizeof(float)
-            * (size_t) new_capacity
-        );
-
-
-    if (
-        new_left == NULL
-    ) {
-        return AVERROR(ENOMEM);
+    int new_capacity = frames > (decoder->pending_capacity * 2) ? frames : (decoder->pending_capacity * 2);
+    if (new_capacity < 8192) {
+        new_capacity = 8192;
     }
 
-
-    decoder->pending_left =
-        new_left;
-
-
-    float *new_right =
-        realloc(
-            decoder->pending_right,
-            sizeof(float)
-            * (size_t) new_capacity
-        );
-
-
-    if (
-        new_right == NULL
-    ) {
-        return AVERROR(ENOMEM);
+    int channels = decoder->output_channels;
+    if (channels <= 0) {
+        channels = 2;
     }
 
+    if (decoder->pending_buffers == NULL) {
+        decoder->pending_buffers = (float **)calloc((size_t)channels, sizeof(float *));
+        if (decoder->pending_buffers == NULL) {
+            return AVERROR(ENOMEM);
+        }
+        for (int ch = 0; ch < channels; ch++) {
+            decoder->pending_buffers[ch] = (float *)malloc((size_t)new_capacity * sizeof(float));
+            if (decoder->pending_buffers[ch] == NULL) {
+                return AVERROR(ENOMEM);
+            }
+        }
+    } else {
+        for (int ch = 0; ch < channels; ch++) {
+            float *re = (float *)realloc(decoder->pending_buffers[ch], (size_t)new_capacity * sizeof(float));
+            if (re == NULL) {
+                return AVERROR(ENOMEM);
+            }
+            decoder->pending_buffers[ch] = re;
+        }
+    }
 
-    decoder->pending_right =
-        new_right;
-
-
-    decoder->pending_capacity =
-        new_capacity;
-
-
+    decoder->pending_capacity = new_capacity;
     return 0;
 }
 
 
-// MARK: - Resampler
+// MARK: - Resampler Configuration
 
 static int
 msru_configure_resampler(
     MSRUFFmpegDecoder *decoder,
     AVFrame *frame
 ) {
+    const int frame_rate = frame->sample_rate > 0 ? frame->sample_rate : decoder->source_sample_rate;
+    const enum AVSampleFormat frame_fmt = (enum AVSampleFormat)frame->format;
 
-    const int sample_rate =
-        frame->sample_rate;
-
-
-    const int channels =
-        frame->ch_layout.nb_channels;
-
-
-    const enum AVSampleFormat sample_format =
-        (enum AVSampleFormat)
-        frame->format;
-
-
-    if (
-        decoder->swr_context != NULL
-        &&
-        decoder->source_sample_rate
-            == sample_rate
-        &&
-        decoder->source_sample_format
-            == sample_format
-        &&
-        decoder->source_channels
-            == channels
-    ) {
-
+    if (decoder->swr_context != NULL
+        && decoder->source_sample_rate == frame_rate
+        && decoder->source_sample_format == frame_fmt
+        && av_channel_layout_compare(&decoder->source_channel_layout, &frame->ch_layout) == 0) {
         return 0;
     }
 
-
-    if (
-        decoder->swr_context != NULL
-    ) {
-
-        swr_free(
-            &decoder->swr_context
-        );
+    if (decoder->swr_context != NULL) {
+        swr_free(&decoder->swr_context);
     }
 
+    decoder->source_sample_rate = frame_rate;
+    decoder->source_sample_format = frame_fmt;
+    av_channel_layout_uninit(&decoder->source_channel_layout);
+    av_channel_layout_copy(&decoder->source_channel_layout, &frame->ch_layout);
 
-    AVChannelLayout output_layout =
-        AV_CHANNEL_LAYOUT_STEREO;
+    // Preserve source channel layout! Do NOT downmix to stereo.
+    av_channel_layout_uninit(&decoder->output_channel_layout);
+    av_channel_layout_copy(&decoder->output_channel_layout, &frame->ch_layout);
+    decoder->output_channels = frame->ch_layout.nb_channels;
 
-
-    int result =
-        swr_alloc_set_opts2(
-            &decoder->swr_context,
-
-            &output_layout,
-
-            AV_SAMPLE_FMT_FLTP,
-
-            sample_rate,
-
-            &frame->ch_layout,
-
-            sample_format,
-
-            sample_rate,
-
-            0,
-
-            NULL
-        );
-
-
-    if (
-        result < 0
-    ) {
-
-        return result;
+    // Sample rate policy:
+    // DSD -> PCM requires conversion (e.g. 88.2 kHz for DSD64, 176.4 kHz for DSD128+)
+    // PCM (APE, DTS) -> preserve source sample rate!
+    if (decoder->is_dsd) {
+        if (decoder->source_sample_rate >= 5644800) {
+            decoder->output_sample_rate = 176400;
+        } else {
+            decoder->output_sample_rate = 88200;
+        }
+    } else {
+        decoder->output_sample_rate = decoder->source_sample_rate;
     }
 
-
-    result =
-        swr_init(
-            decoder->swr_context
-        );
-
-
-    if (
-        result < 0
-    ) {
-
-        return result;
-    }
-
-
-    decoder->source_sample_rate =
-        sample_rate;
-
-
-    decoder->source_sample_format =
-        sample_format;
-
-
-    decoder->source_channels =
-        channels;
-
-
-    decoder->output_sample_rate =
-        sample_rate;
-
-
-    return 0;
-}
-
-
-// MARK: - Convert Frame
-
-static int
-msru_convert_frame(
-    MSRUFFmpegDecoder *decoder,
-    AVFrame *frame
-) {
-
-    int result =
-        msru_configure_resampler(
-            decoder,
-            frame
-        );
-
-
-    if (
-        result < 0
-    ) {
-
-        return result;
-    }
-
-
-    int maximum_output_frames =
-        swr_get_out_samples(
-            decoder->swr_context,
-            frame->nb_samples
-        );
-
-
-    if (
-        maximum_output_frames <= 0
-    ) {
-
-        maximum_output_frames =
-            frame->nb_samples
-            + 64;
-    }
-
-
-    result =
-        msru_ensure_pending_capacity(
-            decoder,
-            maximum_output_frames
-        );
-
-
-    if (
-        result < 0
-    ) {
-
-        return result;
-    }
-
-
-    uint8_t *output_data[2] = {
-
-        (uint8_t *)
-            decoder
-                ->pending_left,
-
-        (uint8_t *)
-            decoder
-                ->pending_right
-    };
-
-
-    const uint8_t **input_data =
-        (const uint8_t **)
-            frame->extended_data;
-
-
-    int converted_frames =
-        swr_convert(
-            decoder->swr_context,
-
-            output_data,
-
-            maximum_output_frames,
-
-            input_data,
-
-            frame->nb_samples
-        );
-
-
-    if (
-        converted_frames < 0
-    ) {
-
-        return converted_frames;
-    }
-
-
-    decoder->pending_frames =
-        converted_frames;
-
-
-    decoder->pending_offset =
-        0;
-
-
-    return converted_frames;
-}
-
-
-// MARK: - Input
-
-static int
-msru_fill_input_buffer(
-    MSRUFFmpegDecoder *decoder
-) {
-
-    if (
-        decoder->reached_file_eof
-    ) {
-
-        return 0;
-    }
-
-
-    size_t bytes_read =
-        fread(
-            decoder->input_buffer,
-            1,
-            MSRU_INPUT_BUFFER_SIZE,
-            decoder->file
-        );
-
-
-    if (
-        bytes_read == 0
-    ) {
-
-        decoder->reached_file_eof =
-            1;
-
-
-        decoder->input_data =
-            NULL;
-
-
-        decoder->input_size =
-            0;
-
-
-        return 0;
-    }
-
-
-    memset(
-        decoder
-            ->input_buffer
-            + bytes_read,
-
+    int ret = swr_alloc_set_opts2(
+        &decoder->swr_context,
+        &decoder->output_channel_layout,
+        AV_SAMPLE_FMT_FLTP,
+        decoder->output_sample_rate,
+        &decoder->source_channel_layout,
+        decoder->source_sample_format,
+        decoder->source_sample_rate,
         0,
-
-        AV_INPUT_BUFFER_PADDING_SIZE
+        NULL
     );
 
-
-    decoder->input_data =
-        decoder->input_buffer;
-
-
-    decoder->input_size =
-        (int) bytes_read;
-
-
-    return 1;
-}
-
-
-// MARK: - Decoder Feed
-
-static int
-msru_send_next_packet(
-    MSRUFFmpegDecoder *decoder
-) {
-
-    while (1) {
-
-        if (
-            decoder->input_size <= 0
-            &&
-            !decoder->reached_file_eof
-        ) {
-
-            msru_fill_input_buffer(
-                decoder
-            );
-        }
-
-
-        if (
-            decoder->input_size > 0
-        ) {
-
-            uint8_t *packet_data =
-                NULL;
-
-
-            int packet_size =
-                0;
-
-
-            int consumed =
-                av_parser_parse2(
-                    decoder->parser,
-
-                    decoder
-                        ->codec_context,
-
-                    &packet_data,
-
-                    &packet_size,
-
-                    decoder
-                        ->input_data,
-
-                    decoder
-                        ->input_size,
-
-                    AV_NOPTS_VALUE,
-
-                    AV_NOPTS_VALUE,
-
-                    0
-                );
-
-
-            if (
-                consumed < 0
-            ) {
-
-                return consumed;
-            }
-
-
-            decoder->input_data +=
-                consumed;
-
-
-            decoder->input_size -=
-                consumed;
-
-
-            if (
-                packet_size > 0
-            ) {
-
-                decoder->packet->data =
-                    packet_data;
-
-
-                decoder->packet->size =
-                    packet_size;
-
-
-                int result =
-                    avcodec_send_packet(
-                        decoder
-                            ->codec_context,
-
-                        decoder
-                            ->packet
-                    );
-
-
-                decoder->packet->data =
-                    NULL;
-
-
-                decoder->packet->size =
-                    0;
-
-
-                if (
-                    result == AVERROR(EAGAIN)
-                ) {
-
-                    return 1;
-                }
-
-
-                if (
-                    result < 0
-                ) {
-
-                    return result;
-                }
-
-
-                return 1;
-            }
-
-
-            /*
-             Parser consumed nothing and
-             produced nothing.
-
-             Avoid a possible infinite loop.
-             */
-
-            if (
-                consumed == 0
-            ) {
-
-                return AVERROR_INVALIDDATA;
-            }
-
-
-            continue;
-        }
-
-
-        /*
-         End of file.
-
-         Flush decoder exactly once.
-         */
-
-        if (
-            decoder->reached_file_eof
-            &&
-            !decoder->sent_decoder_flush
-        ) {
-
-            decoder->sent_decoder_flush =
-                1;
-
-
-            int result =
-                avcodec_send_packet(
-                    decoder
-                        ->codec_context,
-
-                    NULL
-                );
-
-
-            if (
-                result == AVERROR_EOF
-            ) {
-
-                decoder->reached_decoder_eof =
-                    1;
-
-
-                return 0;
-            }
-
-
-            if (
-                result < 0
-                &&
-                result != AVERROR(EAGAIN)
-            ) {
-
-                return result;
-            }
-
-
-            return 1;
-        }
-
-
-        decoder->reached_decoder_eof =
-            1;
-
-
-        return 0;
-    }
-}
-
-
-// MARK: - Decode Next Frame
-
-static int
-msru_decode_next_frame(
-    MSRUFFmpegDecoder *decoder
-) {
-
-    while (1) {
-
-        int result =
-            avcodec_receive_frame(
-                decoder
-                    ->codec_context,
-
-                decoder
-                    ->frame
-            );
-
-
-        if (
-            result == 0
-        ) {
-
-            result =
-                msru_convert_frame(
-                    decoder,
-
-                    decoder
-                        ->frame
-                );
-
-
-            av_frame_unref(
-                decoder
-                    ->frame
-            );
-
-
-            if (
-                result < 0
-            ) {
-
-                return result;
-            }
-
-
-            return 1;
-        }
-
-
-        if (
-            result == AVERROR_EOF
-        ) {
-
-            decoder->reached_decoder_eof =
-                1;
-
-
-            return 0;
-        }
-
-
-        if (
-            result != AVERROR(EAGAIN)
-        ) {
-
-            return result;
-        }
-
-
-        result =
-            msru_send_next_packet(
-                decoder
-            );
-
-
-        if (
-            result < 0
-        ) {
-
-            return result;
-        }
-
-
-        if (
-            result == 0
-            &&
-            decoder->reached_decoder_eof
-        ) {
-
-            return 0;
-        }
-    }
-}
-
-
-// MARK: - Reset
-
-static void
-msru_reset_decoder_state(
-    MSRUFFmpegDecoder *decoder
-) {
-
-    decoder->input_data =
-        NULL;
-
-
-    decoder->input_size =
-        0;
-
-
-    decoder->reached_file_eof =
-        0;
-
-
-    decoder->sent_decoder_flush =
-        0;
-
-
-    decoder->reached_decoder_eof =
-        0;
-
-
-    decoder->pending_frames =
-        0;
-
-
-    decoder->pending_offset =
-        0;
-
-
-    avcodec_flush_buffers(
-        decoder
-            ->codec_context
-    );
-
-
-    if (
-        decoder->parser != NULL
-    ) {
-
-        av_parser_close(
-            decoder->parser
-        );
-
-
-        decoder->parser =
-            NULL;
+    if (ret < 0) {
+        return ret;
     }
 
-
-    decoder->parser =
-        av_parser_init(
-            AV_CODEC_ID_DTS
-        );
-
-
-    if (
-        decoder->swr_context != NULL
-    ) {
-
-        swr_free(
-            &decoder->swr_context
-        );
-    }
-
-
-    decoder->source_sample_rate =
-        0;
-
-
-    decoder->source_channels =
-        0;
-
-
-    decoder->source_sample_format =
-        AV_SAMPLE_FMT_NONE;
+    ret = swr_init(decoder->swr_context);
+    return ret;
 }
 
 
@@ -887,368 +233,126 @@ msru_ffmpeg_decoder_open(
     char *error_buffer,
     int32_t error_buffer_size
 ) {
-
-    if (
-        path == NULL
-    ) {
-
-        msru_write_error(
-            error_buffer,
-            error_buffer_size,
-            "Missing DTS file path."
-        );
-
-
+    if (path == NULL || info == NULL) {
+        msru_write_error(error_buffer, error_buffer_size, "Invalid arguments to msru_ffmpeg_decoder_open.");
         return NULL;
     }
 
-
-    FILE *file =
-        fopen(
-            path,
-            "rb"
-        );
-
-
-    if (
-        file == NULL
-    ) {
-
-        msru_write_error(
-            error_buffer,
-            error_buffer_size,
-            "Unable to open DTS file."
-        );
-
-
+    MSRUFFmpegDecoder *decoder = (MSRUFFmpegDecoder *)calloc(1, sizeof(MSRUFFmpegDecoder));
+    if (decoder == NULL) {
+        msru_write_error(error_buffer, error_buffer_size, "Out of memory allocating MSRUFFmpegDecoder.");
         return NULL;
     }
 
-
-    if (
-        fseeko(
-            file,
-            0,
-            SEEK_END
-        ) != 0
-    ) {
-
-        fclose(
-            file
-        );
-
-
-        msru_write_error(
-            error_buffer,
-            error_buffer_size,
-            "Unable to determine DTS file size."
-        );
-
-
+    int ret = avformat_open_input(&decoder->format_context, path, NULL, NULL);
+    if (ret < 0) {
+        msru_write_ffmpeg_error(error_buffer, error_buffer_size, "Cannot open input file", ret);
+        free(decoder);
         return NULL;
     }
 
-
-    int64_t file_size =
-        (int64_t)
-            ftello(
-                file
-            );
-
-
-    rewind(
-        file
-    );
-
-
-    const AVCodec *codec =
-        avcodec_find_decoder(
-            AV_CODEC_ID_DTS
-        );
-
-
-    if (
-        codec == NULL
-    ) {
-
-        fclose(
-            file
-        );
-
-
-        msru_write_error(
-            error_buffer,
-            error_buffer_size,
-            "FFmpeg DTS/DCA decoder is unavailable."
-        );
-
-
+    ret = avformat_find_stream_info(decoder->format_context, NULL);
+    if (ret < 0) {
+        msru_write_ffmpeg_error(error_buffer, error_buffer_size, "Cannot find stream information", ret);
+        avformat_close_input(&decoder->format_context);
+        free(decoder);
         return NULL;
     }
 
-
-    MSRUFFmpegDecoder *decoder =
-        calloc(
-            1,
-            sizeof(
-                MSRUFFmpegDecoder
-            )
-        );
-
-
-    if (
-        decoder == NULL
-    ) {
-
-        fclose(
-            file
-        );
-
-
-        msru_write_error(
-            error_buffer,
-            error_buffer_size,
-            "Unable to allocate DTS decoder."
-        );
-
-
+    const AVCodec *codec = NULL;
+    int audio_stream = av_find_best_stream(decoder->format_context, AVMEDIA_TYPE_AUDIO, -1, -1, &codec, 0);
+    if (audio_stream < 0 || codec == NULL) {
+        msru_write_error(error_buffer, error_buffer_size, "No supported audio stream found in container.");
+        avformat_close_input(&decoder->format_context);
+        free(decoder);
         return NULL;
     }
 
+    decoder->stream_index = audio_stream;
+    AVStream *stream = decoder->format_context->streams[audio_stream];
 
-    decoder->file =
-        file;
-
-
-    decoder->file_size =
-        file_size;
-
-
-    decoder->source_sample_format =
-        AV_SAMPLE_FMT_NONE;
-
-
-    decoder->parser =
-        av_parser_init(
-            AV_CODEC_ID_DTS
-        );
-
-
-    if (
-        decoder->parser == NULL
-    ) {
-
-        msru_ffmpeg_decoder_close(
-            decoder
-        );
-
-
-        msru_write_error(
-            error_buffer,
-            error_buffer_size,
-            "FFmpeg DTS parser is unavailable."
-        );
-
-
+    decoder->codec_context = avcodec_alloc_context3(codec);
+    if (decoder->codec_context == NULL) {
+        msru_write_error(error_buffer, error_buffer_size, "Cannot allocate codec context.");
+        avformat_close_input(&decoder->format_context);
+        free(decoder);
         return NULL;
     }
 
-
-    decoder->codec_context =
-        avcodec_alloc_context3(
-            codec
-        );
-
-
-    if (
-        decoder->codec_context == NULL
-    ) {
-
-        msru_ffmpeg_decoder_close(
-            decoder
-        );
-
-
-        msru_write_error(
-            error_buffer,
-            error_buffer_size,
-            "Unable to allocate DTS codec context."
-        );
-
-
+    ret = avcodec_parameters_to_context(decoder->codec_context, stream->codecpar);
+    if (ret < 0) {
+        msru_write_ffmpeg_error(error_buffer, error_buffer_size, "Failed to copy codec parameters", ret);
+        avcodec_free_context(&decoder->codec_context);
+        avformat_close_input(&decoder->format_context);
+        free(decoder);
         return NULL;
     }
 
-
-    int result =
-        avcodec_open2(
-            decoder
-                ->codec_context,
-
-            codec,
-
-            NULL
-        );
-
-
-    if (
-        result < 0
-    ) {
-
-        msru_ffmpeg_decoder_close(
-            decoder
-        );
-
-
-        msru_write_ffmpeg_error(
-            error_buffer,
-            error_buffer_size,
-            "Unable to open DTS decoder",
-            result
-        );
-
-
+    ret = avcodec_open2(decoder->codec_context, codec, NULL);
+    if (ret < 0) {
+        msru_write_ffmpeg_error(error_buffer, error_buffer_size, "Failed to open codec", ret);
+        avcodec_free_context(&decoder->codec_context);
+        avformat_close_input(&decoder->format_context);
+        free(decoder);
         return NULL;
     }
 
-
-    decoder->packet =
-        av_packet_alloc();
-
-
-    decoder->frame =
-        av_frame_alloc();
-
-
-    if (
-        decoder->packet == NULL
-        ||
-        decoder->frame == NULL
-    ) {
-
-        msru_ffmpeg_decoder_close(
-            decoder
-        );
-
-
-        msru_write_error(
-            error_buffer,
-            error_buffer_size,
-            "Unable to allocate DTS packet/frame."
-        );
-
-
-        return NULL;
+    // Check if DSD format
+    if (codec->id == AV_CODEC_ID_DSD_LSBF
+        || codec->id == AV_CODEC_ID_DSD_MSBF
+        || codec->id == AV_CODEC_ID_DSD_LSBF_PLANAR
+        || codec->id == AV_CODEC_ID_DSD_MSBF_PLANAR) {
+        decoder->is_dsd = 1;
+    } else {
+        decoder->is_dsd = 0;
     }
 
+    decoder->source_sample_rate = decoder->codec_context->sample_rate;
+    decoder->source_channels = decoder->codec_context->ch_layout.nb_channels;
+    decoder->source_sample_format = decoder->codec_context->sample_fmt;
+    av_channel_layout_copy(&decoder->source_channel_layout, &decoder->codec_context->ch_layout);
 
-    /*
-     Decode first frame immediately.
+    // Initial output layout matches source layout
+    av_channel_layout_copy(&decoder->output_channel_layout, &decoder->source_channel_layout);
+    decoder->output_channels = decoder->source_channels;
 
-     This lets us discover:
-     - sample rate
-     - channel layout
-     - bitrate
-
-     The converted first frame remains
-     in pending PCM and will still be
-     returned to Swift.
-     */
-
-    result =
-        msru_decode_next_frame(
-            decoder
-        );
-
-
-    if (
-        result <= 0
-    ) {
-
-        msru_ffmpeg_decoder_close(
-            decoder
-        );
-
-
-        if (
-            result < 0
-        ) {
-
-            msru_write_ffmpeg_error(
-                error_buffer,
-                error_buffer_size,
-                "Unable to decode first DTS frame",
-                result
-            );
-
+    if (decoder->is_dsd) {
+        if (decoder->source_sample_rate >= 5644800) {
+            decoder->output_sample_rate = 176400;
         } else {
-
-            msru_write_error(
-                error_buffer,
-                error_buffer_size,
-                "DTS file contains no decodable audio frames."
-            );
+            decoder->output_sample_rate = 88200;
         }
+    } else {
+        decoder->output_sample_rate = decoder->source_sample_rate > 0 ? decoder->source_sample_rate : 44100;
+    }
 
-
+    decoder->packet = av_packet_alloc();
+    decoder->frame = av_frame_alloc();
+    if (decoder->packet == NULL || decoder->frame == NULL) {
+        msru_write_error(error_buffer, error_buffer_size, "Cannot allocate AVFrame or AVPacket.");
+        msru_ffmpeg_decoder_close(decoder);
         return NULL;
     }
 
-
-    decoder->bit_rate =
-        decoder
-            ->codec_context
-            ->bit_rate;
-
-
-    double duration =
-        0;
-
-
-    if (
-        decoder->bit_rate > 0
-        &&
-        decoder->file_size > 0
-    ) {
-
-        duration =
-            (
-                (double)
-                    decoder
-                        ->file_size
-                * 8.0
-            )
-            /
-            (double)
-                decoder
-                    ->bit_rate;
+    // Calculate duration
+    double duration = 0.0;
+    if (stream->duration > 0 && stream->time_base.den > 0) {
+        duration = (double)stream->duration * av_q2d(stream->time_base);
+    } else if (decoder->format_context->duration > 0) {
+        duration = (double)decoder->format_context->duration / (double)AV_TIME_BASE;
     }
 
+    info->sample_rate = decoder->output_sample_rate;
+    info->channels = decoder->output_channels;
+    info->channel_layout_mask = decoder->output_channel_layout.order == AV_CHANNEL_ORDER_NATIVE ? decoder->output_channel_layout.u.mask : 0;
+    info->duration_seconds = duration;
+    info->bit_rate = decoder->format_context->bit_rate > 0 ? decoder->format_context->bit_rate : decoder->codec_context->bit_rate;
+    info->can_seek = 1;
 
-    if (
-        info != NULL
-    ) {
+    snprintf(info->codec_name, sizeof(info->codec_name), "%s", codec->name != NULL ? codec->name : "unknown");
+    snprintf(info->format_name, sizeof(info->format_name), "%s", decoder->format_context->iformat->name != NULL ? decoder->format_context->iformat->name : "unknown");
 
-        info->sample_rate =
-            decoder
-                ->output_sample_rate;
-
-
-        info->channels =
-            2;
-
-
-        info->duration_seconds =
-            duration;
-
-
-        info->bit_rate =
-            decoder
-                ->bit_rate;
-    }
-
-
-    return decoder;
+    return (MSRUFFmpegDecoderRef)decoder;
 }
 
 
@@ -1257,168 +361,150 @@ msru_ffmpeg_decoder_open(
 int32_t
 msru_ffmpeg_decoder_read(
     MSRUFFmpegDecoderRef decoder_ref,
-    float *left,
-    float *right,
+    float **channel_buffers,
+    int32_t channel_count,
     int32_t capacity_frames,
     int32_t *output_frames,
     char *error_buffer,
     int32_t error_buffer_size
 ) {
-
-    MSRUFFmpegDecoder *decoder =
-        (MSRUFFmpegDecoder *)
-            decoder_ref;
-
-
-    if (
-        decoder == NULL
-        ||
-        left == NULL
-        ||
-        right == NULL
-        ||
-        capacity_frames <= 0
-    ) {
-
-        msru_write_error(
-            error_buffer,
-            error_buffer_size,
-            "Invalid DTS decoder read request."
-        );
-
-
+    MSRUFFmpegDecoder *decoder = (MSRUFFmpegDecoder *)decoder_ref;
+    if (decoder == NULL || channel_buffers == NULL || capacity_frames <= 0 || output_frames == NULL) {
+        msru_write_error(error_buffer, error_buffer_size, "Invalid arguments to msru_ffmpeg_decoder_read.");
         return -1;
     }
 
+    *output_frames = 0;
+    int frames_needed = capacity_frames;
+    int frames_written = 0;
 
-    int written =
-        0;
+    while (frames_needed > 0) {
+        // Drain pending converted frames first
+        int available = decoder->pending_frames - decoder->pending_offset;
+        if (available > 0) {
+            int to_copy = available < frames_needed ? available : frames_needed;
+            int ch_to_copy = decoder->output_channels < channel_count ? decoder->output_channels : channel_count;
 
+            for (int ch = 0; ch < ch_to_copy; ch++) {
+                if (channel_buffers[ch] != NULL && decoder->pending_buffers[ch] != NULL) {
+                    memcpy(
+                        channel_buffers[ch] + frames_written,
+                        decoder->pending_buffers[ch] + decoder->pending_offset,
+                        (size_t)to_copy * sizeof(float)
+                    );
+                }
+            }
 
-    while (
-        written
-        < capacity_frames
-    ) {
+            // Zero any extra destination channels
+            for (int ch = ch_to_copy; ch < channel_count; ch++) {
+                if (channel_buffers[ch] != NULL) {
+                    memset(channel_buffers[ch] + frames_written, 0, (size_t)to_copy * sizeof(float));
+                }
+            }
 
-        int available =
-            decoder->pending_frames
-            -
-            decoder->pending_offset;
+            decoder->pending_offset += to_copy;
+            frames_written += to_copy;
+            frames_needed -= to_copy;
 
-
-        if (
-            available > 0
-        ) {
-
-            int remaining =
-                capacity_frames
-                - written;
-
-
-            int copy_frames =
-                available
-                < remaining
-                ? available
-                : remaining;
-
-
-            memcpy(
-                left + written,
-
-                decoder
-                    ->pending_left
-                    + decoder
-                        ->pending_offset,
-
-                sizeof(float)
-                * (size_t)
-                    copy_frames
-            );
-
-
-            memcpy(
-                right + written,
-
-                decoder
-                    ->pending_right
-                    + decoder
-                        ->pending_offset,
-
-                sizeof(float)
-                * (size_t)
-                    copy_frames
-            );
-
-
-            decoder->pending_offset +=
-                copy_frames;
-
-
-            written +=
-                copy_frames;
-
-
-            continue;
+            if (frames_needed == 0) {
+                break;
+            }
         }
 
+        // Pending buffer exhausted, reset counters
+        decoder->pending_frames = 0;
+        decoder->pending_offset = 0;
 
-        decoder->pending_frames =
-            0;
-
-
-        decoder->pending_offset =
-            0;
-
-
-        int result =
-            msru_decode_next_frame(
-                decoder
-            );
-
-
-        if (
-            result == 0
-        ) {
-
+        if (decoder->reached_eof) {
             break;
         }
 
+        // Try to receive a decoded frame from codec
+        int ret = avcodec_receive_frame(decoder->codec_context, decoder->frame);
+        if (ret == 0) {
+            // Convert frame using SwrContext
+            int configure_ret = msru_configure_resampler(decoder, decoder->frame);
+            if (configure_ret < 0) {
+                msru_write_ffmpeg_error(error_buffer, error_buffer_size, "Resampler configuration failed", configure_ret);
+                av_frame_unref(decoder->frame);
+                return -1;
+            }
 
-        if (
-            result < 0
-        ) {
+            int max_out = swr_get_out_samples(decoder->swr_context, decoder->frame->nb_samples);
+            if (max_out <= 0) {
+                max_out = decoder->frame->nb_samples;
+            }
 
-            msru_write_ffmpeg_error(
-                error_buffer,
-                error_buffer_size,
-                "DTS decoding failed",
-                result
+            int ensure_ret = msru_ensure_pending_capacity(decoder, max_out);
+            if (ensure_ret < 0) {
+                msru_write_ffmpeg_error(error_buffer, error_buffer_size, "Out of memory in pending buffer", ensure_ret);
+                av_frame_unref(decoder->frame);
+                return -1;
+            }
+
+            int converted = swr_convert(
+                decoder->swr_context,
+                (uint8_t **)decoder->pending_buffers,
+                max_out,
+                (const uint8_t **)decoder->frame->data,
+                decoder->frame->nb_samples
             );
 
+            av_frame_unref(decoder->frame);
 
+            if (converted < 0) {
+                msru_write_ffmpeg_error(error_buffer, error_buffer_size, "Swr conversion failed", converted);
+                return -1;
+            }
+
+            decoder->pending_frames = converted;
+            decoder->pending_offset = 0;
+            continue;
+        } else if (ret == AVERROR_EOF) {
+            decoder->reached_eof = 1;
+            break;
+        } else if (ret == AVERROR(EAGAIN)) {
+            // Need to feed more packets to decoder
+            while (1) {
+                int read_ret = av_read_frame(decoder->format_context, decoder->packet);
+                if (read_ret == AVERROR_EOF) {
+                    // Send flush packet to decoder
+                    if (!decoder->sent_flush) {
+                        avcodec_send_packet(decoder->codec_context, NULL);
+                        decoder->sent_flush = 1;
+                    }
+                    break;
+                } else if (read_ret < 0) {
+                    msru_write_ffmpeg_error(error_buffer, error_buffer_size, "Read frame failed", read_ret);
+                    return -1;
+                }
+
+                if (decoder->packet->stream_index == decoder->stream_index) {
+                    int send_ret = avcodec_send_packet(decoder->codec_context, decoder->packet);
+                    av_packet_unref(decoder->packet);
+                    if (send_ret < 0 && send_ret != AVERROR(EAGAIN)) {
+                        msru_write_ffmpeg_error(error_buffer, error_buffer_size, "Send packet failed", send_ret);
+                        return -1;
+                    }
+                    break;
+                } else {
+                    av_packet_unref(decoder->packet);
+                }
+            }
+        } else {
+            msru_write_ffmpeg_error(error_buffer, error_buffer_size, "Codec receive frame failed", ret);
             return -1;
         }
     }
 
-
-    if (
-        output_frames != NULL
-    ) {
-
-        *output_frames =
-            written;
-    }
-
-
-    if (
-        written > 0
-    ) {
-
+    *output_frames = frames_written;
+    if (frames_written > 0) {
         return 1;
+    } else if (decoder->reached_eof) {
+        return 0;
+    } else {
+        return 0;
     }
-
-
-    return 0;
 }
 
 
@@ -1431,148 +517,42 @@ msru_ffmpeg_decoder_seek(
     char *error_buffer,
     int32_t error_buffer_size
 ) {
-
-    MSRUFFmpegDecoder *decoder =
-        (MSRUFFmpegDecoder *)
-            decoder_ref;
-
-
-    if (
-        decoder == NULL
-    ) {
-
-        msru_write_error(
-            error_buffer,
-            error_buffer_size,
-            "DTS decoder is unavailable."
-        );
-
-
+    MSRUFFmpegDecoder *decoder = (MSRUFFmpegDecoder *)decoder_ref;
+    if (decoder == NULL || decoder->format_context == NULL) {
+        msru_write_error(error_buffer, error_buffer_size, "Invalid decoder reference in seek.");
         return -1;
     }
 
-
-    if (
-        decoder->bit_rate <= 0
-    ) {
-
-        msru_write_error(
-            error_buffer,
-            error_buffer_size,
-            "DTS stream bitrate is unknown; seeking is unavailable."
-        );
-
-
-        return -1;
-    }
-
-
-    if (
-        seconds < 0
-    ) {
-
-        seconds =
-            0;
-    }
-
-
-    double byte_position =
-        seconds
-        *
-        (
-            (double)
-                decoder
-                    ->bit_rate
-            /
-            8.0
-        );
-
-
-    if (
-        byte_position
-        >
-        (double)
-            decoder
-                ->file_size
-    ) {
-
-        byte_position =
-            (double)
-                decoder
-                    ->file_size;
-    }
-
-
-    /*
-     Move slightly backwards.
-
-     Raw DTS has sync words.
-     Parser will locate the next
-     complete DTS frame.
-     */
-
-    const int64_t safety_window =
-        64 * 1024;
-
-
-    int64_t target =
-        (int64_t)
-            byte_position;
-
-
-    if (
-        target
-        > safety_window
-    ) {
-
-        target -=
-            safety_window;
-
+    AVStream *stream = decoder->format_context->streams[decoder->stream_index];
+    int64_t target_ts = 0;
+    if (stream->time_base.den > 0) {
+        target_ts = av_rescale_q((int64_t)(seconds * (double)AV_TIME_BASE), AV_TIME_BASE_Q, stream->time_base);
     } else {
-
-        target =
-            0;
+        target_ts = (int64_t)(seconds * (double)AV_TIME_BASE);
     }
 
+    int ret = av_seek_frame(decoder->format_context, decoder->stream_index, target_ts, AVSEEK_FLAG_BACKWARD);
+    if (ret < 0) {
+        ret = av_seek_frame(decoder->format_context, decoder->stream_index, target_ts, 0);
+    }
 
-    if (
-        fseeko(
-            decoder->file,
-            target,
-            SEEK_SET
-        ) != 0
-    ) {
-
-        msru_write_error(
-            error_buffer,
-            error_buffer_size,
-            "Unable to seek DTS file."
-        );
-
-
+    if (ret < 0) {
+        msru_write_ffmpeg_error(error_buffer, error_buffer_size, "av_seek_frame failed", ret);
         return -1;
     }
 
-
-    msru_reset_decoder_state(
-        decoder
-    );
-
-
-    if (
-        decoder->parser == NULL
-    ) {
-
-        msru_write_error(
-            error_buffer,
-            error_buffer_size,
-            "Unable to recreate DTS parser after seeking."
-        );
-
-
-        return -1;
+    if (decoder->codec_context != NULL) {
+        avcodec_flush_buffers(decoder->codec_context);
     }
 
+    if (decoder->swr_context != NULL) {
+        swr_init(decoder->swr_context);
+    }
+
+    decoder->pending_frames = 0;
+    decoder->pending_offset = 0;
+    decoder->reached_eof = 0;
+    decoder->sent_flush = 0;
 
     return 0;
 }
@@ -1584,104 +564,45 @@ void
 msru_ffmpeg_decoder_close(
     MSRUFFmpegDecoderRef decoder_ref
 ) {
-
-    MSRUFFmpegDecoder *decoder =
-        (MSRUFFmpegDecoder *)
-            decoder_ref;
-
-
-    if (
-        decoder == NULL
-    ) {
-
+    MSRUFFmpegDecoder *decoder = (MSRUFFmpegDecoder *)decoder_ref;
+    if (decoder == NULL) {
         return;
     }
 
-
-    if (
-        decoder->swr_context
-        != NULL
-    ) {
-
-        swr_free(
-            &decoder
-                ->swr_context
-        );
+    if (decoder->pending_buffers != NULL) {
+        for (int ch = 0; ch < decoder->output_channels; ch++) {
+            if (decoder->pending_buffers[ch] != NULL) {
+                free(decoder->pending_buffers[ch]);
+            }
+        }
+        free(decoder->pending_buffers);
+        decoder->pending_buffers = NULL;
     }
 
-
-    if (
-        decoder->frame
-        != NULL
-    ) {
-
-        av_frame_free(
-            &decoder
-                ->frame
-        );
+    if (decoder->swr_context != NULL) {
+        swr_free(&decoder->swr_context);
     }
 
-
-    if (
-        decoder->packet
-        != NULL
-    ) {
-
-        av_packet_free(
-            &decoder
-                ->packet
-        );
+    if (decoder->frame != NULL) {
+        av_frame_free(&decoder->frame);
     }
 
-
-    if (
-        decoder->codec_context
-        != NULL
-    ) {
-
-        avcodec_free_context(
-            &decoder
-                ->codec_context
-        );
+    if (decoder->packet != NULL) {
+        av_packet_free(&decoder->packet);
     }
 
-
-    if (
-        decoder->parser
-        != NULL
-    ) {
-
-        av_parser_close(
-            decoder
-                ->parser
-        );
+    if (decoder->codec_context != NULL) {
+        avcodec_free_context(&decoder->codec_context);
     }
 
-
-    if (
-        decoder->file
-        != NULL
-    ) {
-
-        fclose(
-            decoder->file
-        );
+    if (decoder->format_context != NULL) {
+        avformat_close_input(&decoder->format_context);
     }
 
+    av_channel_layout_uninit(&decoder->source_channel_layout);
+    av_channel_layout_uninit(&decoder->output_channel_layout);
 
-    free(
-        decoder->pending_left
-    );
-
-
-    free(
-        decoder->pending_right
-    );
-
-
-    free(
-        decoder
-    );
+    free(decoder);
 }
 
 
@@ -1689,6 +610,5 @@ msru_ffmpeg_decoder_close(
 
 const char *
 msru_ffmpeg_version(void) {
-
     return av_version_info();
 }

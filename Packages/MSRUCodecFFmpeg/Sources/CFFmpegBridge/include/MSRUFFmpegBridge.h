@@ -17,9 +17,17 @@ typedef struct {
 
     int32_t channels;
 
+    uint64_t channel_layout_mask;
+
     double duration_seconds;
 
     int64_t bit_rate;
+
+    int32_t can_seek;
+
+    char codec_name[32];
+
+    char format_name[32];
 
 } MSRUFFmpegAudioInfo;
 
@@ -27,8 +35,8 @@ typedef struct {
 /*
  Return:
 
- 1  = frames returned
- 0  = EOF
+  1  = frames returned
+  0  = EOF
  -1 = error
  */
 
@@ -45,8 +53,8 @@ msru_ffmpeg_decoder_open(
 int32_t
 msru_ffmpeg_decoder_read(
     MSRUFFmpegDecoderRef decoder,
-    float *left,
-    float *right,
+    float **channel_buffers,
+    int32_t channel_count,
     int32_t capacity_frames,
     int32_t *output_frames,
     char *error_buffer,

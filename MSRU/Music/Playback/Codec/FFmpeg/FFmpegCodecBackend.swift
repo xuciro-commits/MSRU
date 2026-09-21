@@ -7,72 +7,39 @@ import Foundation
 import MSRUCodecFFmpeg
 
 
-struct FFmpegCodecBackend:
-    AudioCodecBackend {
+struct FFmpegCodecBackend: AudioCodecBackend {
 
-    let id =
-        "ffmpeg"
+    let id = "ffmpeg"
 
 
     func canDecode(
-        _ url:
-            URL
+        _ url: URL
     ) -> Bool {
-
-        ExtendedAudioFormatSupport
-            .supports(
-                url
-            )
+        ExtendedAudioFormatSupport.supports(url)
     }
 
 
     func open(
-        _ url:
-            URL
-    ) async throws
-        -> AudioCodecOpenResult {
+        _ url: URL
+    ) async throws -> AudioCodecOpenResult {
 
-        let decoder =
-            try FFmpegAudioDecoder(
-                url:
-                    url
-            )
+        let decoder = try FFmpegAudioDecoder(url: url)
 
+        let format = PCMStreamFormat(
+            sampleRate: decoder.format.sampleRate,
+            channels: UInt32(decoder.format.channels),
+            channelLayoutMask: decoder.format.channelLayoutMask,
+            duration: decoder.format.duration,
+            bitRate: decoder.format.bitRate,
+            canSeek: decoder.format.canSeek,
+            formatHint: "\(decoder.format.codecName.uppercased()) (\(decoder.format.formatName))"
+        )
 
-        let format =
-            PCMStreamFormat(
-
-                sampleRate:
-                    decoder
-                        .format
-                        .sampleRate,
-
-                channels:
-                    UInt32(
-                        decoder
-                            .format
-                            .channels
-                    ),
-
-                duration:
-                    decoder
-                        .format
-                        .duration
-            )
-
-
-        let session =
-            FFmpegPCMDecodeSession(
-                decoder:
-                    decoder
-            )
-
+        let session = FFmpegPCMDecodeSession(decoder: decoder)
 
         return AudioCodecOpenResult(
-            format:
-                format,
-            session:
-                session
+            format: format,
+            session: session
         )
     }
 }
@@ -80,70 +47,39 @@ struct FFmpegCodecBackend:
 
 // MARK: - Session
 
-private actor FFmpegPCMDecodeSession:
-    PCMDecodeSession {
+private actor FFmpegPCMDecodeSession: PCMDecodeSession {
 
-    private let decoder:
-        FFmpegAudioDecoder
+    private let decoder: FFmpegAudioDecoder
 
 
-    init(
-        decoder:
-            FFmpegAudioDecoder
-    ) {
-
-        self.decoder =
-            decoder
+    init(decoder: FFmpegAudioDecoder) {
+        self.decoder = decoder
     }
 
 
     func read(
-        maxFrames:
-            Int
-    ) async throws
-        -> PCMFrameBlock? {
+        maxFrames: Int
+    ) async throws -> PCMFrameBlock? {
 
-        guard
-            let block =
-                try decoder.read(
-                    maxFrames:
-                        maxFrames
-                )
-        else {
-
+        guard let block = try decoder.read(maxFrames: maxFrames) else {
             return nil
         }
 
-
         return PCMFrameBlock(
-
-            left:
-                block.left,
-
-            right:
-                block.right,
-
-            frameCount:
-                block.frameCount
+            channels: block.channels,
+            frameCount: block.frameCount
         )
     }
 
 
     func seek(
-        to seconds:
-            TimeInterval
+        to seconds: TimeInterval
     ) async throws {
-
-        try decoder.seek(
-            to:
-                seconds
-        )
+        try decoder.seek(to: seconds)
     }
 
 
-    func close()
-        async {
-
+    func close() async {
         decoder.close()
     }
 }
