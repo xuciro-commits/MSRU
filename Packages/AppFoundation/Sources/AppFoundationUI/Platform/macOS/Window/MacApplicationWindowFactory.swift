@@ -45,17 +45,28 @@ public enum MacApplicationWindowFactory {
             )
 
 
+        // 1. 设置 minSize / contentMinSize
+        window.minSize =
+            configuration
+                .minimumSize
+
+        window.contentMinSize =
+            configuration
+                .minimumSize
+
+
+        // 2. 安装 contentViewController
         /*
          Install the content controller before toolbar creation.
 
          Native tracking separators require the tracked split view
          to already belong to the same window.
          */
-
         window.contentViewController =
             contentViewController
 
 
+        // 3. 安装 toolbar / titlebar configuration
         window.title =
             configuration
                 .title
@@ -76,14 +87,6 @@ public enum MacApplicationWindowFactory {
             configuration
                 .toolbarStyle
 
-        window.minSize =
-            configuration
-                .minimumSize
-
-        window.contentMinSize =
-            configuration
-                .minimumSize
-
         window.isReleasedWhenClosed =
             configuration
                 .isReleasedWhenClosed
@@ -94,8 +97,24 @@ public enum MacApplicationWindowFactory {
             )
 
 
+        // 4. 明确 setContentSize(initialSize) 保证 NSWindow 是 initial geometry 的唯一 owner。
+        // 如果存在合法持久化恢复，则 restoration 优先；否则阻止 SwiftUI fitting size 压缩窗口
+        let hasRestoredFrame =
+            !window.frameAutosaveName.isEmpty
+            && window.setFrameUsingName(window.frameAutosaveName)
+
+        if !hasRestoredFrame {
+            window.setContentSize(
+                configuration
+                    .initialSize
+            )
+        }
+
+
+        // 5. center
         if configuration
-            .centerOnCreation {
+            .centerOnCreation
+            && !hasRestoredFrame {
 
             window.center()
         }

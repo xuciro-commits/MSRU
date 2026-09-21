@@ -140,10 +140,12 @@ final class MSRUMacWindowComposition {
                                     .init(
                                         canCollapse:
                                             false,
+                                        allowsFullHeightLayout:
+                                            true,
                                         minimumThickness:
                                             500,
                                         automaticallyAdjustsSafeAreaInsets:
-                                            true
+                                            false
                                     )
                             ),
 
@@ -200,6 +202,8 @@ final class MSRUMacWindowComposition {
 
                         applicationAccessory:
                             .init(
+                                height:
+                                    76,
                                 resolve: {
                                     shell in
 
@@ -300,7 +304,9 @@ final class MSRUMacWindowComposition {
                                     .settings
                                 )
                         }
-                    )
+                    ),
+                height:
+                    44
             )
 
 
@@ -460,7 +466,14 @@ final class MSRUMacWindowComposition {
                         .languageSettings
                         .resolvedLocale
                 )
-                let hosting = NSHostingController(rootView: AnyView(canvas))
+                let hosting =
+                    MacHostingControllerFactory
+                        .make(
+                            rootView:
+                                AnyView(
+                                    canvas
+                                )
+                        )
                 canvasHostingController = hosting
                 rootViewController.setCanvasViewController(hosting)
             }

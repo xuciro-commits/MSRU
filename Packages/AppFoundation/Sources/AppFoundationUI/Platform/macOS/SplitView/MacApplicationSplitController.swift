@@ -164,24 +164,6 @@ public final class MacApplicationSplitController:
             splitView.autosaveName =
                 autosaveName
         }
-
-
-        if let backgroundColor =
-            configuration
-                .backgroundColor {
-
-            splitView.wantsLayer =
-                true
-
-            splitView.layer?
-                .backgroundColor =
-                    backgroundColor
-                        .cgColor
-
-            splitView.layer?
-                .isOpaque =
-                    true
-        }
     }
 
 

@@ -137,6 +137,7 @@ struct PlaylistsView: View {
                     }
                     .padding(24)
                 }
+                .scrollIndicators(.hidden)
             }
         }
         .sheet(isPresented: $isNewPlaylistSheetPresented) {

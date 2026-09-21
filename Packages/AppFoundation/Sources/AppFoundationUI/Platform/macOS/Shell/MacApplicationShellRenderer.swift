@@ -114,12 +114,20 @@ public final class MacApplicationShellRenderer {
 
 
         let initialWorkspace =
-            shell
-                .workspace?
-                .content
-            ??
-            AnyView(
-                EmptyView()
+            Self.wrapWorkspaceContent(
+                shell
+                    .workspace?
+                    .content
+                ??
+                AnyView(
+                    EmptyView()
+                ),
+                accessoryHeight:
+                    configuration
+                        .applicationAccessory?
+                        .height,
+                locale:
+                    locale
             )
 
 
@@ -227,7 +235,10 @@ public final class MacApplicationShellRenderer {
                         ??
                         AnyView(
                             EmptyView()
-                        )
+                        ),
+                    height:
+                        accessoryConfiguration
+                            .height
                 )
 
 
@@ -324,7 +335,7 @@ public final class MacApplicationShellRenderer {
 
 
         workspaceHost.rootView =
-            wrapWithLocale(
+            wrapWorkspaceContent(
                 shell
                     .workspace?
                     .content
@@ -452,11 +463,64 @@ public final class MacApplicationShellRenderer {
     }
 
 
+    // MARK: - Workspace Wrapping Helper
+
+    private static func wrapWorkspaceContent(
+        _ content:
+            AnyView,
+        accessoryHeight:
+            CGFloat?,
+        locale:
+            Locale?
+    ) -> AnyView {
+
+        var wrapped =
+            content
+
+        if let accessoryHeight,
+           accessoryHeight > 0 {
+
+            wrapped =
+                AnyView(
+                    wrapped
+                        .safeAreaPadding(
+                            .bottom,
+                            accessoryHeight
+                        )
+                )
+        }
+
+        return wrapWithLocale(
+            wrapped,
+            locale:
+                locale
+        )
+    }
+
+    private func wrapWorkspaceContent(
+        _ content:
+            AnyView
+    ) -> AnyView {
+
+        Self.wrapWorkspaceContent(
+            content,
+            accessoryHeight:
+                configuration
+                    .applicationAccessory?
+                    .height,
+            locale:
+                locale
+        )
+    }
+
+
     // MARK: - Locale Wrapping Helper
 
-    private func wrapWithLocale(
+    private static func wrapWithLocale(
         _ view:
-            AnyView
+            AnyView,
+        locale:
+            Locale?
     ) -> AnyView {
 
         if let locale {
@@ -470,6 +534,18 @@ public final class MacApplicationShellRenderer {
         }
 
         return view
+    }
+
+    private func wrapWithLocale(
+        _ view:
+            AnyView
+    ) -> AnyView {
+
+        Self.wrapWithLocale(
+            view,
+            locale:
+                locale
+        )
     }
 
 

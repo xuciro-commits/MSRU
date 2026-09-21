@@ -33,11 +33,18 @@ public final class MacSplitAccessoryHostingController<
             CGFloat? = nil
     ) {
 
-        self.hostingView =
+        let host =
             NSHostingView(
                 rootView:
                     rootView
             )
+
+        if height != nil {
+            host.sizingOptions = []
+        }
+
+        self.hostingView =
+            host
 
         self.fixedHeight =
             height
@@ -89,6 +96,10 @@ public final class MacSplitAccessoryHostingController<
 
     public override func loadView() {
 
+        if fixedHeight != nil {
+            hostingView.sizingOptions = []
+        }
+
         hostingView
             .translatesAutoresizingMaskIntoConstraints =
                 false
@@ -96,7 +107,6 @@ public final class MacSplitAccessoryHostingController<
 
         let container =
             NSView()
-
 
         container.addSubview(
             hostingView

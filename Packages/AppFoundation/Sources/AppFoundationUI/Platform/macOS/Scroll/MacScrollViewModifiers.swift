@@ -15,29 +15,16 @@ public struct MacScrollIndicatorRemover: NSViewRepresentable {
     public func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async { [weak view] in
-            stripScrollers(from: view)
+            guard let view, let scrollView = view.enclosingScrollView else { return }
+            scrollView.hasVerticalScroller = false
+            scrollView.hasHorizontalScroller = false
         }
         return view
     }
 
     public func updateNSView(_ nsView: NSView, context: Context) {
-        stripScrollers(from: nsView)
-    }
-
-    private func stripScrollers(from view: NSView?) {
-        guard let view, let scrollView = view.enclosingScrollView else { return }
-        if scrollView.scrollerStyle != .overlay {
-            scrollView.scrollerStyle = .overlay
-        }
-        if !scrollView.autohidesScrollers {
-            scrollView.autohidesScrollers = true
-        }
-        if let h = scrollView.horizontalScroller, h.alphaValue != 0 {
-            h.alphaValue = 0
-        }
-        if let v = scrollView.verticalScroller, v.alphaValue != 0 {
-            v.alphaValue = 0
-        }
+        // Intentionally empty: mutating enclosing NSScrollView properties during
+        // SwiftUI layout passes triggers recursive layout feedback loops.
     }
 }
 #endif
@@ -46,14 +33,8 @@ public extension View {
 
     @ViewBuilder
     func hideScrollIndicatorsCompletely() -> some View {
-        #if os(macOS)
         self
             .scrollIndicators(.hidden)
-            .background(MacScrollIndicatorRemover())
-        #else
-        self
-            .scrollIndicators(.hidden)
-        #endif
     }
 }
 

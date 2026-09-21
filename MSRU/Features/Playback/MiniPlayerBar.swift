@@ -22,13 +22,16 @@ struct MiniPlayerBar: View {
 
     var body: some View {
 
-        GeometryReader {
-            proxy in
+        ViewThatFits(
+            in:
+                .horizontal
+        ) {
 
-            playerContent(
-                width:
-                    proxy.size.width
-            )
+            standardPlayerContent
+
+            midCompactPlayerContent
+
+            ultraCompactPlayerContent
         }
         .frame(
             height: 60
@@ -50,69 +53,66 @@ struct MiniPlayerBar: View {
     }
 
 
-    // MARK: - Layout
+    // MARK: - Layouts
 
-    @ViewBuilder
-    private func playerContent(width: CGFloat) -> some View {
-        if width < 400 {
-            // Ultra-compact layout (InteractionAtlas 15.1 & 2.1)
-            // [Artwork] [Title · Artist] [Play/Pause] [Queue]
-            HStack(spacing: 8) {
-                artwork(size: 34)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(LocalizedStringKey(playback.unifiedTitle))
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-
-                    Text(LocalizedStringKey(playback.unifiedSubtitle))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                playPauseButton(size: 15)
-
-                queueButton
+    private var standardPlayerContent: some View {
+        ZStack {
+            HStack(spacing: 0) {
+                transportControls
+                Spacer(minLength: 20)
+                trailingUtilities(compact: false)
             }
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if width < 600 {
-            // Mid-compact layout
-            // [Artwork] [Title/Subtitle/Scrubber] [Prev Play Next] [Queue]
-            HStack(spacing: 12) {
-                artwork(size: 38)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    metadata
-                    Spacer(minLength: 2)
-                    scrubber
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                compactTransportControls
-
-                trailingUtilities(compact: true)
-            }
-            .padding(.horizontal, 14)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            // Standard / Expanded layout
-            ZStack {
-                HStack(spacing: 0) {
-                    transportControls
-                    Spacer(minLength: 20)
-                    trailingUtilities(compact: width < 720)
-                }
-                nowPlayingCenter.frame(width: min(420, width * 0.44))
-            }
-            .padding(.horizontal, 18)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            nowPlayingCenter
+                .frame(maxWidth: 420)
         }
+        .padding(.horizontal, 18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var midCompactPlayerContent: some View {
+        HStack(spacing: 12) {
+            artwork(size: 38)
+
+            VStack(alignment: .leading, spacing: 1) {
+                metadata
+                Spacer(minLength: 2)
+                scrubber
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            compactTransportControls
+
+            trailingUtilities(compact: true)
+        }
+        .padding(.horizontal, 14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var ultraCompactPlayerContent: some View {
+        HStack(spacing: 8) {
+            artwork(size: 34)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(LocalizedStringKey(playback.unifiedTitle))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Text(LocalizedStringKey(playback.unifiedSubtitle))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            playPauseButton(size: 15)
+
+            queueButton
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Leading Transport

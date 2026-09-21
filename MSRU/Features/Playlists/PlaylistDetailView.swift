@@ -151,6 +151,7 @@ struct PlaylistDetailView: View {
             }
             .padding(.bottom, 48)
         }
+        .scrollIndicators(.hidden)
         .sheet(isPresented: $isEditSheetPresented) {
             NewPlaylistSheetView(
                 initialTitle: playlist.title,

@@ -68,6 +68,9 @@ public struct MacApplicationContextRendering {
 @MainActor
 public struct MacApplicationAccessoryRendering {
 
+    public let height:
+        CGFloat?
+
     private let resolver:
         @MainActor (
             ResolvedApplicationShell
@@ -75,11 +78,16 @@ public struct MacApplicationAccessoryRendering {
 
 
     public init(
+        height:
+            CGFloat? = nil,
         resolve:
             @escaping @MainActor (
                 ResolvedApplicationShell
             ) -> ResolvedAccessoryPresentation?
     ) {
+
+        self.height =
+            height
 
         self.resolver =
             resolve
