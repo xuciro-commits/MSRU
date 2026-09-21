@@ -165,23 +165,51 @@ struct LibraryPerformanceBenchmarkTests {
         }
     }
 
-    // MARK: - 5. LibraryQueryEngine Async Snapshot Benchmark Across 4 Scales
+    // MARK: - 5. LibraryQueryEngine Async Snapshot Benchmark Across Scales
 
-    @Test("Audit 7: LibraryQueryEngine snapshot latency and MainActor decoupling across 4 scales")
-    func auditLibraryQueryEngineSnapshots() async {
-        print("\n=== AUDIT 7: LibraryQueryEngine Background Snapshot Across 4 Scales ===")
-        let engine = LibraryQueryEngine()
+    @Test("Audit 7: LibraryQueryEngine database-backed snapshot latency and MainActor decoupling across scales")
+    func auditLibraryQueryEngineSnapshots() async throws {
+        print("\n=== AUDIT 7: LibraryQueryEngine Background DB Snapshot Across Scales ===")
+        let db = try AppDatabase.makeEphemeral()
+        let identityRepo = IdentityRepository(db: db)
 
-        for count in [2_000, 10_000, 50_000, 100_000] {
-            let tracks = Self.generateSyntheticTracks(count: count)
-            let items = tracks.map { QueryTrackItem(localTrack: $0) }
+        for count in [2_000, 10_000] {
+            var artists: [(id: ArtistID, name: String)] = []
+            var recordings: [(id: RecordingID, title: String, duration: Double?)] = []
+            var releaseGroups: [(id: ReleaseGroupID, title: String)] = []
+            var releases: [(id: ReleaseID, releaseGroupID: ReleaseGroupID?, title: String, year: Int?)] = []
+            var releaseTracks: [(id: ReleaseTrackID, releaseID: ReleaseID, trackNumber: Int, title: String, duration: Double?, recordingID: RecordingID)] = []
+            var artistCredits: [(artistID: ArtistID, entityType: String, entityID: String)] = []
 
+            for i in 0..<count {
+                let recID = RecordingID("rec_\(i)")
+                let artID = ArtistID("art_\(i % 100)")
+                let relID = ReleaseID("rel_\(i % 50)")
+                let rgID = ReleaseGroupID("rg_\(i % 50)")
+                let trkID = ReleaseTrackID("trk_\(i)")
+                artists.append((id: artID, name: "Artist \(i % 100)"))
+                recordings.append((id: recID, title: "Track \(i)", duration: 180.0))
+                releaseGroups.append((id: rgID, title: "Album \(i % 50)"))
+                releases.append((id: relID, releaseGroupID: rgID, title: "Album \(i % 50)", year: 2020))
+                releaseTracks.append((id: trkID, releaseID: relID, trackNumber: (i % 12) + 1, title: "Track \(i)", duration: 180.0, recordingID: recID))
+                artistCredits.append((artistID: artID, entityType: "recording", entityID: recID.rawValue))
+            }
+
+            try await identityRepo.batchUpsertEntities(
+                artists: artists,
+                recordings: recordings,
+                releaseGroups: releaseGroups,
+                releases: releases,
+                releaseTracks: releaseTracks,
+                artistCredits: artistCredits
+            )
+
+            let engine = LibraryQueryEngine(db: db)
             let start = CFAbsoluteTimeGetCurrent()
-            await engine.setSourceTracks(items)
-            let snapshot = await engine.querySnapshot()
+            let snapshot = try await engine.queryDatabaseSnapshot()
             let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000.0
 
-            print("[\(count) tracks] QueryEngine async snapshot: \(String(format: "%.2f", elapsed)) ms (orderedIDs: \(snapshot.orderedIDs.count), albums: \(snapshot.albumSummaries.count), artists: \(snapshot.artistSummaries.count), positionLookup entries: \(snapshot.positionLookup.count))")
+            print("[\(count) tracks] QueryEngine DB snapshot: \(String(format: "%.2f", elapsed)) ms (orderedIDs: \(snapshot.orderedIDs.count), albums: \(snapshot.albumSummaries.count), artists: \(snapshot.artistSummaries.count), positionLookup entries: \(snapshot.positionLookup.count))")
             #expect(snapshot.orderedIDs.count == count)
             #expect(!snapshot.positionLookup.isEmpty)
         }

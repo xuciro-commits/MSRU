@@ -28,7 +28,6 @@ final class LocalLibraryStore {
     }
 
     private func refreshQuerySnapshot() async {
-        _ = await LibraryQueryEngine.shared.setSourceLocalTracks(tracks)
         let snapshot = await LibraryQueryEngine.shared.querySnapshot()
         self.querySnapshot = snapshot
     }
@@ -58,6 +57,7 @@ final class LocalLibraryStore {
 
             printArtworkMemoryDiagnostics()
 
+            await syncTracksToDatabase(tracks)
             await refreshQuerySnapshot()
 
             didLoad = true
@@ -80,8 +80,8 @@ final class LocalLibraryStore {
                 }
             }
             self.tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-            await self.refreshQuerySnapshot()
             await self.syncTracksToDatabase(newTracks)
+            await self.refreshQuerySnapshot()
             await LocalLibraryIndexingService.shared.enqueue(newTracks)
         }
     }

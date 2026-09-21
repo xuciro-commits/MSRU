@@ -2,58 +2,13 @@
 //  LibraryQueryEngine.swift
 //  MSRU
 //
-//  Dedicated actor for query index maintenance, filtered/sorted ID ordering,
-//  ID-to-position mapping, group summaries, and revisioned snapshot publishing.
-//  Backed by SQLite with indexes and FTS5 for sub-millisecond query execution.
+//  Dedicated query engine actor backed directly by SQLite indexes and FTS5 for sub-millisecond execution.
+//  Powers cursor-based virtualized table surfaces, multi-lingual search, and fast database snapshots.
 //
 
 import Foundation
 import AppFoundation
-
-/// Lightweight queryable track descriptor for the Query Engine.
-nonisolated public struct QueryTrackItem: Identifiable, Sendable, Hashable {
-    public let id: String
-    public let title: String
-    public let artist: String
-    public let album: String?
-    public let duration: TimeInterval
-    public let trackNumber: Int?
-    public let year: Int?
-    public let artworkReference: String?
-
-    nonisolated public init(
-        id: String,
-        title: String,
-        artist: String,
-        album: String? = nil,
-        duration: TimeInterval = 0,
-        trackNumber: Int? = nil,
-        year: Int? = nil,
-        artworkReference: String? = nil
-    ) {
-        self.id = id
-        self.title = title
-        self.artist = artist
-        self.album = album
-        self.duration = duration
-        self.trackNumber = trackNumber
-        self.year = year
-        self.artworkReference = artworkReference
-    }
-
-    nonisolated public init(localTrack: LocalTrack) {
-        self.init(
-            id: localTrack.id,
-            title: localTrack.title,
-            artist: localTrack.artist,
-            album: localTrack.album,
-            duration: localTrack.duration,
-            trackNumber: localTrack.trackNumber,
-            year: localTrack.year,
-            artworkReference: localTrack.artworkReference
-        )
-    }
-}
+import GRDB
 
 /// Immutable, revisioned query projection snapshot.
 nonisolated public struct LibraryQuerySnapshot: Sendable {
@@ -90,98 +45,17 @@ nonisolated public struct LibraryQuerySnapshot: Sendable {
     }
 }
 
-/// Dedicated query engine actor with revision-tracked cancellation, coalescing,
-/// and direct SQLite database acceleration.
+/// Dedicated query engine actor with SQLite database acceleration,
+/// random-access sparse keyset paging, and Chinese FTS5 multi-lingual search.
 public actor LibraryQueryEngine {
 
     public static let shared = LibraryQueryEngine()
 
     private let db: AppDatabase
-    private var sourceItems: [QueryTrackItem] = []
     private var currentRevision: UInt64 = 0
-    private var inFlightJob: Task<LibraryQuerySnapshot, Never>?
 
     public init(db: AppDatabase = AppDatabase.shared) {
         self.db = db
-    }
-
-    /// Ingests updated track items from the store, bumping revision and invalidating obsolete in-flight jobs.
-    @discardableResult
-    public func setSourceTracks(_ tracks: [QueryTrackItem]) -> UInt64 {
-        sourceItems = tracks
-        currentRevision &+= 1
-        inFlightJob?.cancel()
-        inFlightJob = nil
-        return currentRevision
-    }
-
-    @discardableResult
-    public func setSourceLocalTracks(_ tracks: [LocalTrack]) -> UInt64 {
-        let items = tracks.map { QueryTrackItem(localTrack: $0) }
-        return setSourceTracks(items)
-    }
-
-    /// Computes or returns an immutable query snapshot for the current revision.
-    /// Superseded computations are cancelled and guaranteed never to publish.
-    public func querySnapshot() async -> LibraryQuerySnapshot {
-        let revision = currentRevision
-
-        // If there's an active in-flight job for the same revision, await it
-        if let inFlight = inFlightJob {
-            let result = await inFlight.value
-            if result.revision == revision {
-                return result
-            }
-        }
-
-        let items = sourceItems
-        let task = Task<LibraryQuerySnapshot, Never> { () -> LibraryQuerySnapshot in
-            guard !Task.isCancelled else {
-                return LibraryQuerySnapshot(revision: revision)
-            }
-
-            // 1. Position and ID ordering
-            var orderedIDs: [String] = []
-            orderedIDs.reserveCapacity(items.count)
-            var positionLookup: [String: Int] = [:]
-            positionLookup.reserveCapacity(items.count)
-
-            for (index, item) in items.enumerated() {
-                orderedIDs.append(item.id)
-                positionLookup[item.id] = index + 1
-            }
-
-            guard !Task.isCancelled else {
-                return LibraryQuerySnapshot(revision: revision)
-            }
-
-            // 2. Group summaries (Albums and Artists)
-            let albums = Self.buildAlbumSummaries(from: items)
-            let artists = Self.buildArtistSummaries(from: items)
-
-            guard !Task.isCancelled else {
-                return LibraryQuerySnapshot(revision: revision)
-            }
-
-            return LibraryQuerySnapshot(
-                revision: revision,
-                orderedIDs: orderedIDs,
-                positionLookup: positionLookup,
-                albumSummaries: albums,
-                artistSummaries: artists
-            )
-        }
-
-        inFlightJob = task
-        let snapshot = await task.value
-        inFlightJob = nil
-
-        // Stale result check: if revision changed while running, discard and re-query
-        if snapshot.revision != currentRevision {
-            return await querySnapshot()
-        }
-
-        return snapshot
     }
 
     // MARK: - DB-Backed Fast-Path Snapshots (<15ms at 100K)
@@ -275,6 +149,15 @@ public actor LibraryQueryEngine {
                 albumSummaries: albums,
                 artistSummaries: artists
             )
+        }
+    }
+
+    /// Snapshot query delegating to the fast database engine.
+    public func querySnapshot() async -> LibraryQuerySnapshot {
+        do {
+            return try await queryDatabaseSnapshot()
+        } catch {
+            return LibraryQuerySnapshot(revision: currentRevision)
         }
     }
 
@@ -414,70 +297,5 @@ public actor LibraryQueryEngine {
                 )
             }
         }
-    }
-
-    // MARK: - Legacy In-Memory Aggregations (Backward Compatibility)
-
-    private static func buildAlbumSummaries(from items: [QueryTrackItem]) -> [AlbumPresentationModel] {
-        var albumGroups: [String: [QueryTrackItem]] = [:]
-
-        for track in items {
-            let key = (track.album?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
-                ? "\(track.artist) — \(track.album!)"
-                : "\(track.artist) — Unknown Album"
-            albumGroups[key, default: []].append(track)
-        }
-
-        var models: [AlbumPresentationModel] = []
-        for (key, tracks) in albumGroups {
-            guard let first = tracks.first else { continue }
-            let artist = first.artist
-            let albumTitle = (first.album?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
-                ? first.album!
-                : "Unknown Album"
-            let year = tracks.compactMap(\.year).first
-            let artwork = tracks.compactMap(\.artworkReference).first
-
-            models.append(AlbumPresentationModel(
-                id: key,
-                title: albumTitle,
-                artist: artist,
-                year: year,
-                artworkData: nil,
-                artworkURL: nil,
-                artworkReference: artwork,
-                trackCount: tracks.count,
-                duration: 0
-            ))
-        }
-
-        return models.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-    }
-
-    private static func buildArtistSummaries(from items: [QueryTrackItem]) -> [ArtistPresentationModel] {
-        var artistGroups: [String: [QueryTrackItem]] = [:]
-
-        for track in items {
-            let artistName = track.artist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? "Unknown Artist"
-                : track.artist
-            artistGroups[artistName, default: []].append(track)
-        }
-
-        var models: [ArtistPresentationModel] = []
-        for (artistName, tracks) in artistGroups {
-            let albums = Set(tracks.compactMap { $0.album?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
-            let avatarRef = tracks.compactMap(\.artworkReference).first
-
-            models.append(ArtistPresentationModel(
-                id: artistName,
-                name: artistName,
-                albumCount: albums.count,
-                trackCount: tracks.count,
-                artworkReference: avatarRef
-            ))
-        }
-
-        return models.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 }
