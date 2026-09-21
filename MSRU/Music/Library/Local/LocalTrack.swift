@@ -6,7 +6,7 @@
 import Foundation
 
 
-public struct LocalTrack:
+nonisolated public struct LocalTrack:
     Identifiable,
     Hashable,
     Sendable,

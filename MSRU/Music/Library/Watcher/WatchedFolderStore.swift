@@ -23,6 +23,7 @@ final class WatchedFolderStore {
 
     private let localStore: LocalLibraryStore
     private let watcherService: FolderWatcherService
+    private let scanner: WatchedFolderScanner
     private let manifestURL: URL?
     private var debounceTasks: [UUID: Task<Void, Never>] = [:]
     private var activeScopedFolders: [UUID: URL] = [:]
@@ -30,11 +31,13 @@ final class WatchedFolderStore {
     public init(
         localStore: LocalLibraryStore,
         watcherService: FolderWatcherService = FolderWatcherService(),
+        scanner: WatchedFolderScanner = WatchedFolderScanner(),
         manifestURL: URL? = nil,
         seedDefaultFolder: Bool = true
     ) {
         self.localStore = localStore
         self.watcherService = watcherService
+        self.scanner = scanner
         self.manifestURL = manifestURL ?? Self.defaultManifestURL()
         loadPersistedFolders()
         if seedDefaultFolder {
@@ -235,83 +238,43 @@ final class WatchedFolderStore {
             return 0
         }
 
-        // Recursively collect all supported audio files
-        let allAudioURLs = collectAudioFiles(at: targetURL)
-        let existingStandardizedURLs = Set(localStore.tracks.map { $0.fileURL.standardizedFileURL.path })
+        // Ensure localStore is hydrated before diffing
+        await localStore.loadIfNeeded()
 
-        var newAudioURLs: [URL] = []
-        for audioURL in allAudioURLs {
-            if !existingStandardizedURLs.contains(audioURL.standardizedFileURL.path) {
-                newAudioURLs.append(audioURL)
-            }
+        let targetPath = targetURL.standardizedFileURL.path
+        let tracksInFolder = localStore.tracks.filter { track in
+            track.fileURL.standardizedFileURL.path.hasPrefix(targetPath)
         }
 
-        var newTracks: [LocalTrack] = []
-        for fileURL in newAudioURLs {
-            do {
-                let track = try await FileLocalLibraryRepository.readTrack(from: fileURL)
-                newTracks.append(track)
-            } catch {
-                print("Watcher failed to read track:", fileURL.lastPathComponent, error.localizedDescription)
-            }
-            await Task.yield()
-        }
+        let result = await scanner.reconcileFolder(
+            targetURL: targetURL,
+            existingTracksInFolder: tracksInFolder,
+            assetCache: LocalFingerprintRegistry.shared.assetCache
+        )
 
-        if folder.autoIngest && !newTracks.isEmpty {
-            await localStore.addTracks(newTracks)
-
-            // Auto-learn acoustic fingerprints and path heuristic rules in background utility task
-            Task(priority: .utility) {
-                let fingerprinter = AcoustIDFingerprintExtractor()
-                for track in newTracks {
-                    if LocalAudioFormatSupport.isNativeAppleFormat(track.fileURL),
-                       let fp = try? await fingerprinter.generateFingerprint(for: track.fileURL) {
-                        LocalFingerprintRegistry.shared.register(
-                            fingerprint: fp.fingerprint,
-                            duration: fp.duration,
-                            title: track.title,
-                            artist: track.artist,
-                            album: track.album,
-                            artworkData: track.artworkData
-                        )
-                    }
-                    PathHeuristicRuleStore.shared.learnFrom(
-                        folderURL: track.fileURL.deletingLastPathComponent(),
-                        artist: track.artist,
-                        album: track.album
-                    )
-                    try? await Task.sleep(nanoseconds: 100_000_000)
+        if folder.autoIngest {
+            let tracksToIngest = result.newTracks + result.modifiedTracks
+            if !tracksToIngest.isEmpty {
+                do {
+                    try await localStore.addTracks(tracksToIngest)
+                } catch {
+                    print("Watcher failed to ingest tracks:", error.localizedDescription)
                 }
+            }
+
+            if !result.deletedTrackPaths.isEmpty {
+                await localStore.deleteTracks(withIDs: Set(result.deletedTrackPaths))
             }
         }
 
         // Update folder stats
         if let idx = folders.firstIndex(where: { $0.id == folder.id }) {
-            folders[idx].trackCount = allAudioURLs.count
+            folders[idx].trackCount = result.totalScannedCount
             folders[idx].lastScannedAt = Date()
             persistFolders()
         }
 
-        return newTracks.count
-    }
-
-    private func collectAudioFiles(at directory: URL) -> [URL] {
-        var results: [URL] = []
-        let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey]
-        guard let enumerator = FileManager.default.enumerator(
-            at: directory,
-            includingPropertiesForKeys: keys,
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
-        ) else {
-            return results
-        }
-
-        while let fileURL = enumerator.nextObject() as? URL {
-            if LocalAudioFormatSupport.supports(fileURL) {
-                results.append(fileURL)
-            }
-        }
-        return results
+        return result.discoveredCount
     }
 
     // MARK: - Persistence

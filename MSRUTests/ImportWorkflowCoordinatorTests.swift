@@ -156,7 +156,7 @@ struct ImportWorkflowCoordinatorTests {
             artworkData: nil
         )
 
-        await store.addTracks([track])
+        try? await store.addTracks([track])
         #expect(store.tracks.count == 1)
         #expect(store.tracks.first?.fileURL == originalURL)
         #expect(store.tracks.first?.title == "爱错")

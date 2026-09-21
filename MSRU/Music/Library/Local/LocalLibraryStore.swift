@@ -44,11 +44,11 @@ final class LocalLibraryStore {
         }
     }
 
-    func addTracks(_ newTracks: [LocalTrack]) async {
+    func addTracks(_ newTracks: [LocalTrack]) async throws {
         guard !newTracks.isEmpty else { return }
-        await serialized {
+        try await serializedThrowing {
+            try await self.repository.saveTracksInPlace(newTracks)
             for track in newTracks {
-                try? await self.repository.saveTrackInPlace(track)
                 if let index = self.tracks.firstIndex(where: { $0.id == track.id || $0.fileURL.standardizedFileURL == track.fileURL.standardizedFileURL }) {
                     self.tracks[index] = track
                 } else {
@@ -161,42 +161,69 @@ final class LocalLibraryStore {
     }
 
     private func registerTracksInMemory(_ tracks: [LocalTrack]) {
-        Task {
+        Task(priority: .utility) {
             let fingerprinter = AcoustIDFingerprintExtractor()
+            var batchItems: [FingerprintRegistrationItem] = []
+
             for track in tracks {
-                if let fp = try? await fingerprinter.generateFingerprint(for: track.fileURL) {
-                    LocalFingerprintRegistry.shared.register(
-                        fingerprint: fp.fingerprint,
-                        duration: fp.duration,
-                        title: track.title,
-                        artist: track.artist,
-                        album: track.album
-                    )
+                let fileURL = track.fileURL
+                if LocalAudioFormatSupport.isNativeAppleFormat(fileURL) {
+                    let hasRecord = await LocalFingerprintRegistry.shared.hasValidRecord(for: fileURL)
+                    if !hasRecord {
+                        if let fp = try? await fingerprinter.generateFingerprint(for: fileURL) {
+                            batchItems.append(FingerprintRegistrationItem(
+                                fingerprint: fp.fingerprint,
+                                duration: fp.duration,
+                                title: track.title,
+                                artist: track.artist,
+                                album: track.album,
+                                artworkData: track.artworkData,
+                                fileURL: fileURL
+                            ))
+                        }
+                    }
                 }
-                PathHeuristicRuleStore.shared.learnFrom(
+                await PathHeuristicRuleStore.shared.learnFrom(
                     folderURL: track.fileURL.deletingLastPathComponent(),
                     artist: track.artist,
                     album: track.album
                 )
+            }
+
+            if !batchItems.isEmpty {
+                await LocalFingerprintRegistry.shared.registerBatch(batchItems)
             }
         }
     }
 
     // File scanning and importing share one ordered state commit path. An old scan
     // must not replace tracks imported while metadata loading was suspended.
-    private func serialized(_ operation: @escaping @MainActor () async -> Void) async {
+    private func serializedThrowing(_ operation: @escaping @MainActor () async throws -> Void) async throws {
         let previous = pendingOperation
         let id = UUID()
-        let task = Task { @MainActor in
-            await previous?.value
-            await operation()
+        let task = Task { @MainActor () throws -> Void in
+            _ = await previous?.result
+            try await operation()
         }
-        pendingOperation = task
+        pendingOperation = Task { _ = try? await task.value }
         operationID = id
-        await task.value
+        let result = await task.result
         if operationID == id {
             pendingOperation = nil
             operationID = nil
+        }
+        switch result {
+        case .success:
+            break
+        case .failure(let error):
+            self.errorMessage = error.localizedDescription
+            throw error
+        }
+    }
+
+    private func serialized(_ operation: @escaping @MainActor () async -> Void) async {
+        try? await serializedThrowing {
+            await operation()
         }
     }
 }

@@ -2,24 +2,27 @@ import Foundation
 import AVFoundation
 
 /// Local media I/O boundary. UI state and selection remain in the store/scene.
-@MainActor
-protocol LocalLibraryRepository {
+protocol LocalLibraryRepository: Sendable {
     func loadTracks() async throws -> [LocalTrack]
     func importTrack(from url: URL) async throws -> LocalTrack?
     func saveTrackInPlace(_ track: LocalTrack) async throws
+    func saveTracksInPlace(_ tracks: [LocalTrack]) async throws
     func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws
     func readTrack(from url: URL) async throws -> LocalTrack
 }
 
 extension LocalLibraryRepository {
-    func saveTrackInPlace(_ track: LocalTrack) async throws {}
+    func saveTrackInPlace(_ track: LocalTrack) async throws {
+        try await saveTracksInPlace([track])
+    }
+    func saveTracksInPlace(_ tracks: [LocalTrack]) async throws {}
     func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws {}
     func readTrack(from url: URL) async throws -> LocalTrack {
         try await FileLocalLibraryRepository.readTrack(from: url)
     }
 }
 
-private struct PersistedTrackRecord: Codable {
+nonisolated private struct PersistedTrackRecord: Codable {
     let fileURL: URL
     let bookmarkData: Data?
     let title: String
@@ -40,8 +43,7 @@ private struct PersistedTrackRecord: Codable {
     }
 }
 
-@MainActor
-final class FileLocalLibraryRepository: LocalLibraryRepository {
+actor FileLocalLibraryRepository: LocalLibraryRepository {
     private let directory: URL?
 
     init(directory: URL? = nil) {
@@ -104,9 +106,10 @@ final class FileLocalLibraryRepository: LocalLibraryRepository {
         }
     }
 
-    func saveTrackInPlace(_ track: LocalTrack) async throws {
-        var existingRecords: [PersistedTrackRecord] = []
+    func saveTracksInPlace(_ tracks: [LocalTrack]) async throws {
+        guard !tracks.isEmpty else { return }
         let manifestURL = try externalManifestURL()
+        var existingRecords: [PersistedTrackRecord] = []
         if let data = try? Data(contentsOf: manifestURL),
            let decoded = try? JSONDecoder().decode([PersistedTrackRecord].self, from: data) {
             existingRecords = decoded
@@ -117,25 +120,38 @@ final class FileLocalLibraryRepository: LocalLibraryRepository {
 #else
         let bookmarkOptions: URL.BookmarkCreationOptions = []
 #endif
-        let bookmark = try? track.fileURL.bookmarkData(options: bookmarkOptions, includingResourceValuesForKeys: nil, relativeTo: nil)
-        let newRecord = PersistedTrackRecord(
-            fileURL: track.fileURL,
-            bookmarkData: bookmark,
-            title: track.title,
-            artist: track.artist,
-            album: track.album,
-            duration: track.duration,
-            artworkData: track.artworkData
-        )
 
-        if let idx = existingRecords.firstIndex(where: { $0.fileURL.standardizedFileURL == track.fileURL.standardizedFileURL }) {
-            existingRecords[idx] = newRecord
-        } else {
-            existingRecords.append(newRecord)
+        var recordMap: [String: Int] = [:]
+        for (idx, rec) in existingRecords.enumerated() {
+            recordMap[rec.fileURL.standardizedFileURL.path] = idx
+        }
+
+        for track in tracks {
+            let key = track.fileURL.standardizedFileURL.path
+            let bookmark = try? track.fileURL.bookmarkData(options: bookmarkOptions, includingResourceValuesForKeys: nil, relativeTo: nil)
+            let newRecord = PersistedTrackRecord(
+                fileURL: track.fileURL,
+                bookmarkData: bookmark,
+                title: track.title,
+                artist: track.artist,
+                album: track.album,
+                duration: track.duration,
+                artworkData: track.artworkData
+            )
+            if let existingIdx = recordMap[key] {
+                existingRecords[existingIdx] = newRecord
+            } else {
+                recordMap[key] = existingRecords.count
+                existingRecords.append(newRecord)
+            }
         }
 
         let encoded = try JSONEncoder().encode(existingRecords)
         try encoded.write(to: manifestURL, options: .atomic)
+    }
+
+    func saveTrackInPlace(_ track: LocalTrack) async throws {
+        try await saveTracksInPlace([track])
     }
 
     func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws {

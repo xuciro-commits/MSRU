@@ -43,7 +43,7 @@ struct ImportReviewWorkspaceView: View {
                     },
                     onCommit: { tracks in
                         Task {
-                            await localStore.addTracks(tracks)
+                            try? await localStore.addTracks(tracks)
 
                             // Auto-learn acoustic fingerprints and path heuristic rules locally
                             let fingerprinter = AcoustIDFingerprintExtractor()

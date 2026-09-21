@@ -313,8 +313,13 @@ final class ApplicationModel {
         coordinator.activate()
         self.systemNowPlayingCoordinator = coordinator
 
+        let localLibrary =
+            localLibrary
+
         startupTask = Task {
 
+            await localLibrary
+                .loadIfNeeded()
             await library
                 .load()
             await playlistStore

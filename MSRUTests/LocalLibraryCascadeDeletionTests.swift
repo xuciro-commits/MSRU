@@ -24,6 +24,10 @@ private final class MockDeletionRepository: LocalLibraryRepository {
         tracks.append(track)
     }
 
+    func saveTracksInPlace(_ newTracks: [LocalTrack]) async throws {
+        tracks.append(contentsOf: newTracks)
+    }
+
     func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws {
         deletedIDs.formUnion(ids)
         tracks.removeAll { ids.contains($0.id) }
@@ -40,7 +44,7 @@ struct LocalLibraryCascadeDeletionTests {
         let t2 = LocalTrack(fileURL: URL(fileURLWithPath: "/music/track2.flac"), title: "Track 2", artist: "Artist B", album: "Album 2", duration: 200)
 
         let store = LocalLibraryStore(repository: repo)
-        await store.addTracks([t1, t2])
+        try? await store.addTracks([t1, t2])
         #expect(store.tracks.count == 2)
 
         await store.deleteTracks(withIDs: [t1.id])
@@ -57,7 +61,7 @@ struct LocalLibraryCascadeDeletionTests {
         let t3 = LocalTrack(fileURL: URL(fileURLWithPath: "/music/b1.flac"), title: "晴天", artist: "周杰伦", album: "叶惠美", duration: 269)
 
         let store = LocalLibraryStore(repository: repo)
-        await store.addTracks([t1, t2, t3])
+        try? await store.addTracks([t1, t2, t3])
         #expect(store.tracks.count == 3)
 
         // Delete "冀西南林路行" album
@@ -77,7 +81,7 @@ struct LocalLibraryCascadeDeletionTests {
         let t4 = LocalTrack(fileURL: URL(fileURLWithPath: "/music/ad1.flac"), title: "Rolling in the Deep", artist: "Adele", album: "21", duration: 228)
 
         let store = LocalLibraryStore(repository: repo)
-        await store.addTracks([t1, t2, t3, t4])
+        try? await store.addTracks([t1, t2, t3, t4])
         #expect(store.tracks.count == 4)
 
         // Cascade delete artist "周杰伦"
