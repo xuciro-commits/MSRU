@@ -45,6 +45,12 @@ struct LocalLibraryView: View {
     @State private var searchQuery:
         String = ""
 
+    @State private var debouncedQuery:
+        String = ""
+
+    @State private var searchDebounceTask:
+        Task<Void, Never>? = nil
+
 
     // MARK: - Body
 
@@ -62,6 +68,22 @@ struct LocalLibraryView: View {
             maxHeight:
                 .infinity
         )
+        .onChange(of: searchQuery) { _, newQuery in
+            let trimmed = newQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                searchDebounceTask?.cancel()
+                searchDebounceTask = nil
+                debouncedQuery = ""
+            } else {
+                searchDebounceTask?.cancel()
+                searchDebounceTask = Task {
+                    try? await Task.sleep(nanoseconds: 150_000_000)
+                    if !Task.isCancelled {
+                        debouncedQuery = trimmed
+                    }
+                }
+            }
+        }
         .task {
 
             await store
@@ -106,13 +128,14 @@ struct LocalLibraryView: View {
 
         } else {
 
+            let isFiltered = !debouncedQuery.isEmpty
             let tracks =
                 LibraryCollectionSortFilter
                     .filterAndSort(
                         tracks:
                             store.tracks,
                         query:
-                            searchQuery,
+                            debouncedQuery,
                         field:
                             sortField,
                         ascending:
@@ -161,6 +184,8 @@ struct LocalLibraryView: View {
                                 tracks,
                             positionLookup:
                                 store.positionLookup,
+                            isFiltered:
+                                isFiltered,
                             selectedTrack:
                                 $selectedTrack,
                             playback:

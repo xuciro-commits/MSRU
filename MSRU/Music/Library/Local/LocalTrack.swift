@@ -57,6 +57,20 @@ nonisolated public struct LocalTrack:
         fileURL.absoluteString
     }
 
+    public var displayAlbum: String {
+        guard let album, !album.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return "—"
+        }
+        return album
+    }
+
+    public var formattedDuration: String {
+        let totalSeconds = max(0, Int(duration.rounded()))
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+
     // MARK: - Codable Migration Compatibility
 
     enum CodingKeys: String, CodingKey {

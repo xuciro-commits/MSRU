@@ -11,6 +11,7 @@ struct LocalTrackTableView: View {
 
     let tracks: [LocalTrack]
     let positionLookup: [String: Int]
+    let isFiltered: Bool
     @Binding var selectedTrack: LocalTrack?
     @Bindable var playback: PlaybackController
     @Bindable var library: LibraryStore
@@ -24,6 +25,7 @@ struct LocalTrackTableView: View {
     init(
         tracks: [LocalTrack],
         positionLookup: [String: Int]? = nil,
+        isFiltered: Bool = false,
         selectedTrack: Binding<LocalTrack?>,
         playback: PlaybackController,
         library: LibraryStore,
@@ -31,6 +33,7 @@ struct LocalTrackTableView: View {
         onDeleteTracks: ((Set<String>) -> Void)? = nil
     ) {
         self.tracks = tracks
+        self.isFiltered = isFiltered
         if let positionLookup {
             self.positionLookup = positionLookup
         } else {
@@ -129,43 +132,37 @@ struct LocalTrackTableView: View {
                         )
                     }
                 }
-                .contextMenu {
-                    trackContextMenu(track)
-                }
             }
             .width(min: 140, ideal: 200)
 
-            // Artist column
-            TableColumn("Artist") { track in
-                Text(track.artist)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            .width(min: 100, ideal: 130)
+            // Artist column (Native text cell, 0 NSHostingView)
+            TableColumn("Artist", value: \.artist)
+                .width(min: 100, ideal: 130)
 
-            // Album column
-            TableColumn("Album") { track in
-                Text(track.album ?? "—")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            .width(min: 100, ideal: 130)
+            // Album column (Native text cell, 0 NSHostingView)
+            TableColumn("Album", value: \.displayAlbum)
+                .width(min: 100, ideal: 130)
 
-            // Duration column
-            TableColumn("Duration") { track in
-                Text(durationString(track.duration))
-                    .font(.callout.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-            .width(min: 45, ideal: 55, max: 65)
+            // Duration column (Native text cell, 0 NSHostingView)
+            TableColumn("Duration", value: \.formattedDuration)
+                .width(min: 45, ideal: 55, max: 65)
 
             // Favorite column (isolated favorite store observation)
             TableColumn("Favorite") { track in
                 TrackFavoriteButton(track: track, library: library)
             }
             .width(min: 32, ideal: 36, max: 40)
+        }
+        .id(isFiltered ? "library-table-filtered" : "library-table-all")
+        .transaction { $0.animation = nil }
+        .contextMenu(forSelectionType: LocalTrack.ID.self) { selection in
+            if let firstID = selection.first, let track = tracks.first(where: { $0.id == firstID }) {
+                trackContextMenu(track)
+            }
+        } primaryAction: { selection in
+            if let firstID = selection.first, let track = tracks.first(where: { $0.id == firstID }) {
+                playback.toggle(track: track, queue: tracks)
+            }
         }
         .tint(Color.accentColor)
         .hideScrollIndicatorsCompletely()
