@@ -60,7 +60,8 @@ public actor WatchedFolderScanner {
     public func reconcileFolder(
         targetURL: URL,
         existingTracksInFolder: [LocalTrack],
-        assetCache: [String: AssetFingerprintEntry] = [:]
+        assetCache: [String: AssetFingerprintEntry] = [:],
+        signatures: [String: AudioFileSignature] = [:]
     ) async -> FolderReconciliationResult {
         let allAudioURLs = collectAudioFiles(at: targetURL)
         let existingMap = Dictionary(
@@ -79,7 +80,11 @@ public actor WatchedFolderScanner {
                 newAudioURLs.append(audioURL)
             } else {
                 let canonicalPath = audioURL.resolvingSymlinksInPath().standardizedFileURL.path
-                if let cached = assetCache[canonicalPath] {
+                if let sig = signatures[canonicalPath] {
+                    if !sig.matches(fileURL: audioURL) {
+                        modifiedAudioURLs.append(audioURL)
+                    }
+                } else if let cached = assetCache[canonicalPath] {
                     if let attrs = try? FileManager.default.attributesOfItem(atPath: canonicalPath),
                        let size = attrs[.size] as? Int64,
                        let modDate = attrs[.modificationDate] as? Date,

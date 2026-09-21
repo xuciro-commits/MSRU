@@ -50,11 +50,14 @@ final class WatchedFolderStore {
     /// Starts monitoring all enabled watched folders.
     func startMonitoring() {
         for folder in folders where folder.isEnabled {
-            startWatchingFolder(folder)
+            if SecurityScopePolicy.isLocalVolume(folder.url) {
+                startWatchingFolder(folder)
+            }
         }
-        Task {
-            await rescanAll()
-        }
+        // NOTE: On startup, do NOT rescanAll().
+        // Persistent library state is already hydrated by LocalLibraryStore.
+        // Network folders (NAS/SMB) only refresh via explicit manual user request.
+        // Local folders reactively monitor changes via FSEvents.
     }
 
     /// Stops all background monitoring streams.
@@ -75,16 +78,18 @@ final class WatchedFolderStore {
     // MARK: - Watcher Management
 
     private func startWatchingFolder(_ folder: WatchedFolder) {
+        // Network shares (SMB/NFS) cannot be monitored via FSEvents
+        guard SecurityScopePolicy.isLocalVolume(folder.url) else { return }
+
         let folderID = folder.id
         #if os(macOS)
         if activeScopedFolders[folderID] == nil {
-            var isStale = false
             if let bookmark = folder.bookmarkData,
-               let resolved = try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale) {
-                if resolved.startAccessingSecurityScopedResource() {
-                    activeScopedFolders[folderID] = resolved
+               let resolved = SecurityScopePolicy.resolveBookmark(bookmark) {
+                if SecurityScopePolicy.isSandboxed && resolved.url.startAccessingSecurityScopedResource() {
+                    activeScopedFolders[folderID] = resolved.url
                 }
-            } else if folder.url.startAccessingSecurityScopedResource() {
+            } else if SecurityScopePolicy.isSandboxed && folder.url.startAccessingSecurityScopedResource() {
                 activeScopedFolders[folderID] = folder.url
             }
         }
@@ -117,11 +122,7 @@ final class WatchedFolderStore {
             return
         }
 
-#if os(macOS)
-        let bookmarkOptions: URL.BookmarkCreationOptions = .withSecurityScope
-#else
-        let bookmarkOptions: URL.BookmarkCreationOptions = []
-#endif
+        let bookmarkOptions = SecurityScopePolicy.bookmarkCreationOptions
         let bookmark = try? cleanURL.bookmarkData(options: bookmarkOptions, includingResourceValuesForKeys: nil, relativeTo: nil)
 
         let newFolder = WatchedFolder(
@@ -208,29 +209,27 @@ final class WatchedFolderStore {
     }
 
     private func scanSingleFolder(_ folder: WatchedFolder) async -> Int {
-        var isStale = false
-#if os(macOS)
-        let resolveOptions: URL.BookmarkResolutionOptions = .withSecurityScope
-#else
-        let resolveOptions: URL.BookmarkResolutionOptions = []
-#endif
         let targetURL: URL
         var hasSecurityScope = false
 
         if let existingScope = activeScopedFolders[folder.id] {
             targetURL = existingScope
         } else if let bookmark = folder.bookmarkData,
-           let resolved = try? URL(resolvingBookmarkData: bookmark, options: resolveOptions, relativeTo: nil, bookmarkDataIsStale: &isStale) {
-            targetURL = resolved
-            hasSecurityScope = targetURL.startAccessingSecurityScopedResource()
-            if hasSecurityScope {
-                activeScopedFolders[folder.id] = targetURL
+                  let resolved = SecurityScopePolicy.resolveBookmark(bookmark) {
+            targetURL = resolved.url
+            if SecurityScopePolicy.isSandboxed {
+                hasSecurityScope = targetURL.startAccessingSecurityScopedResource()
+                if hasSecurityScope {
+                    activeScopedFolders[folder.id] = targetURL
+                }
             }
         } else {
             targetURL = folder.url
-            hasSecurityScope = targetURL.startAccessingSecurityScopedResource()
-            if hasSecurityScope {
-                activeScopedFolders[folder.id] = targetURL
+            if SecurityScopePolicy.isSandboxed {
+                hasSecurityScope = targetURL.startAccessingSecurityScopedResource()
+                if hasSecurityScope {
+                    activeScopedFolders[folder.id] = targetURL
+                }
             }
         }
 
@@ -247,10 +246,12 @@ final class WatchedFolderStore {
         }
 
         let cache = await LocalFingerprintRegistry.shared.assetCache
+        let signatures = await LocalFingerprintRegistry.shared.signatures
         let result = await scanner.reconcileFolder(
             targetURL: targetURL,
             existingTracksInFolder: tracksInFolder,
-            assetCache: cache
+            assetCache: cache,
+            signatures: signatures
         )
 
         if folder.autoIngest {
@@ -314,11 +315,7 @@ final class WatchedFolderStore {
         let defaultURL = URL(fileURLWithPath: path).standardizedFileURL
         let exists = folders.contains(where: { $0.url.standardizedFileURL.path == defaultURL.path })
         if !exists {
-#if os(macOS)
-            let bookmarkOptions: URL.BookmarkCreationOptions = .withSecurityScope
-#else
-            let bookmarkOptions: URL.BookmarkCreationOptions = []
-#endif
+            let bookmarkOptions = SecurityScopePolicy.bookmarkCreationOptions
             let bookmark = try? defaultURL.bookmarkData(options: bookmarkOptions, includingResourceValuesForKeys: nil, relativeTo: nil)
 
             let defaultFolder = WatchedFolder(

@@ -67,17 +67,14 @@ nonisolated private struct PersistedTrackRecord: Codable {
     }
 
     func toLocalTrack() -> LocalTrack {
-        var resolvedArtwork = artworkData
-        if resolvedArtwork == nil, let rel = artworkRelativePath {
-            resolvedArtwork = LocalArtworkStorage.shared.loadArtwork(relativePath: rel)
-        }
         return LocalTrack(
             fileURL: fileURL,
             title: title,
             artist: artist,
             album: album,
             duration: duration,
-            artworkData: resolvedArtwork
+            artworkReference: artworkRelativePath,
+            artworkData: nil
         )
     }
 }
@@ -113,10 +110,12 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
             }
         }
 
-        // Also merge in-place referenced external tracks
+        // Also merge in-place referenced external tracks with O(M+N) complexity
         let externalTracks = loadExternalTracks()
+        var existingPaths = Set(loadedTracks.map { $0.fileURL.standardizedFileURL.path })
         for ext in externalTracks {
-            if !loadedTracks.contains(where: { $0.fileURL.standardizedFileURL == ext.fileURL.standardizedFileURL }) {
+            let path = ext.fileURL.standardizedFileURL.path
+            if existingPaths.insert(path).inserted {
                 loadedTracks.append(ext)
             }
         }
@@ -171,11 +170,7 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
             existingRecords = decoded
         }
 
-#if os(macOS)
-        let bookmarkOptions: URL.BookmarkCreationOptions = .withSecurityScope
-#else
-        let bookmarkOptions: URL.BookmarkCreationOptions = []
-#endif
+        let bookmarkOptions = SecurityScopePolicy.bookmarkCreationOptions
 
         var recordMap: [String: Int] = [:]
         for (idx, rec) in existingRecords.enumerated() {
@@ -187,10 +182,10 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
             let bookmark = try? track.fileURL.bookmarkData(options: bookmarkOptions, includingResourceValuesForKeys: nil, relativeTo: nil)
 
             // Decouple artwork data: store on disk in LocalArtworkStorage, do not serialize into JSON
-            var relPath: String? = nil
-            if let art = track.artworkData {
+            var relPath: String? = track.artworkReference
+            if relPath == nil, let art = track.artworkData {
                 relPath = LocalArtworkStorage.shared.storeArtwork(art)
-            } else if let existingIdx = recordMap[key] {
+            } else if relPath == nil, let existingIdx = recordMap[key] {
                 relPath = existingRecords[existingIdx].artworkRelativePath
             }
 
@@ -305,38 +300,23 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
 
         var tracks: [LocalTrack] = []
         for record in records {
-            var isStale = false
-#if os(macOS)
-            let resolveOptions: URL.BookmarkResolutionOptions = .withSecurityScope
-#else
-            let resolveOptions: URL.BookmarkResolutionOptions = []
-#endif
-            var resolvedArtwork = record.artworkData
-            if resolvedArtwork == nil, let rel = record.artworkRelativePath {
-                resolvedArtwork = LocalArtworkStorage.shared.loadArtwork(relativePath: rel)
+            let targetURL: URL
+            if let bookmark = record.bookmarkData,
+               let resolved = SecurityScopePolicy.resolveBookmark(bookmark) {
+                targetURL = resolved.url
+            } else {
+                targetURL = record.fileURL
             }
 
-            if let bookmark = record.bookmarkData,
-               let resolvedURL = try? URL(resolvingBookmarkData: bookmark, options: resolveOptions, relativeTo: nil, bookmarkDataIsStale: &isStale) {
-                _ = resolvedURL.startAccessingSecurityScopedResource()
-                tracks.append(LocalTrack(
-                    fileURL: resolvedURL,
-                    title: record.title,
-                    artist: record.artist,
-                    album: record.album,
-                    duration: record.duration,
-                    artworkData: resolvedArtwork
-                ))
-            } else {
-                tracks.append(LocalTrack(
-                    fileURL: record.fileURL,
-                    title: record.title,
-                    artist: record.artist,
-                    album: record.album,
-                    duration: record.duration,
-                    artworkData: resolvedArtwork
-                ))
-            }
+            tracks.append(LocalTrack(
+                fileURL: targetURL,
+                title: record.title,
+                artist: record.artist,
+                album: record.album,
+                duration: record.duration,
+                artworkReference: record.artworkRelativePath,
+                artworkData: nil
+            ))
         }
         return tracks
     }

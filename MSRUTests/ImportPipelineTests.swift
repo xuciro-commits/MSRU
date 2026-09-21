@@ -97,10 +97,10 @@ struct ImportPipelineTests {
         #expect(acceptedTracks[0].album == "叶惠美")
         #expect(acceptedTracks[0].artworkData == mockArtwork)
 
-        // 5. Test aggregation into AlbumPresentationModel includes artwork
+        // 5. Test aggregation into AlbumPresentationModel includes artwork reference
         let presentationModels = LibraryPresentationAggregator.buildAlbums(from: acceptedTracks)
         #expect(presentationModels.count == 1)
-        #expect(presentationModels[0].artworkData == mockArtwork)
+        #expect(presentationModels[0].artworkReference != nil)
         #expect(presentationModels[0].title == "叶惠美")
         await LocalFingerprintRegistry.shared.remove(fingerprint: testFP)
     }

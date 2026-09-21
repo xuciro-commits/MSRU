@@ -110,7 +110,14 @@ struct ArtistsView: View {
                                 onSelect: {
                                     selectedArtist = artist
                                 }
-                            )
+                            ) {
+                                ArtworkThumbnailView(
+                                    reference: artist.artworkReference,
+                                    targetSize: CGSize(width: 180, height: 180),
+                                    placeholderSystemImage: "music.mic",
+                                    cornerRadius: 90
+                                )
+                            }
                             .contextMenu {
                                 Button(role: .destructive) {
                                     artistPendingDelete = artist

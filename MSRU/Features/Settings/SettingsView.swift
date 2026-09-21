@@ -659,17 +659,31 @@ struct SettingsView:
                             .font(.headline)
 
                         if folder.isEnabled {
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(Color.green)
-                                    .frame(width: 6, height: 6)
-                                Text(LocalizedStringKey("Monitoring"))
-                                    .font(.caption2.bold())
-                                    .foregroundStyle(.green)
+                            if folder.isNetworkVolume {
+                                HStack(spacing: 4) {
+                                    Circle()
+                                        .fill(Color.blue)
+                                        .frame(width: 6, height: 6)
+                                    Text(LocalizedStringKey("Network (Snapshot)"))
+                                        .font(.caption2.bold())
+                                        .foregroundStyle(.blue)
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.blue.opacity(0.12), in: Capsule())
+                            } else {
+                                HStack(spacing: 4) {
+                                    Circle()
+                                        .fill(Color.green)
+                                        .frame(width: 6, height: 6)
+                                    Text(LocalizedStringKey("Monitoring"))
+                                        .font(.caption2.bold())
+                                        .foregroundStyle(.green)
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.green.opacity(0.12), in: Capsule())
                             }
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.green.opacity(0.12), in: Capsule())
                         } else {
                             Text(LocalizedStringKey("Paused"))
                                 .font(.caption2)

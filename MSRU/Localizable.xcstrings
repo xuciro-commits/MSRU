@@ -6872,6 +6872,41 @@
         }
       }
     },
+    "Network (Snapshot)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "དྲ་རྒྱའི་བརྙན་རིས།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network (Snapshot)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ネットワークスナップショット"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网络快照"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "網路快照"
+          }
+        }
+      }
+    },
     "Network Error" : {
       "extractionState" : "manual",
       "localizations" : {

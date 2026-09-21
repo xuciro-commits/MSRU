@@ -51,10 +51,11 @@
 | 31 | 已完成：监控文件夹后台自动扫描与持续增量摄入 (Watched Folders & FSEvents Ingestion) | 依据 FoundationRoadmap STAGE 1 与 InteractionAtlas 第 11 节；落地 WatchedFolder 实体与 WatchedFolderStore 状态机；构建基于 macOS 原生 FSEvents 的 FolderWatcherService 及跨平台驱动 SimulatedFolderWatcherDriver；实现后台静默增量感知新音频拷入/变动/删除、1.2s 防抖调度、秒级声纹匹配与自动入库学习；默认智能探测持久化 `/Volumes/资料盘/70-媒体与收藏/71-音乐库/Artists/` 首要目录；在设置中心（音乐库与目录）与导入中心端出可自定义添加/删除/启停/立即扫描/定位 Finder 的监控卡片管理 UI；新增 WatchedFolderStoreTests，应用 249 项测试 + 框架 49 项全绿，Preview 门禁 70 视图 100% 独立覆盖，架构 0 违规 |
 | 32 | 已完成：宏观大布局与沉浸式半透明透光架构修复 (Apple Music-style Immersive Shell) | 依据 01-USER-INTENT.md 与用户指令；解耦 AppKit 与 SwiftUI 安全区，启用 automaticallyAdjustsSafeAreaInsets；消除 macOS 17pt legacy scroller 滑槽纯黑死区，收口 scrollerStyle = .overlay 与 tile()；通过 WorkspaceSafeAreaContainer 注入环境 safeAreaInsets，零硬编码自适应 Inspector 300~420pt 拖拽、折叠与窗口缩放；横向卡片 Shelf 双向穿透左侧 Sidebar 与右侧 Inspector 毛玻璃；全量通过（框架 49 项 + 应用 249 项全绿），Preview 门禁 100% 独立覆盖，架构 0 违规 |
 | 33 | 已完成：曲库导入性能重构、独立封面存储与声纹单所有者异步调度 | 依据用户指令与 01-USER-INTENT.md 彻底解决大曲库导入内存暴涨（3.14GB~4.1GB）与卡顿：1. 剥离 946MB 的 Base64 artwork blob，改由 LocalArtworkStorage 独立 SHA256 存取（manifest 骤降 99.5% 至 4.2MB）；2. 落地 AudioFileSignature 启发式缓存校验与 LocalFingerprintRegistry 批量持久化；3. 落地专用后台 actor AudioFingerprintService，支持全局唯一所有者调度、in-flight 去重与并发合并，彻底消除 MainActor 音频解码；4. 落地 LocalLibraryIndexingService 三阶段协调器，与 PathHeuristicRuleStore 批量学习解耦；全量 273 项应用回归测试 + 49 项框架测试全绿，0 处未经管控的 extractor 实例，0 处循环内全文件写入 |
-| 34 | 待开始：动态智能歌单与规则求值引擎 (Smart Playlists & Dynamic Rule Engine) | 依据 FoundationRoadmap STAGE 1 与 InteractionAtlas 第 7.4 节；在 `Music/Library` 构建纯函数式规则引擎 `PlaylistRuleEngine`（支持基于音质、采样率、添加时间、播放次数、流派、爱心等多维字段的复合 AND/OR 规则表达式）；支持动态实时求值计算智能歌单列表并跨端同步；新增 SmartPlaylistTests，Preview 门禁与架构检查 0 违规 |
-| 35 | 待开始：macOS 菜单栏极简驻留播放器 (MenuBarExtra Status Item & Mini Controller) | 依据 01-USER-INTENT.md 原生体验与 FoundationRoadmap STAGE 1；在 `Platform/macOS` 采用 SwiftUI 原生 `MenuBarExtra` 声明式挂载系统右上角状态栏播放器；展示微缩封面、曲目标题/艺术家、即时播放/暂停/切歌与音量控制；共享同一 `PlaybackController` 弱引用监听；100% 同文件独立 Preview，macOS 干净编译通过 |
-| 36 | 待开始：实时歌词时间戳微调校准、偏移调节与物理写回 (Lyrics Timestamp Tuning & SYLT/USLT Writeback) | 依据 FoundationRoadmap STAGE 1 与 InteractionAtlas 第 15 节；在 `LyricsPaneView` 与沉浸大画卷提供 +/-0.5s 原生微调控制器并即时校准播放时钟同步；支持将微调后的 LRC 文本写回伴生 `.lrc` 文件或通过 `AudioTagWriter` 写入物理文件内嵌同步歌词标签；新增 LyricsTuningTests，测试全部通过 |
-| 37 | 待开始：系统级 Spotlight 全局索引与 App Intents 快捷指令 (CoreSpotlight & Shortcuts Integration) | 依据 FoundationRoadmap STAGE 1 与 Apple 原生生态规范；接入 `CoreSpotlight` 索引本地曲库曲目、专辑、艺术家元数据；实现原生 `AppIntents`（PlayTrackIntent、SearchMusicIntent 等），支持系统聚焦搜索点击直达播放与 Siri 自动化调度；新增 SpotlightIndexingTests，测试全部通过 |
+| 34 | 已完成：大曲库冷启动常驻内存优化、按需异步封面加载、沙盒书签安全策略与 NAS 监控解耦 | 依据用户审计证据与真机诊断彻底解决冷启动内存攀升至 2GB 与启动 DetachedSignatures 报错：1. `LocalTrack` 剥离常驻 `artworkData: Data?`（原 696.59MB 常驻 RAM 归零），改用轻量 `artworkReference` 并由 `ArtworkLoader` 专用 actor 按需异步、硬件级降采样（CGImageSource）与有界缓存（NSCache 40MB）加载；2. 落地 `SecurityScopePolicy`，智能识别 App Sandbox 容器环境，非沙盒开发测试环境走普通 bookmark 规避 DetachedSignatures SQLite 报错，沙盒环境自动化释放作用域；3. 修复 `LocalLibraryRepository.loadTracks` 的 O(N) 合并与书签作用域泄漏；4. 区分本地目录（FSEvents 实时监控）与 NAS/SMB 网络共享（持久快照+按需手动刷新），移除冷启动无条件 `rescanAll()`，冷启动网络枚举/索引重算降为 0；实测 2,049 首曲目冷启动恢复耗时仅 15.52ms；新增 ArtworkLoaderTests、SecurityScopePolicyTests，应用 280 项测试 + 框架 49 项测试全绿，架构 0 违规 |
+| 35 | 待开始：动态智能歌单与规则求值引擎 (Smart Playlists & Dynamic Rule Engine) | 依据 FoundationRoadmap STAGE 1 与 InteractionAtlas 第 7.4 节；在 `Music/Library` 构建纯函数式规则引擎 `PlaylistRuleEngine`（支持基于音质、采样率、添加时间、播放次数、流派、爱心等多维字段的复合 AND/OR 规则表达式）；支持动态实时求值计算智能歌单列表并跨端同步；新增 SmartPlaylistTests，Preview 门禁与架构检查 0 违规 |
+| 36 | 待开始：macOS 菜单栏极简驻留播放器 (MenuBarExtra Status Item & Mini Controller) | 依据 01-USER-INTENT.md 原生体验与 FoundationRoadmap STAGE 1；在 `Platform/macOS` 采用 SwiftUI 原生 `MenuBarExtra` 声明式挂载系统右上角状态栏播放器；展示微缩封面、曲目标题/艺术家、即时播放/暂停/切歌与音量控制；共享同一 `PlaybackController` 弱引用监听；100% 同文件独立 Preview，macOS 干净编译通过 |
+| 37 | 待开始：实时歌词时间戳微调校准、偏移调节与物理写回 (Lyrics Timestamp Tuning & SYLT/USLT Writeback) | 依据 FoundationRoadmap STAGE 1 与 InteractionAtlas 第 15 节；在 `LyricsPaneView` 与沉浸大画卷提供 +/-0.5s 原生微调控制器并即时校准播放时钟同步；支持将微调后的 LRC 文本写回伴生 `.lrc` 文件或通过 `AudioTagWriter` 写入物理文件内嵌同步歌词标签；新增 LyricsTuningTests，测试全部通过 |
+| 38 | 待开始：系统级 Spotlight 全局索引与 App Intents 快捷指令 (CoreSpotlight & Shortcuts Integration) | 依据 FoundationRoadmap STAGE 1 与 Apple 原生生态规范；接入 `CoreSpotlight` 索引本地曲库曲目、专辑、艺术家元数据；实现原生 `AppIntents`（PlayTrackIntent、SearchMusicIntent 等），支持系统聚焦搜索点击直达播放与 Siri 自动化调度；新增 SpotlightIndexingTests，测试全部通过 |
 
 具体文件和迁移范围见 [迁移路线](../Docs/Roadmap/FoundationRoadmap.md)。不要把本表与该路线维护成两套详细任务拆解。
 
@@ -105,11 +106,12 @@
 | watchOS 短任务切片与轻量播控 | 依据 InteractionAtlas 第 19.1 节落地 WatchNowPlayingView 与 WatchQueueSheetView；专为 Apple Watch 小表盘设计的紧凑层级与大触控热区；规格徽标、微缩封面、紧凑进度条、队列管理与音量弹窗；100% 覆盖同文件 Preview；经 WatchNowPlayingTests 自动化测试通过。 |
 | 系统级播控打通与硬件联动 | 落地 SystemNowPlayingCoordinator 与 PlaybackSessionObserving 弱引用监听；对接系统级 MPRemoteCommandCenter（键盘播放/暂停/切歌物理键、耳机线控、锁屏拖拽 Seek）与 MPNowPlayingInfoCenter（封面、曲目标题、副标题、进度、电台直播标识）；ApplicationModel 完整生命周期绑定；经 SystemNowPlayingCoordinatorTests 自动化测试通过。 |
 | 曲库导入性能与声纹调度 | 独立磁盘封面存储 LocalArtworkStorage（manifest 由 946MB 缩减至 4.2MB）、AudioFileSignature 轻量特征校验、LocalFingerprintRegistry actor 化原子批量持久化、AudioFingerprintService 全局单所有者后台调度（in-flight 任务去重与并发合并，彻底消除 MainActor 音频解码）、LocalLibraryIndexingService 导入/规则学习解耦协调。全量测试全绿（框架 49 项 + 应用 273 项）。 |
+| 封面按需加载与网络快照解耦 | LocalTrack 剥离常驻 artworkData 字节（696.59MB 常驻 RAM 归零），改由 ArtworkLoader actor 异步硬件降采样加载（NSCache 40MB 限制）；SecurityScopePolicy 区分沙盒与非沙盒环境，根除 DetachedSignatures SQLite 启动报错；WatchedFolderStore 解耦本地 FSEvents 与 NAS/SMB 网络快照，移除冷启动无条件扫描，网络文件冷启动枚举与声纹索引降为 0。全量测试全绿（框架 49 项 + 应用 280 项）。 |
 
 
 验证基线：
 
-- 应用：全量 **273 项通过**，使用 `MSRU-UnitTests`。
+- 应用：全量 **280 项通过**，使用 `MSRU-UnitTests`。
 - 框架：**49 项通过**，使用 `AppFoundation` Package 测试。
 - 构建：macOS 与 iOS 均编译链接通过（iOS Simulator 干净构建通过，0 错误 0 警告）；关闭签名，不代表设备安装运行验收。
 - UI：开发签名 Runner 的 **2 项通过**，验证前台启动、实际 Cmd+Q／重启、保留打开窗口并排除手动关闭窗口。使用独立恢复域与稳定 scene ID；测试全部通过。

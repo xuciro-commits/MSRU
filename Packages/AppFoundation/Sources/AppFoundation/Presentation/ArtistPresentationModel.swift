@@ -16,6 +16,7 @@ public struct ArtistPresentationModel: Identifiable, Hashable, Sendable {
     public let trackCount: Int
     public let artworkData: Data?
     public let artworkURL: URL?
+    public let artworkReference: String?
     public let biography: String?
     public let lifeSpan: String?
     public let genres: [String]
@@ -29,6 +30,7 @@ public struct ArtistPresentationModel: Identifiable, Hashable, Sendable {
         trackCount: Int = 0,
         artworkData: Data? = nil,
         artworkURL: URL? = nil,
+        artworkReference: String? = nil,
         biography: String? = nil,
         lifeSpan: String? = nil,
         genres: [String] = []
@@ -41,6 +43,7 @@ public struct ArtistPresentationModel: Identifiable, Hashable, Sendable {
         self.trackCount = trackCount
         self.artworkData = artworkData
         self.artworkURL = artworkURL
+        self.artworkReference = artworkReference
         self.biography = biography
         self.lifeSpan = lifeSpan
         self.genres = genres

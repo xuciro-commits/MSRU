@@ -229,7 +229,14 @@ struct AlbumDetailView: View {
 
     @ViewBuilder
     private var heroArtworkView: some View {
-        if let data = album.artworkData, let image = Image(artworkData: data) {
+        if let ref = album.artworkReference {
+            ArtworkThumbnailView(
+                reference: ref,
+                targetSize: CGSize(width: 240, height: 240),
+                placeholderSystemImage: "music.note",
+                cornerRadius: 12
+            )
+        } else if let data = album.artworkData, let image = Image(artworkData: data) {
             image
                 .resizable()
                 .scaledToFill()

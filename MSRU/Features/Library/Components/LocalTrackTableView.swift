@@ -352,21 +352,12 @@ struct LocalTrackTableView: View {
 
     @ViewBuilder
     private func trackArtwork(_ track: LocalTrack) -> some View {
-        if let data = track.artworkData, let image = Image(artworkData: data) {
-            image.resizable().scaledToFill()
-        } else {
-            placeholderArtwork
-        }
-    }
-
-    private var placeholderArtwork: some View {
-        RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .fill(Color.secondary.opacity(0.15))
-            .overlay {
-                Image(systemName: "music.note")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
+        ArtworkThumbnailView(
+            reference: track.artworkReference,
+            targetSize: CGSize(width: 36, height: 36),
+            placeholderSystemImage: "music.note",
+            cornerRadius: 6
+        )
     }
 
     @ViewBuilder

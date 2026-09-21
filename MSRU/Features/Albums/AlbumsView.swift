@@ -124,7 +124,14 @@ struct AlbumsView: View {
                                 onPlay: {
                                     playAlbum(album)
                                 }
-                            )
+                            ) {
+                                ArtworkThumbnailView(
+                                    reference: album.artworkReference,
+                                    targetSize: CGSize(width: 220, height: 220),
+                                    placeholderSystemImage: "square.stack",
+                                    cornerRadius: 10
+                                )
+                            }
                             .contextMenu {
                                 Button("Play Album") { playAlbum(album) }
                                 Divider()

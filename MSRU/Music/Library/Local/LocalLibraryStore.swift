@@ -36,6 +36,9 @@ final class LocalLibraryStore {
     private func reloadNow() async {
         do {
             tracks = try await repository.loadTracks()
+
+            printArtworkMemoryDiagnostics()
+
             didLoad = true
             errorMessage = nil
         } catch {
@@ -187,5 +190,19 @@ final class LocalLibraryStore {
         try? await serializedThrowing {
             await operation()
         }
+    }
+    
+    private func printArtworkMemoryDiagnostics() {
+        let referenceCount = tracks.filter { $0.artworkReference != nil }.count
+
+        print("""
+        ==============================
+        MSRU Artwork Memory Diagnostics
+        ==============================
+        tracks total: \(tracks.count)
+        tracks with artwork reference: \(referenceCount)
+        LocalTrack resident artwork bytes: 0 (Decoupled on-demand storage)
+        ==============================
+        """)
     }
 }

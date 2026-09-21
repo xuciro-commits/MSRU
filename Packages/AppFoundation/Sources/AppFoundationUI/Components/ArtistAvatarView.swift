@@ -6,27 +6,36 @@
 import SwiftUI
 import AppFoundation
 
-public struct ArtistAvatarView: View {
+public struct ArtistAvatarView<Avatar: View>: View {
     public let artist: ArtistPresentationModel
     public let onSelect: () -> Void
+    private let customAvatar: Avatar?
 
     @State private var isHovered: Bool = false
 
     public init(
         artist: ArtistPresentationModel,
-        onSelect: @escaping () -> Void
+        onSelect: @escaping () -> Void,
+        @ViewBuilder avatar: () -> Avatar
     ) {
         self.artist = artist
         self.onSelect = onSelect
+        self.customAvatar = avatar()
     }
 
     public var body: some View {
         VStack(spacing: 10) {
-            avatarImageView
-                .aspectRatio(1, contentMode: .fit)
-                .clipShape(Circle())
-                .shadow(color: .black.opacity(isHovered ? 0.15 : 0.05), radius: isHovered ? 12 : 5, y: isHovered ? 6 : 2)
-                .scaleEffect(isHovered ? 1.03 : 1.0)
+            Group {
+                if let customAvatar {
+                    customAvatar
+                } else {
+                    avatarImageView
+                }
+            }
+            .aspectRatio(1, contentMode: .fit)
+            .clipShape(Circle())
+            .shadow(color: .black.opacity(isHovered ? 0.15 : 0.05), radius: isHovered ? 12 : 5, y: isHovered ? 6 : 2)
+            .scaleEffect(isHovered ? 1.03 : 1.0)
 
             VStack(spacing: 2) {
                 Text(artist.name)
@@ -85,6 +94,17 @@ public struct ArtistAvatarView: View {
                     .font(.system(size: 40))
                     .foregroundStyle(.secondary.opacity(0.5))
             }
+    }
+}
+
+extension ArtistAvatarView where Avatar == EmptyView {
+    public init(
+        artist: ArtistPresentationModel,
+        onSelect: @escaping () -> Void
+    ) {
+        self.artist = artist
+        self.onSelect = onSelect
+        self.customAvatar = nil
     }
 }
 

@@ -6,19 +6,22 @@
 import SwiftUI
 import AppFoundation
 
-public struct AlbumCardView: View {
+public struct AlbumCardView<Cover: View>: View {
     public let album: AlbumPresentationModel
     public let onSelect: () -> Void
     public let onPlay: () -> Void
+    private let customCover: Cover?
 
     public init(
         album: AlbumPresentationModel,
         onSelect: @escaping () -> Void,
-        onPlay: @escaping () -> Void = {}
+        onPlay: @escaping () -> Void = {},
+        @ViewBuilder cover: () -> Cover
     ) {
         self.album = album
         self.onSelect = onSelect
         self.onPlay = onPlay
+        self.customCover = cover()
     }
 
     public var body: some View {
@@ -28,7 +31,11 @@ public struct AlbumCardView: View {
             footerText: album.year != nil ? String(album.year!) : nil,
             onSelect: onSelect
         ) {
-            coverImageView
+            if let customCover {
+                customCover
+            } else {
+                coverImageView
+            }
         } topTrailingBadges: {
             if let badge = album.audioQualityBadge {
                 FoundationCardBadge(badge)
@@ -72,6 +79,19 @@ public struct AlbumCardView: View {
                     .font(.system(size: 40))
                     .foregroundStyle(.secondary.opacity(0.5))
             }
+    }
+}
+
+extension AlbumCardView where Cover == EmptyView {
+    public init(
+        album: AlbumPresentationModel,
+        onSelect: @escaping () -> Void,
+        onPlay: @escaping () -> Void = {}
+    ) {
+        self.album = album
+        self.onSelect = onSelect
+        self.onPlay = onPlay
+        self.customCover = nil
     }
 }
 

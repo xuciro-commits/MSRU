@@ -70,6 +70,7 @@ public struct AlbumPresentationModel: Identifiable, Hashable, Sendable {
     public let year: Int?
     public let artworkData: Data?
     public let artworkURL: URL?
+    public let artworkReference: String?
     public let trackCount: Int
     public let duration: TimeInterval
     public let audioQualityBadge: String?
@@ -82,6 +83,7 @@ public struct AlbumPresentationModel: Identifiable, Hashable, Sendable {
         year: Int? = nil,
         artworkData: Data? = nil,
         artworkURL: URL? = nil,
+        artworkReference: String? = nil,
         trackCount: Int,
         duration: TimeInterval,
         audioQualityBadge: String? = nil,
@@ -93,6 +95,7 @@ public struct AlbumPresentationModel: Identifiable, Hashable, Sendable {
         self.year = year
         self.artworkData = artworkData
         self.artworkURL = artworkURL
+        self.artworkReference = artworkReference
         self.trackCount = trackCount
         self.duration = duration
         self.audioQualityBadge = audioQualityBadge

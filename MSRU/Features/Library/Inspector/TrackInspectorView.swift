@@ -861,7 +861,14 @@ struct TrackInspectorView: View {
 
     @ViewBuilder
     private func artwork(_ track: LocalTrack) -> some View {
-        if let data = track.artworkData, let image = Image(artworkData: data) {
+        if let ref = track.artworkReference {
+            ArtworkThumbnailView(
+                reference: ref,
+                targetSize: CGSize(width: 260, height: 260),
+                placeholderSystemImage: "music.note",
+                cornerRadius: 14
+            )
+        } else if let data = track.artworkData, let image = Image(artworkData: data) {
             image
                 .resizable()
                 .scaledToFill()

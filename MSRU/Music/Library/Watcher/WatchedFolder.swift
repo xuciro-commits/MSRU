@@ -42,4 +42,8 @@ public struct WatchedFolder: Identifiable, Codable, Sendable, Equatable {
     public var path: String {
         url.path
     }
+
+    public var isNetworkVolume: Bool {
+        !SecurityScopePolicy.isLocalVolume(url)
+    }
 }
