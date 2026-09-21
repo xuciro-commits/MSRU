@@ -92,3 +92,16 @@ public struct WorkspacePresentation<Context> {
         )
     }
 }
+
+// MARK: - Workspace Safe Area Insets Environment
+
+private struct WorkspaceSafeAreaInsetsKey: EnvironmentKey {
+    static let defaultValue: EdgeInsets = EdgeInsets()
+}
+
+public extension EnvironmentValues {
+    var workspaceSafeAreaInsets: EdgeInsets {
+        get { self[WorkspaceSafeAreaInsetsKey.self] }
+        set { self[WorkspaceSafeAreaInsetsKey.self] = newValue }
+    }
+}

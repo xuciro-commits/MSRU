@@ -15,6 +15,9 @@ struct MusicSectionView: View {
     let onSelect:
         (MusicContent) -> Void
 
+    @Environment(\.workspaceSafeAreaInsets)
+    private var workspaceSafeArea
+
 
     var body: some View {
 
@@ -67,8 +70,12 @@ struct MusicSectionView: View {
             }
         }
         .padding(
-            .horizontal,
+            .leading,
             28
+        )
+        .padding(
+            .trailing,
+            workspaceSafeArea.trailing + 28
         )
     }
 
@@ -164,14 +171,23 @@ struct MusicSectionView: View {
                 }
             }
             .padding(
-                .horizontal,
+                .leading,
                 28
+            )
+            .padding(
+                .trailing,
+                workspaceSafeArea.trailing + 28
             )
         }
         .scrollIndicators(
             .hidden
         )
         .hideScrollIndicatorsCompletely()
+        .ignoresSafeArea(
+            .all,
+            edges:
+                .trailing
+        )
     }
 
 
@@ -224,8 +240,12 @@ struct MusicSectionView: View {
             }
         }
         .padding(
-            .horizontal,
+            .leading,
             28
+        )
+        .padding(
+            .trailing,
+            workspaceSafeArea.trailing + 28
         )
     }
 }

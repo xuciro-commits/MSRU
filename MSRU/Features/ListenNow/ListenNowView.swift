@@ -16,6 +16,9 @@ struct ListenNowView: View {
     let onSelect:
         (MusicContent) -> Void
 
+    @Environment(\.workspaceSafeAreaInsets)
+    private var workspaceSafeArea
+
 
     var body: some View {
 
@@ -41,6 +44,11 @@ struct ListenNowView: View {
             .hidden
         )
         .hideScrollIndicatorsCompletely()
+        .ignoresSafeArea(
+            .all,
+            edges:
+                .trailing
+        )
         .task {
 
             await store
@@ -97,8 +105,12 @@ struct ListenNowView: View {
             providerMenu
         }
         .padding(
-            .horizontal,
+            .leading,
             28
+        )
+        .padding(
+            .trailing,
+            workspaceSafeArea.trailing + 28
         )
         .padding(
             .top,

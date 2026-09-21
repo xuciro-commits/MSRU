@@ -145,7 +145,7 @@ final class MSRUMacWindowComposition {
                                         minimumThickness:
                                             500,
                                         automaticallyAdjustsSafeAreaInsets:
-                                            false
+                                            true
                                     )
                             ),
 

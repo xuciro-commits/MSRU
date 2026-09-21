@@ -21,6 +21,9 @@ public enum MacScrollIndicatorSuppressor {
     }
 
     public static func suppress(scrollView: NSScrollView) {
+        if scrollView.scrollerStyle != .overlay {
+            scrollView.scrollerStyle = .overlay
+        }
         if scrollView.hasVerticalScroller {
             scrollView.hasVerticalScroller = false
         }
@@ -35,6 +38,7 @@ public enum MacScrollIndicatorSuppressor {
             h.alphaValue = 0
             h.isHidden = true
         }
+        scrollView.tile()
     }
 }
 
