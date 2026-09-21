@@ -84,40 +84,76 @@ final class SystemNowPlayingCoordinator: NSObject, PlaybackSessionObserving, Sys
 
         // Play
         let playToken = commandCenter.playCommand.addTarget { [weak self] _ in
-            self?.handlePlay() ?? .commandFailed
+            if Thread.isMainThread {
+                return self?.handlePlay() ?? .commandFailed
+            } else {
+                return DispatchQueue.main.sync {
+                    self?.handlePlay() ?? .commandFailed
+                }
+            }
         }
         commandTokens.append((commandCenter.playCommand, playToken))
 
         // Pause
         let pauseToken = commandCenter.pauseCommand.addTarget { [weak self] _ in
-            self?.handlePause() ?? .commandFailed
+            if Thread.isMainThread {
+                return self?.handlePause() ?? .commandFailed
+            } else {
+                return DispatchQueue.main.sync {
+                    self?.handlePause() ?? .commandFailed
+                }
+            }
         }
         commandTokens.append((commandCenter.pauseCommand, pauseToken))
 
         // Toggle Play / Pause
         let toggleToken = commandCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
-            self?.handleTogglePlayPause() ?? .commandFailed
+            if Thread.isMainThread {
+                return self?.handleTogglePlayPause() ?? .commandFailed
+            } else {
+                return DispatchQueue.main.sync {
+                    self?.handleTogglePlayPause() ?? .commandFailed
+                }
+            }
         }
         commandTokens.append((commandCenter.togglePlayPauseCommand, toggleToken))
 
         // Next Track
         let nextToken = commandCenter.nextTrackCommand.addTarget { [weak self] _ in
-            self?.handleNext() ?? .commandFailed
+            if Thread.isMainThread {
+                return self?.handleNext() ?? .commandFailed
+            } else {
+                return DispatchQueue.main.sync {
+                    self?.handleNext() ?? .commandFailed
+                }
+            }
         }
         commandTokens.append((commandCenter.nextTrackCommand, nextToken))
 
         // Previous Track
         let prevToken = commandCenter.previousTrackCommand.addTarget { [weak self] _ in
-            self?.handlePrevious() ?? .commandFailed
+            if Thread.isMainThread {
+                return self?.handlePrevious() ?? .commandFailed
+            } else {
+                return DispatchQueue.main.sync {
+                    self?.handlePrevious() ?? .commandFailed
+                }
+            }
         }
         commandTokens.append((commandCenter.previousTrackCommand, prevToken))
 
         // Seek (Change Playback Position)
         let seekToken = commandCenter.changePlaybackPositionCommand.addTarget { [weak self] event in
-            guard let self, let posEvent = event as? MPChangePlaybackPositionCommandEvent else {
+            guard let posEvent = event as? MPChangePlaybackPositionCommandEvent else {
                 return .commandFailed
             }
-            return self.handleSeek(to: posEvent.positionTime)
+            if Thread.isMainThread {
+                return self?.handleSeek(to: posEvent.positionTime) ?? .commandFailed
+            } else {
+                return DispatchQueue.main.sync {
+                    self?.handleSeek(to: posEvent.positionTime) ?? .commandFailed
+                }
+            }
         }
         commandTokens.append((commandCenter.changePlaybackPositionCommand, seekToken))
 
@@ -203,20 +239,9 @@ final class SystemNowPlayingCoordinator: NSObject, PlaybackSessionObserving, Sys
 
         info[MPNowPlayingInfoPropertyPlaybackRate] = playback.isPlaying ? 1.0 : 0.0
 
-        if let artworkData = playback.unifiedArtworkData {
-            #if canImport(AppKit) && !targetEnvironment(macCatalyst)
-            if let image = NSImage(data: artworkData) {
-                let size = image.size
-                let artwork = MPMediaItemArtwork(boundsSize: size) { _ in image }
-                info[MPMediaItemPropertyArtwork] = artwork
-            }
-            #elseif canImport(UIKit)
-            if let image = UIImage(data: artworkData) {
-                let size = image.size
-                let artwork = MPMediaItemArtwork(boundsSize: size) { _ in image }
-                info[MPMediaItemPropertyArtwork] = artwork
-            }
-            #endif
+        if let artworkData = playback.unifiedArtworkData,
+           let artwork = makeMediaItemArtwork(from: artworkData) {
+            info[MPMediaItemPropertyArtwork] = artwork
         }
 
         nowPlayingCenter.nowPlayingInfo = info
@@ -274,3 +299,27 @@ final class SystemNowPlayingCoordinator: NSObject, PlaybackSessionObserving, Sys
         currentNowPlayingInfo = info
     }
 }
+
+// MARK: - Nonisolated Artwork Helper
+
+#if canImport(AppKit) && !targetEnvironment(macCatalyst)
+private nonisolated func makeMediaItemArtwork(from data: Data) -> MPMediaItemArtwork? {
+    guard let image = NSImage(data: data), image.size.width > 0, image.size.height > 0 else {
+        return nil
+    }
+    let size = image.size
+    return MPMediaItemArtwork(boundsSize: size) { _ in
+        image
+    }
+}
+#elseif canImport(UIKit)
+private nonisolated func makeMediaItemArtwork(from data: Data) -> MPMediaItemArtwork? {
+    guard let image = UIImage(data: data), image.size.width > 0, image.size.height > 0 else {
+        return nil
+    }
+    let size = image.size
+    return MPMediaItemArtwork(boundsSize: size) { _ in
+        image
+    }
+}
+#endif
