@@ -171,6 +171,10 @@ struct LocalLibraryView: View {
                                 }
                             }
                         )
+                        .frame(
+                            maxWidth: .infinity,
+                            maxHeight: .infinity
+                        )
 
 
                     case .grid:
@@ -178,9 +182,17 @@ struct LocalLibraryView: View {
                         trackGrid(
                             tracks
                         )
+                        .frame(
+                            maxWidth: .infinity,
+                            maxHeight: .infinity
+                        )
                     }
                 }
             }
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity
+            )
         }
     }
 

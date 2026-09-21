@@ -21,13 +21,15 @@ struct LocalTrackTableView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            ZStack(alignment: .bottom) {
+            Group {
                 if proxy.size.width < 500 {
                     compactListView
                 } else {
                     tableView
                 }
-
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .overlay(alignment: .bottom) {
                 if selectedTrackIDs.count > 1 {
                     floatingBatchBar
                         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -113,7 +115,7 @@ struct LocalTrackTableView: View {
                     trackContextMenu(track)
                 }
             }
-            .width(min: 180, ideal: 240)
+            .width(min: 140, ideal: 200)
 
             // Artist column
             TableColumn("Artist") { track in
@@ -122,7 +124,7 @@ struct LocalTrackTableView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            .width(min: 120, ideal: 160)
+            .width(min: 100, ideal: 130)
 
             // Album column
             TableColumn("Album") { track in
@@ -131,7 +133,7 @@ struct LocalTrackTableView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            .width(min: 120, ideal: 160)
+            .width(min: 100, ideal: 130)
 
             // Duration column
             TableColumn("Duration") { track in
@@ -139,7 +141,7 @@ struct LocalTrackTableView: View {
                     .font(.callout.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
-            .width(min: 50, ideal: 60, max: 70)
+            .width(min: 45, ideal: 55, max: 65)
 
             // Favorite column
             TableColumn("Favorite") { track in
@@ -330,7 +332,7 @@ struct LocalTrackTableView: View {
                 .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 16)
         .padding(.bottom, 16)
     }
 
