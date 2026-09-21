@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import Observation
 
 /// A locally learned acoustic fingerprint association (pure content identity).
 nonisolated public struct AcousticFingerprintRecord: Identifiable, Codable, Sendable, Equatable {
@@ -111,32 +110,41 @@ nonisolated public struct FingerprintRegistrationItem: Sendable {
     }
 }
 
-private struct RegistryStorage: Codable {
+nonisolated private struct RegistryStorage: Codable {
     var records: [AcousticFingerprintRecord]
     var assetCache: [String: AssetFingerprintEntry]
+    var signatures: [String: AudioFileSignature]?
 }
 
-/// Central registry managing lightweight local acoustic fingerprint memory and asset cache.
-@MainActor
-@Observable
-public final class LocalFingerprintRegistry {
+/// Dedicated background storage actor managing local acoustic fingerprint memory,
+/// file cache signatures, and atomic batch persistence off the main thread.
+public actor LocalFingerprintRegistry: Sendable {
     public static let shared = LocalFingerprintRegistry()
 
-    public private(set) var records: [AcousticFingerprintRecord] = []
-    public private(set) var assetCache: [String: AssetFingerprintEntry] = [:]
+    public private(set) var records: [AcousticFingerprintRecord]
+    public private(set) var assetCache: [String: AssetFingerprintEntry]
+    public private(set) var signatures: [String: AudioFileSignature]
+    public private(set) var persistenceWriteCount: Int = 0
+
     private let storageURL: URL
 
     public init(storageURL: URL? = nil) {
+        let finalURL: URL
         if let storageURL {
-            self.storageURL = storageURL
+            finalURL = storageURL
         } else {
             let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
                 ?? FileManager.default.temporaryDirectory
             let dir = support.appendingPathComponent("MSRU/Fingerprints", isDirectory: true)
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            self.storageURL = dir.appendingPathComponent("local_fingerprints.json")
+            finalURL = dir.appendingPathComponent("local_fingerprints.json")
         }
-        load()
+        self.storageURL = finalURL
+
+        let loaded = Self.load(from: finalURL)
+        self.records = loaded.records
+        self.assetCache = loaded.assetCache
+        self.signatures = loaded.signatures
     }
 
     /// Fast lookup by exact fingerprint or duration proximity.
@@ -156,10 +164,23 @@ public final class LocalFingerprintRegistry {
         return nil
     }
 
-    /// Checks if the physical file has a valid, unchanged fingerprint in the asset cache.
-    /// Validates canonical path, file size, AND modification date.
+    /// Validates whether the given audio file has a valid cache entry using physical file signatures.
+    public func hasValidRecord(for fileURL: URL) -> Bool {
+        cachedFingerprint(for: fileURL) != nil
+    }
+
+    /// Checks if the physical file has a valid, unchanged fingerprint signature in cache.
     public func cachedFingerprint(for fileURL: URL) -> String? {
         let canonicalPath = fileURL.resolvingSymlinksInPath().standardizedFileURL.path
+
+        // Check modern AudioFileSignature first
+        if let sig = signatures[canonicalPath], sig.matches(fileURL: fileURL) {
+            if let entry = assetCache[canonicalPath], records.contains(where: { $0.fingerprint == entry.fingerprint }) {
+                return entry.fingerprint
+            }
+        }
+
+        // Fallback for legacy asset cache entries
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: canonicalPath),
               let size = attrs[.size] as? Int64,
               let modDate = attrs[.modificationDate] as? Date else {
@@ -173,11 +194,6 @@ public final class LocalFingerprintRegistry {
             }
         }
         return nil
-    }
-
-    /// Fast boolean check if the given audio file already has a valid asset record.
-    public func hasValidRecord(for fileURL: URL) -> Bool {
-        cachedFingerprint(for: fileURL) != nil
     }
 
     /// Records an authentic match event (e.g. during recognition/disambiguation).
@@ -205,8 +221,8 @@ public final class LocalFingerprintRegistry {
         }
     }
 
-    /// Registers or updates a single local fingerprint memory record and optional asset cache entry.
-    /// Does NOT mutate matchCount; saves to disk only if content actually changed.
+    /// Registers or updates a single local fingerprint memory record.
+    /// Saves to disk only if content actually changed.
     public func register(
         fingerprint: String,
         duration: TimeInterval,
@@ -262,11 +278,14 @@ public final class LocalFingerprintRegistry {
                 records[idx].recordingMBID = recordingMBID
                 changed = true
             }
-            if let artworkData = item.artworkData, records[idx].artworkData != artworkData {
+            // Only update artwork if smaller than 64KB to prevent bloating registry JSON
+            if let artworkData = item.artworkData, artworkData.count < 65536, records[idx].artworkData != artworkData {
                 records[idx].artworkData = artworkData
                 changed = true
             }
         } else {
+            // Guard against storing giant image blobs in registry
+            let safeArtwork: Data? = (item.artworkData != nil && item.artworkData!.count < 65536) ? item.artworkData : nil
             let record = AcousticFingerprintRecord(
                 fingerprint: item.fingerprint,
                 duration: item.duration,
@@ -276,23 +295,25 @@ public final class LocalFingerprintRegistry {
                 trackNumber: item.trackNumber,
                 releaseMBID: item.releaseMBID,
                 recordingMBID: item.recordingMBID,
-                artworkData: item.artworkData,
+                artworkData: safeArtwork,
                 matchCount: 0
             )
             records.append(record)
             changed = true
         }
 
-        // Update asset cache if fileURL provided
+        // Update asset cache & physical signatures if fileURL provided
         if let fileURL = item.fileURL {
             let canonicalPath = fileURL.resolvingSymlinksInPath().standardizedFileURL.path
-            if let attrs = try? FileManager.default.attributesOfItem(atPath: canonicalPath),
-               let size = attrs[.size] as? Int64,
-               let modDate = attrs[.modificationDate] as? Date {
+            if let sig = AudioFileSignature(fileURL: fileURL) {
+                if signatures[canonicalPath] != sig {
+                    signatures[canonicalPath] = sig
+                    changed = true
+                }
                 let entry = AssetFingerprintEntry(
                     canonicalPath: canonicalPath,
-                    fileSize: size,
-                    modificationDate: modDate,
+                    fileSize: sig.fileSize,
+                    modificationDate: Date(timeIntervalSince1970: sig.modificationTime),
                     fingerprint: item.fingerprint
                 )
                 if assetCache[canonicalPath] != entry {
@@ -309,6 +330,7 @@ public final class LocalFingerprintRegistry {
     public func remove(fingerprint: String) {
         records.removeAll { $0.fingerprint == fingerprint }
         assetCache = assetCache.filter { $0.value.fingerprint != fingerprint }
+        signatures = signatures.filter { assetCache[$0.key] != nil }
         save()
     }
 
@@ -316,6 +338,7 @@ public final class LocalFingerprintRegistry {
     public func removeAll() {
         records.removeAll()
         assetCache.removeAll()
+        signatures.removeAll()
         save()
     }
 
@@ -333,6 +356,7 @@ public final class LocalFingerprintRegistry {
             return !activeKeys.contains(key)
         }
         assetCache = assetCache.filter { activePaths.contains($0.key) }
+        signatures = signatures.filter { activePaths.contains($0.key) }
 
         let removed = beforeCount - records.count
         if removed > 0 {
@@ -341,23 +365,36 @@ public final class LocalFingerprintRegistry {
         return removed
     }
 
-    private func load() {
+    nonisolated private static func load(from storageURL: URL) -> (records: [AcousticFingerprintRecord], assetCache: [String: AssetFingerprintEntry], signatures: [String: AudioFileSignature]) {
         guard FileManager.default.fileExists(atPath: storageURL.path),
               let data = try? Data(contentsOf: storageURL) else {
-            return
+            return ([], [:], [:])
         }
         if let decoded = try? JSONDecoder().decode(RegistryStorage.self, from: data) {
-            self.records = decoded.records
-            self.assetCache = decoded.assetCache
+            let records = decoded.records
+            let assetCache = decoded.assetCache
+            var signatures = decoded.signatures ?? [:]
+            if decoded.signatures == nil {
+                // Version migration: populate signatures from assetCache
+                for (path, entry) in decoded.assetCache {
+                    signatures[path] = AudioFileSignature(
+                        canonicalPath: entry.canonicalPath,
+                        fileSize: entry.fileSize,
+                        modificationTime: entry.modificationTime
+                    )
+                }
+            }
+            return (records, assetCache, signatures)
         } else if let legacyRecords = try? JSONDecoder().decode([AcousticFingerprintRecord].self, from: data) {
-            self.records = legacyRecords
-            self.assetCache = [:]
+            return (legacyRecords, [:], [:])
         }
+        return ([], [:], [:])
     }
 
     private func save() {
-        let storage = RegistryStorage(records: records, assetCache: assetCache)
+        let storage = RegistryStorage(records: records, assetCache: assetCache, signatures: signatures)
         guard let encoded = try? JSONEncoder().encode(storage) else { return }
         try? encoded.write(to: storageURL, options: .atomic)
+        persistenceWriteCount += 1
     }
 }

@@ -51,15 +51,25 @@ public struct ImportPipelineReport: Sendable, Equatable {
 /// 11. Optional File Organization
 public final class ImportPipeline: Sendable {
 
-    private let fingerprinter: any AudioFingerprinting
+    private let fingerprintService: AudioFingerprintService
     private let catalog: any ExternalCatalogService
 
     public init(
-        fingerprinter: any AudioFingerprinting = AcoustIDFingerprintExtractor(),
+        fingerprintService: AudioFingerprintService = .shared,
         catalog: any ExternalCatalogService = MusicBrainzCatalogClient.shared
     ) {
-        self.fingerprinter = fingerprinter
+        self.fingerprintService = fingerprintService
         self.catalog = catalog
+    }
+
+    public convenience init(
+        fingerprinter: any AudioFingerprinting,
+        catalog: any ExternalCatalogService = MusicBrainzCatalogClient.shared
+    ) {
+        self.init(
+            fingerprintService: AudioFingerprintService(fingerprinter: fingerprinter),
+            catalog: catalog
+        )
     }
 
     /// Executes the full 11-step import pipeline over a list of discovered audio URLs.
@@ -73,7 +83,7 @@ public final class ImportPipeline: Sendable {
         // Steps 1..4: Parse embedded metadata, heuristic clues, consult local rules/fingerprint registry, and compute fingerprints
         for url in audioURLs {
             let parsed = FileNameHeuristicParser.parse(fileURL: url)
-            let fp = try? await fingerprinter.generateFingerprint(for: url)
+            let fp = try? await fingerprintService.fingerprint(for: url)
 
             var detectedTitle: String? = nil
             var detectedArtist: String? = nil
@@ -110,7 +120,7 @@ public final class ImportPipeline: Sendable {
 
             // Priority 2: Local Acoustic Fingerprint Memory Registry (0ms in-memory lookup)
             if let fp = fp,
-               let memory = LocalFingerprintRegistry.shared.lookup(fingerprint: fp.fingerprint, duration: fp.duration) {
+               let memory = await LocalFingerprintRegistry.shared.lookup(fingerprint: fp.fingerprint, duration: fp.duration) {
                 // If local memory exists, fill in MBID or missing fields
                 recordingMBID = memory.recordingMBID
                 matchedMemoryRecord = memory
@@ -142,7 +152,8 @@ public final class ImportPipeline: Sendable {
 
             // Priority 5: Path Heuristic Rules (only for filling missing artist or album from directory structure)
             if detectedArtist == nil || detectedArtist?.isEmpty == true || detectedArtist == "Unknown Artist" || detectedAlbum == nil {
-                if let rule = PathHeuristicRuleStore.shared.match(fileURL: url) {
+                let rule = await MainActor.run { PathHeuristicRuleStore.shared.match(fileURL: url) }
+                if let rule = rule {
                     if detectedArtist == nil || detectedArtist?.isEmpty == true || detectedArtist == "Unknown Artist" {
                         detectedArtist = rule.targetArtist
                     }

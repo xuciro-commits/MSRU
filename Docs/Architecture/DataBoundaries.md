@@ -24,3 +24,5 @@ Offline-first 是领域同步策略：本地权威数据、待提交操作、幂
 `FileLocalLibraryRepository(directory:)` 可以显式注入媒体目录；真实文件集成测试只使用临时目录。测试生成 PCM WAV，验证复制、同名文件隔离、元数据读取、重新扫描、Provider 解析和 AVFoundation 可解码性，不把这些检查等同于扬声器输出或远程流媒体验收。
 
 `LocalMediaIntegrationTests.actualPlaybackAdvancesQueueAndStopsAtEnd` 进一步使用真实、静音的 AVPlayer 顺序播放两个临时 WAV，不手动发送结束通知。它验证自动切歌、历史/剩余队列、最终停止状态，并读取两个 AVPlayer 的实际媒体时钟确认都到达文件末尾。硬件听感和公网流媒体仍需分别验收。
+
+曲库 Manifest（如 `external_tracks.json`）仅保存轻量结构化元数据与相对文件引用，严禁内联大二进制 Blob（如专辑封面图片）。大尺寸媒体/封面统一由内容寻址存储（`LocalArtworkStorage`）落盘为独立文件，避免整库序列化出现 O(n²) 内存与 I/O 放大。

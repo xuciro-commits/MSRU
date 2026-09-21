@@ -44,7 +44,7 @@ struct ImportPipelineTests {
         let mockArtwork = Data([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46] + Array(repeating: UInt8(0), count: 50))
 
         // 1. Pre-register acoustic memory
-        LocalFingerprintRegistry.shared.register(
+        await LocalFingerprintRegistry.shared.register(
             fingerprint: testFP,
             duration: 342.0,
             title: "以父之名",
@@ -55,9 +55,6 @@ struct ImportPipelineTests {
             recordingMBID: "mbid_rec_jay_01",
             artworkData: mockArtwork
         )
-        defer {
-            LocalFingerprintRegistry.shared.remove(fingerprint: testFP)
-        }
 
         // 2. Incoming file has a messy/disorganized filename: "01. Unknown Track.wav"
         let messyURL = URL(fileURLWithPath: "/music/Disorganized/01. Unknown Track.wav")
@@ -105,6 +102,7 @@ struct ImportPipelineTests {
         #expect(presentationModels.count == 1)
         #expect(presentationModels[0].artworkData == mockArtwork)
         #expect(presentationModels[0].title == "叶惠美")
+        await LocalFingerprintRegistry.shared.remove(fingerprint: testFP)
     }
 
     @Test
@@ -128,16 +126,13 @@ struct ImportPipelineTests {
         }
 
         let testFP = "fp_skip_test_\(UUID().uuidString)"
-        LocalFingerprintRegistry.shared.register(
+        await LocalFingerprintRegistry.shared.register(
             fingerprint: testFP,
             duration: 200.0,
             title: "Song With Metadata",
             artist: "Known Artist",
             album: "Known Album"
         )
-        defer {
-            LocalFingerprintRegistry.shared.remove(fingerprint: testFP)
-        }
 
         struct StaticFingerprinter: AudioFingerprinting {
             let fp: AudioFingerprint
@@ -155,5 +150,7 @@ struct ImportPipelineTests {
         // Remote lookup must be 0 because local metadata / memory resolved it!
         let calls = await counter.count
         #expect(calls == 0)
+
+        await LocalFingerprintRegistry.shared.remove(fingerprint: testFP)
     }
 }

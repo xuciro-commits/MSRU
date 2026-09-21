@@ -41,6 +41,7 @@ public final class PathHeuristicRuleStore {
     public static let shared = PathHeuristicRuleStore()
 
     public private(set) var rules: [PathHeuristicRule] = []
+    public private(set) var persistenceWriteCount: Int = 0
     private let storageURL: URL
 
     public init(storageURL: URL? = nil) {
@@ -84,23 +85,33 @@ public final class PathHeuristicRuleStore {
     }
 
     /// Adds or updates a heuristic rule.
-    public func addRule(pathPattern: String, targetArtist: String, targetAlbum: String? = nil) {
+    @discardableResult
+    public func addRule(pathPattern: String, targetArtist: String, targetAlbum: String? = nil, autoSave: Bool = true) -> Bool {
         let cleanPattern = pathPattern.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanArtist = targetArtist.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleanPattern.isEmpty, !cleanArtist.isEmpty, cleanArtist != "Unknown Artist" else { return }
-        guard !Self.genericFolderNames.contains(cleanPattern.lowercased()) else { return }
+        guard !cleanPattern.isEmpty, !cleanArtist.isEmpty, cleanArtist != "Unknown Artist" else { return false }
+        guard !Self.genericFolderNames.contains(cleanPattern.lowercased()) else { return false }
 
+        var changed = false
         if let idx = rules.firstIndex(where: { $0.pathPattern.lowercased() == cleanPattern.lowercased() }) {
-            rules[idx].targetArtist = cleanArtist
-            rules[idx].targetAlbum = targetAlbum
+            if rules[idx].targetArtist != cleanArtist || rules[idx].targetAlbum != targetAlbum {
+                rules[idx].targetArtist = cleanArtist
+                rules[idx].targetAlbum = targetAlbum
+                changed = true
+            }
         } else {
             rules.append(PathHeuristicRule(
                 pathPattern: cleanPattern,
                 targetArtist: cleanArtist,
                 targetAlbum: targetAlbum
             ))
+            changed = true
         }
-        save()
+
+        if changed && autoSave {
+            save()
+        }
+        return changed
     }
 
     /// Removes a rule by its ID.
@@ -116,11 +127,12 @@ public final class PathHeuristicRuleStore {
     }
 
     /// Automatically learns a rule from an imported folder and identified artist.
-    public func learnFrom(folderURL: URL?, artist: String, album: String? = nil) {
-        guard let folderURL else { return }
+    @discardableResult
+    public func learnFrom(folderURL: URL?, artist: String, album: String? = nil, autoSave: Bool = true) -> Bool {
+        guard let folderURL else { return false }
         let folderName = folderURL.lastPathComponent.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !folderName.isEmpty, folderName != "/" else { return }
-        guard !Self.genericFolderNames.contains(folderName.lowercased()) else { return }
+        guard !folderName.isEmpty, folderName != "/" else { return false }
+        guard !Self.genericFolderNames.contains(folderName.lowercased()) else { return false }
 
         var finalArtist = artist.trimmingCharacters(in: .whitespacesAndNewlines)
         var finalAlbum = album?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -134,11 +146,24 @@ public final class PathHeuristicRuleStore {
                 }
             } else {
                 // Cannot infer a valid artist, do not learn a polluted rule
-                return
+                return false
             }
         }
 
-        addRule(pathPattern: folderName, targetArtist: finalArtist, targetAlbum: finalAlbum)
+        return addRule(pathPattern: folderName, targetArtist: finalArtist, targetAlbum: finalAlbum, autoSave: autoSave)
+    }
+
+    /// Batched rule learning from a collection of tracks with single atomic write if changed.
+    public func learnBatch(from tracks: [LocalTrack]) {
+        var changed = false
+        for track in tracks {
+            if learnFrom(folderURL: track.fileURL.deletingLastPathComponent(), artist: track.artist, album: track.album, autoSave: false) {
+                changed = true
+            }
+        }
+        if changed {
+            save()
+        }
     }
 
     /// Extracts artist and album from patterns like "刘达 - 甄选2024(24K金碟头版限量)"
@@ -203,5 +228,6 @@ public final class PathHeuristicRuleStore {
     private func save() {
         guard let encoded = try? JSONEncoder().encode(rules) else { return }
         try? encoded.write(to: storageURL, options: .atomic)
+        persistenceWriteCount += 1
     }
 }

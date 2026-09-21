@@ -64,7 +64,7 @@ struct LocalLibraryLifecycleTests {
             try Data(repeating: UInt8(i), count: 1024).write(to: fileURL)
             let track = LocalTrack(fileURL: fileURL, title: "Track \(i)", artist: "Artist", duration: 180.0)
             initialTracks.append(track)
-            registry.register(
+            await registry.register(
                 fingerprint: "fp_\(i)",
                 duration: 180.0,
                 title: track.title,
@@ -83,10 +83,11 @@ struct LocalLibraryLifecycleTests {
 
         // 2. Reconcile unchanged folder
         let scanner = WatchedFolderScanner()
+        let cache = await registry.assetCache
         let result = await scanner.reconcileFolder(
             targetURL: tempDir,
             existingTracksInFolder: store.tracks,
-            assetCache: registry.assetCache
+            assetCache: cache
         )
 
         // Acceptance criterion: 0 new, 0 modified, 0 deleted, 0 writes
@@ -112,7 +113,7 @@ struct LocalLibraryLifecycleTests {
             try Data(repeating: UInt8(i), count: 1024).write(to: fileURL)
             let track = LocalTrack(fileURL: fileURL, title: "Track \(i)", artist: "Artist", duration: 180.0)
             initialTracks.append(track)
-            registry.register(
+            await registry.register(
                 fingerprint: "fp_\(i)",
                 duration: 180.0,
                 title: track.title,
@@ -132,10 +133,11 @@ struct LocalLibraryLifecycleTests {
         await store.loadIfNeeded()
 
         let scanner = WatchedFolderScanner()
+        let cache = await registry.assetCache
         let result = await scanner.reconcileFolder(
             targetURL: tempDir,
             existingTracksInFolder: store.tracks,
-            assetCache: registry.assetCache
+            assetCache: cache
         )
 
         #expect(result.newTracks.count == 2)
@@ -162,7 +164,7 @@ struct LocalLibraryLifecycleTests {
         try Data(repeating: 0x11, count: 1024).write(to: fileURL)
 
         let track = LocalTrack(fileURL: fileURL, title: "Original Title", artist: "Artist", duration: 120.0)
-        registry.register(
+        await registry.register(
             fingerprint: "fp_original",
             duration: 120.0,
             title: track.title,
@@ -170,23 +172,24 @@ struct LocalLibraryLifecycleTests {
             fileURL: fileURL
         )
 
-        #expect(registry.hasValidRecord(for: fileURL))
+        #expect(await registry.hasValidRecord(for: fileURL))
 
         // Modify file on disk: change file size
         try Data(repeating: 0x22, count: 2048).write(to: fileURL)
 
         // Asset cache must now detect invalidation
-        #expect(!registry.hasValidRecord(for: fileURL))
+        #expect(await !registry.hasValidRecord(for: fileURL))
 
         let repo = MockManifestRepository(initialTracks: [track])
         let store = LocalLibraryStore(repository: repo)
         await store.loadIfNeeded()
 
         let scanner = WatchedFolderScanner()
+        let cache = await registry.assetCache
         let result = await scanner.reconcileFolder(
             targetURL: tempDir,
             existingTracksInFolder: store.tracks,
-            assetCache: registry.assetCache
+            assetCache: cache
         )
 
         #expect(result.newTracks.isEmpty)
@@ -275,7 +278,7 @@ struct LocalLibraryLifecycleTests {
     }
 
     @Test
-    func test_twoDistinctPathsSharingSameAcousticFingerprint() throws {
+    func test_twoDistinctPathsSharingSameAcousticFingerprint() async throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
@@ -290,14 +293,14 @@ struct LocalLibraryLifecycleTests {
 
         let commonFP = "shared_stream_fingerprint_xyz"
 
-        registry.register(
+        await registry.register(
             fingerprint: commonFP,
             duration: 210.0,
             title: "Hit Song",
             artist: "Famous Artist",
             fileURL: path1
         )
-        registry.register(
+        await registry.register(
             fingerprint: commonFP,
             duration: 210.0,
             title: "Hit Song",
@@ -306,19 +309,19 @@ struct LocalLibraryLifecycleTests {
         )
 
         // Only one fingerprint record
-        #expect(registry.records.count == 1)
-        #expect(registry.records.first?.fingerprint == commonFP)
+        #expect(await registry.records.count == 1)
+        #expect(await registry.records.first?.fingerprint == commonFP)
 
         // Two distinct asset entries both resolving to the common fingerprint
-        #expect(registry.cachedFingerprint(for: path1) == commonFP)
-        #expect(registry.cachedFingerprint(for: path2) == commonFP)
-        #expect(registry.hasValidRecord(for: path1))
-        #expect(registry.hasValidRecord(for: path2))
+        #expect(await registry.cachedFingerprint(for: path1) == commonFP)
+        #expect(await registry.cachedFingerprint(for: path2) == commonFP)
+        #expect(await registry.hasValidRecord(for: path1))
+        #expect(await registry.hasValidRecord(for: path2))
 
         // Reopening registry preserves both asset cache records
         let reopened = LocalFingerprintRegistry(storageURL: regStorage)
-        #expect(reopened.records.count == 1)
-        #expect(reopened.cachedFingerprint(for: path1) == commonFP)
-        #expect(reopened.cachedFingerprint(for: path2) == commonFP)
+        #expect(await reopened.records.count == 1)
+        #expect(await reopened.cachedFingerprint(for: path1) == commonFP)
+        #expect(await reopened.cachedFingerprint(for: path2) == commonFP)
     }
 }

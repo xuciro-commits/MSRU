@@ -45,26 +45,6 @@ struct ImportReviewWorkspaceView: View {
                         Task {
                             try? await localStore.addTracks(tracks)
 
-                            // Auto-learn acoustic fingerprints and path heuristic rules locally
-                            let fingerprinter = AcoustIDFingerprintExtractor()
-                            for track in tracks {
-                                if let fp = try? await fingerprinter.generateFingerprint(for: track.fileURL) {
-                                    LocalFingerprintRegistry.shared.register(
-                                        fingerprint: fp.fingerprint,
-                                        duration: fp.duration,
-                                        title: track.title,
-                                        artist: track.artist,
-                                        album: track.album,
-                                        artworkData: track.artworkData
-                                    )
-                                }
-                                PathHeuristicRuleStore.shared.learnFrom(
-                                    folderURL: track.fileURL.deletingLastPathComponent(),
-                                    artist: track.artist,
-                                    album: track.album
-                                )
-                            }
-
                             state = .success(
                                 message: "Successfully added \(tracks.count) tracks to the library.",
                                 undoEntries: []

@@ -246,10 +246,11 @@ final class WatchedFolderStore {
             track.fileURL.standardizedFileURL.path.hasPrefix(targetPath)
         }
 
+        let cache = await LocalFingerprintRegistry.shared.assetCache
         let result = await scanner.reconcileFolder(
             targetURL: targetURL,
             existingTracksInFolder: tracksInFolder,
-            assetCache: LocalFingerprintRegistry.shared.assetCache
+            assetCache: cache
         )
 
         if folder.autoIngest {

@@ -156,6 +156,7 @@ public final class ImportReviewStore {
     ) async -> [LocalTrack] {
         let accepted = pendingReviewClusters.filter { selectedClusterIDs.contains($0.id) }
         var generatedTracks: [LocalTrack] = []
+        var fingerprintItems: [FingerprintRegistrationItem] = []
         let tagWriter = AudioTagWriter()
 
         for clusterResult in accepted {
@@ -195,9 +196,9 @@ public final class ImportReviewStore {
                     ArtworkFileExporter.exportCover(artworkData: artworkData, to: local.fileURL.deletingLastPathComponent())
                 }
 
-                // 3. Register in Local Fingerprint Memory
+                // 3. Collect for batch registration in Local Fingerprint Memory
                 if let fp = local.fingerprint ?? local.acoustID {
-                    LocalFingerprintRegistry.shared.register(
+                    fingerprintItems.append(FingerprintRegistrationItem(
                         fingerprint: fp,
                         duration: local.duration,
                         title: title,
@@ -206,8 +207,9 @@ public final class ImportReviewStore {
                         trackNumber: trackNumber,
                         releaseMBID: releaseMBID,
                         recordingMBID: recordingMBID,
-                        artworkData: artworkData
-                    )
+                        artworkData: artworkData,
+                        fileURL: local.fileURL
+                    ))
                 }
 
                 let track = LocalTrack(
@@ -220,6 +222,10 @@ public final class ImportReviewStore {
                 )
                 generatedTracks.append(track)
             }
+        }
+
+        if !fingerprintItems.isEmpty {
+            await LocalFingerprintRegistry.shared.registerBatch(fingerprintItems)
         }
 
         let count = accepted.reduce(0) { $0 + $1.cluster.tracks.count }

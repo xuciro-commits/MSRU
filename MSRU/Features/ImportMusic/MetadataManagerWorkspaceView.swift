@@ -46,8 +46,8 @@ struct MetadataManagerWorkspaceView: View {
     @State private var acoustIDTestStatus: String? = nil
     @State private var isVerifyingAcoustID: Bool = false
     @State private var orphanCleanFeedback: String? = nil
+    @State private var fingerprintRecords: [AcousticFingerprintRecord] = []
 
-    private var fingerprintRegistry = LocalFingerprintRegistry.shared
     private var ruleStore = PathHeuristicRuleStore.shared
     private var providerConfig = MetadataProviderConfigStore.shared
 
@@ -84,6 +84,21 @@ struct MetadataManagerWorkspaceView: View {
         .sheet(isPresented: $isAddRulePresented) {
             addRuleSheet
         }
+        .task {
+            await loadFingerprintRecords()
+        }
+        .onChange(of: selectedTab) { _, newTab in
+            if newTab == .fingerprints {
+                Task {
+                    await loadFingerprintRecords()
+                }
+            }
+        }
+    }
+
+    private func loadFingerprintRecords() async {
+        let records = await LocalFingerprintRegistry.shared.records
+        self.fingerprintRecords = records
     }
 
     // MARK: - Tab Picker Header
@@ -114,7 +129,7 @@ struct MetadataManagerWorkspaceView: View {
 
             // Badge Metrics Summary
             HStack(spacing: 12) {
-                Text("Fingerprints \(fingerprintRegistry.records.count) tracks")
+                Text("Fingerprints \(fingerprintRecords.count) tracks")
                     .font(.caption2.bold())
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -136,10 +151,10 @@ struct MetadataManagerWorkspaceView: View {
 
     private var filteredRecords: [AcousticFingerprintRecord] {
         if fingerprintSearchText.isEmpty {
-            return fingerprintRegistry.records
+            return fingerprintRecords
         }
         let q = fingerprintSearchText.lowercased()
-        return fingerprintRegistry.records.filter {
+        return fingerprintRecords.filter {
             $0.title.lowercased().contains(q) ||
             $0.artist.lowercased().contains(q) ||
             ($0.album?.lowercased().contains(q) ?? false) ||
@@ -348,11 +363,12 @@ struct MetadataManagerWorkspaceView: View {
                         .foregroundStyle(Color.accentColor)
                 }
 
-                if !fingerprintRegistry.records.isEmpty {
+                if !fingerprintRecords.isEmpty {
                     Button("Clean orphaned fingerprints") {
-                        let cleaned = fingerprintRegistry.cleanOrphanRecords(activeTracks: localStore.tracks)
-                        orphanCleanFeedback = cleaned > 0 ? "Cleaned \(cleaned) orphaned fingerprints" : "No orphaned fingerprints"
                         Task {
+                            let cleaned = await LocalFingerprintRegistry.shared.cleanOrphanRecords(activeTracks: localStore.tracks)
+                            await loadFingerprintRecords()
+                            orphanCleanFeedback = cleaned > 0 ? "Cleaned \(cleaned) orphaned fingerprints" : "No orphaned fingerprints"
                             try? await Task.sleep(for: .seconds(3))
                             orphanCleanFeedback = nil
                         }
@@ -365,9 +381,10 @@ struct MetadataManagerWorkspaceView: View {
                         .foregroundStyle(.secondary)
 
                     Button("Clear all fingerprints") {
-                        fingerprintRegistry.removeAll()
-                        orphanCleanFeedback = "All fingerprints cleared"
                         Task {
+                            await LocalFingerprintRegistry.shared.removeAll()
+                            await loadFingerprintRecords()
+                            orphanCleanFeedback = "All fingerprints cleared"
                             try? await Task.sleep(for: .seconds(3))
                             orphanCleanFeedback = nil
                         }
@@ -448,7 +465,10 @@ struct MetadataManagerWorkspaceView: View {
             Spacer()
 
             Button {
-                fingerprintRegistry.remove(fingerprint: record.fingerprint)
+                Task {
+                    await LocalFingerprintRegistry.shared.remove(fingerprint: record.fingerprint)
+                    await loadFingerprintRecords()
+                }
             } label: {
                 Image(systemName: "trash")
                     .font(.caption)

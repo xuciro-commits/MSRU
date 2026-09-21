@@ -5,8 +5,10 @@ import AVFoundation
 protocol LocalLibraryRepository: Sendable {
     func loadTracks() async throws -> [LocalTrack]
     func importTrack(from url: URL) async throws -> LocalTrack?
+    func importTracks(from urls: [URL]) async throws -> [LocalTrack]
     func saveTrackInPlace(_ track: LocalTrack) async throws
     func saveTracksInPlace(_ tracks: [LocalTrack]) async throws
+    func batchUpsertTracks(_ tracks: [LocalTrack]) async throws
     func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws
     func readTrack(from url: URL) async throws -> LocalTrack
 }
@@ -16,6 +18,18 @@ extension LocalLibraryRepository {
         try await saveTracksInPlace([track])
     }
     func saveTracksInPlace(_ tracks: [LocalTrack]) async throws {}
+    func batchUpsertTracks(_ tracks: [LocalTrack]) async throws {
+        try await saveTracksInPlace(tracks)
+    }
+    func importTracks(from urls: [URL]) async throws -> [LocalTrack] {
+        var imported: [LocalTrack] = []
+        for url in urls {
+            if let track = try await importTrack(from: url) {
+                imported.append(track)
+            }
+        }
+        return imported
+    }
     func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws {}
     func readTrack(from url: URL) async throws -> LocalTrack {
         try await FileLocalLibraryRepository.readTrack(from: url)
@@ -29,16 +43,41 @@ nonisolated private struct PersistedTrackRecord: Codable {
     let artist: String
     let album: String?
     let duration: TimeInterval
+    let artworkRelativePath: String?
     let artworkData: Data?
 
+    init(
+        fileURL: URL,
+        bookmarkData: Data?,
+        title: String,
+        artist: String,
+        album: String?,
+        duration: TimeInterval,
+        artworkRelativePath: String?,
+        artworkData: Data? = nil
+    ) {
+        self.fileURL = fileURL
+        self.bookmarkData = bookmarkData
+        self.title = title
+        self.artist = artist
+        self.album = album
+        self.duration = duration
+        self.artworkRelativePath = artworkRelativePath
+        self.artworkData = artworkData
+    }
+
     func toLocalTrack() -> LocalTrack {
-        LocalTrack(
+        var resolvedArtwork = artworkData
+        if resolvedArtwork == nil, let rel = artworkRelativePath {
+            resolvedArtwork = LocalArtworkStorage.shared.loadArtwork(relativePath: rel)
+        }
+        return LocalTrack(
             fileURL: fileURL,
             title: title,
             artist: artist,
             album: album,
             duration: duration,
-            artworkData: artworkData
+            artworkData: resolvedArtwork
         )
     }
 }
@@ -86,24 +125,41 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
     }
 
     func importTrack(from url: URL) async throws -> LocalTrack? {
-        guard isSupported(url) else { return nil }
+        let list = try await importTracks(from: [url])
+        return list.first
+    }
 
-        if directory != nil {
-            // Injected test directory mode: copies into test directory
-            return try await readTrack(from: copyFile(url))
-        } else {
-            // Production in-place reference mode: zero copying, original file untouched!
-            let hasSecurityAccess = url.startAccessingSecurityScopedResource()
-            defer {
-                if hasSecurityAccess {
-                    url.stopAccessingSecurityScopedResource()
+    func importTracks(from urls: [URL]) async throws -> [LocalTrack] {
+        let supported = urls.filter { isSupported($0) }
+        guard !supported.isEmpty else { return [] }
+
+        var readList: [LocalTrack] = []
+        for url in supported {
+            if directory != nil {
+                do {
+                    let track = try await readTrack(from: copyFile(url))
+                    readList.append(track)
+                } catch {
+                    print("Batch copy failed:", url.lastPathComponent, error.localizedDescription)
+                }
+            } else {
+                let hasSecurityAccess = url.startAccessingSecurityScopedResource()
+                defer {
+                    if hasSecurityAccess {
+                        url.stopAccessingSecurityScopedResource()
+                    }
+                }
+                do {
+                    let track = try await readTrack(from: url)
+                    readList.append(track)
+                } catch {
+                    print("Batch read failed:", url.lastPathComponent, error.localizedDescription)
                 }
             }
-
-            let track = try await readTrack(from: url)
-            try await saveTrackInPlace(track)
-            return track
         }
+
+        try await saveTracksInPlace(readList)
+        return readList
     }
 
     func saveTracksInPlace(_ tracks: [LocalTrack]) async throws {
@@ -129,6 +185,15 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
         for track in tracks {
             let key = track.fileURL.standardizedFileURL.path
             let bookmark = try? track.fileURL.bookmarkData(options: bookmarkOptions, includingResourceValuesForKeys: nil, relativeTo: nil)
+
+            // Decouple artwork data: store on disk in LocalArtworkStorage, do not serialize into JSON
+            var relPath: String? = nil
+            if let art = track.artworkData {
+                relPath = LocalArtworkStorage.shared.storeArtwork(art)
+            } else if let existingIdx = recordMap[key] {
+                relPath = existingRecords[existingIdx].artworkRelativePath
+            }
+
             let newRecord = PersistedTrackRecord(
                 fileURL: track.fileURL,
                 bookmarkData: bookmark,
@@ -136,7 +201,8 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
                 artist: track.artist,
                 album: track.album,
                 duration: track.duration,
-                artworkData: track.artworkData
+                artworkRelativePath: relPath,
+                artworkData: nil
             )
             if let existingIdx = recordMap[key] {
                 existingRecords[existingIdx] = newRecord
@@ -245,6 +311,11 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
 #else
             let resolveOptions: URL.BookmarkResolutionOptions = []
 #endif
+            var resolvedArtwork = record.artworkData
+            if resolvedArtwork == nil, let rel = record.artworkRelativePath {
+                resolvedArtwork = LocalArtworkStorage.shared.loadArtwork(relativePath: rel)
+            }
+
             if let bookmark = record.bookmarkData,
                let resolvedURL = try? URL(resolvingBookmarkData: bookmark, options: resolveOptions, relativeTo: nil, bookmarkDataIsStale: &isStale) {
                 _ = resolvedURL.startAccessingSecurityScopedResource()
@@ -254,10 +325,17 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
                     artist: record.artist,
                     album: record.album,
                     duration: record.duration,
-                    artworkData: record.artworkData
+                    artworkData: resolvedArtwork
                 ))
             } else {
-                tracks.append(record.toLocalTrack())
+                tracks.append(LocalTrack(
+                    fileURL: record.fileURL,
+                    title: record.title,
+                    artist: record.artist,
+                    album: record.album,
+                    duration: record.duration,
+                    artworkData: resolvedArtwork
+                ))
             }
         }
         return tracks

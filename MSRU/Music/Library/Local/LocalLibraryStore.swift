@@ -56,7 +56,7 @@ final class LocalLibraryStore {
                 }
             }
             self.tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-            self.registerTracksInMemory(newTracks)
+            await LocalLibraryIndexingService.shared.enqueue(newTracks)
         }
     }
 
@@ -142,57 +142,19 @@ final class LocalLibraryStore {
 
     private func importNow(_ urls: [URL]) async {
         errorMessage = nil
-        var newlyImported: [LocalTrack] = []
         do {
-            for url in urls {
-                guard let track = try await repository.importTrack(from: url) else { continue }
+            let newlyImported = try await repository.importTracks(from: urls)
+            for track in newlyImported {
                 if let index = tracks.firstIndex(where: { $0.id == track.id || $0.fileURL.standardizedFileURL == track.fileURL.standardizedFileURL }) {
                     tracks[index] = track
                 } else {
                     tracks.append(track)
                 }
-                newlyImported.append(track)
             }
             tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-            registerTracksInMemory(newlyImported)
+            await LocalLibraryIndexingService.shared.enqueue(newlyImported)
         } catch {
             errorMessage = error.localizedDescription
-        }
-    }
-
-    private func registerTracksInMemory(_ tracks: [LocalTrack]) {
-        Task(priority: .utility) {
-            let fingerprinter = AcoustIDFingerprintExtractor()
-            var batchItems: [FingerprintRegistrationItem] = []
-
-            for track in tracks {
-                let fileURL = track.fileURL
-                if LocalAudioFormatSupport.isNativeAppleFormat(fileURL) {
-                    let hasRecord = LocalFingerprintRegistry.shared.hasValidRecord(for: fileURL)
-                    if !hasRecord {
-                        if let fp = try? await fingerprinter.generateFingerprint(for: fileURL) {
-                            batchItems.append(FingerprintRegistrationItem(
-                                fingerprint: fp.fingerprint,
-                                duration: fp.duration,
-                                title: track.title,
-                                artist: track.artist,
-                                album: track.album,
-                                artworkData: track.artworkData,
-                                fileURL: fileURL
-                            ))
-                        }
-                    }
-                }
-                PathHeuristicRuleStore.shared.learnFrom(
-                    folderURL: track.fileURL.deletingLastPathComponent(),
-                    artist: track.artist,
-                    album: track.album
-                )
-            }
-
-            if !batchItems.isEmpty {
-                LocalFingerprintRegistry.shared.registerBatch(batchItems)
-            }
         }
     }
 

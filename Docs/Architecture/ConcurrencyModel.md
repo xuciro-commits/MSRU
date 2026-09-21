@@ -12,7 +12,7 @@
 | View `.task` | 只为当前可见 UI 服务的工作 | SwiftUI 取消该任务时；向 host 发 action 不自动转移其取消关系 |
 | Renderer | 原生 observer、delegate、订阅 | detach/close 时撤销；不拥有领域网络请求 |
 
-UI/Observation 和 Feature 状态转换限定 MainActor。I/O 的异步接口不意味着整段工作自动离开 MainActor；实际 CPU 密集解码/扫描应有明确执行边界。只有需要保护共享可变状态的库、缓存、解码器才建 actor，不给每个名词套 actor。跨隔离边界的请求和结果要求 Sendable；原生句柄由适配器拥有，UI action 全在 MainActor 时不必为了形式强加 Sendable。
+UI/Observation 和 Feature 状态转换限定 MainActor。I/O 的异步接口不意味着整段工作自动离开 MainActor；实际 CPU 密集解码/扫描应有明确执行边界。声学特征提取与文件解码等 CPU/IO 密集工作必须通过专有后台 actor（如 `AudioFingerprintService`）调度并进行 in-flight 去重与并发合并，严禁在 `MainActor` 或其子 `Task` 中直接同步解码。只有需要保护共享可变状态的库、缓存、解码器才建 actor，不给每个名词套 actor。跨隔离边界的请求和结果要求 Sendable；原生句柄由适配器拥有，UI action 全在 MainActor 时不必为了形式强加 Sendable。
 
 `DependencyValues` 的下标虽被 MainActor 约束，`@unchecked Sendable` 容器仍允许任意 `Key.Value`。目前不能仅凭这一点断言数据竞争，但也不能宣称任意依赖安全跨 actor。优先让 key 的值显式 Sendable（包括受全局 actor 保护的对象），并将擦除存储的不变量限制在一个实现点；后台工作只捕获所需 client/不可变值，不传整包依赖。Preview/Test 的未配置 I/O 应明确失败或返回 fixture，不应悄悄落到 live。
 

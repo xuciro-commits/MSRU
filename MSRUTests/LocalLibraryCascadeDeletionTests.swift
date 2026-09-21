@@ -124,11 +124,11 @@ struct LocalLibraryCascadeDeletionTests {
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
         let registry = LocalFingerprintRegistry(storageURL: tempDir.appendingPathComponent("test_fp.json"))
-        registry.register(fingerprint: "fp1", duration: 180, title: "Title A", artist: "Artist A")
-        registry.register(fingerprint: "fp2", duration: 200, title: "Title B", artist: "Artist B")
-        registry.register(fingerprint: "fp3", duration: 220, title: "Title C", artist: "Artist C")
+        await registry.register(fingerprint: "fp1", duration: 180, title: "Title A", artist: "Artist A")
+        await registry.register(fingerprint: "fp2", duration: 200, title: "Title B", artist: "Artist B")
+        await registry.register(fingerprint: "fp3", duration: 220, title: "Title C", artist: "Artist C")
 
-        #expect(registry.records.count == 3)
+        #expect(await registry.records.count == 3)
 
         // Only Title A and Title B are in active tracks
         let activeTracks = [
@@ -136,12 +136,12 @@ struct LocalLibraryCascadeDeletionTests {
             LocalTrack(fileURL: URL(fileURLWithPath: "/dummy/b.flac"), title: "Title B", artist: "Artist B", duration: 200)
         ]
 
-        let cleaned = registry.cleanOrphanRecords(activeTracks: activeTracks)
+        let cleaned = await registry.cleanOrphanRecords(activeTracks: activeTracks)
         #expect(cleaned == 1)
-        #expect(registry.records.count == 2)
-        #expect(registry.records.contains { $0.title == "Title A" })
-        #expect(registry.records.contains { $0.title == "Title B" })
-        #expect(!registry.records.contains { $0.title == "Title C" })
+        #expect(await registry.records.count == 2)
+        #expect(await registry.records.contains { $0.title == "Title A" })
+        #expect(await registry.records.contains { $0.title == "Title B" })
+        #expect(await !registry.records.contains { $0.title == "Title C" })
     }
 
     @Test
