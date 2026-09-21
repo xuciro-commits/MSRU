@@ -301,7 +301,7 @@ struct LocalLibraryView: View {
             }
             .padding(28)
         }
-        .scrollIndicators(.hidden)
+        .hideScrollIndicatorsCompletely()
         .overlay {
 
             if isDropTargeted {

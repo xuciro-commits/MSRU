@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import Observation
+import AppFoundationUI
 
 struct QueuePaneView: View {
     @Bindable var playback: PlaybackController
@@ -31,7 +32,7 @@ struct QueuePaneView: View {
             }
             .listStyle(.inset)
             .scrollContentBackground(.hidden)
-            .scrollIndicators(.hidden)
+            .hideScrollIndicatorsCompletely()
         }
     }
 

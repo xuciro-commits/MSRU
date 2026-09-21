@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Observation
+import AppFoundationUI
 
 struct LocalTrackTableView: View {
 
@@ -165,7 +166,7 @@ struct LocalTrackTableView: View {
             .width(min: 32, ideal: 36, max: 40)
         }
         .tint(Color.accentColor)
-        .scrollIndicators(.hidden)
+        .hideScrollIndicatorsCompletely()
     }
 
     // MARK: - Compact List View
@@ -180,7 +181,7 @@ struct LocalTrackTableView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
         }
-        .scrollIndicators(.hidden)
+        .hideScrollIndicatorsCompletely()
     }
 
     private func compactRow(index: Int, track: LocalTrack) -> some View {

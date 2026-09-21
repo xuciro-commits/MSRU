@@ -171,7 +171,7 @@ struct ArtistDetailView: View {
             }
             .padding(.bottom, 40)
         }
-        .scrollIndicators(.hidden)
+        .hideScrollIndicatorsCompletely()
         .task {
             if biographyRecord == nil {
                 biographyRecord = await ArtistBiographyService.shared.fetchBiography(artistName: artist.name)

@@ -139,7 +139,7 @@ struct AlbumsView: View {
                     }
                     .padding(24)
                 }
-                .scrollIndicators(.hidden)
+                .hideScrollIndicatorsCompletely()
             }
         }
     }

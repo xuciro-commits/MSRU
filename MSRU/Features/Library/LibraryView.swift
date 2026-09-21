@@ -444,7 +444,7 @@ struct LibraryView:
                 28
             )
         }
-        .scrollIndicators(.hidden)
+        .hideScrollIndicatorsCompletely()
     }
 
 

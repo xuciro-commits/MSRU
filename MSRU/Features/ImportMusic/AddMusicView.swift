@@ -6,6 +6,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import Observation
+import AppFoundationUI
 
 
 struct AddMusicView: View {
@@ -178,7 +179,7 @@ struct AddMusicView: View {
             }
             .padding(28)
         }
-        .scrollIndicators(.hidden)
+        .hideScrollIndicatorsCompletely()
     }
 
 

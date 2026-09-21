@@ -6,6 +6,7 @@
 import SwiftUI
 import MusicKit
 import Observation
+import AppFoundationUI
 
 
 struct MusicLibraryView: View {
@@ -174,7 +175,7 @@ struct MusicLibraryView: View {
             }
             .padding(28)
         }
-        .scrollIndicators(.hidden)
+        .hideScrollIndicatorsCompletely()
     }
 
 
@@ -265,7 +266,7 @@ struct MusicLibraryView: View {
             }
             .padding(28)
         }
-        .scrollIndicators(.hidden)
+        .hideScrollIndicatorsCompletely()
     }
 
 
@@ -336,9 +337,7 @@ struct MusicLibraryView: View {
         .scrollContentBackground(
             .hidden
         )
-        .scrollIndicators(
-            .hidden
-        )
+        .hideScrollIndicatorsCompletely()
     }
 
 

@@ -5,6 +5,7 @@
 
 import SwiftUI
 import AppFoundation
+import AppFoundationUI
 
 @MainActor
 struct PlaylistDetailView: View {
@@ -151,7 +152,7 @@ struct PlaylistDetailView: View {
             }
             .padding(.bottom, 48)
         }
-        .scrollIndicators(.hidden)
+        .hideScrollIndicatorsCompletely()
         .sheet(isPresented: $isEditSheetPresented) {
             NewPlaylistSheetView(
                 initialTitle: playlist.title,
