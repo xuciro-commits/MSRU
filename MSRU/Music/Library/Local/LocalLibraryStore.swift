@@ -168,7 +168,7 @@ final class LocalLibraryStore {
             for track in tracks {
                 let fileURL = track.fileURL
                 if LocalAudioFormatSupport.isNativeAppleFormat(fileURL) {
-                    let hasRecord = await LocalFingerprintRegistry.shared.hasValidRecord(for: fileURL)
+                    let hasRecord = LocalFingerprintRegistry.shared.hasValidRecord(for: fileURL)
                     if !hasRecord {
                         if let fp = try? await fingerprinter.generateFingerprint(for: fileURL) {
                             batchItems.append(FingerprintRegistrationItem(
@@ -183,7 +183,7 @@ final class LocalLibraryStore {
                         }
                     }
                 }
-                await PathHeuristicRuleStore.shared.learnFrom(
+                PathHeuristicRuleStore.shared.learnFrom(
                     folderURL: track.fileURL.deletingLastPathComponent(),
                     artist: track.artist,
                     album: track.album
@@ -191,7 +191,7 @@ final class LocalLibraryStore {
             }
 
             if !batchItems.isEmpty {
-                await LocalFingerprintRegistry.shared.registerBatch(batchItems)
+                LocalFingerprintRegistry.shared.registerBatch(batchItems)
             }
         }
     }

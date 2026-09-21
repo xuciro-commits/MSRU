@@ -341,7 +341,7 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
         // Fast path for DSD DSF files: bypass AVFoundation to prevent CoreAudio FFR errors
         if url.pathExtension.lowercased() == "dsf", let dsfMeta = DSFHeaderReader.readMetadata(from: url) {
             let parsed = FileNameHeuristicParser.parse(fileURL: url)
-            let rule = await PathHeuristicRuleStore.shared.match(fileURL: url)
+            let rule = PathHeuristicRuleStore.shared.match(fileURL: url)
             let title = parsed.title
             let artist = rule?.targetArtist ?? parsed.artist ?? "Unknown Artist"
             let album = rule?.targetAlbum ?? parsed.album
@@ -387,7 +387,7 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
         // MARK: Title
 
         let parsed = FileNameHeuristicParser.parse(fileURL: url)
-        let rule = await PathHeuristicRuleStore.shared.match(fileURL: url)
+        let rule = PathHeuristicRuleStore.shared.match(fileURL: url)
 
         // MARK: Title
 

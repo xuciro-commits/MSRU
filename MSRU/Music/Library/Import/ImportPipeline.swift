@@ -110,7 +110,7 @@ public final class ImportPipeline: Sendable {
 
             // Priority 2: Local Acoustic Fingerprint Memory Registry (0ms in-memory lookup)
             if let fp = fp,
-               let memory = await LocalFingerprintRegistry.shared.lookup(fingerprint: fp.fingerprint, duration: fp.duration) {
+               let memory = LocalFingerprintRegistry.shared.lookup(fingerprint: fp.fingerprint, duration: fp.duration) {
                 // If local memory exists, fill in MBID or missing fields
                 recordingMBID = memory.recordingMBID
                 matchedMemoryRecord = memory
@@ -142,7 +142,7 @@ public final class ImportPipeline: Sendable {
 
             // Priority 5: Path Heuristic Rules (only for filling missing artist or album from directory structure)
             if detectedArtist == nil || detectedArtist?.isEmpty == true || detectedArtist == "Unknown Artist" || detectedAlbum == nil {
-                if let rule = await PathHeuristicRuleStore.shared.match(fileURL: url) {
+                if let rule = PathHeuristicRuleStore.shared.match(fileURL: url) {
                     if detectedArtist == nil || detectedArtist?.isEmpty == true || detectedArtist == "Unknown Artist" {
                         detectedArtist = rule.targetArtist
                     }

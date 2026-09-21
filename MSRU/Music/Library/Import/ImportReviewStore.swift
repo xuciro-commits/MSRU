@@ -197,7 +197,7 @@ public final class ImportReviewStore {
 
                 // 3. Register in Local Fingerprint Memory
                 if let fp = local.fingerprint ?? local.acoustID {
-                    await LocalFingerprintRegistry.shared.register(
+                    LocalFingerprintRegistry.shared.register(
                         fingerprint: fp,
                         duration: local.duration,
                         title: title,
