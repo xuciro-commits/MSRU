@@ -87,6 +87,19 @@ flowchart TD
    - 动态环境注入：`SwiftUISceneRootView`（iOS/visionOS）与 `MSRUMacWindowComposition`（macOS）顶层侦听 `languageSettings.resolvedLocale`，注入 `.applyLocaleOverride()` 驱动界面与导航栏全局即时响应切换。
    - 用户偏好自选：在“设置 - 通用 - 语言”提供可视化分段选择器，设置变动即刻生效，无需重启应用。
 
+## 平台几何与呈现意图边界 (Platform Geometry & Presentation Invariants)
+
+```text
+Platform owns geometry.
+Product composition selects policy.
+Feature owns presentation intent.
+```
+
+- **Native Platform Layer (AppFoundationUI)**: 负责发现并暴露实际的 Window、Split 与 Safe-Area 真实几何（通过 `WorkspaceSafeAreaContainer` 向 SwiftUI 注入 `\.workspaceSafeAreaInsets` 环境值）。macOS Split region 的几何策略属于 composition-time policy，在 `NSSplitViewItem` 加入 split hierarchy 前完成配置，不依赖运行期修改结构性 layout policy 来重建 underlap geometry。
+- **Product Composition (MSRU / Composition)**: 负责决定工作区是否启用原生沉浸式 Underlap 模式。
+- **Feature UI (MSRU / Features)**: 负责决定具体业务内容哪些避让、哪些穿越未遮挡工作区边界。
+- **不变量约束**：任何 Feature 严禁硬编码 Sidebar、Inspector、Toolbar 或 Accessory 的物理尺寸。
+
 ## 为什么当前方向大体可保留
 
 `ApplicationDefinition` 已把 feature contributions 与 destinations 一次安装；typed Route、应用/场景状态分离、FeatureHost 的依赖快照和可替换窗口工厂都有实际用途。问题不是缺少更高层抽象，而是任务失效、呈现刷新、恢复容错和第二平台尚未闭环。先证明这四点，再扩大框架表面积。

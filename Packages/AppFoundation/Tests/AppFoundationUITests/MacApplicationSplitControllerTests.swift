@@ -48,6 +48,57 @@ struct MacApplicationSplitControllerTests {
 
     @Test
     @MainActor
+    func appliesCompositionTimeStructuralPolicyToSplitItems() {
+
+        let controller =
+            MacApplicationSplitController(
+                navigationViewController:
+                    NSViewController(),
+                workspaceViewController:
+                    NSViewController(),
+                configuration:
+                    .init(
+                        navigation:
+                            .init(
+                                canCollapse:
+                                    true,
+                                minimumThickness:
+                                    180
+                            ),
+                        workspace:
+                            .init(
+                                canCollapse:
+                                    false,
+                                minimumThickness:
+                                    500,
+                                automaticallyAdjustsSafeAreaInsets:
+                                    true
+                            )
+                    )
+            )
+
+        controller
+            .loadViewIfNeeded()
+
+
+        #expect(
+            controller
+                .workspaceItem
+                .automaticallyAdjustsSafeAreaInsets
+        )
+
+        #expect(
+            controller
+                .workspaceItem
+                .minimumThickness
+            ==
+            500
+        )
+    }
+
+
+    @Test
+    @MainActor
     func installsOptionalContextRegion() {
 
         let controller =

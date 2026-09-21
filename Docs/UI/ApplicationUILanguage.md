@@ -34,3 +34,16 @@ Browse 目前页面内搜索和新 toolbar 搜索重复。第一批工作应是�
 同一套 fixture，两个平台分别验证：搜索、取消/替换搜索、导航后回来、队列开关、播放状态共享、场景 UI 独立、保存并恢复。原生 toolbar 文本与 enabled 的更新不能丢键盘焦点。iPad 同时验证一个 Scene 的语义与多个 WindowGroup 会话的隔离；不要把 `.new` 命令被拒绝误报为已支持跨窗口路由。
 
 每个导出的独立 View/renderer 提供无网络、无真实持久化的 Preview/PreviewHost，覆盖有内容、空、失败、窄宽度及长文本。行为类型用契约测试，不要求每个 struct 都造一个 Preview。当前 Workspace/Context/Accessory 和 Mac renderer 已有 preview host，先复用它们；暂不新增通用 Card、Page、Form、Table 包装。
+
+## Immersive Workspace
+
+macOS Workspace is treated as a continuous visual surface.
+
+Native Sidebar and Inspector chrome may overlay the Workspace. Horizontal immersive content may extend beneath translucent system chrome, while its resting content remains aligned to the unobscured workspace region.
+
+Feature views must not encode sidebar or inspector widths. They respond to platform-provided workspace safe-area geometry.
+
+Ordinary controls, headers, grids, and interaction-critical content remain inside the unobscured region unless the feature intentionally opts into edge-to-edge presentation.
+
+AppFoundationUI 的“完全隐藏滚动指示器”语义必须同时移除 native scroller 的布局占位；具体 AppKit 兼容处理由平台层封装，Feature 不直接管理 `NSScroller`。
+
