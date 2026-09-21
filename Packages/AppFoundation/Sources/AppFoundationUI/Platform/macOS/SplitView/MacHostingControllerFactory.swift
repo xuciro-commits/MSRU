@@ -12,6 +12,11 @@ import SwiftUI
 @MainActor
 public final class MacSplitHostingController<Content: View>: NSHostingController<Content> {
 
+    public override func viewWillAppear() {
+        super.viewWillAppear()
+        MacScrollIndicatorSuppressor.suppressScrollIndicators(in: view)
+    }
+
     public override func viewDidLayout() {
         super.viewDidLayout()
         MacScrollIndicatorSuppressor.suppressScrollIndicators(in: view)

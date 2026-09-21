@@ -490,12 +490,47 @@ public final class MacApplicationShellRenderer {
                 )
         }
 
-        return wrapWithLocale(
-            wrapped,
-            locale:
-                locale
+        let localized =
+            wrapWithLocale(
+                wrapped,
+                locale:
+                    locale
+            )
+
+        return AnyView(
+            WorkspaceSafeAreaContainer(
+                content:
+                    localized
+            )
         )
     }
+}
+
+private struct WorkspaceSafeAreaContainer: View {
+
+    let content:
+        AnyView
+
+    var body: some View {
+
+        GeometryReader { proxy in
+
+            content
+                .frame(
+                    width:
+                        proxy.size.width,
+                    height:
+                        proxy.size.height
+                )
+                .environment(
+                    \.workspaceSafeAreaInsets,
+                    proxy.safeAreaInsets
+                )
+        }
+    }
+}
+
+extension MacApplicationShellRenderer {
 
     private func wrapWorkspaceContent(
         _ content:
