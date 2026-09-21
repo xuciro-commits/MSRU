@@ -180,4 +180,79 @@ struct CustomAudioCodecTests {
         #expect(seekBlock.frameCount > 0)
         decoder.close()
     }
+
+    @Test("Decoder format is strictly negotiated and locked at open time (P1-1)")
+    func testDecoderFormatLockedAtOpen() throws {
+        let dsfURL = URL(fileURLWithPath: "/Volumes/资料盘/70-媒体与收藏/71-音乐库/Artists/华语女/陈慧娴/陈慧娴 - The Wall.dsf")
+        guard FileManager.default.fileExists(atPath: dsfURL.path) else { return }
+
+        let decoder = try FFmpegAudioDecoder(url: dsfURL)
+        let initialSampleRate = decoder.format.sampleRate
+        let initialChannels = decoder.format.channels
+        let canSeek = decoder.format.canSeek
+
+        #expect(canSeek == true)
+        #expect(initialChannels == 2)
+        #expect(initialSampleRate == 88200 || initialSampleRate == 176400)
+
+        // Read several blocks
+        for _ in 0..<5 {
+            let block = try decoder.read(maxFrames: 2048)
+            let validBlock = try #require(block)
+            #expect(validBlock.channelCount == initialChannels)
+            #expect(validBlock.frameCount > 0)
+        }
+
+        // Verify format remained exactly identical
+        #expect(decoder.format.sampleRate == initialSampleRate)
+        #expect(decoder.format.channels == initialChannels)
+        decoder.close()
+    }
+
+    @Test("Repeated seek cycles cleanly reset resampler and state machine (P1-2)")
+    func testRepeatedSeekCyclesCleanReset() throws {
+        let apeURL = URL(fileURLWithPath: "/Volumes/资料盘/70-媒体与收藏/71-音乐库/Artists/华语男/李克勤/李克勤-护花使者.ape")
+        guard FileManager.default.fileExists(atPath: apeURL.path) else { return }
+
+        let decoder = try FFmpegAudioDecoder(url: apeURL)
+        let seekTargets: [TimeInterval] = [10.0, 2.0, 25.0, 0.0, 15.0]
+
+        for target in seekTargets {
+            try decoder.seek(to: target)
+            let block = try decoder.read(maxFrames: 2048)
+            let b = try #require(block)
+            #expect(b.frameCount > 0)
+            #expect(b.channelCount == 2)
+        }
+
+        decoder.close()
+    }
+
+    @Test("Decoder thread-safety under concurrent access (P1-5)")
+    func testDecoderThreadSafetyConcurrentAccess() throws {
+        let apeURL = URL(fileURLWithPath: "/Volumes/资料盘/70-媒体与收藏/71-音乐库/Artists/华语男/李克勤/李克勤-护花使者.ape")
+        guard FileManager.default.fileExists(atPath: apeURL.path) else { return }
+
+        let decoder = try FFmpegAudioDecoder(url: apeURL)
+        let group = DispatchGroup()
+
+        // Concurrent reads and seeks
+        for i in 0..<8 {
+            group.enter()
+            DispatchQueue.global().async {
+                do {
+                    if i % 2 == 0 {
+                        try decoder.seek(to: Double(i * 3))
+                    }
+                    _ = try decoder.read(maxFrames: 1024)
+                } catch {
+                    // Ignore closed or expected errors during concurrent stress
+                }
+                group.leave()
+            }
+        }
+
+        group.wait()
+        decoder.close()
+    }
 }

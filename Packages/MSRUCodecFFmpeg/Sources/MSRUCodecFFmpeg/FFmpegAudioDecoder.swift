@@ -181,33 +181,35 @@ public final class FFmpegAudioDecoder: @unchecked Sendable {
         }
 
         let channelCount = max(1, format.channels)
-        var channelArrays = (0..<channelCount).map { _ in
-            [Float](repeating: 0, count: maxFrames)
+
+        // Safely allocate dedicated native float buffers for each channel
+        var channelPointers = [UnsafeMutablePointer<Float>?]()
+        channelPointers.reserveCapacity(channelCount)
+        for _ in 0..<channelCount {
+            let ptr = UnsafeMutablePointer<Float>.allocate(capacity: maxFrames)
+            ptr.initialize(repeating: 0, count: maxFrames)
+            channelPointers.append(ptr)
+        }
+        defer {
+            for ptr in channelPointers {
+                ptr?.deallocate()
+            }
         }
 
         var outputFrames: Int32 = 0
         var errorBuffer = [CChar](repeating: 0, count: 1024)
 
-        // Allocate pointer array pointing to the raw buffer of each channel
-        var pointers = [UnsafeMutablePointer<Float>?](repeating: nil, count: channelCount)
-
-        let result = channelArrays.withUnsafeMutableBufferPointer { outerBuffer in
-            for ch in 0..<channelCount {
-                pointers[ch] = outerBuffer[ch].withUnsafeMutableBufferPointer { $0.baseAddress }
-            }
-
-            return pointers.withUnsafeMutableBufferPointer { pointerArray in
-                errorBuffer.withUnsafeMutableBufferPointer { errorPointer in
-                    msru_ffmpeg_decoder_read(
-                        handle,
-                        pointerArray.baseAddress,
-                        Int32(channelCount),
-                        Int32(maxFrames),
-                        &outputFrames,
-                        errorPointer.baseAddress,
-                        Int32(errorPointer.count)
-                    )
-                }
+        let result = channelPointers.withUnsafeMutableBufferPointer { ptrList in
+            errorBuffer.withUnsafeMutableBufferPointer { errorPointer in
+                msru_ffmpeg_decoder_read(
+                    handle,
+                    ptrList.baseAddress,
+                    Int32(channelCount),
+                    Int32(maxFrames),
+                    &outputFrames,
+                    errorPointer.baseAddress,
+                    Int32(errorPointer.count)
+                )
             }
         }
 
@@ -220,12 +222,16 @@ public final class FFmpegAudioDecoder: @unchecked Sendable {
         }
 
         let count = Int(outputFrames)
-        let trimmedChannels = channelArrays.map { ch in
-            count < maxFrames ? Array(ch.prefix(count)) : ch
+        let channels: [[Float]] = (0..<channelCount).map { ch in
+            if let ptr = channelPointers[ch] {
+                return Array(UnsafeBufferPointer(start: ptr, count: count))
+            } else {
+                return [Float](repeating: 0, count: count)
+            }
         }
 
         return FFmpegPCMBlock(
-            channels: trimmedChannels,
+            channels: channels,
             frameCount: count
         )
     }

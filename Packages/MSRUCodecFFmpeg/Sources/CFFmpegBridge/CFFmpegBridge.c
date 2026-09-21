@@ -15,51 +15,32 @@
 
 
 typedef struct {
-
     AVFormatContext *format_context;
-
     AVCodecContext *codec_context;
-
     SwrContext *swr_context;
-
     AVPacket *packet;
-
     AVFrame *frame;
-
     int stream_index;
 
-
     int source_sample_rate;
-
     int source_channels;
-
     AVChannelLayout source_channel_layout;
-
     enum AVSampleFormat source_sample_format;
 
-
     int output_sample_rate;
-
     int output_channels;
-
     AVChannelLayout output_channel_layout;
 
-
     int is_dsd;
-
     int reached_eof;
-
     int sent_flush;
-
+    int has_pending_packet;
 
     float **pending_buffers;
-
-    int pending_capacity;
-
+    int pending_capacity_frames;
+    int pending_channels;
     int pending_frames;
-
     int pending_offset;
-
 } MSRUFFmpegDecoder;
 
 
@@ -112,55 +93,151 @@ msru_write_ffmpeg_error(
 }
 
 
-// MARK: - Pending Buffer Management
+// MARK: - DSD Rate Selection Policy (P0-3)
+
+/*
+ * DSD-to-PCM decimation rate policy:
+ * - DSD64 (2.8224 MHz bit clock or 352.8 kHz byte clock) -> 88.2 kHz
+ * - DSD128 (5.6448 MHz bit clock or 705.6 kHz byte clock) -> 176.4 kHz
+ * - DSD256 and above (11.2896 MHz+) -> 176.4 kHz (compatibility cap for AudioUnit / AVAudioEngine)
+ * - 48kHz-family DSD (3.072 MHz, 6.144 MHz, etc.) -> 96 kHz / 192 kHz
+ */
+static int
+msru_choose_dsd_pcm_rate(int source_sample_rate) {
+    if (source_sample_rate <= 0) {
+        return 88200;
+    }
+
+    // Check for 48kHz-family DSD (multiples of 48000, 384000, 3072000, etc.)
+    if ((source_sample_rate % 48000 == 0) || (source_sample_rate % 384000 == 0)) {
+        if (source_sample_rate >= 6144000 || (source_sample_rate >= 768000 && source_sample_rate < 2822400)) {
+            return 192000;
+        }
+        return 96000;
+    }
+
+    // Standard 44.1kHz-family DSD (2.8224MHz / 352.8kHz for DSD64, 5.6448MHz / 705.6kHz for DSD128, etc.)
+    if (source_sample_rate >= 5644800 || (source_sample_rate >= 705600 && source_sample_rate < 2822400)) {
+        return 176400;
+    }
+
+    // DSD64 default -> 88.2 kHz
+    return 88200;
+}
+
+
+// MARK: - Seekability Detection (P1-3)
+
+static int
+msru_compute_can_seek(const MSRUFFmpegDecoder *decoder) {
+    if (decoder == NULL || decoder->format_context == NULL) {
+        return 0;
+    }
+
+    if (decoder->format_context->pb != NULL) {
+        if (decoder->format_context->pb->seekable & AVIO_SEEKABLE_NORMAL) {
+            return 1;
+        }
+        if (decoder->format_context->pb->seekable != 0) {
+            return 1;
+        }
+    }
+
+    if (decoder->format_context->duration > 0) {
+        return 1;
+    }
+
+    return 0;
+}
+
+
+// MARK: - Pending Buffer Management (P0-5)
+
+static void
+msru_free_pending_buffers(MSRUFFmpegDecoder *decoder) {
+    if (decoder->pending_buffers != NULL) {
+        for (int ch = 0; ch < decoder->pending_channels; ch++) {
+            if (decoder->pending_buffers[ch] != NULL) {
+                free(decoder->pending_buffers[ch]);
+                decoder->pending_buffers[ch] = NULL;
+            }
+        }
+        free(decoder->pending_buffers);
+        decoder->pending_buffers = NULL;
+    }
+    decoder->pending_capacity_frames = 0;
+    decoder->pending_channels = 0;
+    decoder->pending_frames = 0;
+    decoder->pending_offset = 0;
+}
 
 static int
 msru_ensure_pending_capacity(
     MSRUFFmpegDecoder *decoder,
     int frames
 ) {
-    if (decoder->pending_capacity >= frames && decoder->pending_buffers != NULL) {
+    int target_channels = decoder->output_channels > 0 ? decoder->output_channels : 2;
+
+    // Cleanly reallocate if channel count changed
+    if (decoder->pending_buffers != NULL && decoder->pending_channels != target_channels) {
+        msru_free_pending_buffers(decoder);
+    }
+
+    if (decoder->pending_buffers != NULL && decoder->pending_capacity_frames >= frames) {
         return 0;
     }
 
-    int new_capacity = frames > (decoder->pending_capacity * 2) ? frames : (decoder->pending_capacity * 2);
+    int new_capacity = frames > (decoder->pending_capacity_frames * 2)
+        ? frames
+        : (decoder->pending_capacity_frames * 2);
     if (new_capacity < 8192) {
         new_capacity = 8192;
     }
 
-    int channels = decoder->output_channels;
-    if (channels <= 0) {
-        channels = 2;
-    }
-
     if (decoder->pending_buffers == NULL) {
-        decoder->pending_buffers = (float **)calloc((size_t)channels, sizeof(float *));
-        if (decoder->pending_buffers == NULL) {
+        float **new_buffers = (float **)calloc((size_t)target_channels, sizeof(float *));
+        if (new_buffers == NULL) {
             return AVERROR(ENOMEM);
         }
-        for (int ch = 0; ch < channels; ch++) {
-            decoder->pending_buffers[ch] = (float *)malloc((size_t)new_capacity * sizeof(float));
-            if (decoder->pending_buffers[ch] == NULL) {
+        for (int ch = 0; ch < target_channels; ch++) {
+            new_buffers[ch] = (float *)malloc((size_t)new_capacity * sizeof(float));
+            if (new_buffers[ch] == NULL) {
+                for (int i = 0; i < ch; i++) {
+                    free(new_buffers[i]);
+                }
+                free(new_buffers);
                 return AVERROR(ENOMEM);
             }
         }
-    } else {
-        for (int ch = 0; ch < channels; ch++) {
-            float *re = (float *)realloc(decoder->pending_buffers[ch], (size_t)new_capacity * sizeof(float));
-            if (re == NULL) {
-                return AVERROR(ENOMEM);
-            }
-            decoder->pending_buffers[ch] = re;
-        }
+        decoder->pending_buffers = new_buffers;
+        decoder->pending_channels = target_channels;
+        decoder->pending_capacity_frames = new_capacity;
+        decoder->pending_frames = 0;
+        decoder->pending_offset = 0;
+        return 0;
     }
 
-    decoder->pending_capacity = new_capacity;
+    // Safe realloc for existing channel buffers
+    for (int ch = 0; ch < target_channels; ch++) {
+        float *re = (float *)realloc(decoder->pending_buffers[ch], (size_t)new_capacity * sizeof(float));
+        if (re == NULL) {
+            return AVERROR(ENOMEM);
+        }
+        decoder->pending_buffers[ch] = re;
+    }
+
+    decoder->pending_capacity_frames = new_capacity;
     return 0;
 }
 
 
-// MARK: - Resampler Configuration
+// MARK: - Resampler Configuration (P0-2, P0-4)
 
+/*
+ * Note: DSD-to-PCM decimation pipeline:
+ * Decodes DSD bitstream to float planar samples, resampled/filtered via libswresample
+ * into target float planar PCM (AV_SAMPLE_FMT_FLTP). Does NOT claim Native DSD or DoP.
+ */
 static int
 msru_configure_resampler(
     MSRUFFmpegDecoder *decoder,
@@ -178,6 +255,7 @@ msru_configure_resampler(
 
     if (decoder->swr_context != NULL) {
         swr_free(&decoder->swr_context);
+        decoder->swr_context = NULL;
     }
 
     decoder->source_sample_rate = frame_rate;
@@ -185,20 +263,55 @@ msru_configure_resampler(
     av_channel_layout_uninit(&decoder->source_channel_layout);
     av_channel_layout_copy(&decoder->source_channel_layout, &frame->ch_layout);
 
-    // Preserve source channel layout! Do NOT downmix to stereo.
+    // Multichannel preservation: do not downmix to stereo! Preserve full channel layout.
     av_channel_layout_uninit(&decoder->output_channel_layout);
     av_channel_layout_copy(&decoder->output_channel_layout, &frame->ch_layout);
     decoder->output_channels = frame->ch_layout.nb_channels;
 
-    // Sample rate policy:
-    // DSD -> PCM requires conversion (e.g. 88.2 kHz for DSD64, 176.4 kHz for DSD128+)
-    // PCM (APE, DTS) -> preserve source sample rate!
     if (decoder->is_dsd) {
-        if (decoder->source_sample_rate >= 5644800) {
-            decoder->output_sample_rate = 176400;
-        } else {
-            decoder->output_sample_rate = 88200;
-        }
+        decoder->output_sample_rate = msru_choose_dsd_pcm_rate(decoder->source_sample_rate);
+    } else {
+        decoder->output_sample_rate = decoder->source_sample_rate > 0 ? decoder->source_sample_rate : 44100;
+    }
+
+    int ret = swr_alloc_set_opts2(
+        &decoder->swr_context,
+        &decoder->output_channel_layout,
+        AV_SAMPLE_FMT_FLTP,
+        decoder->output_sample_rate,
+        &decoder->source_channel_layout,
+        decoder->source_sample_format,
+        decoder->source_sample_rate,
+        0,
+        NULL
+    );
+
+    if (ret < 0) {
+        return ret;
+    }
+
+    return swr_init(decoder->swr_context);
+}
+
+static int
+msru_configure_resampler_fallback(
+    MSRUFFmpegDecoder *decoder
+) {
+    if (decoder->swr_context != NULL) {
+        return 0;
+    }
+
+    decoder->source_sample_rate = decoder->codec_context->sample_rate > 0 ? decoder->codec_context->sample_rate : 44100;
+    decoder->source_sample_format = decoder->codec_context->sample_fmt != AV_SAMPLE_FMT_NONE ? decoder->codec_context->sample_fmt : AV_SAMPLE_FMT_FLTP;
+    av_channel_layout_uninit(&decoder->source_channel_layout);
+    av_channel_layout_copy(&decoder->source_channel_layout, &decoder->codec_context->ch_layout);
+
+    av_channel_layout_uninit(&decoder->output_channel_layout);
+    av_channel_layout_copy(&decoder->output_channel_layout, &decoder->source_channel_layout);
+    decoder->output_channels = decoder->source_channel_layout.nb_channels > 0 ? decoder->source_channel_layout.nb_channels : 2;
+
+    if (decoder->is_dsd) {
+        decoder->output_sample_rate = msru_choose_dsd_pcm_rate(decoder->source_sample_rate);
     } else {
         decoder->output_sample_rate = decoder->source_sample_rate;
     }
@@ -219,12 +332,11 @@ msru_configure_resampler(
         return ret;
     }
 
-    ret = swr_init(decoder->swr_context);
-    return ret;
+    return swr_init(decoder->swr_context);
 }
 
 
-// MARK: - Open
+// MARK: - Open (P1-1: Probing First Frame & Locking Format)
 
 MSRUFFmpegDecoderRef
 msru_ffmpeg_decoder_open(
@@ -288,6 +400,18 @@ msru_ffmpeg_decoder_open(
         return NULL;
     }
 
+    // Check if DSD format
+    if (codec->id == AV_CODEC_ID_DSD_LSBF
+        || codec->id == AV_CODEC_ID_DSD_MSBF
+        || codec->id == AV_CODEC_ID_DSD_LSBF_PLANAR
+        || codec->id == AV_CODEC_ID_DSD_MSBF_PLANAR) {
+        decoder->is_dsd = 1;
+        // P0-2: Request float planar samples from DSD decoder
+        decoder->codec_context->request_sample_fmt = AV_SAMPLE_FMT_FLTP;
+    } else {
+        decoder->is_dsd = 0;
+    }
+
     ret = avcodec_open2(decoder->codec_context, codec, NULL);
     if (ret < 0) {
         msru_write_ffmpeg_error(error_buffer, error_buffer_size, "Failed to open codec", ret);
@@ -297,31 +421,16 @@ msru_ffmpeg_decoder_open(
         return NULL;
     }
 
-    // Check if DSD format
-    if (codec->id == AV_CODEC_ID_DSD_LSBF
-        || codec->id == AV_CODEC_ID_DSD_MSBF
-        || codec->id == AV_CODEC_ID_DSD_LSBF_PLANAR
-        || codec->id == AV_CODEC_ID_DSD_MSBF_PLANAR) {
-        decoder->is_dsd = 1;
-    } else {
-        decoder->is_dsd = 0;
-    }
-
     decoder->source_sample_rate = decoder->codec_context->sample_rate;
     decoder->source_channels = decoder->codec_context->ch_layout.nb_channels;
     decoder->source_sample_format = decoder->codec_context->sample_fmt;
     av_channel_layout_copy(&decoder->source_channel_layout, &decoder->codec_context->ch_layout);
 
-    // Initial output layout matches source layout
     av_channel_layout_copy(&decoder->output_channel_layout, &decoder->source_channel_layout);
     decoder->output_channels = decoder->source_channels;
 
     if (decoder->is_dsd) {
-        if (decoder->source_sample_rate >= 5644800) {
-            decoder->output_sample_rate = 176400;
-        } else {
-            decoder->output_sample_rate = 88200;
-        }
+        decoder->output_sample_rate = msru_choose_dsd_pcm_rate(decoder->source_sample_rate);
     } else {
         decoder->output_sample_rate = decoder->source_sample_rate > 0 ? decoder->source_sample_rate : 44100;
     }
@@ -334,6 +443,83 @@ msru_ffmpeg_decoder_open(
         return NULL;
     }
 
+    // P1-1: Probe the first valid audio frame to negotiate and lock output parameters
+    int probed = 0;
+    while (!probed && !decoder->reached_eof) {
+        int r_ret = avcodec_receive_frame(decoder->codec_context, decoder->frame);
+        if (r_ret == 0) {
+            probed = 1;
+            break;
+        } else if (r_ret == AVERROR_EOF) {
+            decoder->reached_eof = 1;
+            break;
+        } else if (r_ret == AVERROR(EAGAIN)) {
+            int got_packet = 0;
+            while (!got_packet) {
+                int read_ret = av_read_frame(decoder->format_context, decoder->packet);
+                if (read_ret == AVERROR_EOF) {
+                    if (!decoder->sent_flush) {
+                        avcodec_send_packet(decoder->codec_context, NULL);
+                        decoder->sent_flush = 1;
+                    }
+                    break;
+                } else if (read_ret < 0) {
+                    break;
+                }
+
+                if (decoder->packet->stream_index == decoder->stream_index) {
+                    int send_ret = avcodec_send_packet(decoder->codec_context, decoder->packet);
+                    if (send_ret == 0) {
+                        av_packet_unref(decoder->packet);
+                        got_packet = 1;
+                    } else if (send_ret == AVERROR(EAGAIN)) {
+                        decoder->has_pending_packet = 1;
+                        got_packet = 1;
+                    } else {
+                        av_packet_unref(decoder->packet);
+                        break;
+                    }
+                } else {
+                    av_packet_unref(decoder->packet);
+                }
+            }
+            if (!got_packet && decoder->sent_flush) {
+                continue;
+            }
+            if (!got_packet) {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    if (probed && decoder->frame->nb_samples > 0) {
+        int config_ret = msru_configure_resampler(decoder, decoder->frame);
+        if (config_ret >= 0) {
+            int max_out = swr_get_out_samples(decoder->swr_context, decoder->frame->nb_samples);
+            if (max_out <= 0) {
+                max_out = decoder->frame->nb_samples;
+            }
+            if (msru_ensure_pending_capacity(decoder, max_out) >= 0) {
+                int converted = swr_convert(
+                    decoder->swr_context,
+                    (uint8_t **)decoder->pending_buffers,
+                    max_out,
+                    (const uint8_t **)decoder->frame->extended_data,
+                    decoder->frame->nb_samples
+                );
+                if (converted > 0) {
+                    decoder->pending_frames = converted;
+                    decoder->pending_offset = 0;
+                }
+            }
+        }
+        av_frame_unref(decoder->frame);
+    } else {
+        msru_configure_resampler_fallback(decoder);
+    }
+
     // Calculate duration
     double duration = 0.0;
     if (stream->duration > 0 && stream->time_base.den > 0) {
@@ -342,12 +528,15 @@ msru_ffmpeg_decoder_open(
         duration = (double)decoder->format_context->duration / (double)AV_TIME_BASE;
     }
 
+    // Return locked output format information
     info->sample_rate = decoder->output_sample_rate;
     info->channels = decoder->output_channels;
-    info->channel_layout_mask = decoder->output_channel_layout.order == AV_CHANNEL_ORDER_NATIVE ? decoder->output_channel_layout.u.mask : 0;
+    info->channel_layout_mask = (decoder->output_channel_layout.order == AV_CHANNEL_ORDER_NATIVE)
+        ? decoder->output_channel_layout.u.mask
+        : 0;
     info->duration_seconds = duration;
     info->bit_rate = decoder->format_context->bit_rate > 0 ? decoder->format_context->bit_rate : decoder->codec_context->bit_rate;
-    info->can_seek = 1;
+    info->can_seek = msru_compute_can_seek(decoder);
 
     snprintf(info->codec_name, sizeof(info->codec_name), "%s", codec->name != NULL ? codec->name : "unknown");
     snprintf(info->format_name, sizeof(info->format_name), "%s", decoder->format_context->iformat->name != NULL ? decoder->format_context->iformat->name : "unknown");
@@ -356,7 +545,7 @@ msru_ffmpeg_decoder_open(
 }
 
 
-// MARK: - Read
+// MARK: - Read (P0-1, P0-4)
 
 int32_t
 msru_ffmpeg_decoder_read(
@@ -379,7 +568,7 @@ msru_ffmpeg_decoder_read(
     int frames_written = 0;
 
     while (frames_needed > 0) {
-        // Drain pending converted frames first
+        // 1. Drain pending converted frames first
         int available = decoder->pending_frames - decoder->pending_offset;
         if (available > 0) {
             int to_copy = available < frames_needed ? available : frames_needed;
@@ -419,10 +608,10 @@ msru_ffmpeg_decoder_read(
             break;
         }
 
-        // Try to receive a decoded frame from codec
+        // 2. Try to receive decoded frame
         int ret = avcodec_receive_frame(decoder->codec_context, decoder->frame);
         if (ret == 0) {
-            // Convert frame using SwrContext
+            // Frame received! Convert and store into pending_buffers
             int configure_ret = msru_configure_resampler(decoder, decoder->frame);
             if (configure_ret < 0) {
                 msru_write_ffmpeg_error(error_buffer, error_buffer_size, "Resampler configuration failed", configure_ret);
@@ -442,11 +631,12 @@ msru_ffmpeg_decoder_read(
                 return -1;
             }
 
+            // P0-4: Use extended_data for planar and multichannel safety (>8 channels)
             int converted = swr_convert(
                 decoder->swr_context,
                 (uint8_t **)decoder->pending_buffers,
                 max_out,
-                (const uint8_t **)decoder->frame->data,
+                (const uint8_t **)decoder->frame->extended_data,
                 decoder->frame->nb_samples
             );
 
@@ -464,11 +654,34 @@ msru_ffmpeg_decoder_read(
             decoder->reached_eof = 1;
             break;
         } else if (ret == AVERROR(EAGAIN)) {
-            // Need to feed more packets to decoder
-            while (1) {
+            // P0-1: Standard send/receive state machine
+            // If we have a pending packet from earlier EAGAIN, try sending it again
+            if (decoder->has_pending_packet) {
+                int send_ret = avcodec_send_packet(decoder->codec_context, decoder->packet);
+                if (send_ret == 0) {
+                    av_packet_unref(decoder->packet);
+                    decoder->has_pending_packet = 0;
+                    continue; // Loop back to receive_frame
+                } else if (send_ret == AVERROR(EAGAIN)) {
+                    // Packet not accepted yet, drain frames if possible
+                } else if (send_ret == AVERROR_EOF) {
+                    av_packet_unref(decoder->packet);
+                    decoder->has_pending_packet = 0;
+                    decoder->reached_eof = 1;
+                    break;
+                } else {
+                    msru_write_ffmpeg_error(error_buffer, error_buffer_size, "Send packet failed", send_ret);
+                    av_packet_unref(decoder->packet);
+                    decoder->has_pending_packet = 0;
+                    return -1;
+                }
+            }
+
+            // Read packets until a packet is accepted or EOF
+            int packet_sent = 0;
+            while (!packet_sent && !decoder->has_pending_packet) {
                 int read_ret = av_read_frame(decoder->format_context, decoder->packet);
                 if (read_ret == AVERROR_EOF) {
-                    // Send flush packet to decoder
                     if (!decoder->sent_flush) {
                         avcodec_send_packet(decoder->codec_context, NULL);
                         decoder->sent_flush = 1;
@@ -481,12 +694,22 @@ msru_ffmpeg_decoder_read(
 
                 if (decoder->packet->stream_index == decoder->stream_index) {
                     int send_ret = avcodec_send_packet(decoder->codec_context, decoder->packet);
-                    av_packet_unref(decoder->packet);
-                    if (send_ret < 0 && send_ret != AVERROR(EAGAIN)) {
+                    if (send_ret == 0) {
+                        av_packet_unref(decoder->packet);
+                        packet_sent = 1;
+                    } else if (send_ret == AVERROR(EAGAIN)) {
+                        // DO NOT UNREF! Keep packet in decoder->packet
+                        decoder->has_pending_packet = 1;
+                        packet_sent = 1;
+                    } else if (send_ret == AVERROR_EOF) {
+                        av_packet_unref(decoder->packet);
+                        decoder->reached_eof = 1;
+                        packet_sent = 1;
+                    } else {
                         msru_write_ffmpeg_error(error_buffer, error_buffer_size, "Send packet failed", send_ret);
+                        av_packet_unref(decoder->packet);
                         return -1;
                     }
-                    break;
                 } else {
                     av_packet_unref(decoder->packet);
                 }
@@ -508,7 +731,7 @@ msru_ffmpeg_decoder_read(
 }
 
 
-// MARK: - Seek
+// MARK: - Seek (P1-2: Complete State Cleanup)
 
 int32_t
 msru_ffmpeg_decoder_seek(
@@ -541,18 +764,35 @@ msru_ffmpeg_decoder_seek(
         return -1;
     }
 
+    // 1. Flush codec buffers
     if (decoder->codec_context != NULL) {
         avcodec_flush_buffers(decoder->codec_context);
     }
 
-    if (decoder->swr_context != NULL) {
-        swr_init(decoder->swr_context);
+    // 2. Unref any pending packet
+    if (decoder->has_pending_packet) {
+        av_packet_unref(decoder->packet);
+        decoder->has_pending_packet = 0;
     }
 
+    // 3. Unref any cached frame
+    if (decoder->frame != NULL) {
+        av_frame_unref(decoder->frame);
+    }
+
+    // 4. Clear pending buffer state
     decoder->pending_frames = 0;
     decoder->pending_offset = 0;
+
+    // 5. Reset EOF and flush flags
     decoder->reached_eof = 0;
     decoder->sent_flush = 0;
+
+    // 6. Free resampler context so next frame rebuilds it fresh, eliminating stale filter delay
+    if (decoder->swr_context != NULL) {
+        swr_free(&decoder->swr_context);
+        decoder->swr_context = NULL;
+    }
 
     return 0;
 }
@@ -569,18 +809,11 @@ msru_ffmpeg_decoder_close(
         return;
     }
 
-    if (decoder->pending_buffers != NULL) {
-        for (int ch = 0; ch < decoder->output_channels; ch++) {
-            if (decoder->pending_buffers[ch] != NULL) {
-                free(decoder->pending_buffers[ch]);
-            }
-        }
-        free(decoder->pending_buffers);
-        decoder->pending_buffers = NULL;
-    }
+    msru_free_pending_buffers(decoder);
 
     if (decoder->swr_context != NULL) {
         swr_free(&decoder->swr_context);
+        decoder->swr_context = NULL;
     }
 
     if (decoder->frame != NULL) {
@@ -588,6 +821,10 @@ msru_ffmpeg_decoder_close(
     }
 
     if (decoder->packet != NULL) {
+        if (decoder->has_pending_packet) {
+            av_packet_unref(decoder->packet);
+            decoder->has_pending_packet = 0;
+        }
         av_packet_free(&decoder->packet);
     }
 

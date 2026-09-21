@@ -761,33 +761,37 @@ done < <(
 
 
 # ============================================================
-# DCA Verification
+# Symbol Verification (Fail-fast Gate)
 # ============================================================
 
 echo
-echo "DCA symbols:"
+echo "Verifying required symbols across all libraries..."
 echo
 
+REQUIRED_SYMBOLS=(
+    "ff_dca_decoder"
+    "ff_ape_decoder"
+    "ff_dsd_lsbf_decoder"
+    "ff_dsd_msbf_decoder"
+    "ff_dsd_lsbf_planar_decoder"
+    "ff_dsd_msbf_planar_decoder"
+    "ff_dts_demuxer"
+    "ff_ape_demuxer"
+    "ff_dsf_demuxer"
+    "ff_iff_demuxer"
+    "ff_file_protocol"
+)
 
 while IFS= read -r library
 do
-
-    echo
-    echo "$library"
-
-
-    nm \
-        "$library" \
-        2>/dev/null \
-        |
-        grep -E \
-            'ff_dca_decoder|ff_ape_decoder|ff_dsd_lsbf_decoder|ff_dsf_demuxer|ff_iff_demuxer' \
-        |
-        head \
-            -10 \
-        ||
-        true
-
+    echo "Checking $library..."
+    for sym in "${REQUIRED_SYMBOLS[@]}"; do
+        if ! nm "$library" 2>/dev/null | grep -E " [TSD] _?${sym}$" >/dev/null; then
+            echo "ERROR: Required symbol '$sym' missing in $library" >&2
+            exit 1
+        fi
+    done
+    echo "  ✓ All required symbols present"
 done < <(
     find \
         "$XCFRAMEWORK" \
