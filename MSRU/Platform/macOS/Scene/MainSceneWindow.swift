@@ -11,6 +11,33 @@ import Observation
 import AppFoundation
 
 
+// MARK: - Scene Window Protocol
+
+@MainActor
+protocol MacSceneWindow: AnyObject {
+    var sceneID: SceneID { get }
+    var isActive: Bool { get }
+    func activate()
+    func restorationSnapshot() -> SceneRestorationSnapshot
+}
+
+extension MacSceneWindow {
+    var isActive: Bool {
+        false
+    }
+}
+
+// MARK: - Factory
+
+@MainActor
+protocol MacSceneWindowFactory: AnyObject {
+    func makeWindow(
+        scene: SceneModel,
+        onSnapshotChange: @escaping @MainActor (SceneRestorationSnapshot) -> Void,
+        onSceneClosed: @escaping @MainActor (SceneID) -> Void
+    ) -> any MacSceneWindow
+}
+
 // MARK: - Main Scene Window
 
 @MainActor

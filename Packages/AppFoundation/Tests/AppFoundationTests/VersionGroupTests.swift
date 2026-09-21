@@ -115,4 +115,49 @@ struct VersionGroupTests {
 
         #expect(decoded == resolution)
     }
+
+    @Test
+    func entityAliasCollectionResolvesPreferredLocales() {
+        let collection = EntityAliasCollection(
+            canonicalName: "周杰倫",
+            aliases: [
+                EntityAlias(name: "Jay Chou", localeIdentifier: "en", isPrimary: true),
+                EntityAlias(name: "周杰伦", localeIdentifier: "zh-Hans"),
+                EntityAlias(name: "周杰倫", localeIdentifier: "zh-Hant")
+            ]
+        )
+
+        let zhHansName = collection.displayName(preferredLocales: [Locale(identifier: "zh-Hans")])
+        #expect(zhHansName == "周杰伦")
+
+        let enName = collection.displayName(preferredLocales: [Locale(identifier: "en")])
+        #expect(enName == "Jay Chou")
+
+        let frName = collection.displayName(preferredLocales: [Locale(identifier: "fr")])
+        #expect(frName == "Jay Chou", "Should fall back to primary alias")
+
+        let emptyCollection = EntityAliasCollection(canonicalName: "Radiohead")
+        #expect(emptyCollection.displayName() == "Radiohead")
+    }
+
+    @Test
+    func entityAliasCollectionCodableRoundtrip() throws {
+        let collection = EntityAliasCollection(
+            canonicalName: "Taylor Swift",
+            aliases: [
+                EntityAlias(name: "霉霉", localeIdentifier: "zh-Hans"),
+                EntityAlias(name: "Taylor Swift", localeIdentifier: "en", isPrimary: true)
+            ]
+        )
+
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(collection)
+
+        let decoder = JSONDecoder()
+        let decoded = try decoder.decode(EntityAliasCollection.self, from: data)
+
+        #expect(decoded.canonicalName == "Taylor Swift")
+        #expect(decoded.aliases.count == 2)
+        #expect(decoded.displayName(preferredLocales: [Locale(identifier: "zh-Hans")]) == "霉霉")
+    }
 }

@@ -5,7 +5,9 @@
 
 import Foundation
 import Observation
+import SwiftUI
 import AppFoundation
+import AppFoundationUI
 
 
 // MARK: - Feature
@@ -316,3 +318,89 @@ where F == LibraryFeature {
             )
     }
 }
+
+// MARK: - Application Contribution
+
+extension LibraryFeature: ApplicationFeature {
+
+    typealias Route = SceneRoute
+
+    nonisolated static var contributions: FeatureContribution<Route> {
+        FeatureContribution(
+            sidebar: [
+                SidebarContribution(
+                    id: "library",
+                    group: "Library",
+                    title: "Songs",
+                    systemImage: "music.note",
+                    route: SceneRoute.section(.library),
+                    order: 100
+                )
+            ],
+            routes: [
+                RouteContribution(
+                    id: "library",
+                    route: SceneRoute.section(.library)
+                )
+            ]
+        )
+    }
+}
+
+// MARK: - Application Presentation
+
+extension LibraryFeature: ApplicationFeaturePresentation {
+
+    typealias PresentationContext = SceneModel
+
+    static var routeDestinations: [RouteDestination<SceneRoute, SceneModel>] {
+        [
+            RouteDestination(
+                id: "library",
+                route: .section(.library),
+                workspace: { scene in
+                    WorkspacePresentation(
+                        identity: WorkspaceIdentity(
+                            title: "Songs",
+                            systemImage: "music.note"
+                        )
+                    ) { _ in
+                        LibraryFeatureDestination(scene: scene)
+                    }
+                }
+            )
+        ]
+    }
+}
+
+// MARK: - Destination Adapter
+
+private struct LibraryFeatureDestination: View {
+
+    @Bindable var scene: SceneModel
+
+    var body: some View {
+        LibraryView(
+            feature: scene.libraryFeature,
+            localStore: scene.application.localLibrary,
+            playback: scene.application.playback,
+            selectedLocalTrack: Binding(
+                get: { scene.selectedLocalTrack },
+                set: { scene.select(localTrack: $0) }
+            ),
+            selectedLibraryTrack: Binding(
+                get: { scene.selectedLibraryTrack },
+                set: { scene.select(libraryTrack: $0) }
+            ),
+            onAddMusic: {
+                scene.send(.navigate(.section(.addMusic)))
+            }
+        )
+    }
+}
+
+#Preview("Library Destination") {
+    LibraryFeatureDestination(scene: MSRUPreviewData.makeScene(section: .library))
+        .frame(width: 900, height: 650)
+}
+

@@ -903,4 +903,25 @@ private final class CoordinatorTestLibraryRepository:
     }
 }
 
+struct MacSceneLifecyclePolicyTests {
+    @Test
+    func applicationTerminationPreservesRestoration() {
+        let policy = MacSceneLifecyclePolicy()
+        #expect(policy.restorationDisposition(isApplicationTerminating: true) == .preserve)
+    }
+
+    @Test
+    func explicitSceneCloseRemovesRestoration() {
+        let policy = MacSceneLifecyclePolicy()
+        #expect(policy.restorationDisposition(isApplicationTerminating: false) == .remove)
+    }
+
+    @Test
+    func lastWindowTerminationPolicyIsIndependentFromScenePersistence() {
+        let policy = MacSceneLifecyclePolicy(terminatesAfterLastWindowClosed: true)
+        #expect(policy.terminatesAfterLastWindowClosed)
+        #expect(policy.restorationDisposition(isApplicationTerminating: false) == .remove)
+    }
+}
+
 #endif

@@ -7,80 +7,75 @@ import Foundation
 import Observation
 import AppFoundation
 
+// MARK: - Scene Restoration Snapshot
 
-// MARK: - Scene Scope
+nonisolated struct SceneRestorationSnapshot: Codable, Equatable, Sendable {
+    static let currentVersion = 1
 
-/*
- 一个 SceneModel 对应一个 Window / Scene。
+    let version: Int
+    let sceneID: SceneID
+    var section: SceneSection
+    var isQueuePresented: Bool
 
- Application Scope 负责共享资源。
+    init(
+        version: Int = Self.currentVersion,
+        sceneID: SceneID,
+        section: SceneSection,
+        isQueuePresented: Bool
+    ) {
+        self.version = version
+        self.sceneID = sceneID
+        self.section = section
+        self.isQueuePresented = isQueuePresented
+    }
 
- Scene Scope 负责：
+    var isSupported: Bool {
+        version == Self.currentVersion
+    }
+}
 
- - Identity
- - Command Routing
- - Navigation
- - Selection
- - Presentation
- - Feature Runtime
- - Restoration Snapshot
+// MARK: - Scene Restoration Store
 
- 外部语义 Intent
- 统一通过 send(_:) 进入 Scene。
- */
+@MainActor
+protocol SceneRestorationStore: AnyObject {
+    func loadSnapshots() -> [SceneRestorationSnapshot]
+    func save(_ snapshot: SceneRestorationSnapshot)
+    func remove(sceneID: SceneID)
+}
+
+// MARK: - Application Scene Runtime Protocol
+
+@MainActor
+protocol ApplicationSceneRuntime: AnyObject {
+    var id: SceneID { get }
+    func send(_ command: SceneCommand)
+}
+
+// MARK: - Application Multi Scene Runtime Protocol
+
+@MainActor
+protocol ApplicationMultiSceneRuntime: AnyObject {
+    @discardableResult
+    func route(_ request: SceneRoutingRequest) -> SceneID?
+    @discardableResult
+    func openNewScene(route: SceneRoute?) -> SceneID
+    @discardableResult
+    func activateScene(_ sceneID: SceneID) -> Bool
+}
+
+// MARK: - Scene Model
 
 @MainActor
 @Observable
-final class SceneModel:
-    Identifiable {
+final class SceneModel: Identifiable, ApplicationSceneRuntime {
+    let id: SceneID
+    let application: ApplicationModel
+    let navigation: SceneNavigation
 
-    // MARK: - Identity
-
-    let id:
-        SceneID
-
-
-    // MARK: - Application
-
-    let application:
-        ApplicationModel
-
-
-    // MARK: - Navigation
-
-    let navigation:
-        SceneNavigation
-
-
-    // MARK: - Selection
-
-    /*
-     Selection != Navigation。
-
-     当前 MusicContent / LocalTrack
-     还没有对应真实 detail route。
-
-     所以它们暂时仍是 runtime selection，
-     不进入 SceneRoute。
-     */
-
-    var selectedMusicContent:
-        MusicContent?
-
-
-    var selectedLocalTrack:
-        LocalTrack?
-
-
-    var selectedLibraryTrack:
-        LibraryTrack?
-
-
-    var selectedRadioStation:
-        RadioStation?
-
-
-    // MARK: - Presentation
+    var selectedMusicContent: MusicContent?
+    var selectedLocalTrack: LocalTrack?
+    var selectedLibraryTrack: LibraryTrack?
+    var selectedRadioStation: RadioStation?
 
     enum ContextPane: String, CaseIterable, Identifiable, Codable, Sendable {
         case inspector
@@ -101,12 +96,8 @@ final class SceneModel:
     }
 
     var activeContextPane: ContextPane = .inspector
-
-    var isQueuePresented:
-        Bool
-
-    var isNowPlayingPresented:
-        Bool
+    var isQueuePresented: Bool
+    var isNowPlayingPresented: Bool
 
     func select(localTrack: LocalTrack?) {
         guard !isClosed else { return }
@@ -180,25 +171,14 @@ final class SceneModel:
         isNowPlayingPresented = presented
     }
 
-
-
     // MARK: - Features
 
-    let browse:
-        FeatureHost<BrowseFeature>
-
-
-    let libraryFeature:
-        FeatureHost<LibraryFeature>
-
-
-    let radioFeature:
-        FeatureHost<RadioFeature>
-
+    let browse: FeatureHost<BrowseFeature>
+    let libraryFeature: FeatureHost<LibraryFeature>
+    let radioFeature: FeatureHost<RadioFeature>
 
     private(set) var isClosed = false
 
-    /// Closing is terminal; temporary scene inactivity must not call this.
     func close() {
         guard !isClosed else { return }
         isClosed = true
@@ -208,164 +188,62 @@ final class SceneModel:
         radioFeature.stop()
     }
 
-    // MARK: - New Scene
+    // MARK: - Init
 
     init(
-        id:
-            SceneID = SceneID(),
-        application:
-            ApplicationModel,
-        section:
-            SceneSection = .listenNow,
-        isQueuePresented:
-            Bool = true,
-        isNowPlayingPresented:
-            Bool = false
+        id: SceneID = SceneID(),
+        application: ApplicationModel,
+        section: SceneSection = .listenNow,
+        isQueuePresented: Bool = true,
+        isNowPlayingPresented: Bool = false
     ) {
+        self.id = id
+        self.application = application
+        self.navigation = SceneNavigation(section: section)
+        self.isQueuePresented = isQueuePresented
+        self.isNowPlayingPresented = isNowPlayingPresented
 
-        self.id =
-            id
-
-
-        self.application =
-            application
-
-
-        self.navigation =
-            SceneNavigation(
-                section:
-                    section
-            )
-
-
-        self.isQueuePresented =
-            isQueuePresented
-
-
-        self.isNowPlayingPresented =
-            isNowPlayingPresented
-
-
-        self.browse =
-            withDependencies(
-                application.dependencies
-            ) {
-
-                FeatureHost<BrowseFeature>(
-                    service:
-                        BrowseFeature
-                            .Service()
-                )
-            }
-
-
-        self.libraryFeature =
-            withDependencies(
-                application.dependencies
-            ) {
-
-                FeatureHost<LibraryFeature>(
-                    service:
-                        LibraryFeature
-                            .Service()
-                )
-            }
-
-
-        self.radioFeature =
-            withDependencies(
-                application.dependencies
-            ) {
-
-                FeatureHost<RadioFeature>(
-                    service:
-                        RadioFeature
-                            .Service()
-                )
-            }
+        self.browse = withDependencies(application.dependencies) {
+            FeatureHost<BrowseFeature>(service: BrowseFeature.Service())
+        }
+        self.libraryFeature = withDependencies(application.dependencies) {
+            FeatureHost<LibraryFeature>(service: LibraryFeature.Service())
+        }
+        self.radioFeature = withDependencies(application.dependencies) {
+            FeatureHost<RadioFeature>(service: RadioFeature.Service())
+        }
     }
 
-
-    // MARK: - Restored Scene
-
     convenience init?(
-        application:
-            ApplicationModel,
-        restoration:
-            SceneRestorationSnapshot
+        application: ApplicationModel,
+        restoration: SceneRestorationSnapshot
     ) {
-
-        guard
-            restoration.isSupported
-        else {
-
-            return nil
-        }
-
-
+        guard restoration.isSupported else { return nil }
         self.init(
-            id:
-                restoration.sceneID,
-            application:
-                application,
-            section:
-                restoration.section,
-            isQueuePresented:
-                restoration.isQueuePresented
+            id: restoration.sceneID,
+            application: application,
+            section: restoration.section,
+            isQueuePresented: restoration.isQueuePresented
         )
     }
 
-
     // MARK: - Command Routing
 
-    /*
-     Scene-level semantic intent
-     统一从这里进入。
-
-     Future callers:
-
-     - Sidebar
-     - Menu Commands
-     - Deep Link
-     - Handoff
-     - Spotlight
-     - Automation
-     */
-
-    func send(
-        _ command:
-            SceneCommand
-    ) {
-
+    func send(_ command: SceneCommand) {
         guard !isClosed else { return }
         switch command {
-
-        case .navigate(
-            let route
-        ):
-
-            navigation
-                .navigate(
-                    to:
-                        route
-                )
+        case .navigate(let route):
+            navigation.navigate(to: route)
         }
     }
 
-
     // MARK: - Restoration
 
-    func restorationSnapshot()
-        -> SceneRestorationSnapshot {
-
+    func restorationSnapshot() -> SceneRestorationSnapshot {
         SceneRestorationSnapshot(
-            sceneID:
-                id,
-            section:
-                navigation
-                    .section,
-            isQueuePresented:
-                isQueuePresented
+            sceneID: id,
+            section: navigation.section,
+            isQueuePresented: isQueuePresented
         )
     }
 }

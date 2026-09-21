@@ -9,6 +9,7 @@ import Testing
 import Foundation
 import AppFoundation
 @testable import MSRU
+
 @Suite(.serialized)
 struct AudioFingerprintServiceTests {
 
@@ -32,8 +33,7 @@ struct AudioFingerprintServiceTests {
 
         func generateFingerprint(for fileURL: URL) async throws -> AudioFingerprint {
             executionCounter.increment()
-            // Simulate minimal work
-            try await Task.sleep(nanoseconds: 10_000_000) // 10ms
+            try await Task.sleep(nanoseconds: 10_000_000)
             return AudioFingerprint(fingerprint: "mock_fp_\(fileURL.lastPathComponent)", duration: 180.0)
         }
     }
@@ -53,13 +53,12 @@ struct AudioFingerprintServiceTests {
         let registry = LocalFingerprintRegistry(storageURL: regStorage)
         let service = AudioFingerprintService(fingerprinter: fingerprinter, registry: registry)
 
-        // Launch two concurrent requests for the exact same URL
         async let first = service.fingerprint(for: fileURL)
         async let second = service.fingerprint(for: fileURL)
 
         let (fp1, fp2) = try await (first, second)
         #expect(fp1.fingerprint == fp2.fingerprint)
-        #expect(counter.count == 1) // Only extracted once due to in-flight deduplication!
+        #expect(counter.count == 1)
     }
 
     @Test
@@ -84,19 +83,17 @@ struct AudioFingerprintServiceTests {
             LocalTrack(fileURL: fileB, title: "Track B", artist: "Artist B", duration: 180.0)
         ]
 
-        // First pass: extracts both
         let result1 = await service.indexTracks(tracks)
         #expect(result1.totalReceived == 2)
         #expect(result1.extractedCount == 2)
         #expect(result1.skippedCachedCount == 0)
         #expect(counter.count == 2)
 
-        // Second pass on unchanged files: should skip both!
         let result2 = await service.indexTracks(tracks)
         #expect(result2.totalReceived == 2)
         #expect(result2.extractedCount == 0)
         #expect(result2.skippedCachedCount == 2)
-        #expect(counter.count == 2) // Unchanged!
+        #expect(counter.count == 2)
     }
 
     @Test
@@ -121,7 +118,6 @@ struct AudioFingerprintServiceTests {
         let result = await service.indexTracks(tracks, chunkSize: 5)
         #expect(result.extractedCount == 12)
 
-        // 12 tracks with chunk size 5 = 2 chunk writes (5 + 5) + 1 final flush write (2) = 3 total writes
         let writeCount = await registry.persistenceWriteCount
         #expect(writeCount == 3)
         #expect(await registry.records.count == 12)
@@ -148,7 +144,6 @@ struct AudioFingerprintServiceTests {
         #expect(await indexingService.currentStage == .idle)
         await indexingService.enqueue([track])
 
-        // Wait for background indexing task to finish
         for _ in 0..<300 {
             if case .complete = await indexingService.currentStage {
                 break
@@ -162,6 +157,88 @@ struct AudioFingerprintServiceTests {
             #expect(skipped == 0)
         } else {
             Issue.record("Indexing service did not reach complete stage within deadline, got: \(finalStage)")
+        }
+    }
+}
+
+@MainActor
+struct AcoustIDConfigurationTests {
+
+    @Test
+    func defaultKeyIsBuiltInApplicationKey() async {
+        let testDefaults = UserDefaults(suiteName: "AcoustIDTestDefaults_\(UUID().uuidString)")!
+        let config = AcoustIDConfiguration(defaults: testDefaults)
+
+        let key = await config.apiKey
+        #expect(key == AcoustIDConfiguration.defaultClientKey)
+        #expect(key == "cSpUJKpD")
+    }
+
+    @Test
+    func updateAndResetApiKey() async {
+        let testDefaults = UserDefaults(suiteName: "AcoustIDTestDefaults_\(UUID().uuidString)")!
+        let config = AcoustIDConfiguration(defaults: testDefaults)
+
+        await config.setApiKey("test-custom-key-123")
+        let updated = await config.apiKey
+        #expect(updated == "test-custom-key-123")
+
+        await config.resetToDefault()
+        let reset = await config.apiKey
+        #expect(reset == AcoustIDConfiguration.defaultClientKey)
+    }
+
+    @Test
+    func verifyConnectivityWithDefaultApplicationKey() async {
+        let testDefaults = UserDefaults(suiteName: "AcoustIDTestDefaults_\(UUID().uuidString)")!
+        let config = AcoustIDConfiguration(defaults: testDefaults)
+
+        let result = await config.verifyConnectivity()
+        #expect(result.success == true)
+        #expect(result.message.contains("200 OK"))
+    }
+
+    @Test
+    func verifyConnectivityWithInvalidUserKeyReturnsClearDiagnostic() async {
+        let testDefaults = UserDefaults(suiteName: "AcoustIDTestDefaults_\(UUID().uuidString)")!
+        let config = AcoustIDConfiguration(defaults: testDefaults)
+        await config.setApiKey("M7G5ocyWpU")
+
+        let result = await config.verifyConnectivity()
+        #expect(result.success == false)
+        #expect(result.message.contains("Invalid API Key") || result.message.contains("API Key 无效"))
+        #expect(result.message.contains("User Key"))
+    }
+}
+
+@MainActor
+struct AcoustIDFingerprintExtractorTests {
+
+    @Test
+    func generateFingerprintFromRealLocalAudioFile() async throws {
+        let realAudioURL = URL(fileURLWithPath: "/Users/ciro/Music/Music/Media.localized/Music/Adele/21/Rolling In The Deep.m4a")
+        guard FileManager.default.fileExists(atPath: realAudioURL.path) else {
+            return
+        }
+
+        let extractor = AcoustIDFingerprintExtractor()
+        let fp = try await extractor.generateFingerprint(for: realAudioURL)
+
+        #expect(fp.duration > 200.0 && fp.duration < 300.0)
+        #expect(!fp.fingerprint.isEmpty)
+        #expect(fp.algorithm == "chromaprint-pcm-v1")
+    }
+
+    @Test
+    func nonExistentFileThrowsError() async {
+        let missingURL = URL(fileURLWithPath: "/nonexistent/path/missing.flac")
+        let extractor = AcoustIDFingerprintExtractor()
+
+        do {
+            _ = try await extractor.generateFingerprint(for: missingURL)
+            Issue.record("Expected error for missing file")
+        } catch {
+            #expect(error is FingerprintError)
         }
     }
 }

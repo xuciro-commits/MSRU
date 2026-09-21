@@ -287,6 +287,126 @@ struct PlaylistsView: View {
 
 // MARK: - Previews
 
+// MARK: - New Playlist Sheet View
+
+@MainActor
+struct NewPlaylistSheetView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var initialTitle: String = ""
+    var initialDescription: String = ""
+    var onSave: (String, String?) -> Void
+
+    @State private var title: String = ""
+    @State private var playlistDescription: String = ""
+
+    init(
+        initialTitle: String = "",
+        initialDescription: String = "",
+        onSave: @escaping (String, String?) -> Void
+    ) {
+        self.initialTitle = initialTitle
+        self.initialDescription = initialDescription
+        self.onSave = onSave
+        _title = State(initialValue: initialTitle)
+        _playlistDescription = State(initialValue: initialDescription)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField(LocalizedStringKey("Playlist Name"), text: $title)
+                        .textFieldStyle(.roundedBorder)
+
+                    TextField(LocalizedStringKey("Description (Optional)"), text: $playlistDescription, axis: .vertical)
+                        .lineLimit(3...5)
+                        .textFieldStyle(.roundedBorder)
+                } header: {
+                    Text(LocalizedStringKey("Details"))
+                }
+            }
+            .formStyle(.grouped)
+            .navigationTitle(initialTitle.isEmpty ? LocalizedStringKey("New Playlist") : LocalizedStringKey("Edit Playlist"))
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(LocalizedStringKey("Cancel")) {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(LocalizedStringKey("Save")) {
+                        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty else { return }
+                        let desc = playlistDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+                        onSave(trimmed, desc.isEmpty ? nil : desc)
+                        dismiss()
+                    }
+                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .frame(minWidth: 320, minHeight: 220)
+        }
+    }
+}
+
+// MARK: - Feature
+
+enum PlaylistsFeature: ApplicationFeaturePresentation {
+    typealias Route = SceneRoute
+    typealias PresentationContext = SceneModel
+
+    nonisolated static var contributions: FeatureContribution<Route> {
+        FeatureContribution(
+            sidebar: [
+                SidebarContribution(
+                    id: "playlists",
+                    group: "Library",
+                    title: "Playlists",
+                    systemImage: "music.note.list",
+                    route: .section(.playlists),
+                    order: 115
+                )
+            ],
+            routes: [
+                RouteContribution(
+                    id: "playlists",
+                    route: .section(.playlists)
+                )
+            ]
+        )
+    }
+
+    @MainActor
+    static var routeDestinations: [RouteDestination<Route, PresentationContext>] {
+        [
+            RouteDestination(
+                id: "playlists",
+                route: .section(.playlists)
+            ) { scene in
+                WorkspacePresentation(
+                    identity: WorkspaceIdentity(
+                        title: String(localized: "Playlists"),
+                        systemImage: "music.note.list"
+                    )
+                ) { _ in
+                    PlaylistsView(
+                        playlistStore: scene.application.playlistStore,
+                        localStore: scene.application.localLibrary,
+                        playback: scene.application.playback,
+                        onSelectTrack: { track in
+                            scene.select(localTrack: track)
+                        }
+                    )
+                }
+            }
+        ]
+    }
+}
+
+// MARK: - Previews
+
 #Preview("Playlists Overview") {
     let playback = MSRUPreviewData.makePlaybackController()
     let localStore = MSRUPreviewData.makeLocalLibraryStore()
@@ -311,3 +431,14 @@ struct PlaylistsView: View {
     )
     .frame(width: 800, height: 600)
 }
+
+#Preview("New Playlist Sheet") {
+    NewPlaylistSheetView(
+        initialTitle: "Favorites",
+        initialDescription: "Top favorite tracks",
+        onSave: { title, desc in
+            print("Saved playlist:", title, desc ?? "")
+        }
+    )
+}
+

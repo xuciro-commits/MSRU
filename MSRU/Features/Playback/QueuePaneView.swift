@@ -100,6 +100,27 @@ struct QueuePaneView: View {
     }
 }
 
+// MARK: - Queue Header View
+
+struct QueueHeaderView: View {
+    let onClear: () -> Void
+
+    var body: some View {
+        HStack {
+            Text("Next").font(.headline)
+            Spacer()
+            Button(action: onClear) {
+                Text("Clear")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+}
+
+
 #Preview("Queue · Empty") {
     QueuePaneView(playback: MSRUPreviewData.makePlaybackController())
         .frame(width: 340, height: 700)

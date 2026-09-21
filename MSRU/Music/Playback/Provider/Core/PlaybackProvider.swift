@@ -5,47 +5,99 @@
 
 import Foundation
 
+// MARK: - Playback Provider ID & Protocol
 
-enum PlaybackProviderID:
-    String,
-    CaseIterable,
-    Hashable,
-    Sendable {
-
+enum PlaybackProviderID: String, CaseIterable, Hashable, Sendable {
     case extendedAudio
-
     case local
-
     case openverse
-
     case radio
 }
 
+protocol PlaybackProvider: Sendable {
+    var id: PlaybackProviderID { get }
+    var priority: Int { get }
 
-protocol PlaybackProvider:
-    Sendable {
+    func canResolve(_ request: PlaybackRequest) -> Bool
+    func resolve(_ request: PlaybackRequest) async throws -> PlaybackResource
+}
 
-    var id:
-        PlaybackProviderID {
-        get
+// MARK: - Playback Request
+
+enum PlaybackQuality: String, Sendable {
+    case automatic
+    case low
+    case standard
+    case high
+    case lossless
+}
+
+struct PlaybackRequest: Sendable {
+
+    enum Source: String, Sendable {
+        case local
+        case openverse
+        case radio
     }
 
+    let itemID: String
+    let source: Source
+    let preferredQuality: PlaybackQuality
+    let localFileURL: URL?
+    let remoteURL: URL?
+    let providerHint: PlaybackProviderID?
 
-    var priority:
-        Int {
-        get
+    init(
+        itemID: String,
+        source: Source,
+        preferredQuality: PlaybackQuality = .automatic,
+        localFileURL: URL? = nil,
+        remoteURL: URL? = nil,
+        providerHint: PlaybackProviderID? = nil
+    ) {
+        self.itemID = itemID
+        self.source = source
+        self.preferredQuality = preferredQuality
+        self.localFileURL = localFileURL
+        self.remoteURL = remoteURL
+        self.providerHint = providerHint
+    }
+}
+
+// MARK: - Playback Resource
+
+struct PCMPlaybackResource: Sendable {
+    let format: PCMStreamFormat
+    let session: any PCMDecodeSession
+}
+
+enum PlaybackTransport: Sendable {
+    case avPlayerURL(URL)
+    case decodedPCM(PCMPlaybackResource)
+    case providerNative(providerID: PlaybackProviderID, token: String?)
+}
+
+struct PlaybackResource: Sendable {
+
+    let providerID: PlaybackProviderID
+    let transport: PlaybackTransport
+    let duration: TimeInterval?
+    let expiresAt: Date?
+
+    init(
+        providerID: PlaybackProviderID,
+        transport: PlaybackTransport,
+        duration: TimeInterval? = nil,
+        expiresAt: Date? = nil
+    ) {
+        self.providerID = providerID
+        self.transport = transport
+        self.duration = duration
+        self.expiresAt = expiresAt
     }
 
-
-    func canResolve(
-        _ request:
-            PlaybackRequest
-    ) -> Bool
-
-
-    func resolve(
-        _ request:
-            PlaybackRequest
-    ) async throws
-        -> PlaybackResource
+    var isExpired: Bool {
+        guard let expiresAt else { return false }
+        return expiresAt <= Date()
+    }
 }

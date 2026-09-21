@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Observation
+import AppFoundation
 import AppFoundationUI
 
 
@@ -332,22 +333,57 @@ struct ListenNowView: View {
 }
 
 
+// MARK: - Feature
+
+enum ListenNowFeature: ApplicationFeaturePresentation {
+    typealias Route = SceneRoute
+    typealias PresentationContext = SceneModel
+
+    nonisolated static var contributions: FeatureContribution<Route> {
+        FeatureContribution(
+            sidebar: [
+                SidebarContribution(
+                    id: "listen-now",
+                    group: "Discover",
+                    title: "Listen Now",
+                    systemImage: "play.circle",
+                    route: .section(.listenNow),
+                    order: 10
+                )
+            ],
+            routes: [
+                RouteContribution(
+                    id: "listen-now",
+                    route: .section(.listenNow)
+                )
+            ]
+        )
+    }
+
+    @MainActor
+    static var routeDestinations: [RouteDestination<Route, PresentationContext>] {
+        [
+            RouteDestination(
+                id: "listen-now",
+                route: .section(.listenNow)
+            ) { scene in
+                ListenNowView(
+                    store: scene.application.musicCatalog,
+                    onSelect: { item in
+                        scene.selectedMusicContent = item
+                    }
+                )
+            }
+        ]
+    }
+}
+
 // MARK: - Preview
 
 #Preview("Listen Now") {
-
     ListenNowView(
-        store:
-            MSRUPreviewData
-                .makeCatalogStore(),
-        onSelect: {
-            _ in
-        }
+        store: MSRUPreviewData.makeCatalogStore(),
+        onSelect: { _ in }
     )
-    .frame(
-        width:
-            1100,
-        height:
-            800
-    )
+    .frame(width: 1100, height: 800)
 }

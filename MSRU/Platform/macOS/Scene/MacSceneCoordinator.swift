@@ -9,6 +9,27 @@ import AppKit
 import AppFoundation
 
 
+// MARK: - Restoration Disposition
+
+nonisolated enum MacSceneRestorationDisposition: Equatable, Sendable {
+    case preserve
+    case remove
+}
+
+// MARK: - Scene Lifecycle Policy
+
+nonisolated struct MacSceneLifecyclePolicy: Equatable, Sendable {
+    let terminatesAfterLastWindowClosed: Bool
+
+    init(terminatesAfterLastWindowClosed: Bool = true) {
+        self.terminatesAfterLastWindowClosed = terminatesAfterLastWindowClosed
+    }
+
+    func restorationDisposition(isApplicationTerminating: Bool) -> MacSceneRestorationDisposition {
+        isApplicationTerminating ? .preserve : .remove
+    }
+}
+
 // MARK: - macOS Scene Coordinator
 
 @MainActor
@@ -611,5 +632,9 @@ final class MacSceneCoordinator {
             nil
     }
 }
+
+// MARK: - Application Multi Scene Runtime
+
+extension MacSceneCoordinator: ApplicationMultiSceneRuntime {}
 
 #endif

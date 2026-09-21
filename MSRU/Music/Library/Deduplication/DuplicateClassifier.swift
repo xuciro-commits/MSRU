@@ -8,9 +8,182 @@
 import Foundation
 import AppFoundation
 
+// MARK: - Deduplication Enums
+
+/// Recommended handling strategy for duplicate resolution.
+nonisolated public enum DeduplicationStrategy: String, Sendable, Codable, Equatable, Hashable, CaseIterable {
+    /// Exact binary duplicate; safe to prune or hard-link one physical file.
+    case safeDeduplicateFile
+
+    /// Different encoding containers (e.g. FLAC vs MP3); co-exist for hi-fi and mobile scenarios.
+    case coexistEncodings
+
+    /// Same recording with varying sample rates or bit depths; group into TrackVersions and elect primary.
+    case groupByQualitySelectPrimary
+
+    /// Different mastering, mixing, or release issues; preserve all under the parent ReleaseGroup.
+    case keepSeparateReleases
+
+    /// Different live or studio performances of the same work; treat as distinct Recordings, strictly do not merge.
+    case treatAsDistinctRecordings
+
+    /// Unrelated tracks; no action.
+    case none
+}
+
+/// The 5 architectural categories of music duplicate analysis (aligned with IdentityResolutionEngine Section 3).
+nonisolated public enum DuplicateCategory: String, Sendable, Codable, Equatable, Hashable, CaseIterable {
+    /// A. 物理重复 (File Duplicate): Exact binary duplicate (identical SHA256 checksum).
+    case fileDuplicate
+
+    /// B. 格式不同 (Different Encoding): Same recording and acoustID, different container codec (e.g. FLAC vs MP3).
+    case differentEncoding
+
+    /// C. 音质差异 (Different Quality): Same recording, different quantization/sampling (e.g. 16/44.1 CD vs 24/96 Hi-Res).
+    case qualityDifference
+
+    /// D. 版本/混音差异 (Different Master): Same musical composition, different release master (e.g. 1982 Original vs 2011 Remaster).
+    case differentMaster
+
+    /// E. 演出差异 (Different Performance): Same musical composition, different performance capture (e.g. Studio vs Live 1994).
+    case differentPerformance
+
+    /// Unrelated tracks.
+    case none
+
+    /// User-facing descriptive title.
+    public var title: String {
+        switch self {
+        case .fileDuplicate:
+            return String(localized: "File Duplicate")
+        case .differentEncoding:
+            return String(localized: "Different Encoding")
+        case .qualityDifference:
+            return String(localized: "Different Quality")
+        case .differentMaster:
+            return String(localized: "Different Master")
+        case .differentPerformance:
+            return String(localized: "Different Performance")
+        case .none:
+            return String(localized: "Distinct Tracks")
+        }
+    }
+
+    /// Corresponding resolution action strategy.
+    public var actionStrategy: DeduplicationStrategy {
+        switch self {
+        case .fileDuplicate:
+            return .safeDeduplicateFile
+        case .differentEncoding:
+            return .coexistEncodings
+        case .qualityDifference:
+            return .groupByQualitySelectPrimary
+        case .differentMaster:
+            return .keepSeparateReleases
+        case .differentPerformance:
+            return .treatAsDistinctRecordings
+        case .none:
+            return .none
+        }
+    }
+
+    /// Whether it is completely safe to eliminate one of the physical file references.
+    public var isSafeToMerge: Bool {
+        self == .fileDuplicate
+    }
+
+    /// Whether the items represent the exact same recording event.
+    public var isSameRecording: Bool {
+        switch self {
+        case .fileDuplicate, .differentEncoding, .qualityDifference:
+            return true
+        case .differentMaster, .differentPerformance, .none:
+            return false
+        }
+    }
+
+    /// Whether the items represent the same underlying musical composition.
+    public var isSameWork: Bool {
+        self != .none
+    }
+}
+
+// MARK: - Audio Quality Ranking
+
+/// Calculated composite quality score for an audio asset.
+nonisolated public struct AudioQualityScore: Comparable, Sendable, Equatable, Hashable, Codable {
+    public let isLossless: Bool
+    public let sampleRate: Double
+    public let bitDepthBits: Int
+    public let bitrateKbps: Int
+    public let totalScore: Int
+
+    public init(
+        isLossless: Bool,
+        sampleRate: Double,
+        bitDepthBits: Int,
+        bitrateKbps: Int
+    ) {
+        self.isLossless = isLossless
+        self.sampleRate = sampleRate
+        self.bitDepthBits = bitDepthBits
+        self.bitrateKbps = bitrateKbps
+
+        // Lossless formats (FLAC, ALAC, WAV) receive a dominant base tier (+1_000_000).
+        let baseTier = isLossless ? 1_000_000 : 0
+        let sampleRatePoints = Int(sampleRate / 100.0)
+        let bitDepthPoints = bitDepthBits * 100
+        let bitratePoints = bitrateKbps
+
+        self.totalScore = baseTier + (sampleRatePoints * 10) + bitDepthPoints + bitratePoints
+    }
+
+    public static func < (lhs: AudioQualityScore, rhs: AudioQualityScore) -> Bool {
+        if lhs.totalScore != rhs.totalScore {
+            return lhs.totalScore < rhs.totalScore
+        }
+        if lhs.sampleRate != rhs.sampleRate {
+            return lhs.sampleRate < rhs.sampleRate
+        }
+        if lhs.bitDepthBits != rhs.bitDepthBits {
+            return lhs.bitDepthBits < rhs.bitDepthBits
+        }
+        return lhs.bitrateKbps < rhs.bitrateKbps
+    }
+}
+
+/// Evaluates and ranks audio assets deterministically according to audiophile priority rules.
+nonisolated public enum AudioQualityRanker {
+    /// Parses the integer bit depth from string descriptors (e.g. "24-bit" -> 24).
+    public static func parseBitDepthBits(from string: String?) -> Int {
+        guard let string else { return 16 }
+        let digits = string.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+        return Int(digits) ?? 16
+    }
+
+    /// Evaluates the quantitative quality score for an audio asset.
+    public static func score(for asset: AudioAsset) -> AudioQualityScore {
+        let bitDepth = parseBitDepthBits(from: asset.bitDepth)
+        let bitrate = asset.bitrateKbps ?? (asset.isLossless ? (bitDepth == 24 ? 2000 : 900) : 256)
+
+        return AudioQualityScore(
+            isLossless: asset.isLossless,
+            sampleRate: asset.sampleRate,
+            bitDepthBits: bitDepth,
+            bitrateKbps: bitrate
+        )
+    }
+
+    /// Returns `true` if `lhs` possesses strictly higher audio quality than `rhs`.
+    public static func isHigherQuality(_ lhs: AudioAsset, than rhs: AudioAsset) -> Bool {
+        score(for: lhs) > score(for: rhs)
+    }
+}
+
+// MARK: - Duplicate Classifier
+
 /// Detailed analysis output from comparing two audio assets and their identity graph context.
 nonisolated public struct DuplicateAnalysisResult: Sendable, Equatable, Hashable, Codable {
-
     /// The resolved duplicate category (A~E or none).
     public let category: DuplicateCategory
 
@@ -37,13 +210,6 @@ nonisolated public struct DuplicateAnalysisResult: Sendable, Equatable, Hashable
 }
 
 /// Evaluates pairs of audio assets against the 5 music duplicate criteria.
-///
-/// Implements Roon/MusicBrainz standards:
-/// - A. File Duplicate (SHA256 match)
-/// - B. Different Encoding (same Recording/AcoustID, different codec)
-/// - C. Quality Difference (same Recording, different sample rate or bit depth)
-/// - D. Different Master (same Work, different studio mastering/release)
-/// - E. Different Performance (same Work, live vs studio, strictly not duplicate)
 nonisolated public enum DuplicateClassifier {
 
     /// Classifies the duplicate relationship between two audio assets and optional graph entities.

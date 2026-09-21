@@ -252,52 +252,313 @@ extension FoundationCard where
     }
 }
 
-// MARK: - Preview
+// MARK: - Album Card View
 
-#Preview("FoundationCard Variations") {
-    HStack(spacing: 24) {
-        // Standard 1:1 Album Style Card
-        FoundationCard(
-            titleText: "Abbey Road",
-            subtitleText: "The Beatles",
-            footerText: "1969 • 17 tracks",
-            onSelect: {}
-        ) {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.blue.gradient)
-                .overlay {
-                    Image(systemName: "opticaldisc")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.white.opacity(0.8))
-                }
-        } topLeadingBadges: {
-            FoundationCardBadge("HI-RES", systemImage: "sparkles")
-        } actionOverlay: {
-            FoundationCardActionButton(systemImage: "play.fill", action: {})
-        }
+public struct AlbumCardView<Cover: View>: View {
+    public let album: AlbumPresentationModel
+    public let onSelect: () -> Void
+    public let onPlay: () -> Void
+    private let customCover: Cover?
 
-        // 16:9 Video/Station Style Card (Selected)
+    public init(
+        album: AlbumPresentationModel,
+        onSelect: @escaping () -> Void,
+        onPlay: @escaping () -> Void = {},
+        @ViewBuilder cover: () -> Cover
+    ) {
+        self.album = album
+        self.onSelect = onSelect
+        self.onPlay = onPlay
+        self.customCover = cover()
+    }
+
+    public var body: some View {
         FoundationCard(
-            titleText: "Chillhop Radio 24/7",
-            subtitleText: "Lo-Fi Beats to Study & Relax",
-            footerText: "1.2k listeners",
-            aspectRatio: 16.0 / 9.0,
-            isSelected: true,
-            onSelect: {}
+            titleText: album.title,
+            subtitleText: album.artist,
+            footerText: album.year != nil ? String(album.year!) : nil,
+            onSelect: onSelect
         ) {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.purple.gradient)
-                .overlay {
-                    Image(systemName: "antenna.radiowaves.left.and.right")
-                        .font(.system(size: 36))
-                        .foregroundStyle(.white.opacity(0.8))
-                }
+            if let customCover {
+                customCover
+            } else {
+                coverImageView
+            }
         } topTrailingBadges: {
-            FoundationCardBadge("LIVE", foregroundStyle: .white, backgroundStyle: Color.red)
+            if let badge = album.audioQualityBadge {
+                FoundationCardBadge(badge)
+            }
         } actionOverlay: {
-            FoundationCardActionButton(systemImage: "pause.fill", action: {})
+            FoundationCardActionButton(systemImage: "play.fill", action: onPlay)
         }
     }
-    .padding(32)
-    .frame(width: 500)
+
+    @ViewBuilder
+    private var coverImageView: some View {
+        if let data = album.artworkData, let image = Image(foundationArtworkData: data) {
+            image
+                .resizable()
+                .scaledToFill()
+        } else if let url = album.artworkURL {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .empty:
+                    ProgressView()
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .failure:
+                    placeholderNoteView
+                @unknown default:
+                    placeholderNoteView
+                }
+            }
+        } else {
+            placeholderNoteView
+        }
+    }
+
+    private var placeholderNoteView: some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(Color.secondary.opacity(0.15))
+            .overlay {
+                Image(systemName: "music.note")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.secondary.opacity(0.5))
+            }
+    }
+}
+
+extension AlbumCardView where Cover == EmptyView {
+    public init(
+        album: AlbumPresentationModel,
+        onSelect: @escaping () -> Void,
+        onPlay: @escaping () -> Void = {}
+    ) {
+        self.album = album
+        self.onSelect = onSelect
+        self.onPlay = onPlay
+        self.customCover = nil
+    }
+}
+
+// MARK: - Artist Avatar View
+
+public struct ArtistAvatarView<Avatar: View>: View {
+    public let artist: ArtistPresentationModel
+    public let onSelect: () -> Void
+    private let customAvatar: Avatar?
+
+    @State private var isHovered: Bool = false
+
+    public init(
+        artist: ArtistPresentationModel,
+        onSelect: @escaping () -> Void,
+        @ViewBuilder avatar: () -> Avatar
+    ) {
+        self.artist = artist
+        self.onSelect = onSelect
+        self.customAvatar = avatar()
+    }
+
+    public var body: some View {
+        VStack(spacing: 10) {
+            Group {
+                if let customAvatar {
+                    customAvatar
+                } else {
+                    avatarImageView
+                }
+            }
+            .aspectRatio(1, contentMode: .fit)
+            .clipShape(Circle())
+            .shadow(color: .black.opacity(isHovered ? 0.15 : 0.05), radius: isHovered ? 12 : 5, y: isHovered ? 6 : 2)
+            .scaleEffect(isHovered ? 1.03 : 1.0)
+
+            VStack(spacing: 2) {
+                Text(artist.name)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .foregroundStyle(.primary)
+
+                Text(artist.displaySubtitle)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onSelect()
+        }
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var avatarImageView: some View {
+        if let data = artist.artworkData, let image = Image(foundationArtworkData: data) {
+            image
+                .resizable()
+                .scaledToFill()
+        } else if let url = artist.artworkURL {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .empty:
+                    ProgressView()
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .failure:
+                    placeholderAvatarView
+                @unknown default:
+                    placeholderAvatarView
+                }
+            }
+        } else {
+            placeholderAvatarView
+        }
+    }
+
+    private var placeholderAvatarView: some View {
+        Circle()
+            .fill(Color.secondary.opacity(0.15))
+            .overlay {
+                Image(systemName: "music.mic")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.secondary.opacity(0.5))
+            }
+    }
+}
+
+extension ArtistAvatarView where Avatar == EmptyView {
+    public init(
+        artist: ArtistPresentationModel,
+        onSelect: @escaping () -> Void
+    ) {
+        self.artist = artist
+        self.onSelect = onSelect
+        self.customAvatar = nil
+    }
+}
+
+// MARK: - Unified Track Card View
+
+public struct UnifiedTrackCardView<Artwork: View, ActionsMenu: View>: View {
+    public let title: String
+    public let subtitle: String
+    public let secondaryText: String?
+    public let durationText: String?
+    public let qualityBadge: String?
+    public let isPlaying: Bool
+    public let isSelected: Bool
+    public let onSelect: () -> Void
+    public let onPlay: () -> Void
+    public let artwork: Artwork
+    public let actionsMenu: ActionsMenu?
+
+    public init(
+        title: String,
+        subtitle: String,
+        secondaryText: String? = nil,
+        durationText: String? = nil,
+        qualityBadge: String? = nil,
+        isPlaying: Bool = false,
+        isSelected: Bool = false,
+        onSelect: @escaping () -> Void,
+        onPlay: @escaping () -> Void,
+        @ViewBuilder artwork: () -> Artwork,
+        @ViewBuilder actionsMenu: () -> ActionsMenu
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.secondaryText = secondaryText
+        self.durationText = durationText
+        self.qualityBadge = qualityBadge
+        self.isPlaying = isPlaying
+        self.isSelected = isSelected
+        self.onSelect = onSelect
+        self.onPlay = onPlay
+        self.artwork = artwork()
+        self.actionsMenu = actionsMenu()
+    }
+
+    public init(
+        title: String,
+        subtitle: String,
+        secondaryText: String? = nil,
+        durationText: String? = nil,
+        qualityBadge: String? = nil,
+        isPlaying: Bool = false,
+        isSelected: Bool = false,
+        onSelect: @escaping () -> Void,
+        onPlay: @escaping () -> Void,
+        @ViewBuilder artwork: () -> Artwork
+    ) where ActionsMenu == EmptyView {
+        self.title = title
+        self.subtitle = subtitle
+        self.secondaryText = secondaryText
+        self.durationText = durationText
+        self.qualityBadge = qualityBadge
+        self.isPlaying = isPlaying
+        self.isSelected = isSelected
+        self.onSelect = onSelect
+        self.onPlay = onPlay
+        self.artwork = artwork()
+        self.actionsMenu = nil
+    }
+
+    public var body: some View {
+        FoundationCard(
+            aspectRatio: 1.0,
+            cornerRadius: 10,
+            isSelected: isSelected,
+            onSelect: onSelect
+        ) {
+            artwork
+        } topLeadingBadges: {
+            if let qualityBadge {
+                FoundationCardBadge(qualityBadge)
+            }
+        } actionOverlay: {
+            FoundationCardActionButton(
+                systemImage: isPlaying ? "pause.fill" : "play.fill",
+                action: onPlay
+            )
+        } title: {
+            Text(title)
+                .font(.callout.weight(.semibold))
+                .lineLimit(1)
+        } subtitle: {
+            Text(subtitle)
+                .font(.caption)
+                .lineLimit(1)
+        } footer: {
+            HStack(spacing: 6) {
+                if let secondaryText {
+                    Text(secondaryText)
+                        .font(.caption2)
+                        .lineLimit(1)
+                        .foregroundStyle(.tertiary)
+                }
+
+                Spacer(minLength: 4)
+
+                if let durationText {
+                    Text(durationText)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                }
+
+                if let actionsMenu {
+                    actionsMenu
+                }
+            }
+        }
+    }
 }

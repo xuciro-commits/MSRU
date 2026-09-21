@@ -885,3 +885,27 @@ private struct HoverScrubber:
     MiniPlayerBar(playback: playback, onToggleQueue: {})
         .frame(width: 480).padding()
 }
+
+// MARK: - Mini Player Accessory View
+
+struct MiniPlayerAccessoryView: View {
+
+    @Bindable var playback: PlaybackController
+    let onToggleQueue: () -> Void
+    var onToggleVisualizer: (() -> Void)? = nil
+    var onToggleLyrics: (() -> Void)? = nil
+    var onExpandNowPlaying: (() -> Void)? = nil
+
+    var body: some View {
+        MiniPlayerBar(
+            playback: playback,
+            onToggleQueue: onToggleQueue,
+            onToggleVisualizer: onToggleVisualizer,
+            onToggleLyrics: onToggleLyrics,
+            onExpandNowPlaying: onExpandNowPlaying
+        )
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+    }
+}
+

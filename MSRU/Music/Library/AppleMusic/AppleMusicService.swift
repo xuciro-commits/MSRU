@@ -5,7 +5,21 @@
 
 import Foundation
 import MusicKit
+import Observation
 
+// MARK: - Options
+
+struct LibraryImportOptions: Equatable {
+    var importsArtists = true
+    var importsSongs = true
+    var importsAlbums = true
+
+    var hasSelection: Bool {
+        importsArtists || importsSongs || importsAlbums
+    }
+}
+
+// MARK: - Service Protocol & Implementation
 
 @MainActor
 protocol AppleMusicLibraryServing {
@@ -16,98 +30,119 @@ protocol AppleMusicLibraryServing {
 }
 
 struct AppleMusicService: AppleMusicLibraryServing {
-
-    // MARK: - Authorization
-
-    func requestAuthorization()
-        async -> MusicAuthorization.Status {
-
+    func requestAuthorization() async -> MusicAuthorization.Status {
         await MusicAuthorization.request()
     }
 
-
-    // MARK: - Albums
-
-    func fetchAlbums()
-        async throws -> [Album] {
-
-        try await fetchAll(
-            Album.self
-        )
+    func fetchAlbums() async throws -> [Album] {
+        try await fetchAll(Album.self)
     }
 
-
-    // MARK: - Artists
-
-    func fetchArtists()
-        async throws -> [Artist] {
-
-        try await fetchAll(
-            Artist.self
-        )
+    func fetchArtists() async throws -> [Artist] {
+        try await fetchAll(Artist.self)
     }
 
-
-    // MARK: - Songs
-
-    func fetchSongs()
-        async throws -> [Song] {
-
-        try await fetchAll(
-            Song.self
-        )
+    func fetchSongs() async throws -> [Song] {
+        try await fetchAll(Song.self)
     }
 
-
-    // MARK: - Generic Library Request
-
-    private func fetchAll<Item>(
-        _ type: Item.Type
-    ) async throws -> [Item]
-    where Item: MusicLibraryRequestable {
-
+    private func fetchAll<Item>(_ type: Item.Type) async throws -> [Item] where Item: MusicLibraryRequestable {
         let pageSize = 100
-
         var offset = 0
         var result: [Item] = []
 
-
         while true {
+            var request = MusicLibraryRequest<Item>()
+            request.limit = pageSize
+            request.offset = offset
 
-            var request =
-                MusicLibraryRequest<Item>()
+            let response = try await request.response()
+            let page = Array(response.items)
+            result.append(contentsOf: page)
 
-            request.limit =
-                pageSize
-
-            request.offset =
-                offset
-
-
-            let response =
-                try await request.response()
-
-
-            let page =
-                Array(response.items)
-
-
-            result.append(
-                contentsOf: page
-            )
-
-
-            guard
-                page.count == pageSize
-            else {
-                break
-            }
-
-
+            guard page.count == pageSize else { break }
             offset += page.count
         }
 
-
         return result
+    }
+}
+
+// MARK: - Apple Music Library Store
+
+@MainActor
+@Observable
+final class AppleMusicLibraryStore {
+    // MARK: - Content
+    private(set) var albums: [Album] = []
+    private(set) var artists: [Artist] = []
+    private(set) var songs: [Song] = []
+
+    // MARK: - State
+    private(set) var authorizationStatus: MusicAuthorization.Status
+    private(set) var isImporting = false
+    private(set) var lastError: String?
+
+    // MARK: - Service
+    private let service: any AppleMusicLibraryServing
+
+    convenience init() {
+        self.init(service: AppleMusicService(), authorizationStatus: MusicAuthorization.currentStatus)
+    }
+
+    init(service: any AppleMusicLibraryServing, authorizationStatus: MusicAuthorization.Status) {
+        self.service = service
+        self.authorizationStatus = authorizationStatus
+    }
+
+    // MARK: - Summary
+    var hasContent: Bool {
+        !albums.isEmpty || !artists.isEmpty || !songs.isEmpty
+    }
+
+    var albumCount: Int {
+        albums.count
+    }
+
+    var artistCount: Int {
+        artists.count
+    }
+
+    var songCount: Int {
+        songs.count
+    }
+
+    // MARK: - Import
+    @discardableResult
+    func importLibrary(options: LibraryImportOptions) async -> Bool {
+        guard options.hasSelection else { return false }
+
+        isImporting = true
+        lastError = nil
+        defer { isImporting = false }
+
+        let status = await service.requestAuthorization()
+        authorizationStatus = status
+
+        guard status == .authorized else {
+            lastError = "Apple Music access was not authorized."
+            return false
+        }
+
+        do {
+            if options.importsAlbums {
+                albums = try await service.fetchAlbums()
+            }
+            if options.importsArtists {
+                artists = try await service.fetchArtists()
+            }
+            if options.importsSongs {
+                songs = try await service.fetchSongs()
+            }
+            return true
+        } catch {
+            lastError = error.localizedDescription
+            return false
+        }
     }
 }

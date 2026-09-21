@@ -3,9 +3,10 @@
 //  MSRU
 //
 
-import Foundation
+import SwiftUI
 import Observation
 import AppFoundation
+import AppFoundationUI
 
 // MARK: - Feature Definition
 
@@ -184,5 +185,89 @@ extension FeatureHost where F == RadioFeature {
 
     func isFavorite(_ station: RadioStation) -> Bool {
         state.isFavorite(station)
+    }
+}
+
+// MARK: - Application Contribution
+
+extension RadioFeature: ApplicationFeature {
+
+    typealias Route = SceneRoute
+
+    nonisolated static var contributions: FeatureContribution<Route> {
+        FeatureContribution(
+            sidebar: [
+                SidebarContribution(
+                    id: "radio",
+                    group: "Discover",
+                    title: "Radio",
+                    systemImage: "dot.radiowaves.left.and.right",
+                    route: SceneRoute.section(.radio),
+                    order: 30
+                )
+            ],
+            routes: [
+                RouteContribution(
+                    id: "radio",
+                    route: SceneRoute.section(.radio)
+                )
+            ]
+        )
+    }
+}
+
+// MARK: - Application Presentation
+
+extension RadioFeature: ApplicationFeaturePresentation {
+
+    typealias PresentationContext = SceneModel
+
+    static var routeDestinations: [RouteDestination<SceneRoute, SceneModel>] {
+        [
+            RouteDestination(
+                id: "radio",
+                route: .section(.radio),
+                workspace: { scene in
+                    WorkspacePresentation(
+                        identity: WorkspaceIdentity(
+                            title: String(localized: "Radio"),
+                            systemImage: "dot.radiowaves.left.and.right"
+                        ),
+                        toolbar: radioToolbar
+                    ) { _ in
+                        RadioView(
+                            feature: scene.radioFeature,
+                            selectedStation: scene.selectedRadioStation,
+                            onSelectStation: { station in
+                                scene.select(radioStation: station)
+                            }
+                        )
+                    }
+                }
+            )
+        ]
+    }
+
+    // MARK: - Workspace Toolbar
+
+    private static var radioToolbar: ToolbarPresentation<SceneModel> {
+        ToolbarPresentation(
+            items: [
+                .search(
+                    ToolbarSearchPresentation(
+                        id: "radio.search",
+                        prompt: String(localized: "Search stations, genres, or countries"),
+                        text: { scene in
+                            scene.radioFeature.state.searchQuery
+                        },
+                        update: { scene, value in
+                            scene.radioFeature.send(
+                                .searchQueryChanged(value)
+                            )
+                        }
+                    )
+                )
+            ]
+        )
     }
 }
