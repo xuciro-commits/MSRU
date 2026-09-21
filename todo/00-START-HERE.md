@@ -32,6 +32,7 @@
 | 并发、取消、生命周期 | [并发模型](../Docs/Architecture/ConcurrencyModel.md) | 明确任务所有者和失效行为 |
 | 数据、持久化与业务边界 | [数据边界](../Docs/Architecture/DataBoundaries.md) | 避免状态与存储职责混杂 |
 | 音乐实体数据库与身份解析 | [身份解析引擎](../Docs/Architecture/IdentityResolutionEngine.md) | 实体模型、三层元数据、声纹聚类与加权匹配 |
+| 500K 大曲库、身份与展示架构 | [大曲库与音乐身份架构](../Docs/Architecture/LargeLibraryAndIdentityArchitecture.md) | GRDB/SQLite WAL、确定性ID、中文FTS5、稀疏分页、零成本更新与全量性能证据 |
 | 如何验证架构要求 | [架构验证](../Docs/Architecture/ArchitectureVerification.md) | 转换为构建、测试和可执行约束 |
 | 已有问题与审视背景 | [架构审视](../Docs/Architecture/Review.md) | 作为分析线索；历史结论须对照当前代码 |
 | 分阶段演进方向 | [基础框架路线图](../Docs/Roadmap/FoundationRoadmap.md) | 作为顺序参考，不视作全部立即实施的授权 |

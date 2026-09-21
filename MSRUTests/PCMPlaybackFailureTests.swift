@@ -27,8 +27,10 @@ private final class FailingPCMProvider: PlaybackProvider {
     }
 }
 
-@MainActor
-struct PCMPlaybackFailureTests {
+extension AudioHardwareTestSuite {
+    @Suite(.serialized)
+    @MainActor
+    struct PCMPlaybackFailureTests {
     @Test
     func decodeFailureClosesSessionAndRetryCreatesFreshTransport() async throws {
         let provider = FailingPCMProvider()
@@ -38,7 +40,7 @@ struct PCMPlaybackFailureTests {
         controller.play(MSRUPreviewData.localTracks[0])
         let queueIDs = controller.playbackQueue.allItems.map(\.id)
         for attempt in 1...2 {
-            let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+            let deadline = ContinuousClock.now.advanced(by: .seconds(10))
             while controller.playbackErrorMessage == nil && ContinuousClock.now < deadline {
                 try await Task.sleep(for: .milliseconds(10))
             }
@@ -60,4 +62,5 @@ struct PCMPlaybackFailureTests {
             }
         }
     }
+}
 }

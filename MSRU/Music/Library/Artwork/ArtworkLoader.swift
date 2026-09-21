@@ -30,43 +30,19 @@ public actor ArtworkLoader: Sendable {
     }
 
     /// Asynchronously loads a downsampled thumbnail for the given artwork reference.
-    /// Hardware-downsampled from compressed disk bytes using CGImageSource without allocating full-res bitmap.
+    /// Consolidated to unified 3-tier ArtworkPipeline.
     public func loadThumbnail(for reference: String, targetSize: CGSize = CGSize(width: 160, height: 160)) async -> PlatformImage? {
-        let cleanRef = reference.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleanRef.isEmpty else { return nil }
-
-        let cacheKey = "\(cleanRef)@\(Int(targetSize.width))x\(Int(targetSize.height))"
-
-        if let cached = cache.object(forKey: cacheKey as NSString) {
-            return cached
+        let bucket: PixelBucket
+        if targetSize.width <= 32 {
+            bucket = .pt32
+        } else if targetSize.width <= 64 {
+            bucket = .pt64
+        } else if targetSize.width <= 128 {
+            bucket = .pt128
+        } else {
+            bucket = .pt256
         }
-
-        if let existingTask = inFlightTasks[cacheKey] {
-            return await existingTask.value
-        }
-
-        let task = Task<PlatformImage?, Never> { [weak self] () -> PlatformImage? in
-            guard !Task.isCancelled else { return nil }
-
-            guard let data = LocalArtworkStorage.shared.loadArtwork(relativePath: cleanRef) else {
-                return nil
-            }
-
-            guard !Task.isCancelled else { return nil }
-
-            let thumb = Self.createDownsampledThumbnail(from: data, targetSize: targetSize)
-
-            if let thumb, let strongSelf = self {
-                await strongSelf.storeInCache(thumb, forKey: cacheKey, targetSize: targetSize)
-            }
-
-            return thumb
-        }
-
-        inFlightTasks[cacheKey] = task
-        let result = await task.value
-        inFlightTasks.removeValue(forKey: cacheKey)
-        return result
+        return await ArtworkPipeline.shared.loadThumbnail(for: reference, bucket: bucket)
     }
 
     /// Asynchronously loads the full-resolution artwork image.

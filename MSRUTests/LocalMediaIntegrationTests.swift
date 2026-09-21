@@ -3,8 +3,11 @@ import Foundation
 import Testing
 @testable import MSRU
 
-@MainActor
-struct LocalMediaIntegrationTests {
+@Suite("Audio Hardware Tests", .serialized)
+enum AudioHardwareTestSuite {
+    @Suite(.serialized)
+    @MainActor
+    struct LocalMediaIntegrationTests {
     @Test
     func importedWAVSurvivesReloadAndResolvesToPlayableAsset() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -368,4 +371,5 @@ struct LocalMediaIntegrationTests {
         data.append(Data(repeating: 0, count: Int(byteCount)))
         return data
     }
+}
 }

@@ -21,13 +21,18 @@ public actor LocalLibraryIndexingService: Sendable {
     public static let shared = LocalLibraryIndexingService()
 
     private let fingerprintService: AudioFingerprintService
+    private let learnRules: Bool
     private var pendingQueue: [URL: LocalTrack] = [:]
     private var activeTask: Task<Void, Never>?
 
     public private(set) var currentStage: LibraryIndexingStage = .idle
 
-    public init(fingerprintService: AudioFingerprintService = .shared) {
+    public init(
+        fingerprintService: AudioFingerprintService = .shared,
+        learnRules: Bool = true
+    ) {
         self.fingerprintService = fingerprintService
+        self.learnRules = learnRules
     }
 
     /// Enqueues a batch of newly committed tracks for background indexing.
@@ -71,8 +76,10 @@ public actor LocalLibraryIndexingService: Sendable {
             totalSkipped += fpResult.skippedCachedCount
 
             // Stage 2B: Delegate to PathHeuristicRuleStore (batched rule learning)
-            await MainActor.run {
-                PathHeuristicRuleStore.shared.learnBatch(from: currentBatch)
+            if learnRules {
+                await MainActor.run {
+                    PathHeuristicRuleStore.shared.learnBatch(from: currentBatch)
+                }
             }
 
             await Task.yield()

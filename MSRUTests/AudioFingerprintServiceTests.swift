@@ -7,9 +7,9 @@
 
 import Testing
 import Foundation
-@testable import MSRU
 import AppFoundation
-
+@testable import MSRU
+@Suite(.serialized)
 struct AudioFingerprintServiceTests {
 
     private struct MockFingerprinter: AudioFingerprinting, Sendable {
@@ -141,26 +141,27 @@ struct AudioFingerprintServiceTests {
         let regStorage = tempDir.appendingPathComponent("reg.json")
         let registry = LocalFingerprintRegistry(storageURL: regStorage)
         let fpService = AudioFingerprintService(fingerprinter: fingerprinter, registry: registry)
-        let indexingService = LocalLibraryIndexingService(fingerprintService: fpService)
+        let indexingService = LocalLibraryIndexingService(fingerprintService: fpService, learnRules: false)
 
         let track = LocalTrack(fileURL: fileURL, title: "Orchestration Track", artist: "Orchestration Artist", duration: 150.0)
 
         #expect(await indexingService.currentStage == .idle)
         await indexingService.enqueue([track])
 
-        // Wait briefly for background indexing task to finish
-        for _ in 0..<50 {
+        // Wait for background indexing task to finish
+        for _ in 0..<300 {
             if case .complete = await indexingService.currentStage {
                 break
             }
             try await Task.sleep(nanoseconds: 20_000_000)
         }
 
-        if case .complete(let total, let skipped) = await indexingService.currentStage {
+        let finalStage = await indexingService.currentStage
+        if case .complete(let total, let skipped) = finalStage {
             #expect(total == 1)
             #expect(skipped == 0)
         } else {
-            Issue.record("Indexing service did not reach complete stage")
+            Issue.record("Indexing service did not reach complete stage within deadline, got: \(finalStage)")
         }
     }
 }

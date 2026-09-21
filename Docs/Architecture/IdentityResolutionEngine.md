@@ -2,6 +2,7 @@
 
 > 核心思想：**文件不是歌曲。名字只是属性，ID 才是身份。**
 > 架构参考：**Roon 实体与版本模型 + MusicBrainz 身份体系 + Picard/AcoustID 声纹聚类 + beets 加权匹配与置信度。**
+> 500K 级持久化与展现基础设施技术规范与性能证据参见：[大曲库与音乐身份架构](LargeLibraryAndIdentityArchitecture.md)。
 
 ---
 

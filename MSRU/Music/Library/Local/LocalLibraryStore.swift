@@ -81,8 +81,61 @@ final class LocalLibraryStore {
             }
             self.tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
             await self.refreshQuerySnapshot()
+            await self.syncTracksToDatabase(newTracks)
             await LocalLibraryIndexingService.shared.enqueue(newTracks)
         }
+    }
+
+    private func syncTracksToDatabase(_ newTracks: [LocalTrack]) async {
+        let identityRepo = IdentityRepository(db: AppDatabase.shared)
+        let assetRepo = AssetRepository(db: AppDatabase.shared)
+        let sourceID = SourceID("src_local_default")
+
+        var artists: [(id: ArtistID, name: String)] = []
+        var recordings: [(id: RecordingID, title: String, duration: Double?)] = []
+        var releaseGroups: [(id: ReleaseGroupID, title: String)] = []
+        var releases: [(id: ReleaseID, releaseGroupID: ReleaseGroupID?, title: String, year: Int?)] = []
+        var releaseTracks: [(id: ReleaseTrackID, releaseID: ReleaseID, trackNumber: Int, title: String, duration: Double?, recordingID: RecordingID)] = []
+        var artistCredits: [(artistID: ArtistID, entityType: String, entityID: String)] = []
+        var assets: [PersistedAssetRecord] = []
+
+        for track in newTracks {
+            let relTitle = track.album ?? "Unknown Album"
+            let recID = DeterministicID.recording(title: track.title, artist: track.artist)
+            let artID = DeterministicID.artist(name: track.artist)
+            let rgID = DeterministicID.releaseGroup(artist: track.artist, title: relTitle)
+            let relID = DeterministicID.release(artist: track.artist, title: relTitle)
+            let trkID = DeterministicID.releaseTrack(releaseID: relID, medium: 1, track: track.trackNumber ?? 1)
+            let astID = DeterministicID.asset(sourceID: sourceID, relativePath: track.fileURL.standardizedFileURL.path)
+
+            artists.append((id: artID, name: track.artist))
+            recordings.append((id: recID, title: track.title, duration: track.duration))
+            releaseGroups.append((id: rgID, title: relTitle))
+            releases.append((id: relID, releaseGroupID: rgID, title: relTitle, year: track.year))
+            releaseTracks.append((id: trkID, releaseID: relID, trackNumber: track.trackNumber ?? 1, title: track.title, duration: track.duration, recordingID: recID))
+            artistCredits.append((artistID: artID, entityType: "recording", entityID: recID.rawValue))
+
+            assets.append(PersistedAssetRecord(
+                id: astID,
+                sourceID: sourceID,
+                relativePath: track.fileURL.standardizedFileURL.path,
+                fileSize: 0,
+                mtime: Date().timeIntervalSince1970,
+                format: track.fileURL.pathExtension.uppercased(),
+                duration: track.duration,
+                recordingID: recID
+            ))
+        }
+
+        try? await identityRepo.batchUpsertEntities(
+            artists: artists,
+            recordings: recordings,
+            releaseGroups: releaseGroups,
+            releases: releases,
+            releaseTracks: releaseTracks,
+            artistCredits: artistCredits
+        )
+        try? await assetRepo.batchUpsert(assets)
     }
 
     func deleteTracks(withIDs ids: Set<String>, deletePhysical: Bool = false) async {

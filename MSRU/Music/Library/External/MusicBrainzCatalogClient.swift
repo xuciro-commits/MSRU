@@ -176,11 +176,12 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
             ("duration", "\(dur)"),
             ("fingerprint", fingerprint)
         ]
-        let bodyString = bodyParameters.map { key, val in
+        let bodyParts: [String] = bodyParameters.map { key, val in
             let escapedKey = key.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? key
             let escapedVal = val.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? val
             return "\(escapedKey)=\(escapedVal)"
-        }.joined(separator: "&")
+        }
+        let bodyString: String = bodyParts.joined(separator: "&")
         request.httpBody = bodyString.data(using: .utf8)
 
         guard let (data, response) = try? await urlSession.data(for: request),

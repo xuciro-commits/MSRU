@@ -37,12 +37,19 @@ let package = Package(
         )
     ],
 
+    dependencies: [
+        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.0")
+    ],
+
     targets: [
 
         // MARK: - Core
 
         .target(
             name: "AppFoundation",
+            dependencies: [
+                .product(name: "GRDB", package: "GRDB.swift")
+            ],
             resources: [
                 .process("Resources")
             ]
