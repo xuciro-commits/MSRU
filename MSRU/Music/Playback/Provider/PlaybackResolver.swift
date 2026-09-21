@@ -77,7 +77,9 @@ final class PlaybackResolver:
             throw PlaybackResolutionError
                 .noProvider(
                     source:
-                        request.source
+                        request.source,
+                    formatHint:
+                        request.localFileURL?.pathExtension.uppercased()
                 )
         }
 
@@ -117,7 +119,9 @@ final class PlaybackResolver:
         throw PlaybackResolutionError
             .noProvider(
                 source:
-                    request.source
+                    request.source,
+                formatHint:
+                    request.localFileURL?.pathExtension.uppercased()
             )
     }
 }
@@ -130,7 +134,9 @@ private enum PlaybackResolutionError:
 
     case noProvider(
         source:
-            PlaybackRequest.Source
+            PlaybackRequest.Source,
+        formatHint:
+            String? = nil
     )
 
     case providerFailed(
@@ -147,9 +153,12 @@ private enum PlaybackResolutionError:
         switch self {
 
         case .noProvider(
-            let source
+            let source,
+            let formatHint
         ):
-
+            if let formatHint, !formatHint.isEmpty {
+                return "Format .\(formatHint) is currently not supported by playback engine."
+            }
             return
                 "No playback provider can resolve \(source.rawValue)."
 

@@ -48,6 +48,11 @@
 | 28 | 已完成：系统级播控打通与硬件联动 (MPRemoteCommandCenter 与 MPNowPlayingInfoCenter) | 遵循 Apple MediaPlayer 原生规范；在 PlaybackController 扩展 PlaybackSessionObserving 弱引用监听流；在 Platform/Media 落地 SystemNowPlayingCoordinator 系统级播控协调器，打通 Mac 键盘物理媒体按键、耳机触控/线控、系统锁屏与控制中心封面元数据同步（MPMediaItemPropertyArtwork / Title / Artist / Duration / Rate / isLiveStream）及锁屏拖拽 Seek；ApplicationModel 生命周期在 start() 与 terminate() 幂等激活与清理；新增 SystemNowPlayingCoordinatorTests，全量通过（应用 241 项 + 框架 49 项全部通过），Preview 门禁保持 64 视图 100% 覆盖，架构检查 0 违规，macOS 与 iOS 编译干净通过 |
 | 29 | 已完成：歌单实体 (Playlists) 与收藏管理闭环，打通多端 Shell 浏览与播放控制 | InteractionAtlas 第 7.4 节与 01-USER-INTENT.md；建立 Playlist 实体与 JSON 原子持久化、PlaylistStore 增删改查与排序状态机；SceneSection 扩展 .playlists、注册 PlaylistsFeature 至主工程与 CompactApplicationShell 移动端 Segment 分流；落地 PlaylistsView 网格/列表/排序/新建、PlaylistDetailView 大画卷封面/整单顺序及随机播放/曲目列表、NewPlaylistSheetView 弹窗；新增 PlaylistStoreTests 与 ApplicationDefinitionContractTests 契约测试，全量通过（应用 246 项 + 框架 49 项全部通过），Preview 门禁覆盖 67 视图（100% 覆盖），架构检查 0 违规，macOS 与 iOS 编译干净通过；分支 feat/playlists 已干净合并入 main |
 | 30 | 已完成：框架级通用卡片 (FoundationCard) 交付与全库 Card 统一收口 | 依据 01-USER-INTENT.md 与 ProductPlatformBlueprint 第 11 节（按证据开门）；在 AppFoundationUI 交付通用插槽式 FoundationCard、FoundationCardBadge 与 FoundationCardActionButton（原生连续圆角、环境光抬升、Hover 微动与选中高亮）；全面重构并收口 AlbumCardView、UnifiedTrackCardView、RadioStationCardView 与 PlaylistsView.playlistCard，消除重复手写自绘与视觉割裂；新增 FoundationCardTests，全量通过（246 项回归测试全绿），Preview 门禁覆盖 70 视图（100% 独立覆盖），架构检查 0 违规，macOS 与 iOS 干净编译通过；分支 feat/foundation-card 已干净合并入 main |
+| 31 | 已完成：监控文件夹后台自动扫描与持续增量摄入 (Watched Folders & FSEvents Ingestion) | 依据 FoundationRoadmap STAGE 1 与 InteractionAtlas 第 11 节；落地 WatchedFolder 实体与 WatchedFolderStore 状态机；构建基于 macOS 原生 FSEvents 的 FolderWatcherService 及跨平台驱动 SimulatedFolderWatcherDriver；实现后台静默增量感知新音频拷入/变动/删除、1.2s 防抖调度、秒级声纹匹配与自动入库学习；默认智能探测持久化 `/Volumes/资料盘/70-媒体与收藏/71-音乐库/Artists/` 首要目录；在设置中心（音乐库与目录）与导入中心端出可自定义添加/删除/启停/立即扫描/定位 Finder 的监控卡片管理 UI；新增 WatchedFolderStoreTests，应用 249 项测试 + 框架 49 项全绿，Preview 门禁 70 视图 100% 独立覆盖，架构 0 违规 |
+| 32 | 待开始：动态智能歌单与规则求值引擎 (Smart Playlists & Dynamic Rule Engine) | 依据 FoundationRoadmap STAGE 1 与 InteractionAtlas 第 7.4 节；在 `Music/Library` 构建纯函数式规则引擎 `PlaylistRuleEngine`（支持基于音质、采样率、添加时间、播放次数、流派、爱心等多维字段的复合 AND/OR 规则表达式）；支持动态实时求值计算智能歌单列表并跨端同步；新增 SmartPlaylistTests，Preview 门禁与架构检查 0 违规 |
+| 33 | 待开始：macOS 菜单栏极简驻留播放器 (MenuBarExtra Status Item & Mini Controller) | 依据 01-USER-INTENT.md 原生体验与 FoundationRoadmap STAGE 1；在 `Platform/macOS` 采用 SwiftUI 原生 `MenuBarExtra` 声明式挂载系统右上角状态栏播放器；展示微缩封面、曲目标题/艺术家、即时播放/暂停/切歌与音量控制；共享同一 `PlaybackController` 弱引用监听；100% 同文件独立 Preview，macOS 干净编译通过 |
+| 34 | 待开始：实时歌词时间戳微调校准、偏移调节与物理写回 (Lyrics Timestamp Tuning & SYLT/USLT Writeback) | 依据 FoundationRoadmap STAGE 1 与 InteractionAtlas 第 15 节；在 `LyricsPaneView` 与沉浸大画卷提供 +/-0.5s 原生微调控制器并即时校准播放时钟同步；支持将微调后的 LRC 文本写回伴生 `.lrc` 文件或通过 `AudioTagWriter` 写入物理文件内嵌同步歌词标签；新增 LyricsTuningTests，测试全部通过 |
+| 35 | 待开始：系统级 Spotlight 全局索引与 App Intents 快捷指令 (CoreSpotlight & Shortcuts Integration) | 依据 FoundationRoadmap STAGE 1 与 Apple 原生生态规范；接入 `CoreSpotlight` 索引本地曲库曲目、专辑、艺术家元数据；实现原生 `AppIntents`（PlayTrackIntent、SearchMusicIntent 等），支持系统聚焦搜索点击直达播放与 Siri 自动化调度；新增 SpotlightIndexingTests，测试全部通过 |
 
 具体文件和迁移范围见 [迁移路线](../Docs/Roadmap/FoundationRoadmap.md)。不要把本表与该路线维护成两套详细任务拆解。
 
@@ -101,11 +106,11 @@
 
 验证基线：
 
-- 应用：全量 **241 项通过**，使用 `MSRU-UnitTests`。
+- 应用：全量 **249 项通过**，使用 `MSRU-UnitTests`。
 - 框架：**49 项通过**，使用 `AppFoundation` Package 测试。
 - 构建：macOS 与 iOS 均编译链接通过（iOS Simulator 干净构建通过，0 错误 0 警告）；关闭签名，不代表设备安装运行验收。
 - UI：开发签名 Runner 的 **2 项通过**，验证前台启动、实际 Cmd+Q／重启、保留打开窗口并排除手动关闭窗口。使用独立恢复域与稳定 scene ID；测试全部通过。
-- 门禁：架构（0 违规）、Preview（**64 个全部覆盖**，新增 WatchNowPlayingView 与 WatchQueueSheetView 同文件 Preview）、diff 检查通过；入口链接须在修改后继续检查。源码检查不能替代渲染或运行时验收。
+- 门禁：架构（0 违规）、Preview（**70 个全部覆盖**，100% 独立同文件 Preview）、diff 检查通过；入口链接须在修改后继续检查。源码检查不能替代渲染或运行时验收。
 
 ## 尚未完成的验收
 

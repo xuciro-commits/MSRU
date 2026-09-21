@@ -63,6 +63,28 @@ nonisolated enum LocalAudioFormatSupport {
         supportedExtensions.contains(ext.lowercased())
     }
 
+    // MARK: - Native Apple Formats
+    static let nativeAppleExtensions: Set<String> = [
+        "mp3",
+        "m4a",
+        "aac",
+        "wav",
+        "aif",
+        "aiff",
+        "caf",
+        "flac",
+        "alac",
+        "mp4"
+    ]
+
+    static func isNativeAppleFormat(_ url: URL) -> Bool {
+        nativeAppleExtensions.contains(url.pathExtension.lowercased())
+    }
+
+    static func isNativeAppleFormat(extension ext: String) -> Bool {
+        nativeAppleExtensions.contains(ext.lowercased())
+    }
+
     static func isDTS(_ url: URL) -> Bool {
         url.pathExtension.lowercased() == "dts"
     }

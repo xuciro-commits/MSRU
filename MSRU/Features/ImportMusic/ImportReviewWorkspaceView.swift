@@ -10,6 +10,7 @@ import AppFoundationUI
 
 struct ImportReviewWorkspaceView: View {
     @Bindable var localStore: LocalLibraryStore
+    var watchedFolders: WatchedFolderStore? = nil
     let onOpenLibrary: () -> Void
 
     enum WorkspaceState {
@@ -106,8 +107,45 @@ struct ImportReviewWorkspaceView: View {
                 Text("Import local music, perform fingerprinting, entity resolution, and confidence review.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+
+                if let watchedFolders, !watchedFolders.folders.isEmpty {
+                    HStack(spacing: 10) {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 8, height: 8)
+
+                        let activeCount = watchedFolders.folders.filter(\.isEnabled).count
+                        Text("Watched Folders: \(activeCount) active directory(ies)")
+                            .font(.caption.bold())
+
+                        Spacer()
+
+                        if let first = watchedFolders.folders.first(where: \.isEnabled) {
+                            Text(first.displayName)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+
+                        Button {
+                            Task {
+                                await watchedFolders.rescanAll()
+                            }
+                        } label: {
+                            Label("Rescan", systemImage: "arrow.clockwise")
+                                .font(.caption2)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .frame(maxWidth: 620)
+                    .padding(.top, 6)
+                }
             }
-            .padding(.top, 40)
+            .padding(.top, 30)
 
             // Drop Area
             ZStack {

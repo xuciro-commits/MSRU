@@ -31,15 +31,17 @@ public final class AcoustIDFingerprintExtractor: AudioFingerprinting, Sendable {
         let asset = AVURLAsset(url: fileURL)
         var durationSeconds: Double = 0.0
 
-        if let durationCMTime = try? await asset.load(.duration) {
+        if fileURL.pathExtension.lowercased() == "dsf", let dsfMeta = DSFHeaderReader.readMetadata(from: fileURL) {
+            durationSeconds = dsfMeta.duration
+        } else if let durationCMTime = try? await asset.load(.duration) {
             let secs = CMTimeGetSeconds(durationCMTime)
             if secs > 0 && !secs.isNaN {
                 durationSeconds = secs
             }
         }
 
-        // Fallback for duration using AVAudioFile if AVURLAsset fails
-        if durationSeconds <= 0 {
+        // Fallback for duration using AVAudioFile if AVURLAsset fails (only for native Apple audio formats)
+        if durationSeconds <= 0 && LocalAudioFormatSupport.isNativeAppleFormat(fileURL) {
             if let audioFile = try? AVAudioFile(forReading: fileURL) {
                 let frameCount = Double(audioFile.length)
                 let sampleRate = audioFile.processingFormat.sampleRate
@@ -65,8 +67,9 @@ public final class AcoustIDFingerprintExtractor: AudioFingerprinting, Sendable {
 
         var sampleCount = 0
 
-        // Inspect audio track and sample PCM audio via AVAssetReader
-        if let tracks = try? await asset.loadTracks(withMediaType: .audio),
+        // Inspect audio track and sample PCM audio via AVAssetReader (only for native formats)
+        if LocalAudioFormatSupport.isNativeAppleFormat(fileURL),
+           let tracks = try? await asset.loadTracks(withMediaType: .audio),
            let audioTrack = tracks.first {
             let naturalTimeScale = (try? await audioTrack.load(.naturalTimeScale)) ?? 44100
             let timeRange = (try? await audioTrack.load(.timeRange))

@@ -106,4 +106,54 @@ struct ImportPipelineTests {
         #expect(presentationModels[0].artworkData == mockArtwork)
         #expect(presentationModels[0].title == "叶惠美")
     }
+
+    @Test
+    func filesWithEmbeddedOrMemoryMetadataSkipRemoteNetworkLookup() async throws {
+        actor CallCounter {
+            var lookupRecordingCount = 0
+            func increment() { lookupRecordingCount += 1 }
+            var count: Int { lookupRecordingCount }
+        }
+        let counter = CallCounter()
+
+        struct SpyCatalog: ExternalCatalogService {
+            let counter: CallCounter
+            func lookupRecording(fingerprint: AudioFingerprint) async throws -> [ExternalRecordingMatch] {
+                await counter.increment()
+                return []
+            }
+            func lookupRelease(releaseMBID: String) async throws -> ExternalReleaseMatch? { nil }
+            func searchReleases(artist: String, album: String) async throws -> [ExternalReleaseMatch] { [] }
+            func fetchArtistAliases(artistMBID: String) async throws -> [EntityAlias] { [] }
+        }
+
+        let testFP = "fp_skip_test_\(UUID().uuidString)"
+        LocalFingerprintRegistry.shared.register(
+            fingerprint: testFP,
+            duration: 200.0,
+            title: "Song With Metadata",
+            artist: "Known Artist",
+            album: "Known Album"
+        )
+        defer {
+            LocalFingerprintRegistry.shared.remove(fingerprint: testFP)
+        }
+
+        struct StaticFingerprinter: AudioFingerprinting {
+            let fp: AudioFingerprint
+            func generateFingerprint(for fileURL: URL) async throws -> AudioFingerprint { fp }
+        }
+
+        let spy = SpyCatalog(counter: counter)
+        let pipeline = ImportPipeline(
+            fingerprinter: StaticFingerprinter(fp: AudioFingerprint(fingerprint: testFP, duration: 200.0)),
+            catalog: spy
+        )
+
+        _ = try await pipeline.process(audioURLs: [URL(fileURLWithPath: "/music/test.wav")])
+
+        // Remote lookup must be 0 because local metadata / memory resolved it!
+        let calls = await counter.count
+        #expect(calls == 0)
+    }
 }

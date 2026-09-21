@@ -82,41 +82,51 @@ public final class ImportPipeline: Sendable {
             var matchedMemoryRecord: AcousticFingerprintRecord? = nil
             var artworkData: Data? = nil
 
-            // Priority 1: Local Acoustic Fingerprint Memory Registry
-            if let fp = fp,
-               let memory = await LocalFingerprintRegistry.shared.lookup(fingerprint: fp.fingerprint, duration: fp.duration) {
-                detectedTitle = memory.title
-                detectedArtist = memory.artist
-                detectedAlbum = memory.album
-                recordingMBID = memory.recordingMBID
-                matchedMemoryRecord = memory
-                artworkData = memory.artworkData
-            }
-
-            // Priority 2: Remote Acoustic Fingerprint (AcoustID / MusicBrainz)
-            if matchedMemoryRecord == nil, let fp = fp,
-               let online = (try? await catalog.lookupRecording(fingerprint: fp))?.first {
-                detectedTitle = online.title
-                detectedArtist = online.artist
-                recordingMBID = online.recordingMBID
-            }
-
-            // Priority 3: Embedded Tags in audio file (AVURLAsset)
-            if detectedTitle == nil || detectedArtist == nil || detectedAlbum == nil {
+            // Priority 1: Embedded Tags in audio file (Authoritative Ground Truth)
+            if url.pathExtension.lowercased() == "dsf" {
+                if let dsfMeta = DSFHeaderReader.readMetadata(from: url) {
+                    if let folderArt = LocalArtworkExtractor.extractFromDirectory(folderURL: url.deletingLastPathComponent()) {
+                        artworkData = folderArt
+                    }
+                }
+            } else if FileManager.default.fileExists(atPath: url.path) {
                 let asset = AVURLAsset(url: url)
                 if let metadata = try? await asset.load(.commonMetadata) {
                     for item in metadata {
                         if let key = item.commonKey?.rawValue {
-                            if key == "title", let val = try? await item.load(.stringValue), !val.isEmpty, detectedTitle == nil {
+                            if key == "title", let val = try? await item.load(.stringValue), !val.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, detectedTitle == nil {
                                 detectedTitle = val
-                            } else if key == "artist", let val = try? await item.load(.stringValue), !val.isEmpty, detectedArtist == nil {
+                            } else if key == "artist", let val = try? await item.load(.stringValue), !val.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, detectedArtist == nil {
                                 detectedArtist = val
-                            } else if key == "albumName", let val = try? await item.load(.stringValue), !val.isEmpty, detectedAlbum == nil {
+                            } else if key == "albumName", let val = try? await item.load(.stringValue), !val.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, detectedAlbum == nil {
                                 detectedAlbum = val
                             }
                         }
                     }
                 }
+            }
+
+            let hasAuthoritativeEmbedded = (detectedTitle != nil && detectedArtist != nil && detectedArtist != "Unknown Artist")
+
+            // Priority 2: Local Acoustic Fingerprint Memory Registry (0ms in-memory lookup)
+            if let fp = fp,
+               let memory = await LocalFingerprintRegistry.shared.lookup(fingerprint: fp.fingerprint, duration: fp.duration) {
+                // If local memory exists, fill in MBID or missing fields
+                recordingMBID = memory.recordingMBID
+                matchedMemoryRecord = memory
+                if detectedTitle == nil { detectedTitle = memory.title }
+                if detectedArtist == nil { detectedArtist = memory.artist }
+                if detectedAlbum == nil { detectedAlbum = memory.album }
+                if artworkData == nil { artworkData = memory.artworkData }
+            }
+
+            // Priority 3: Remote Acoustic Fingerprint (AcoustID / MusicBrainz)
+            // SKIPPED when embedded tags or local memory are already authoritative!
+            if !hasAuthoritativeEmbedded && matchedMemoryRecord == nil, let fp = fp,
+               let online = (try? await catalog.lookupRecording(fingerprint: fp))?.first {
+                detectedTitle = online.title
+                detectedArtist = online.artist
+                recordingMBID = online.recordingMBID
             }
 
             // Priority 4: Filename parsed metadata (parsed.title, parsed.artist, parsed.album)

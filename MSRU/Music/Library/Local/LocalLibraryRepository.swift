@@ -8,11 +8,15 @@ protocol LocalLibraryRepository {
     func importTrack(from url: URL) async throws -> LocalTrack?
     func saveTrackInPlace(_ track: LocalTrack) async throws
     func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws
+    func readTrack(from url: URL) async throws -> LocalTrack
 }
 
 extension LocalLibraryRepository {
     func saveTrackInPlace(_ track: LocalTrack) async throws {}
     func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws {}
+    func readTrack(from url: URL) async throws -> LocalTrack {
+        try await FileLocalLibraryRepository.readTrack(from: url)
+    }
 }
 
 private struct PersistedTrackRecord: Codable {
@@ -301,7 +305,11 @@ final class FileLocalLibraryRepository: LocalLibraryRepository {
 
     // MARK: - Metadata
 
-    private func readTrack(
+    func readTrack(from url: URL) async throws -> LocalTrack {
+        try await Self.readTrack(from: url)
+    }
+
+    static func readTrack(
         from url:
             URL
     ) async throws -> LocalTrack {
@@ -314,14 +322,24 @@ final class FileLocalLibraryRepository: LocalLibraryRepository {
             )
 
 
-        /*
-         Metadata 是增强信息，不应该成为
-         “这个文件是否允许进入 Library”的前置条件。
+        // Fast path for DSD DSF files: bypass AVFoundation to prevent CoreAudio FFR errors
+        if url.pathExtension.lowercased() == "dsf", let dsfMeta = DSFHeaderReader.readMetadata(from: url) {
+            let parsed = FileNameHeuristicParser.parse(fileURL: url)
+            let rule = await PathHeuristicRuleStore.shared.match(fileURL: url)
+            let title = parsed.title
+            let artist = rule?.targetArtist ?? parsed.artist ?? "Unknown Artist"
+            let album = rule?.targetAlbum ?? parsed.album
+            let artworkData = LocalArtworkExtractor.extractFromDirectory(folderURL: url.deletingLastPathComponent())
 
-         特别是 DTS / 新格式 / Provider-backed media，
-         系统可能能保存文件，但不一定能通过
-         AVURLAsset 解析全部 metadata。
-         */
+            return LocalTrack(
+                fileURL: url,
+                title: title,
+                artist: artist,
+                album: album,
+                duration: dsfMeta.duration,
+                artworkData: artworkData
+            )
+        }
 
         let metadata:
             [AVMetadataItem]
@@ -486,7 +504,7 @@ final class FileLocalLibraryRepository: LocalLibraryRepository {
         )
     }
 
-    private func metadataString(
+    private static func metadataString(
         identifier:
             AVMetadataIdentifier,
         metadata:
@@ -516,7 +534,7 @@ final class FileLocalLibraryRepository: LocalLibraryRepository {
     }
 
 
-    private func metadataData(
+    private static func metadataData(
         identifier:
             AVMetadataIdentifier,
         metadata:

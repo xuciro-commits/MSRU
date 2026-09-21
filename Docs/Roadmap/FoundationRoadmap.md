@@ -1,33 +1,84 @@
-# 从当前工作树到可持续开发
+# 从当前工作树到可持续开发：长期演进路线图
 
-顺序按风险和产品收益，不以增加类型数为进展。阶段表保留迁移顺序与退出条件；当前执行状态以 todo/02-WORK-QUEUE.md 为准，已完成的实现见文末对照。
+版本：2.0 · 2026-09-21 · 规划视野：2026—2028+ · 状态：现行演进基准
 
-| 阶段 | Goal / Files | API 增删 | Tests / Exit criteria | 用户收益 |
+顺序按真实风险与产品收益推进，不以增加类型数或虚构通用性为进展。阶段表保留演进顺序与退出条件；当前正在执行的任务以 [todo/02-WORK-QUEUE.md](../../todo/02-WORK-QUEUE.md) 为准。
+
+---
+
+## 阶段规划总览 (2026 — 2028+)
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│ 阶段 0：工程基线与核心功能闭环 (Task 1 ~ 30，已全部交付验收)            │
+│ · Swift 6 / 跨平台 Shell (macOS, iOS, watchOS) / 门禁 Preview 100%     │
+│ · 声学指纹 (AcoustID) / 实体图谱 / 物理写回 / 沉浸画卷 / 动态歌词 / 歌单│
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ 阶段 1：极致原生体验与自动摄入 (Stage 1: Ingestion & Native Polish)      │
+│ · 监控文件夹 (FSEvents) 自动扫描与增量摄入                             │
+│ · 动态智能歌单与规则求值引擎                                           │
+│ · macOS MenuBarExtra 状态栏极简驻留播放器                              │
+│ · 歌词时间戳微调校准与物理写回                                         │
+│ · 系统级 Spotlight 全局索引与 App Intents 快捷指令                    │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ 阶段 2：发烧音频链路与高并发存储 (Stage 2: Audiophile DSP & Storage)   │
+│ · CoreAudio HAL 独占模式与 Bit-Perfect 直通输出                        │
+│ · 发烧级 10 段专业均衡器与 EBU R128 / ReplayGain 响度标准化            │
+│ · 大规模曲库 SQLite/SwiftData 存储引擎演进 (流式虚拟化分页)            │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ 阶段 3：异类切片压力测试与框架独立 (Stage 3: Heterogeneous & Framework) │
+│ · 异类切片一：轻量 Markdown 文档工作台 (DocStudio)                     │
+│ · 异类切片二：酒店预订时间轴 PMS 切片 (HotelDesk)                      │
+│ · 框架级全局 Undo/Redo 事务架构                                       │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ 阶段 4：跨设备原生互联与生态闭环 (Stage 4: Apple Ecosystem Connectivity)│
+│ · 基于 Network.framework (Bonjour) 局域网无感遥控播控 (Mac <-> iOS)    │
+│ · 点对点本地高速曲库与歌单推流同步                                     │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 演进阶段详情与退出条件
+
+| 阶段 | 核心目标 / 涉及模块 | API 增删与演进 | 验收测试与退出条件 | 用户与产品收益 |
 |---|---|---|---|---|
-| NOW 0 | 收敛当前未提交的 Shell/Window 迁移；`App/Composition`、`Platform/macOS`、AppFoundationUI Platform | 不新增层；确认旧 MainWindowController/RootSplitViewController 的职责有且仅有一个接收者后删除旧路径 | package/app tests、macOS build；人工双窗口、切页、工具栏、关闭、Cmd+Q、重启 | 新窗口体系行为稳定，留下可回退基线 |
-| NOW 1 | `FeatureHost` 回传 token 校验、`SceneModel`/coordinator 停止边界；restoration store 逐记录容错 | 必要时只加显式 scene stop；不增加 Runtime 总管 | 忽略取消的旧结果、关闭后 snapshot、多窗口好坏记录混合、终止序列测试全部通过 | 快速搜索/关闭窗口不再允许旧操作污染新状态，损坏记录不拖累全部窗口 |
-| NOW 2 | `project.pbxproj` 将 App 迁入 Swift 6 language mode | 修具体隔离/Sendable 诊断；不批量 unchecked | macOS 与 iPad 目标均编译，现有测试通过，新增豁免逐项解释 | 后续异步功能获得更强编译约束 |
-| NEXT 1 | `SwiftUISceneRootView`、Browse presentation/view、平台 Shell renderer；完成同一 Browse 切片 | 增加最小 SwiftUI renderer；删除重复搜索入口和迁移后的 iPad 旧组合路径；必要时 ShellRuntime 改名，无长期别名 | 同一 fixture 驱动两平台；query/enabled 同步、焦点不丢、多窗口状态独立、恢复正确；真机/模拟器验收 | iPad 获得一致功能与合适布局，macOS 搜索不重复 |
-| NEXT 2 | 两个 command runtime 的维护边界；ApplicationCommandCenter 转发层已删除 | runtime 直接调用 gate，删除无策略转发类；Session 是否合并由双平台使用结果决定 | 保留命令排队、顺序、目标场景与 unsupported 的行为测试 | 降低维护成本，不改变交互 |
-| LATER | 曲库导入/保存/重启、provider 错误、播放切换等真实功能 | 只按已暴露的问题提取播放引擎适配器；不先建数据框架 | 用例与失败路径测试；可完成持续使用的音乐流程 | 能搜索、收藏、播放、重启继续使用 |
-| NOT YET | Finder/PMS/ERP/IDE、通用文档工作区、同步引擎、全局 selection/focus/search runtime、架构宏 | 无 | 第二个真实消费者或明确测得的维护痛点才启动 | 避免通用化拖延产品 |
+| **STAGE 1**<br>极致原生体验与自动摄入 | **监控文件夹与动态歌单**：<br>`Music/Library/Watcher`<br>`Music/Library/Rules`<br>`Features/Playlists`<br>`Platform/macOS/MenuBar`<br>`Features/Playback/Lyrics` | · 引入 `FolderWatcherService` (FSEvents)<br>· 引入 `PlaylistRuleEngine`<br>· 引入 `MenuBarExtra` 声明<br>· 扩展 `LyricsService` 微调校准 | · 新增/删除音频文件后台秒级感知，增量送审<br>· 智能歌单动态过滤测试全绿<br>· 状态栏播控与主窗口无缝同步<br>· 歌词偏移 +/-0.5s 即时生效并可写回<br>· Spotlight 索引可检索调起 | 音乐文件下载或拷贝后无需手动反复拖入；歌单随库自动动态更新；无需切换窗口即可在系统顶栏切歌 |
+| **STAGE 2**<br>发烧音频链路与高并发存储 | **发烧级音频与存储底座**：<br>`Music/Playback/DSP`<br>`Music/Playback/CoreAudio`<br>`Music/Library/Storage/SQLite` | · 增加 `AudioEngineAdapter` (AVAudioEngine)<br>· 增加 `ReplayGainScanner`<br>· 实现基于 SQLite 的 `LibraryRepository` | · 外接 DAC 采样率硬件直通，无系统重采样<br>· 10段均衡器与无缝播放(Gapless)实测<br>· 50,000 首曲目冷启动 < 100ms，内存下降 70%<br>· 契约测试保证数据零丢失 | 满足发烧友极致音质与硬件外接需求；曲目数量暴增时依然秒开丝滑 |
+| **STAGE 3**<br>异类切片压力测试与框架独立 | **脱离音乐场景验证框架**：<br>`Examples/DocStudio`<br>`Examples/HotelDesk`<br>`Packages/AppFoundation/Undo` | · AppFoundationUI 提取通用 Undo 事务机制<br>· 严禁向框架泄漏任何 Music 依赖 | · 独立 Demo App 零修改复用 AppFoundation 架构装配与 Shell<br>· 多窗口文档编辑与 Undo/Redo 回滚测试全绿<br>· 证明框架具备 5 年多种产品支撑力 | 验证框架不是音乐特化封装，奠定未来开发不同领域 Apple 原生产品的基础 |
+| **STAGE 4**<br>跨设备原生互联与生态闭环 | **Apple 多端协同**：<br>`Platform/Network`<br>`Features/RemoteControl` | · 纯 Apple 原生 `Network.framework` (Bonjour)<br>· 局域网轻量状态同步协议 | · iPhone / Apple Watch 自动发现 Mac 播放器并毫秒级遥控<br>· 局域网无损音轨传输与歌单高速下发 | 沙发或床上轻松遥控桌面发烧音响，实现媲美 Apple 官方生态的无缝体验 |
 
-每阶段单独可编译、可测试、可回退；改行为与机械重命名分开提交。过渡 API 在最后调用方迁移的同一阶段删除；如果迁移无法在一个小阶段结束，就缩小范围，不维持两套正式架构。
+---
 
-**停止继续设计框架的时间：从现在起就停止新增架构层。** 完成 NOW 的可靠性基线和 NEXT 1 的真实双平台切片后，冻结新的 Foundation 公共概念，转回 MSRU 功能；NEXT 2 可以随产品改动顺手完成，不阻塞产品。没有工作量与可用工时证据，不给虚构的具体日期。
+## 框架抽象准则与停止条件
 
-以后每次框架提取只需回答三件事：实际消除了哪里重复的机制？相较产品直接实现是否减少概念？哪条契约测试证明行为不变？讲得通第二种应用不够；没有第二消费者的需求，先留在产品。
+1. **先产品后框架**：任何新抽象必须先在 MSRU 中经历过真实业务与边界打磨；无真实需求不预先建立通用层。
+2. **提取框架三问**：
+   - 实际消除了哪里重复的机制？
+   - 相较产品直接实现是否减少概念？
+   - 哪条契约测试证明行为不变？
+3. **异类验证作为终审门槛**：只有当一个抽象同时被 MSRU 与第二异类切片（如 DocStudio / HotelDesk）独立使用且语义完全一致时，才允许晋升为框架公共稳定 API。
 
-## 当前实现对照
+---
 
-- 已完成代码迁移至 App / Features / Music / Platform / Shared / PreviewSupport；旧窗口类、PageHeader、Pro 实验页、CommandCenter 转发层及 PlaybackRequest 旧构造器已退出主路径。没有任何调用者的 PlaybackDiagnostics、ProviderHealth 和 PlaybackProviderError 已删除；实际健康状态与错误处理保留在当前业务模型中。
-- 四处内嵌封面解码统一使用 `Platform/SwiftUI/Image+ArtworkData.swift`，Feature 不再直接导入 AppKit / UIKit；占位图与尺寸仍归各视图管理。
-- 直接 View / Representable 均有同文件 Preview，`Scripts/verify-previews.py` 防止回退；预览依赖与真实文件、账户、网络隔离。
-- Feature 回传 token、关闭场景回调身份检查、逐记录恢复及损坏文档备份已实现。
-- App 与测试 target 已使用 Swift 6；macOS、iOS 继续以实际构建和测试作为证据。
-- SwiftUI Shell 已接入同一语义模型；Browse 只有 Shell 搜索入口，macOS 工具栏同结构刷新保留搜索控件身份并验证 enabled。
-- 收藏写入串行化且成功后才发布状态；保存失败保持已提交状态。收藏页面已接入支持来源的播放、下一首和队列操作。
-- NOW 0 阶段收口：旧 MainWindowController/RootSplitViewController 彻底退出；44 个 View/Representable 保持独立同文件 Preview 门禁；统一音量管理、Scrubber 拖拽预览、紧凑自适应排版及真实本地/电台直播流混合顺播通过回归测试。
-- NEXT 2 阶段收口：Command Runtime 维护边界硬化，直接调用 Gate，清除历史废弃标记；`MSRUApplication` 彻底消除过渡宿主模块（`transitionalHostContribution` / `transitionalHostDestinations`），`ListenNowFeature`、`AddMusicFeature` 与 `SettingsFeature` 全面模块化遵循 `ApplicationFeaturePresentation`，全量 6 大功能模块均通过统一的 `builder.add(...)` 进行纯净声明式装配，全量 142 项测试通过。
+## 历史交付对照（基线：Task 1 ~ 30）
 
-已通过原生搜索焦点测试和真实 Cmd+Q / 重启的双窗口恢复 XCUITest。MiniPlayerBar 极窄/紧凑/标准三阶自适应与紧凑列表已完成；本地真实 AVPlayer 播放、音量继承、Seek 夹紧与电台直播流切换均已集成验证。依用户最新指令，**visionOS 涉及的所有开发与验收任务已暂停**；后续跨平台推进将集中于 iOS（含 iPadOS）与 watchOS。历史已生成的 visionOS 构建切片保留作为归档参考。
+- **架构与并发**：AppFoundation 与 AppFoundationUI 独立 Target、纯函数式 `ApplicationDefinition` 组合声明、Swift 6 语言模式全面启用、`FeatureHost` 任务代次令牌与取消隔离。
+- **跨平台多端 Shell**：macOS 原生三栏 Split 宿主、iOS 紧凑 Tab 宿主 (`CompactApplicationShell`) 与 iPad 分栏自适应、watchOS 极简短任务播控切片。
+- **声学指纹与元数据管线**：AcoustID 官方 API Key 真实鉴权、Picard 专辑曲目聚类、beets 8维加权消歧打分、5类重复判定分类器与 Roon 式多版本归集、物理 Vorbis Comments/ID3v2.4 二进制写回与伴生封面导出。
+- **视听交互与多媒体体验**：NowPlayingCanvas 沉浸大画卷、弥散动态光晕、9-15 频段音频波形律动、四级动态平滑滚动 LRC 歌词、高保真 Hi-Res 规格徽标、原生 Table/Grid 双模式浏览、Radio 电台专区、歌单 CRUD、集中预审工作区。
+- **设计系统与国际化**：FoundationCard 通用卡片组件全面统一收口；Xcode String Catalogs (`Localizable.xcstrings`) 覆盖英语、简体中文、藏语，动态即刻响应切换。
+- **系统级播控**：MPRemoteCommandCenter 与 MPNowPlayingInfoCenter 硬件按键/锁屏联动。
+- **工程门禁证据**：70 个视图 100% 同文件独立 Preview 门禁、全量 295 项测试（应用 246 + 框架 49）全部通过，架构静态检查 0 违规。

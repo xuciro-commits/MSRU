@@ -78,6 +78,7 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
                 ) { _ in
                     MetadataManagerWorkspaceView(
                         localStore: scene.application.localLibrary,
+                        watchedFolders: scene.application.watchedFolders,
                         onOpenLibrary: {
                             scene.send(.navigate(.section(.library)))
                         }

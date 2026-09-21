@@ -82,6 +82,12 @@ final class ApplicationModel {
         PlaylistStore
 
 
+    // MARK: - Watched Folders
+
+    let watchedFolders:
+        WatchedFolderStore
+
+
     // MARK: - Language
 
     let languageSettings:
@@ -189,7 +195,9 @@ final class ApplicationModel {
         playlistStore:
             PlaylistStore? = nil,
         languageSettings:
-            LanguageSettings? = nil
+            LanguageSettings? = nil,
+        watchedFolders:
+            WatchedFolderStore? = nil
     ) {
 
         self.musicCatalog =
@@ -232,6 +240,9 @@ final class ApplicationModel {
 
         self.languageSettings =
             languageSettings ?? LanguageSettings()
+
+        self.watchedFolders =
+            watchedFolders ?? WatchedFolderStore(localStore: localLibrary)
 
 
         // MARK: Dependency Composition
@@ -308,6 +319,8 @@ final class ApplicationModel {
                 .load()
             await playlistStore
                 .load()
+            watchedFolders
+                .startMonitoring()
         }
     }
 
@@ -329,6 +342,7 @@ final class ApplicationModel {
 
         systemNowPlayingCoordinator?.deactivate()
         systemNowPlayingCoordinator = nil
+        watchedFolders.stopMonitoring()
 
         startupTask?
             .cancel()

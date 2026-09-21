@@ -14,6 +14,7 @@ import AppFoundationUI
 struct MetadataManagerWorkspaceView: View {
 
     @Bindable var localStore: LocalLibraryStore
+    var watchedFolders: WatchedFolderStore? = nil
     let onOpenLibrary: () -> Void
 
     enum ManagerTab: String, CaseIterable, Identifiable {
@@ -61,6 +62,7 @@ struct MetadataManagerWorkspaceView: View {
             case .importWorkflow:
                 ImportReviewWorkspaceView(
                     localStore: localStore,
+                    watchedFolders: watchedFolders,
                     onOpenLibrary: onOpenLibrary
                 )
 
