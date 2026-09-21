@@ -101,8 +101,8 @@ struct ArtistsView: View {
             } else {
                 ScrollView {
                     LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 140, maximum: 180), spacing: 28)],
-                        spacing: 32
+                        columns: [GridItem(.adaptive(minimum: 140, maximum: 180), spacing: 24)],
+                        spacing: 28
                     ) {
                         ForEach(filteredArtists) { artist in
                             ArtistAvatarView(
@@ -113,9 +113,9 @@ struct ArtistsView: View {
                             ) {
                                 ArtworkThumbnailView(
                                     reference: artist.artworkReference,
-                                    targetSize: CGSize(width: 180, height: 180),
+                                    thumbnailPixelSize: CGSize(width: 240, height: 240),
                                     placeholderSystemImage: "music.mic",
-                                    cornerRadius: 90
+                                    isCircular: true
                                 )
                             }
                             .contextMenu {

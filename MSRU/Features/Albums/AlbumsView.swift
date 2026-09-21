@@ -112,8 +112,8 @@ struct AlbumsView: View {
             } else {
                 ScrollView {
                     LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 170, maximum: 220), spacing: 24)],
-                        spacing: 28
+                        columns: [GridItem(.adaptive(minimum: 160, maximum: 220), spacing: 20)],
+                        spacing: 24
                     ) {
                         ForEach(filteredAlbums) { album in
                             AlbumCardView(
@@ -127,7 +127,7 @@ struct AlbumsView: View {
                             ) {
                                 ArtworkThumbnailView(
                                     reference: album.artworkReference,
-                                    targetSize: CGSize(width: 220, height: 220),
+                                    thumbnailPixelSize: CGSize(width: 240, height: 240),
                                     placeholderSystemImage: "square.stack",
                                     cornerRadius: 10
                                 )

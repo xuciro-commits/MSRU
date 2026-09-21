@@ -232,7 +232,7 @@ struct AlbumDetailView: View {
         if let ref = album.artworkReference {
             ArtworkThumbnailView(
                 reference: ref,
-                targetSize: CGSize(width: 240, height: 240),
+                thumbnailPixelSize: CGSize(width: 360, height: 360),
                 placeholderSystemImage: "music.note",
                 cornerRadius: 12
             )

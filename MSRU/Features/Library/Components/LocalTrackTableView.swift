@@ -354,7 +354,7 @@ struct LocalTrackTableView: View {
     private func trackArtwork(_ track: LocalTrack) -> some View {
         ArtworkThumbnailView(
             reference: track.artworkReference,
-            targetSize: CGSize(width: 36, height: 36),
+            fixedSize: CGSize(width: 36, height: 36),
             placeholderSystemImage: "music.note",
             cornerRadius: 6
         )

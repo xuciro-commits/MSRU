@@ -325,9 +325,9 @@ struct ArtistDetailView: View {
         if let ref = artist.artworkReference {
             ArtworkThumbnailView(
                 reference: ref,
-                targetSize: CGSize(width: 160, height: 160),
+                thumbnailPixelSize: CGSize(width: 320, height: 320),
                 placeholderSystemImage: "music.mic",
-                cornerRadius: 80
+                isCircular: true
             )
         } else if let data = artist.artworkData, let image = Image(artworkData: data) {
             image

@@ -864,7 +864,7 @@ struct TrackInspectorView: View {
         if let ref = track.artworkReference {
             ArtworkThumbnailView(
                 reference: ref,
-                targetSize: CGSize(width: 260, height: 260),
+                thumbnailPixelSize: CGSize(width: 320, height: 320),
                 placeholderSystemImage: "music.note",
                 cornerRadius: 14
             )

@@ -495,9 +495,16 @@ struct LocalLibraryView: View {
 
     @ViewBuilder
     private func artwork(_ track: LocalTrack) -> some View {
-        if let data = track.artworkData, let image = Image(artworkData: data) {
+        if let ref = track.artworkReference {
+            ArtworkThumbnailView(
+                reference: ref,
+                thumbnailPixelSize: CGSize(width: 240, height: 240),
+                placeholderSystemImage: "music.note",
+                cornerRadius: 10
+            )
+        } else if let data = track.artworkData, let image = Image(artworkData: data) {
             image.resizable().scaledToFill()
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         } else {
             artworkPlaceholder
         }
