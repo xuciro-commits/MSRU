@@ -1,19 +1,19 @@
 //
-//  ArtworkLoaderV2.swift
+//  ArtworkLoader.swift
 //  MSRU
 //
 //  3-Tier Artwork Pipeline (L1 In-Memory NSCache, L2 Disk Thumbnail Cache, L3 Content-Addressed Store)
-//  with pixel-bucket downsampling, display scale awareness, and renderer prefetching.
+//  with pixel-bucket downsampling, display scale awareness, renderer prefetching, and deduplicated in-flight loading.
 //
 
 import Foundation
 import ImageIO
 #if canImport(AppKit)
 import AppKit
-public typealias PlatformImageV2 = NSImage
+public typealias PlatformImage = NSImage
 #elseif canImport(UIKit)
 import UIKit
-public typealias PlatformImageV2 = UIImage
+public typealias PlatformImage = UIImage
 #endif
 
 nonisolated public enum PixelBucket: Int, Sendable, CaseIterable {
@@ -26,18 +26,20 @@ nonisolated public enum PixelBucket: Int, Sendable, CaseIterable {
     nonisolated public var maxPixelDimension: Int { rawValue }
 }
 
-public typealias ArtworkPipeline = ArtworkLoaderV2
+public typealias ArtworkPipeline = ArtworkLoader
 
-public actor ArtworkLoaderV2 {
+/// Unified, thread-safe actor responsible for on-demand artwork thumbnail generation,
+/// 3-tier caching (L1 RAM -> L2 Disk -> L3 Local Store), in-flight deduplication, and prefetching.
+public actor ArtworkLoader: Sendable {
 
-    public static let shared = ArtworkLoaderV2()
+    public static let shared = ArtworkLoader()
 
     // L1: Decoded in-memory NSCache (bounded)
-    private let memoryCache = NSCache<NSString, PlatformImageV2>()
+    private let memoryCache = NSCache<NSString, PlatformImage>()
     private let diskCacheURL: URL
-    private var inFlightTasks: [String: Task<PlatformImageV2?, Never>] = [:]
+    private var inFlightTasks: [String: Task<PlatformImage?, Never>] = [:]
 
-    public init(maxMemoryBytes: Int = 60 * 1024 * 1024, maxCount: Int = 600) {
+    public init(maxMemoryBytes: Int = 40 * 1024 * 1024, maxCount: Int = 500) {
         memoryCache.totalCostLimit = maxMemoryBytes
         memoryCache.countLimit = maxCount
 
@@ -52,7 +54,7 @@ public actor ArtworkLoaderV2 {
         for reference: String,
         bucket: PixelBucket = .pt64,
         scale: CGFloat = 2.0
-    ) async -> PlatformImageV2? {
+    ) async -> PlatformImage? {
         let cleanRef = reference.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanRef.isEmpty else { return nil }
 
@@ -68,7 +70,7 @@ public actor ArtworkLoaderV2 {
             return await existingTask.value
         }
 
-        let task = Task<PlatformImageV2?, Never> { [weak self] () -> PlatformImageV2? in
+        let task = Task<PlatformImage?, Never> { [weak self] () -> PlatformImage? in
             guard !Task.isCancelled else { return nil }
 
             // 3. Check L2 Disk Thumbnail Cache
@@ -105,6 +107,27 @@ public actor ArtworkLoaderV2 {
         return result
     }
 
+    /// Convenience overload accepting targetSize (e.g. for SwiftUI views)
+    public func loadThumbnail(for reference: String, targetSize: CGSize) async -> PlatformImage? {
+        let maxDim = max(targetSize.width, targetSize.height)
+        let bucket: PixelBucket
+        if maxDim <= 32 {
+            bucket = .pt32
+        } else if maxDim <= 64 {
+            bucket = .pt64
+        } else if maxDim <= 128 {
+            bucket = .pt128
+        } else {
+            bucket = .pt256
+        }
+        return await loadThumbnail(for: reference, bucket: bucket)
+    }
+
+    /// Asynchronously loads the full-resolution artwork image.
+    public func loadFullImage(for reference: String) async -> PlatformImage? {
+        await loadThumbnail(for: reference, bucket: .original)
+    }
+
     /// Renderer prefetch API to prime nearby visible items during scrolling.
     public func prefetch(
         references: [String],
@@ -123,16 +146,19 @@ public actor ArtworkLoaderV2 {
         }
     }
 
-    public static let pipelineVersion = "v2"
+    /// Purges all in-memory artwork thumbnails from cache.
+    public func clearCache() {
+        memoryCache.removeAllObjects()
+    }
 
     // MARK: - Cache Helpers
 
     private func makeCacheKey(reference: String, bucket: PixelBucket, scale: CGFloat) -> String {
         let baseHash = reference.components(separatedBy: "/").last?.replacingOccurrences(of: ".jpg", with: "") ?? reference
-        return "\(baseHash)_\(bucket.maxPixelDimension)_\(Int(scale))x_\(Self.pipelineVersion)"
+        return "\(baseHash)_\(bucket.maxPixelDimension)_\(Int(scale))x"
     }
 
-    private func saveToMemoryCache(_ image: PlatformImageV2, forKey key: String) {
+    private func saveToMemoryCache(_ image: PlatformImage, forKey key: String) {
         #if canImport(AppKit)
         let cost = Int(image.size.width * image.size.height * 4)
         #elseif canImport(UIKit)
@@ -141,7 +167,7 @@ public actor ArtworkLoaderV2 {
         memoryCache.setObject(image, forKey: key as NSString, cost: cost)
     }
 
-    private func loadFromDiskCache(forKey key: String) -> PlatformImageV2? {
+    private func loadFromDiskCache(forKey key: String) -> PlatformImage? {
         let fileURL = diskCacheURL.appendingPathComponent("\(key).jpg")
         guard FileManager.default.fileExists(atPath: fileURL.path),
               let data = try? Data(contentsOf: fileURL) else {
@@ -154,7 +180,7 @@ public actor ArtworkLoaderV2 {
         #endif
     }
 
-    private func saveToDiskCache(_ image: PlatformImageV2, forKey key: String) {
+    private func saveToDiskCache(_ image: PlatformImage, forKey key: String) {
         let fileURL = diskCacheURL.appendingPathComponent("\(key).jpg")
         guard !FileManager.default.fileExists(atPath: fileURL.path) else { return }
 
@@ -171,7 +197,7 @@ public actor ArtworkLoaderV2 {
         #endif
     }
 
-    private static func decodeDownsampledImage(from data: Data, maxPixelSize: Int) -> PlatformImageV2? {
+    private static func decodeDownsampledImage(from data: Data, maxPixelSize: Int) -> PlatformImage? {
         let options: [CFString: Any] = [
             kCGImageSourceShouldCache: false
         ]

@@ -272,7 +272,7 @@ public struct LibraryTableSurface: NSViewRepresentable {
 
             // Viewport prefetching for thumbnails
             if let artRef = item.artworkReference, row % 20 == 0 {
-                ArtworkLoaderV2.shared.prefetch(references: [artRef], bucket: .pt32)
+                ArtworkLoader.shared.prefetch(references: [artRef], bucket: .pt32)
             }
 
             return cell

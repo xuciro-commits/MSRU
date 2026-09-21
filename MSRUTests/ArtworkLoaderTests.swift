@@ -94,4 +94,22 @@ struct ArtworkLoaderTests {
         #expect(t2 != nil)
         #expect(t1 === t2)
     }
+
+    @Test("Verify PixelBucket dimension values")
+    func testPixelBucketDimensions() {
+        #expect(PixelBucket.pt32.maxPixelDimension == 64)
+        #expect(PixelBucket.pt64.maxPixelDimension == 128)
+        #expect(PixelBucket.pt128.maxPixelDimension == 256)
+        #expect(PixelBucket.pt256.maxPixelDimension == 512)
+        #expect(PixelBucket.original.maxPixelDimension == 0)
+    }
+
+    @Test("Verify ArtworkLoader instance initialization and prefetch non-crashing")
+    func testArtworkLoaderPrefetch() async {
+        let loader = ArtworkLoader()
+        // Prefetch with non-existent references should safely no-op without error or crash
+        await loader.prefetch(references: ["non_existent_artwork_1.jpg", "non_existent_2.jpg"], bucket: .pt64)
+        let result = await loader.loadThumbnail(for: "non_existent.jpg", bucket: .pt64)
+        #expect(result == nil)
+    }
 }
