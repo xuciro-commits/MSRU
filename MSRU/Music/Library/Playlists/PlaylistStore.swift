@@ -226,6 +226,23 @@ final class PlaylistStore {
         await persist()
     }
 
+    /// Purges tracks matching the specified IDs from all playlists in a single atomic save.
+    func purgeTracks(withIDs ids: Set<String>) async {
+        guard !ids.isEmpty else { return }
+        var changed = false
+        for i in playlists.indices {
+            let originalCount = playlists[i].trackIDs.count
+            playlists[i].trackIDs.removeAll { ids.contains($0) }
+            if playlists[i].trackIDs.count != originalCount {
+                playlists[i].updatedAt = Date()
+                changed = true
+            }
+        }
+        if changed {
+            await persist()
+        }
+    }
+
     func removeTracks(at offsets: IndexSet, from playlistID: UUID) async {
         guard let index = playlists.firstIndex(where: { $0.id == playlistID }) else { return }
         playlists[index].trackIDs = playlists[index].trackIDs

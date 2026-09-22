@@ -84,6 +84,29 @@ final class LibraryStore {
     }
     func remove(local track: LocalTrack) async { await removeTrack(containing: LibraryPlaybackSource(local: track)) }
     func remove(openverse track: OpenverseAudio) async { await removeTrack(containing: LibraryPlaybackSource(openverse: track)) }
+
+    /// Purges tracks matching specified IDs or file URLs from the saved library in a single atomic save.
+    func purgeTracks(matchingIDs ids: Set<String>, localURLs: Set<URL>) async {
+        guard !ids.isEmpty || !localURLs.isEmpty else { return }
+        _ = await mutate { current in
+            let filtered = current.filter { track in
+                if ids.contains(track.id.uuidString) { return false }
+                for source in track.sources {
+                    if let url = source.localFileURL {
+                        if localURLs.contains(url) || ids.contains(url.path) || ids.contains(url.standardizedFileURL.path) {
+                            return false
+                        }
+                    }
+                    if let extID = source.externalID, ids.contains(extID) {
+                        return false
+                    }
+                }
+                return true
+            }
+            return filtered.count != current.count ? filtered : nil
+        }
+    }
+
     private func removeTrack(containing source: LibraryPlaybackSource) async {
         _ = await mutate { current in
             guard let track = current.first(where: { $0.sources.contains { self.isSameSource($0, source) } }) else { return nil }

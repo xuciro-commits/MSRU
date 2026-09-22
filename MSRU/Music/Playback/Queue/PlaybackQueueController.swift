@@ -360,6 +360,18 @@ final class PlaybackQueueController {
         }
     }
 
+    /// Purges items matching the predicate from upcoming and history. Returns true if the current item was purged.
+    @discardableResult
+    func purgeItems(matching: (PlaybackItem) -> Bool) -> Bool {
+        upcoming.removeAll { matching($0.item) }
+        history.removeAll { matching($0.item) }
+        if let cur = current, matching(cur.item) {
+            current = nil
+            return true
+        }
+        return false
+    }
+
 
     // MARK: - Reorder
 

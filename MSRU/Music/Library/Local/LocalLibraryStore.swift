@@ -19,6 +19,19 @@ final class LocalLibraryStore {
     private let repository: any LocalLibraryRepository
     private let db: AppDatabase
     private let queryEngine: LibraryQueryEngine
+    private weak var libraryStore: LibraryStore?
+    private weak var playlistStore: PlaylistStore?
+    private weak var playbackController: PlaybackController?
+
+    func attachCascadeCollaborators(
+        libraryStore: LibraryStore?,
+        playlistStore: PlaylistStore?,
+        playbackController: PlaybackController?
+    ) {
+        self.libraryStore = libraryStore
+        self.playlistStore = playlistStore
+        self.playbackController = playbackController
+    }
 
     var albums: [AlbumPresentationModel] {
         if !cachedAlbums.isEmpty {
@@ -214,13 +227,30 @@ final class LocalLibraryStore {
                 ids.contains($0.fileURL.standardizedFileURL.path) ||
                 ids.contains($0.fileURL.path)
             }
-            self.tracks.removeAll {
-                ids.contains($0.id) ||
-                ids.contains($0.fileURL.standardizedFileURL.path) ||
-                ids.contains($0.fileURL.path)
-            }
+            guard !deletedTracks.isEmpty else { return }
+
+            let deletedTrackIDs = Set(deletedTracks.map(\.id))
+            let deletedURLs = Set(deletedTracks.map(\.fileURL))
+            let deletedPaths = Set(deletedTracks.map { $0.fileURL.standardizedFileURL.path })
+            let deletedRelativePaths = Set(deletedTracks.map(\.fileURL.lastPathComponent))
+
+            // 1. Remove from in-memory tracks
+            self.tracks.removeAll { deletedTrackIDs.contains($0.id) }
+
+            // 2. Remove from local JSON manifest and optionally trash physical files
+            try? await self.repository.deleteTracks(withIDs: deletedTrackIDs, deletePhysicalFiles: deletePhysical)
+
+            // 3. Sync deletion to SQLite database (assets, recordings, release_tracks, fts, orphan releases/artists)
+            let identityRepo = IdentityRepository(db: self.db)
+            try? await identityRepo.deleteTracks(relativePaths: deletedPaths.union(deletedRelativePaths))
+
+            // 4. Cross-store cleanup: LibraryStore, PlaylistStore, PlaybackController
+            await self.libraryStore?.purgeTracks(matchingIDs: deletedTrackIDs, localURLs: deletedURLs)
+            await self.playlistStore?.purgeTracks(withIDs: deletedTrackIDs)
+            self.playbackController?.purgeTracks(withIDs: deletedTrackIDs, localURLs: deletedURLs)
+
+            // 5. Update cached presentation and query snapshot
             self.updateCachedPresentations()
-            try? await self.repository.deleteTracks(withIDs: ids, deletePhysicalFiles: deletePhysical)
             self.deregisterTracks(deletedTracks)
             await self.refreshQuerySnapshot()
         }
@@ -236,17 +266,76 @@ final class LocalLibraryStore {
             return matchTitle && matchArtist
         }.map(\.id))
 
-        await deleteTracks(withIDs: trackIDsToDelete, deletePhysical: deletePhysical)
+        if !trackIDsToDelete.isEmpty {
+            await deleteTracks(withIDs: trackIDsToDelete, deletePhysical: deletePhysical)
+        }
+
+        // Also explicitly delete release in SQLite if present
+        let releaseID = DeterministicID.release(artist: artist, title: title)
+        let identityRepo = IdentityRepository(db: self.db)
+        try? await identityRepo.deleteRelease(id: releaseID)
+
+        await serialized {
+            self.updateCachedPresentations()
+            await self.refreshQuerySnapshot()
+        }
     }
 
     func deleteArtist(name: String, deletePhysical: Bool = false) async {
-        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanName.isEmpty else { return }
 
-        let trackIDsToDelete = Set(tracks.filter { track in
-            track.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == cleanName
-        }.map(\.id))
+        var trackIDsToDelete = Set<String>()
+        var tracksToUpdate = [LocalTrack]()
 
-        await deleteTracks(withIDs: trackIDsToDelete, deletePhysical: deletePhysical)
+        for track in tracks {
+            if ArtistCreditCleaner.containsArtist(cleanName, in: track.artist) {
+                if ArtistCreditCleaner.isSoleArtist(cleanName, in: track.artist) {
+                    // Sole artist: delete track
+                    trackIDsToDelete.insert(track.id)
+                } else if let cleanedArtist = ArtistCreditCleaner.removingArtist(cleanName, from: track.artist) {
+                    // Collaboration: preserve track, update artist text
+                    let updated = LocalTrack(
+                        fileURL: track.fileURL,
+                        title: track.title,
+                        artist: cleanedArtist,
+                        album: track.album,
+                        duration: track.duration,
+                        artworkReference: track.artworkReference,
+                        trackNumber: track.trackNumber,
+                        year: track.year
+                    )
+                    tracksToUpdate.append(updated)
+                }
+            }
+        }
+
+        // 1. Update collaboration tracks
+        if !tracksToUpdate.isEmpty {
+            await serialized {
+                for updated in tracksToUpdate {
+                    if let idx = self.tracks.firstIndex(where: { $0.id == updated.id }) {
+                        self.tracks[idx] = updated
+                    }
+                }
+                try? await self.repository.saveTracksInPlace(tracksToUpdate)
+            }
+        }
+
+        // 2. Delete sole-owned tracks (which cascades through SQLite and cross-stores)
+        if !trackIDsToDelete.isEmpty {
+            await deleteTracks(withIDs: trackIDsToDelete, deletePhysical: deletePhysical)
+        }
+
+        // 3. Delete artist entity and credits in SQLite
+        let artistID = DeterministicID.artist(name: cleanName)
+        let identityRepo = IdentityRepository(db: self.db)
+        try? await identityRepo.deleteArtist(id: artistID)
+
+        await serialized {
+            self.updateCachedPresentations()
+            await self.refreshQuerySnapshot()
+        }
     }
 
     private func deregisterTracks(_ tracks: [LocalTrack]) {

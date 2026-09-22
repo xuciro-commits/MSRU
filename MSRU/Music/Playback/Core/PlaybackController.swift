@@ -743,6 +743,27 @@ private struct WeakSessionObserver {
         playbackQueue.moveUpcoming(fromOffsets: fromOffsets, toOffset: toOffset)
     }
 
+    /// Purges deleted tracks from current playback and queue. If current track was purged, advances or stops.
+    func purgeTracks(withIDs ids: Set<String>, localURLs: Set<URL> = []) {
+        guard !ids.isEmpty || !localURLs.isEmpty else { return }
+        let currentAffected = playbackQueue.purgeItems { item in
+            if ids.contains(item.id) { return true }
+            if let local = item.localTrack {
+                if ids.contains(local.id) || localURLs.contains(local.fileURL) || ids.contains(local.fileURL.path) || ids.contains(local.fileURL.standardizedFileURL.path) {
+                    return true
+                }
+            }
+            return false
+        }
+        if currentAffected {
+            if playbackQueue.canNext {
+                next()
+            } else {
+                stop()
+            }
+        }
+    }
+
     func clearUpcoming() {
 
         playbackQueue.clearUpcoming()

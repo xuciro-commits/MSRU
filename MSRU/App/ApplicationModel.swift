@@ -244,6 +244,12 @@ final class ApplicationModel {
         self.watchedFolders =
             watchedFolders ?? WatchedFolderStore(localStore: localLibrary)
 
+        self.localLibrary.attachCascadeCollaborators(
+            libraryStore: library,
+            playlistStore: resolvedPlaylistStore,
+            playbackController: playback
+        )
+
 
         // MARK: Dependency Composition
 
