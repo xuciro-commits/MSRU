@@ -19,7 +19,7 @@ nonisolated enum AppDatabaseMigrations {
 
     // MARK: - Initial Identity & Asset Schema (v1)
 
-    private static func registerV1(to migrator: inout DatabaseMigrator) {
+    nonisolated static func registerV1(to migrator: inout DatabaseMigrator) {
         migrator.registerMigration("v1_create_music_identity_schema") { db in
             // 1. Sources (Storage locations and capabilities)
             try db.create(table: "sources") { t in
@@ -222,7 +222,7 @@ nonisolated enum AppDatabaseMigrations {
 
     // MARK: - Release Groups, File Assets, and Metadata Resolutions (v2)
 
-    private static func registerV2(to migrator: inout DatabaseMigrator) {
+    nonisolated static func registerV2(to migrator: inout DatabaseMigrator) {
         migrator.registerMigration("v2_release_groups_file_assets_and_metadata_resolutions") { db in
             // 1. Release Groups (Abstract grouping of product release editions)
             try db.create(table: "release_groups") { t in

@@ -177,13 +177,14 @@ nonisolated public final class IdentityRepository: Sendable {
         try await db.dbWriter.write { db in
             try db.execute(
                 sql: """
-                INSERT INTO entity_redirects (id, source_id, target_id, entity_type, redirect_reason, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(source_id, entity_type) DO UPDATE SET
-                    target_id = excluded.target_id,
-                    redirect_reason = excluded.redirect_reason
+                INSERT INTO entity_redirects (source_id, canonical_id, entity_type, reason, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(source_id) DO UPDATE SET
+                    canonical_id = excluded.canonical_id,
+                    entity_type = excluded.entity_type,
+                    reason = excluded.reason
                 """,
-                arguments: [UUID().uuidString, sourceID, targetID, entityType, reason, Date()]
+                arguments: [sourceID, targetID, entityType, reason, Date()]
             )
         }
     }
@@ -195,7 +196,7 @@ nonisolated public final class IdentityRepository: Sendable {
             for _ in 0..<5 { // max 5 hops to prevent loops
                 if let next = try String.fetchOne(
                     db,
-                    sql: "SELECT target_id FROM entity_redirects WHERE source_id = ? AND entity_type = ?",
+                    sql: "SELECT canonical_id FROM entity_redirects WHERE source_id = ? AND entity_type = ?",
                     arguments: [current, entityType]
                 ) {
                     current = next
