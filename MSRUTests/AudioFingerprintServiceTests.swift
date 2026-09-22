@@ -226,7 +226,14 @@ struct AcoustIDFingerprintExtractorTests {
 
         #expect(fp.duration > 200.0 && fp.duration < 300.0)
         #expect(!fp.fingerprint.isEmpty)
-        #expect(fp.algorithm == "chromaprint-pcm-v1")
+        #expect(fp.algorithm == "sha256-pcm-v1")
+
+        // Test Chromaprint extraction on real file
+        let chromaprinter = ChromaprintFingerprintExtractor()
+        let chromaFP = try await chromaprinter.generateFingerprint(for: realAudioURL)
+        #expect(chromaFP.duration > 200.0 && chromaFP.duration < 300.0)
+        #expect(chromaFP.algorithm == "chromaprint-v1")
+        #expect(chromaFP.value.hasPrefix("AQAA") || chromaFP.value.hasPrefix("AQA"))
     }
 
     @Test

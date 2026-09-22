@@ -10,10 +10,18 @@ import AVFoundation
 import CryptoKit
 import AppFoundation
 
-/// Deterministic acoustic fingerprint extractor using AVFoundation audio asset inspection.
-public final class AcoustIDFingerprintExtractor: AudioFingerprinting, Sendable {
+/// Deterministic exact-content audio signature extractor using AVFoundation PCM inspection.
+///
+/// Role: **Exactness Evidence** (Local Dedupe & Move Recognition)
+public final class AcoustIDFingerprintExtractor: ExactAudioSignatureExtracting, AudioFingerprinting, Sendable {
 
     public init() {}
+
+    /// Generates an exact-content audio signature (SHA-256).
+    public func generateSignature(for fileURL: URL) async throws -> ExactAudioSignature {
+        let fp = try await generateFingerprint(for: fileURL)
+        return ExactAudioSignature(value: fp.value, duration: fp.duration, algorithm: "sha256-pcm-v1")
+    }
 
     /// Generates a content-based acoustic fingerprint and exact playback duration.
     public func generateFingerprint(for fileURL: URL) async throws -> AudioFingerprint {
@@ -122,10 +130,13 @@ public final class AcoustIDFingerprintExtractor: AudioFingerprinting, Sendable {
         return AudioFingerprint(
             fingerprint: fingerprintString,
             duration: durationSeconds,
-            algorithm: "chromaprint-pcm-v1"
+            algorithm: "sha256-pcm-v1"
         )
     }
 }
+
+/// Canonical alias for the exact PCM audio signature extractor.
+public typealias PCMAudioSignatureExtractor = AcoustIDFingerprintExtractor
 
 public enum FingerprintError: LocalizedError, Sendable {
     case fileNotFound

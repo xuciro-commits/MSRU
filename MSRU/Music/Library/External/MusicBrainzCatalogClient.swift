@@ -353,7 +353,7 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
 
         let bodyParameters: [(String, String)] = [
             ("client", clientKey),
-            ("meta", "recordings+releasegroups+compress"),
+            ("meta", "recordings+releasegroups+releases+compress"),
             ("duration", "\(dur)"),
             ("fingerprint", fingerprint)
         ]
@@ -375,6 +375,7 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
 
         var matches: [ExternalRecordingMatch] = []
         for res in results {
+            let resScore = res["score"] as? Double ?? 0.85
             if let recordings = res["recordings"] as? [[String: Any]] {
                 for rec in recordings {
                     let mbid = rec["id"] as? String ?? UUID().uuidString
@@ -387,13 +388,17 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
                     if let rgs = rec["releasegroups"] as? [[String: Any]], let firstRg = rgs.first {
                         albumTitle = firstRg["title"] as? String
                     }
+                    var releaseIDs: [String] = []
+                    if let rels = rec["releases"] as? [[String: Any]] {
+                        releaseIDs = rels.compactMap { $0["id"] as? String }
+                    }
                     matches.append(ExternalRecordingMatch(
                         recordingMBID: mbid,
                         title: title,
                         artist: artistName,
                         duration: duration,
-                        acoustIDScore: 0.95,
-                        releaseMBIDs: []
+                        acoustIDScore: resScore,
+                        releaseMBIDs: releaseIDs
                     ))
                 }
             }

@@ -145,11 +145,15 @@ public final class ImportPipeline: Sendable {
 
             // Priority 3: Remote Acoustic Fingerprint (AcoustID / MusicBrainz)
             // SKIPPED when embedded tags or local memory are already authoritative!
-            if !hasAuthoritativeEmbedded && matchedMemoryRecord == nil, let fp = fp,
-               let online = (try? await catalog.lookupRecording(fingerprint: fp))?.first {
-                detectedTitle = online.title
-                detectedArtist = online.artist
-                recordingMBID = online.recordingMBID
+            if !hasAuthoritativeEmbedded && matchedMemoryRecord == nil {
+                let chromaprintExtractor = ChromaprintFingerprintExtractor()
+                if let chromaFP = try? await chromaprintExtractor.generateFingerprint(for: url),
+                   let onlineMatches = try? await catalog.lookupRecording(fingerprint: chromaFP),
+                   let bestMatch = onlineMatches.max(by: { ($0.acoustIDScore ?? 0) < ($1.acoustIDScore ?? 0) }) {
+                    detectedTitle = bestMatch.title
+                    detectedArtist = bestMatch.artist
+                    recordingMBID = bestMatch.recordingMBID
+                }
             }
 
             // Priority 4: Filename parsed metadata (parsed.title, parsed.artist, parsed.album)

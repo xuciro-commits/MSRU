@@ -38,7 +38,8 @@ let package = Package(
     ],
 
     dependencies: [
-        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.0")
+        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.0"),
+        .package(path: "../ChromaSwift")
     ],
 
     targets: [
@@ -48,7 +49,8 @@ let package = Package(
         .target(
             name: "AppFoundation",
             dependencies: [
-                .product(name: "GRDB", package: "GRDB.swift")
+                .product(name: "GRDB", package: "GRDB.swift"),
+                .product(name: "ChromaSwift", package: "ChromaSwift")
             ],
             resources: [
                 .process("Resources")

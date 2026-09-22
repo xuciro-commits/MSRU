@@ -85,8 +85,10 @@ nonisolated public struct FingerprintBatchResult: Sendable, Equatable {
 
 // MARK: - Fingerprint Service
 
-/// Dedicated background actor acting as the unique global owner of acoustic fingerprint
+/// Dedicated background actor acting as the unique global owner of exact audio signature
 /// extraction, heuristic caching, in-flight task deduplication, and batched registry persistence.
+///
+/// Role: **Exactness Evidence** (Local Dedupe, File Move/Rename Tracking)
 public actor AudioFingerprintService: Sendable {
 
     public static let shared = AudioFingerprintService()
@@ -105,6 +107,12 @@ public actor AudioFingerprintService: Sendable {
     ) {
         self.fingerprinter = fingerprinter
         self.registry = registry
+    }
+
+    /// Single track exact content signature retrieval.
+    public func signature(for fileURL: URL) async throws -> ExactAudioSignature {
+        let fp = try await fingerprint(for: fileURL)
+        return ExactAudioSignature(value: fp.value, duration: fp.duration, algorithm: "sha256-pcm-v1")
     }
 
     /// Single track fingerprint retrieval with signature cache check and in-flight deduplication.
@@ -228,3 +236,7 @@ public actor AudioFingerprintService: Sendable {
         )
     }
 }
+
+/// Canonical typealias for ExactAudioSignatureService.
+public typealias ExactAudioSignatureService = AudioFingerprintService
+

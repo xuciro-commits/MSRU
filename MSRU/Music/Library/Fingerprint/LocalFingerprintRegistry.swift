@@ -7,11 +7,12 @@
 
 import Foundation
 
-/// A locally learned acoustic fingerprint association (pure content identity).
+/// A locally learned exact-content audio signature association (Exactness Evidence).
 nonisolated public struct AcousticFingerprintRecord: Identifiable, Codable, Sendable, Equatable {
     public var id: String { fingerprint }
     public let fingerprint: String
     public let duration: TimeInterval
+    public var algorithm: String
     public var title: String
     public var artist: String
     public var album: String?
@@ -29,6 +30,7 @@ nonisolated public struct AcousticFingerprintRecord: Identifiable, Codable, Send
     public init(
         fingerprint: String,
         duration: TimeInterval,
+        algorithm: String = "sha256-pcm-v1",
         title: String,
         artist: String,
         album: String? = nil,
@@ -42,6 +44,7 @@ nonisolated public struct AcousticFingerprintRecord: Identifiable, Codable, Send
     ) {
         self.fingerprint = fingerprint
         self.duration = duration
+        self.algorithm = algorithm
         self.title = title
         self.artist = artist
         self.album = album
@@ -58,7 +61,28 @@ nonisolated public struct AcousticFingerprintRecord: Identifiable, Codable, Send
         self.dateLearned = dateLearned
         self.matchCount = matchCount
     }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.fingerprint = try container.decode(String.self, forKey: .fingerprint)
+        self.duration = try container.decode(TimeInterval.self, forKey: .duration)
+        self.algorithm = try container.decodeIfPresent(String.self, forKey: .algorithm) ?? "sha256-pcm-v1"
+        self.title = try container.decode(String.self, forKey: .title)
+        self.artist = try container.decode(String.self, forKey: .artist)
+        self.album = try container.decodeIfPresent(String.self, forKey: .album)
+        self.trackNumber = try container.decodeIfPresent(Int.self, forKey: .trackNumber)
+        self.releaseMBID = try container.decodeIfPresent(String.self, forKey: .releaseMBID)
+        self.recordingMBID = try container.decodeIfPresent(String.self, forKey: .recordingMBID)
+        self.artworkReference = try container.decodeIfPresent(String.self, forKey: .artworkReference)
+        self.dateLearned = try container.decodeIfPresent(Date.self, forKey: .dateLearned) ?? Date()
+        self.matchCount = try container.decodeIfPresent(Int.self, forKey: .matchCount) ?? 0
+    }
 }
+
+/// Canonical typealias for ExactAudioSignatureRecord.
+public typealias ExactAudioSignatureRecord = AcousticFingerprintRecord
+
+
 
 /// A physical file asset cache entry mapping a canonical filesystem state to an acoustic fingerprint.
 nonisolated public struct AssetFingerprintEntry: Codable, Sendable, Equatable {
@@ -137,7 +161,7 @@ nonisolated private struct RegistryStorage: Codable {
     var signatures: [String: AudioFileSignature]?
 }
 
-/// Dedicated background storage actor managing local acoustic fingerprint memory,
+/// Dedicated background storage actor managing local exact audio signature memory,
 /// file cache signatures, and atomic batch persistence off the main thread.
 public actor LocalFingerprintRegistry: Sendable {
     public static let shared = LocalFingerprintRegistry()
@@ -416,3 +440,7 @@ public actor LocalFingerprintRegistry: Sendable {
         persistenceWriteCount += 1
     }
 }
+
+/// Canonical typealias for LocalAudioSignatureRegistry.
+public typealias LocalAudioSignatureRegistry = LocalFingerprintRegistry
+
