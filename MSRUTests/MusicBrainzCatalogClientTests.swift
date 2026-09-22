@@ -150,4 +150,27 @@ struct MusicBrainzCatalogClientTests {
         let fetched = await service.fetchBiography(artistName: "Unknown Artist")
         #expect(fetched == nil)
     }
+
+    @Test
+    func cleanAlbumTitleStripsMediaSuffixes() {
+        #expect(MusicBrainzCatalogClient.cleanAlbumTitle("By Heart - SACD") == "By Heart")
+        #expect(MusicBrainzCatalogClient.cleanAlbumTitle("Fantasy [SACD]") == "Fantasy")
+        #expect(MusicBrainzCatalogClient.cleanAlbumTitle("21 (Deluxe Edition)") == "21")
+        #expect(MusicBrainzCatalogClient.cleanAlbumTitle("Greatest Hits [FLAC 24-96]") == "Greatest Hits")
+        #expect(MusicBrainzCatalogClient.cleanAlbumTitle("The Wall - Remastered") == "The Wall")
+    }
+
+    @Test
+    func resolveRemoteArtworkForPriscillaChanByHeart() async throws {
+        let resolved = await LocalArtworkExtractor.resolveRemoteArtwork(
+            artist: "陈慧娴",
+            album: "By Heart - SACD",
+            title: "Snowflake"
+        )
+
+        let unwrapped = try #require(resolved)
+        #expect(unwrapped.canonicalAlbum?.contains("By Heart") == true)
+        #expect(LocalArtworkExtractor.isValidImageData(unwrapped.data))
+    }
 }
+

@@ -7,6 +7,7 @@
 
 import Foundation
 import AVFoundation
+import AppFoundation
 
 /// Discovers and extracts cover artwork for music tracks from directory files, embedded tags, or remote archive.
 public enum LocalArtworkExtractor {
@@ -23,9 +24,17 @@ public enum LocalArtworkExtractor {
 
     /// Extracts artwork data for a given audio file URL by trying:
     /// 1. Same-folder image files (cover.jpg, folder.jpg, front.jpg, etc.)
-    /// 2. Embedded metadata in the audio file (.commonIdentifierArtwork)
-    /// 3. Remote Cover Art Archive if releaseMBID is available
-    public static func extractArtwork(for fileURL: URL, releaseMBID: String? = nil) async -> Data? {
+    /// 2. Embedded metadata in the audio file (.commonIdentifierArtwork, FLAC Vorbis picture, DSF ID3 APIC)
+    /// 3. Remote Cover Art Archive if releaseMBID / releaseGroupMBID is available
+    /// 4. Remote MusicBrainz search fallback if artist and album/title are provided
+    public static func extractArtwork(
+        for fileURL: URL,
+        releaseMBID: String? = nil,
+        releaseGroupMBID: String? = nil,
+        artist: String? = nil,
+        album: String? = nil,
+        title: String? = nil
+    ) async -> Data? {
         let folder = fileURL.deletingLastPathComponent()
 
         // 1. Probe directory for cover image files
@@ -38,10 +47,17 @@ public enum LocalArtworkExtractor {
             return embedded
         }
 
-        // 3. Remote Cover Art Archive fallback if releaseMBID is present
-        if let releaseMBID = releaseMBID, !releaseMBID.isEmpty {
-            if let remoteData = await fetchRemoteCover(releaseMBID: releaseMBID) {
+        // 3. Remote Cover Art Archive fallback if releaseMBID or releaseGroupMBID is present
+        if (releaseMBID != nil && !releaseMBID!.isEmpty) || (releaseGroupMBID != nil && !releaseGroupMBID!.isEmpty) {
+            if let remoteData = await fetchRemoteCover(releaseMBID: releaseMBID, releaseGroupMBID: releaseGroupMBID) {
                 return remoteData
+            }
+        }
+
+        // 4. Remote MusicBrainz search fallback if artist is known
+        if let artist, !artist.isEmpty {
+            if let resolved = await resolveRemoteArtwork(artist: artist, album: album, title: title) {
+                return resolved.data
             }
         }
 
@@ -86,7 +102,7 @@ public enum LocalArtworkExtractor {
         return nil
     }
 
-    /// Probes embedded artwork metadata from AVURLAsset.
+    /// Probes embedded artwork metadata from audio files (DSF, FLAC, MP3, MP4).
     public static func extractFromAudioFile(url: URL) async -> Data? {
         let accessing = url.startAccessingSecurityScopedResource()
         defer {
@@ -95,31 +111,77 @@ public enum LocalArtworkExtractor {
             }
         }
 
-        let asset = AVURLAsset(url: url)
-        guard let metadata = try? await asset.load(.commonMetadata) else { return nil }
-
-        let items = AVMetadataItem.metadataItems(from: metadata, filteredByIdentifier: .commonIdentifierArtwork)
-        guard let item = items.first else { return nil }
-
-        if let data = try? await item.load(.dataValue), isValidImageData(data) {
-            return data
+        // Fast path for DSF
+        if url.pathExtension.lowercased() == "dsf" {
+            if let dsfArt = DSFHeaderReader.readMetadata(from: url)?.artworkData, isValidImageData(dsfArt) {
+                return dsfArt
+            }
+            return nil
         }
+
+        let asset = AVURLAsset(url: url)
+        var allItems: [AVMetadataItem] = []
+        if let common = try? await asset.load(.commonMetadata) {
+            allItems.append(contentsOf: common)
+        }
+        if let other = try? await asset.load(.metadata) {
+            allItems.append(contentsOf: other)
+        }
+
+        // 1. Common artwork identifier
+        let commonItems = AVMetadataItem.metadataItems(from: allItems, filteredByIdentifier: .commonIdentifierArtwork)
+        for item in commonItems {
+            if let data = try? await item.load(.dataValue), isValidImageData(data) {
+                return data
+            }
+        }
+
+        // 2. Picture / artwork items (FLAC vorb/METADATA_BLOCK_PICTURE, ID3 APIC, etc.)
+        for item in allItems {
+            let idStr = item.identifier?.rawValue.lowercased() ?? ""
+            let keyStr = (item.key as? String)?.lowercased() ?? ""
+            if idStr.contains("picture") || keyStr.contains("picture") || idStr.contains("artwork") || keyStr.contains("artwork") {
+                if let data = try? await item.load(.dataValue), isValidImageData(data) {
+                    return data
+                }
+            }
+        }
+
+        // 3. Fallback to any item containing valid image data
+        for item in allItems {
+            if let data = try? await item.load(.dataValue), isValidImageData(data) {
+                return data
+            }
+        }
+
         return nil
     }
 
-    /// Fetches front cover from Cover Art Archive for a release MBID.
-    public static func fetchRemoteCover(releaseMBID: String) async -> Data? {
-        let urlStrings = [
-            "https://coverartarchive.org/release/\(releaseMBID)/front-500",
-            "https://coverartarchive.org/release/\(releaseMBID)/front-250",
-            "https://coverartarchive.org/release/\(releaseMBID)/front"
-        ]
+    /// Fetches front cover from Cover Art Archive for a release MBID or release-group MBID.
+    public static func fetchRemoteCover(releaseMBID: String? = nil, releaseGroupMBID: String? = nil) async -> Data? {
+        var urlStrings: [String] = []
+
+        if let rg = releaseGroupMBID, !rg.isEmpty {
+            urlStrings.append(contentsOf: [
+                "https://coverartarchive.org/release-group/\(rg)/front-500",
+                "https://coverartarchive.org/release-group/\(rg)/front-250",
+                "https://coverartarchive.org/release-group/\(rg)/front"
+            ])
+        }
+
+        if let rel = releaseMBID, !rel.isEmpty {
+            urlStrings.append(contentsOf: [
+                "https://coverartarchive.org/release/\(rel)/front-500",
+                "https://coverartarchive.org/release/\(rel)/front-250",
+                "https://coverartarchive.org/release/\(rel)/front"
+            ])
+        }
 
         for str in urlStrings {
             guard let url = URL(string: str) else { continue }
             var request = URLRequest(url: url)
-            request.timeoutInterval = 5
-            request.setValue("MSRU/0.1 (local-development)", forHTTPHeaderField: "User-Agent")
+            request.timeoutInterval = 8
+            request.setValue("MSRU/1.0 (contact@msru.local)", forHTTPHeaderField: "User-Agent")
 
             if let (data, response) = try? await URLSession.shared.data(for: request),
                let http = response as? HTTPURLResponse,
@@ -128,6 +190,42 @@ public enum LocalArtworkExtractor {
                 return data
             }
         }
+        return nil
+    }
+
+    /// Searches MusicBrainz for artist and album/title, returning downloaded image data and canonical metadata.
+    public static func resolveRemoteArtwork(
+        artist: String,
+        album: String? = nil,
+        title: String? = nil
+    ) async -> (data: Data, canonicalAlbum: String?, releaseMBID: String?, releaseGroupMBID: String?)? {
+        let cleanArt = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanArt.isEmpty else { return nil }
+
+        // Strategy 1: Search by album if available and not equal to artist name
+        if let alb = album?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !alb.isEmpty,
+           alb.lowercased() != cleanArt.lowercased() {
+            if let releases = try? await MusicBrainzCatalogClient.shared.searchReleases(artist: cleanArt, album: alb) {
+                for rel in releases {
+                    if let imgData = await fetchRemoteCover(releaseMBID: rel.releaseMBID, releaseGroupMBID: rel.releaseGroupMBID) {
+                        return (imgData, rel.title, rel.releaseMBID, rel.releaseGroupMBID)
+                    }
+                }
+            }
+        }
+
+        // Strategy 2: Search by track title if album didn't match or was absent
+        if let trkTitle = title?.trimmingCharacters(in: .whitespacesAndNewlines), !trkTitle.isEmpty {
+            let recordings = await MusicBrainzCatalogClient.shared.searchRecordings(artist: cleanArt, title: trkTitle)
+            for rec in recordings {
+                let firstRelMBID = rec.releaseMBIDs.first
+                if let imgData = await fetchRemoteCover(releaseMBID: firstRelMBID, releaseGroupMBID: rec.releaseGroupMBID) {
+                    return (imgData, rec.albumTitle, firstRelMBID, rec.releaseGroupMBID)
+                }
+            }
+        }
+
         return nil
     }
 

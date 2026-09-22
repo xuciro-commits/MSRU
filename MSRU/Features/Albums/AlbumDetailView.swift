@@ -14,6 +14,7 @@ struct AlbumDetailView: View {
     let onBack: () -> Void
     let onSelectTrack: (LocalTrack) -> Void
     var onDeleteAlbum: (() -> Void)? = nil
+    var onFetchArtwork: (() -> Void)? = nil
 
     @State private var isDeleteConfirmationPresented: Bool = false
 
@@ -90,6 +91,16 @@ struct AlbumDetailView: View {
                                     .padding(.vertical, 8)
                             }
                             .buttonStyle(.bordered)
+
+                            if album.artworkReference == nil, let onFetchArtwork {
+                                Button(action: onFetchArtwork) {
+                                    Label("Fetch Artwork", systemImage: "arrow.clockwise")
+                                        .font(.headline)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                }
+                                .buttonStyle(.bordered)
+                            }
 
                             if onDeleteAlbum != nil {
                                 Button(role: .destructive, action: { isDeleteConfirmationPresented = true }) {

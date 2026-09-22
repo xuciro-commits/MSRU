@@ -103,5 +103,28 @@ struct FileNameHeuristicParserTests {
         #expect(atParsed.album == "Looking for You")
         #expect(atParsed.title == "The Traveler")
         #expect(atParsed.trackNumber == 1)
+
+        // 7. Test loose track inside an artist folder does NOT produce album == artist
+        let jayURL = URL(fileURLWithPath: "/Volumes/团队文件-home.zhuhai/03 音乐资源/音乐/1.歌曲/男歌手/周杰伦/周杰伦 - 愛在西元前.wav")
+        let jayParsed = FileNameHeuristicParser.parse(fileURL: jayURL)
+        #expect(jayParsed.artist == "周杰伦")
+        #expect(jayParsed.album == nil) // Disambiguated: 周杰伦 is artist, not album!
+        #expect(jayParsed.title == "愛在西元前")
+
+        // 8. Test folder with 《Book Title Brackets》
+        let remURL = URL(fileURLWithPath: "/Volumes/1.歌曲/男歌手/R.E.M《The_Best_Of_R.E.M》/01.Man On The Moon.dts")
+        let remParsed = FileNameHeuristicParser.parse(fileURL: remURL)
+        #expect(remParsed.artist == "R.E.M")
+        #expect(remParsed.album == "The_Best_Of_R.E.M")
+        #expect(remParsed.title == "Man On The Moon")
+        #expect(remParsed.trackNumber == 1)
+
+        // 9. Test artist folder under "华语女" (Priscilla Chan loose DSF)
+        let pcURL = URL(fileURLWithPath: "/Volumes/资料盘/70-媒体与收藏/71-音乐库/Artists/华语女/陈慧娴/陈慧娴 - Snowflake.dsf")
+        let pcParsed = FileNameHeuristicParser.parse(fileURL: pcURL)
+        #expect(pcParsed.artist == "陈慧娴")
+        #expect(pcParsed.album == nil) // Heuristic leaves album nil so DSF ID3 can supply By Heart
+        #expect(pcParsed.title == "Snowflake")
     }
 }
+

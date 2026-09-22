@@ -15,6 +15,7 @@ struct TrackInspectorView: View {
 
     @Bindable var playback: PlaybackController
     @Bindable var library: LibraryStore
+    var localStore: LocalLibraryStore? = nil
 
     var onRevealInFinder: ((URL) -> Void)? = nil
     var onClose: (() -> Void)? = nil
@@ -24,6 +25,8 @@ struct TrackInspectorView: View {
     @State private var artistOverlayTier: String = "Multi-language Alias"
     @State private var albumOverlayTier: String = "Canonical"
     @State private var tagOverlayTier: String = "Original"
+    @State private var isReidentifying: Bool = false
+    @State private var reidentifyStatus: String? = nil
 
     enum InspectorTab: String, CaseIterable, Identifiable {
         case details = "Track Details"
@@ -509,16 +512,49 @@ struct TrackInspectorView: View {
                 .background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
 
                 Button {
+                    guard !isReidentifying else { return }
+                    isReidentifying = true
+                    reidentifyStatus = nil
                     Task {
-                        _ = try? await MusicBrainzCatalogClient.shared.searchReleases(artist: artist, album: album ?? "")
+                        defer { isReidentifying = false }
+                        if let localTrack, let localStore {
+                            let success = await localStore.reidentifyTrack(trackID: localTrack.id)
+                            if success {
+                                reidentifyStatus = String(localized: "Successfully matched and updated artwork!")
+                            } else {
+                                reidentifyStatus = String(localized: "No online match found on MusicBrainz.")
+                            }
+                        } else {
+                            let results = try? await MusicBrainzCatalogClient.shared.searchReleases(artist: artist, album: album ?? "")
+                            if let list = results, !list.isEmpty {
+                                reidentifyStatus = String(localized: "Found \(list.count) candidate releases.")
+                            } else {
+                                reidentifyStatus = String(localized: "No matching release found.")
+                            }
+                        }
                     }
                 } label: {
-                    Label("Online Re-identification (MusicBrainz)", systemImage: "arrow.clockwise")
-                        .font(.caption)
+                    HStack(spacing: 6) {
+                        if isReidentifying {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        Text("Online Re-identification (MusicBrainz)")
+                    }
+                    .font(.caption)
                 }
                 .buttonStyle(.bordered)
                 .tint(Color.accentColor)
                 .controlSize(.small)
+                .disabled(isReidentifying)
+
+                if let status = reidentifyStatus {
+                    Text(status)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Divider()

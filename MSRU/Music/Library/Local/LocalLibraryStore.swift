@@ -226,6 +226,194 @@ final class LocalLibraryStore {
         // Clear in-memory references
     }
 
+    // MARK: - Re-identification & Artwork Resolution
+
+    @discardableResult
+    func reidentifyTrack(trackID: String) async -> Bool {
+        guard let index = tracks.firstIndex(where: { $0.id == trackID }) else { return false }
+        let track = tracks[index]
+
+        guard let result = await LocalArtworkExtractor.resolveRemoteArtwork(
+            artist: track.artist,
+            album: track.album,
+            title: track.title
+        ) else {
+            return false
+        }
+
+        let artRef = LocalArtworkStorage.shared.storeArtwork(result.data)
+        var newAlbum = track.album
+        if let canonical = result.canonicalAlbum, !canonical.isEmpty {
+            if newAlbum == nil || newAlbum?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == track.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+                newAlbum = canonical
+            }
+        }
+
+        let updatedTrack = LocalTrack(
+            fileURL: track.fileURL,
+            title: track.title,
+            artist: track.artist,
+            album: newAlbum,
+            duration: track.duration,
+            artworkReference: artRef,
+            trackNumber: track.trackNumber,
+            year: track.year
+        )
+
+        tracks[index] = updatedTrack
+        try? await repository.saveTracksInPlace([updatedTrack])
+        updateCachedPresentations()
+        await syncTracksToDatabase([updatedTrack])
+        await refreshQuerySnapshot()
+        return true
+    }
+
+    @discardableResult
+    func reidentifyAlbum(albumTitle: String, artist: String) async -> Bool {
+        let cleanArt = artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let cleanAlb = albumTitle.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        let matchingIndices = tracks.indices.filter { idx in
+            let t = tracks[idx]
+            let tArt = t.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let tAlb = (t.album ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return tArt == cleanArt && (tAlb == cleanAlb || cleanAlb.isEmpty)
+        }
+        guard !matchingIndices.isEmpty else { return false }
+
+        guard let result = await LocalArtworkExtractor.resolveRemoteArtwork(
+            artist: artist,
+            album: albumTitle,
+            title: tracks[matchingIndices.first!].title
+        ) else {
+            return false
+        }
+
+        let artRef = LocalArtworkStorage.shared.storeArtwork(result.data)
+        var modifiedTracks: [LocalTrack] = []
+
+        for idx in matchingIndices {
+            let t = tracks[idx]
+            var newAlbum = t.album
+            if let canonical = result.canonicalAlbum, !canonical.isEmpty {
+                if newAlbum == nil || newAlbum?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == cleanArt {
+                    newAlbum = canonical
+                }
+            }
+            let updated = LocalTrack(
+                fileURL: t.fileURL,
+                title: t.title,
+                artist: t.artist,
+                album: newAlbum,
+                duration: t.duration,
+                artworkReference: artRef,
+                trackNumber: t.trackNumber,
+                year: t.year
+            )
+            tracks[idx] = updated
+            modifiedTracks.append(updated)
+        }
+
+        try? await repository.saveTracksInPlace(modifiedTracks)
+        updateCachedPresentations()
+        await syncTracksToDatabase(modifiedTracks)
+        await refreshQuerySnapshot()
+        return true
+    }
+
+    @discardableResult
+    func remediateLibraryMetadataAndArtwork(progress: ((Int, Int) -> Void)? = nil) async -> (repairedCount: Int, artworkAddedCount: Int) {
+        var repaired = 0
+        var artworkAdded = 0
+        var updatedTracks: [LocalTrack] = []
+
+        let total = tracks.count
+        for (i, currentTrack) in tracks.enumerated() {
+            progress?(i + 1, total)
+
+            var modified = false
+            var newTitle = currentTrack.title
+            var newArtist = currentTrack.artist
+            var newAlbum = currentTrack.album
+            var newYear = currentTrack.year
+            var newTrackNo = currentTrack.trackNumber
+            var newArtRef = currentTrack.artworkReference
+
+            // 1. Re-read tags from file if accessible
+            if FileManager.default.fileExists(atPath: currentTrack.fileURL.path) {
+                if let fresh = try? await FileLocalLibraryRepository.readTrack(from: currentTrack.fileURL) {
+                    if fresh.title != newTitle {
+                        newTitle = fresh.title
+                        modified = true
+                    }
+                    if fresh.artist != newArtist {
+                        newArtist = fresh.artist
+                        modified = true
+                    }
+                    if let freshAlbum = fresh.album, freshAlbum != newAlbum {
+                        newAlbum = freshAlbum
+                        modified = true
+                    }
+                    if let freshYear = fresh.year, freshYear != newYear {
+                        newYear = freshYear
+                        modified = true
+                    }
+                    if let freshNo = fresh.trackNumber, freshNo != newTrackNo {
+                        newTrackNo = freshNo
+                        modified = true
+                    }
+                    if let freshArt = fresh.artworkReference, newArtRef == nil {
+                        newArtRef = freshArt
+                        artworkAdded += 1
+                        modified = true
+                    }
+                }
+            }
+
+            // 2. Disambiguate album == artist
+            if let alb = newAlbum, alb.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == newArtist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+                newAlbum = nil
+                modified = true
+            }
+
+            // 3. Fallback to companion artwork file in same folder
+            if newArtRef == nil {
+                let folder = currentTrack.fileURL.deletingLastPathComponent()
+                if let folderArtData = LocalArtworkExtractor.extractFromDirectory(folderURL: folder) {
+                    let artRef = LocalArtworkStorage.shared.storeArtwork(folderArtData)
+                    newArtRef = artRef
+                    artworkAdded += 1
+                    modified = true
+                }
+            }
+
+            if modified {
+                repaired += 1
+                let updated = LocalTrack(
+                    fileURL: currentTrack.fileURL,
+                    title: newTitle,
+                    artist: newArtist,
+                    album: newAlbum,
+                    duration: currentTrack.duration,
+                    artworkReference: newArtRef,
+                    trackNumber: newTrackNo,
+                    year: newYear
+                )
+                updatedTracks.append(updated)
+                tracks[i] = updated
+            }
+        }
+
+        if !updatedTracks.isEmpty {
+            try? await repository.saveTracksInPlace(updatedTracks)
+            updateCachedPresentations()
+            await syncTracksToDatabase(updatedTracks)
+            await refreshQuerySnapshot()
+        }
+
+        return (repaired, artworkAdded)
+    }
+
     func importFiles(_ urls: [URL]) async {
         guard !urls.isEmpty else { return }
         pendingImports += 1

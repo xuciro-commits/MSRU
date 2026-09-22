@@ -47,6 +47,7 @@ struct MSRUContextPaneView: View {
                         musicContent: scene.selectedMusicContent,
                         playback: scene.application.playback,
                         library: scene.application.library,
+                        localStore: scene.application.localLibrary,
                         onRevealInFinder: onRevealInFinder,
                         onClose: {
                             scene.isQueuePresented = false

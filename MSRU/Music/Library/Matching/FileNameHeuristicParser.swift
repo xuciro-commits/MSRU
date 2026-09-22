@@ -96,7 +96,18 @@ nonisolated public enum FileNameHeuristicParser {
         }
         working = working.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // 5. Split by " - "
+        // 5. Check for "Artist《Album》" pattern (e.g. "R.E.M《The_Best_Of_R.E.M》")
+        if let leftIdx = working.firstIndex(of: "《"),
+           let rightIdx = working.firstIndex(of: "》"),
+           leftIdx < rightIdx {
+            let artistPart = String(working[..<leftIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let albumPart = String(working[working.index(after: leftIdx)..<rightIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !albumPart.isEmpty {
+                return (artistPart.isEmpty ? nil : artistPart, albumPart, detectedYear)
+            }
+        }
+
+        // 6. Split by " - "
         let parts = working.components(separatedBy: " - ")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -148,6 +159,7 @@ nonisolated public enum FileNameHeuristicParser {
         // Known generic categorization folders
         let artistCategories: Set<String> = [
             "男歌手", "女歌手", "乐队", "组合", "歌手", "华语", "欧美", "日韩", "粤语", "纯音乐",
+            "华语男", "华语女", "欧美男", "欧美女", "日韩男", "日韩女", "港台", "内地", "国语",
             "artists", "artist", "singers", "singer"
         ]
         let albumCategories: Set<String> = [
@@ -157,15 +169,21 @@ nonisolated public enum FileNameHeuristicParser {
         let folderMeta = parseFolderMetadata(parentFolder)
         if finalYear == nil { finalYear = folderMeta.year }
 
-        if artistCategories.contains(grandparentFolder.lowercased()) {
+        let isArtistGrandparent = artistCategories.contains(grandparentFolder.lowercased())
+            || grandparentFolder.lowercased().contains("歌手")
+            || grandparentFolder.lowercased().contains("artists")
+
+        if isArtistGrandparent {
             if folderMeta.artist != nil && finalArtist == nil {
                 finalArtist = folderMeta.artist
             } else if finalArtist == nil {
                 finalArtist = parentFolder
             }
-            if folderMeta.album != nil && finalAlbum == nil {
-                finalAlbum = folderMeta.album
+            // If folderMeta has both artist and album (e.g. from " - " or "《》"), keep album
+            if folderMeta.artist != nil, let alb = folderMeta.album, finalAlbum == nil {
+                finalAlbum = alb
             }
+            // If parent folder has no separator, it is an artist folder, NOT an album!
         } else if albumCategories.contains(grandparentFolder.lowercased()) {
             if folderMeta.artist != nil && finalArtist == nil {
                 finalArtist = folderMeta.artist
@@ -185,12 +203,18 @@ nonisolated public enum FileNameHeuristicParser {
             }
         }
 
-        // Defensive fallback: if finalAlbum is still nil, fall back to folderMeta.album
-        if finalAlbum == nil, let alb = folderMeta.album {
+        // Defensive fallback: if finalAlbum is still nil, fall back to folderMeta.album ONLY if it has an artist
+        if finalAlbum == nil, folderMeta.artist != nil, let alb = folderMeta.album {
             finalAlbum = alb
         }
         if finalArtist == nil, let art = folderMeta.artist {
             finalArtist = art
+        }
+
+        // Safety gate: A directory heuristic must NEVER set the album equal to the artist
+        if let alb = finalAlbum, let art = finalArtist,
+           alb.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == art.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            finalAlbum = nil
         }
 
         return ParsedFileNameCandidate(

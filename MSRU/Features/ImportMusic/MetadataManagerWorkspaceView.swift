@@ -47,6 +47,9 @@ struct MetadataManagerWorkspaceView: View {
     @State private var isVerifyingAcoustID: Bool = false
     @State private var orphanCleanFeedback: String? = nil
     @State private var fingerprintRecords: [AcousticFingerprintRecord] = []
+    @State private var isRemediating: Bool = false
+    @State private var remediationFeedback: String? = nil
+    @State private var remediationProgress: (current: Int, total: Int)? = nil
 
     private var ruleStore = PathHeuristicRuleStore.shared
     private var providerConfig = MetadataProviderConfigStore.shared
@@ -614,6 +617,52 @@ struct MetadataManagerWorkspaceView: View {
             }
             .padding(20)
             .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .frame(maxWidth: 520)
+
+            VStack(spacing: 12) {
+                Button {
+                    guard !isRemediating else { return }
+                    isRemediating = true
+                    remediationFeedback = nil
+                    Task {
+                        defer {
+                            isRemediating = false
+                            remediationProgress = nil
+                        }
+                        let (repaired, artworkAdded) = await localStore.remediateLibraryMetadataAndArtwork { current, total in
+                            remediationProgress = (current, total)
+                        }
+                        remediationFeedback = String(localized: "Remediation complete: \(repaired) tracks repaired, \(artworkAdded) artworks linked.")
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        if isRemediating {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "wand.and.stars")
+                        }
+                        Text("Remediate Library Tags & Artwork")
+                            .font(.headline)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isRemediating)
+
+                if let progress = remediationProgress {
+                    Text("Processing track \(progress.current) of \(progress.total)...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let feedback = remediationFeedback {
+                    Text(feedback)
+                        .font(.caption.bold())
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
             .frame(maxWidth: 520)
 
             Spacer()

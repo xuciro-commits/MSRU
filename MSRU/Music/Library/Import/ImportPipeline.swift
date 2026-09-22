@@ -95,22 +95,35 @@ public final class ImportPipeline: Sendable {
             // Priority 1: Embedded Tags in audio file (Authoritative Ground Truth)
             if url.pathExtension.lowercased() == "dsf" {
                 if let dsfMeta = DSFHeaderReader.readMetadata(from: url) {
-                    if let folderArt = LocalArtworkExtractor.extractFromDirectory(folderURL: url.deletingLastPathComponent()) {
+                    if let t = dsfMeta.title { detectedTitle = t }
+                    if let a = dsfMeta.artist { detectedArtist = a }
+                    if let al = dsfMeta.album { detectedAlbum = al }
+                    if let art = dsfMeta.artworkData {
+                        artworkData = art
+                    } else if let folderArt = LocalArtworkExtractor.extractFromDirectory(folderURL: url.deletingLastPathComponent()) {
                         artworkData = folderArt
                     }
                 }
             } else if FileManager.default.fileExists(atPath: url.path) {
                 let asset = AVURLAsset(url: url)
-                if let metadata = try? await asset.load(.commonMetadata) {
-                    for item in metadata {
-                        if let key = item.commonKey?.rawValue {
-                            if key == "title", let val = try? await item.load(.stringValue), !val.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, detectedTitle == nil {
-                                detectedTitle = val
-                            } else if key == "artist", let val = try? await item.load(.stringValue), !val.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, detectedArtist == nil {
-                                detectedArtist = val
-                            } else if key == "albumName", let val = try? await item.load(.stringValue), !val.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, detectedAlbum == nil {
-                                detectedAlbum = val
-                            }
+                var allItems: [AVMetadataItem] = []
+                if let common = try? await asset.load(.commonMetadata) {
+                    allItems.append(contentsOf: common)
+                }
+                if let other = try? await asset.load(.metadata) {
+                    allItems.append(contentsOf: other)
+                }
+                for item in allItems {
+                    let keyStr = (item.commonKey?.rawValue ?? (item.key as? String) ?? item.identifier?.rawValue ?? "").lowercased()
+                    if (keyStr.contains("title") || keyStr.hasSuffix("/title")), let val = try? await item.load(.stringValue), !val.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, detectedTitle == nil {
+                        detectedTitle = val.trimmingCharacters(in: .whitespacesAndNewlines)
+                    } else if (keyStr.contains("artist") || keyStr.hasSuffix("/artist")), let val = try? await item.load(.stringValue), !val.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, detectedArtist == nil {
+                        detectedArtist = val.trimmingCharacters(in: .whitespacesAndNewlines)
+                    } else if (keyStr.contains("album") || keyStr.hasSuffix("/album")), let val = try? await item.load(.stringValue), !val.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, detectedAlbum == nil {
+                        detectedAlbum = val.trimmingCharacters(in: .whitespacesAndNewlines)
+                    } else if (keyStr.contains("picture") || keyStr.contains("artwork") || keyStr.hasSuffix("artwork")), artworkData == nil {
+                        if let d = try? await item.load(.dataValue), LocalArtworkExtractor.isValidImageData(d) {
+                            artworkData = d
                         }
                     }
                 }
@@ -169,7 +182,13 @@ public final class ImportPipeline: Sendable {
 
             // Discover Artwork if not already found from memory
             if artworkData == nil {
-                artworkData = await LocalArtworkExtractor.extractArtwork(for: url, releaseMBID: matchedMemoryRecord?.releaseMBID)
+                artworkData = await LocalArtworkExtractor.extractArtwork(
+                    for: url,
+                    releaseMBID: matchedMemoryRecord?.releaseMBID,
+                    artist: finalArtist,
+                    album: finalAlbum,
+                    title: finalTitle
+                )
             }
 
             let item = ClusterTrackItem(

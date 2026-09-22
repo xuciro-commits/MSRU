@@ -13,6 +13,8 @@ public struct ExternalRecordingMatch: Sendable, Equatable, Hashable, Codable, Id
     public let recordingMBID: String
     public let title: String
     public let artist: String
+    public let albumTitle: String?
+    public let releaseGroupMBID: String?
     public let duration: TimeInterval?
     public let acoustIDScore: Double
     public let releaseMBIDs: [String]
@@ -21,6 +23,8 @@ public struct ExternalRecordingMatch: Sendable, Equatable, Hashable, Codable, Id
         recordingMBID: String,
         title: String,
         artist: String,
+        albumTitle: String? = nil,
+        releaseGroupMBID: String? = nil,
         duration: TimeInterval? = nil,
         acoustIDScore: Double = 1.0,
         releaseMBIDs: [String] = []
@@ -28,6 +32,8 @@ public struct ExternalRecordingMatch: Sendable, Equatable, Hashable, Codable, Id
         self.recordingMBID = recordingMBID
         self.title = title
         self.artist = artist
+        self.albumTitle = albumTitle
+        self.releaseGroupMBID = releaseGroupMBID
         self.duration = duration
         self.acoustIDScore = acoustIDScore
         self.releaseMBIDs = releaseMBIDs

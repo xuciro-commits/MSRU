@@ -83,6 +83,14 @@ struct AlbumsView: View {
                     onDeleteAlbum: {
                         albumPendingDelete = album
                         isDeleteConfirmationPresented = true
+                    },
+                    onFetchArtwork: {
+                        Task {
+                            await localStore.reidentifyAlbum(albumTitle: album.title, artist: album.artist)
+                            if let updated = localStore.albums.first(where: { $0.id == album.id }) {
+                                selectedAlbum = updated
+                            }
+                        }
                     }
                 )
             } else {
@@ -155,6 +163,13 @@ struct AlbumsView: View {
                             .frame(height: 240)
                             .contextMenu {
                                 Button("Play Album") { playAlbum(album) }
+                                Button {
+                                    Task {
+                                        await localStore.reidentifyAlbum(albumTitle: album.title, artist: album.artist)
+                                    }
+                                } label: {
+                                    Label("Fetch Album Artwork", systemImage: "arrow.clockwise")
+                                }
                                 Divider()
                                 Button(role: .destructive) {
                                     albumPendingDelete = album

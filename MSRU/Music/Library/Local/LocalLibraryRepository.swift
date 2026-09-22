@@ -404,10 +404,12 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
         if url.pathExtension.lowercased() == "dsf", let dsfMeta = DSFHeaderReader.readMetadata(from: url) {
             let parsed = FileNameHeuristicParser.parse(fileURL: url)
             let rule = PathHeuristicRuleStore.shared.match(fileURL: url)
-            let title = parsed.title
-            let artist = rule?.targetArtist ?? parsed.artist ?? "Unknown Artist"
-            let album = rule?.targetAlbum ?? parsed.album
-            let artworkData = LocalArtworkExtractor.extractFromDirectory(folderURL: url.deletingLastPathComponent())
+            let title = dsfMeta.title ?? parsed.title
+            let artist = dsfMeta.artist ?? rule?.targetArtist ?? parsed.artist ?? "Unknown Artist"
+            let album = dsfMeta.album ?? rule?.targetAlbum ?? parsed.album
+            let artworkData = dsfMeta.artworkData ?? LocalArtworkExtractor.extractFromDirectory(folderURL: url.deletingLastPathComponent())
+            let trackNumber = dsfMeta.trackNumber ?? parsed.trackNumber
+            let year = dsfMeta.year ?? parsed.year
 
             return LocalTrack(
                 fileURL: url,
@@ -416,51 +418,36 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
                 album: album,
                 duration: dsfMeta.duration,
                 artworkData: artworkData,
-                trackNumber: parsed.trackNumber,
-                year: parsed.year
+                trackNumber: trackNumber,
+                year: year
             )
         }
 
-        let metadata:
-            [AVMetadataItem]
-
-
-        do {
-
-            metadata =
-                try await asset.load(
-                    .commonMetadata
-                )
-
-        } catch {
-
-            metadata = []
-
-
-            print(
-                """
-                Local Metadata △
-                \(url.lastPathComponent)
-                common metadata unavailable:
-                \(error.localizedDescription)
-                """
-            )
+        var metadata: [AVMetadataItem] = []
+        if let common = try? await asset.load(.commonMetadata) {
+            metadata.append(contentsOf: common)
         }
-
+        if let all = try? await asset.load(.metadata) {
+            metadata.append(contentsOf: all)
+        }
+        if let formats = try? await asset.load(.availableMetadataFormats) {
+            for fmt in formats {
+                if let items = try? await asset.loadMetadata(for: fmt) {
+                    metadata.append(contentsOf: items)
+                }
+            }
+        }
 
         // MARK: Title
 
         let parsed = FileNameHeuristicParser.parse(fileURL: url)
         let rule = PathHeuristicRuleStore.shared.match(fileURL: url)
 
-        // MARK: Title
-
         let rawTitle =
             await metadataString(
-                identifier:
-                    .commonIdentifierTitle,
-                metadata:
-                    metadata
+                identifier: .commonIdentifierTitle,
+                alternateKeys: ["title"],
+                metadata: metadata
             )
         let title = (rawTitle != nil && !rawTitle!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             ? rawTitle!
@@ -471,10 +458,9 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
 
         let rawArtist =
             await metadataString(
-                identifier:
-                    .commonIdentifierArtist,
-                metadata:
-                    metadata
+                identifier: .commonIdentifierArtist,
+                alternateKeys: ["artist", "albumartist", "composer"],
+                metadata: metadata
             )
         let artist: String
         if let rawArtist, !rawArtist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, rawArtist != "Unknown Artist" {
@@ -488,10 +474,9 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
 
         let rawAlbum =
             await metadataString(
-                identifier:
-                    .commonIdentifierAlbumName,
-                metadata:
-                    metadata
+                identifier: .commonIdentifierAlbumName,
+                alternateKeys: ["album"],
+                metadata: metadata
             )
         let album = (rawAlbum != nil && !rawAlbum!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             ? rawAlbum
@@ -502,15 +487,29 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
 
         var artworkData =
             await metadataData(
-                identifier:
-                    .commonIdentifierArtwork,
-                metadata:
-                    metadata
+                identifier: .commonIdentifierArtwork,
+                metadata: metadata
             )
         if artworkData == nil {
             artworkData = LocalArtworkExtractor.extractFromDirectory(folderURL: url.deletingLastPathComponent())
         }
 
+        // MARK: TrackNumber & Year
+        var trackNumber: Int? = parsed.trackNumber
+        if let rawTrk = await metadataString(identifier: .id3MetadataTrackNumber, alternateKeys: ["tracknumber", "trck"], metadata: metadata) {
+            let digits = rawTrk.prefix(while: { $0.isNumber })
+            if let num = Int(digits) {
+                trackNumber = num
+            }
+        }
+
+        var year: Int? = parsed.year
+        if let rawDate = await metadataString(identifier: .id3MetadataYear, alternateKeys: ["date", "year", "tyer", "tdrc"], metadata: metadata) {
+            let digits = rawDate.prefix(while: { $0.isNumber })
+            if digits.count >= 4, let yr = Int(digits.prefix(4)) {
+                year = yr
+            }
+        }
 
         // MARK: Duration
 
@@ -575,68 +574,72 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
             album: album,
             duration: duration,
             artworkData: artworkData,
-            trackNumber: parsed.trackNumber,
-            year: parsed.year
+            trackNumber: trackNumber,
+            year: year
         )
     }
 
     private static func metadataString(
-        identifier:
-            AVMetadataIdentifier,
-        metadata:
-            [AVMetadataItem]
+        identifier: AVMetadataIdentifier,
+        alternateKeys: [String] = [],
+        metadata: [AVMetadataItem]
     ) async -> String? {
-
-        let items =
-            AVMetadataItem
-                .metadataItems(
-                    from:
-                        metadata,
-                    filteredByIdentifier:
-                        identifier
-                )
-
-
-        guard let item =
-                items.first
-        else {
-            return nil
+        // 1. Exact identifier match
+        let items = AVMetadataItem.metadataItems(from: metadata, filteredByIdentifier: identifier)
+        for item in items {
+            if let val = try? await item.load(.stringValue), !val.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return val.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
         }
 
+        // 2. Alternate key / Vorbis comment match (e.g. "vorb/TITLE", "vorb/ALBUM", "TITLE", "ALBUM")
+        let lowerAlts = alternateKeys.map { $0.lowercased() }
+        for item in metadata {
+            let keyStr = (item.key as? String)?.lowercased() ?? ""
+            let idStr = item.identifier?.rawValue.lowercased() ?? ""
+            for alt in lowerAlts {
+                if keyStr == alt || idStr == alt || idStr.hasSuffix("/" + alt) {
+                    if let val = try? await item.load(.stringValue), !val.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        return val.trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                }
+            }
+        }
 
-        return try? await item.load(
-            .stringValue
-        )
+        return nil
     }
 
-
     private static func metadataData(
-        identifier:
-            AVMetadataIdentifier,
-        metadata:
-            [AVMetadataItem]
+        identifier: AVMetadataIdentifier,
+        metadata: [AVMetadataItem]
     ) async -> Data? {
-
-        let items =
-            AVMetadataItem
-                .metadataItems(
-                    from:
-                        metadata,
-                    filteredByIdentifier:
-                        identifier
-                )
-
-
-        guard let item =
-                items.first
-        else {
-            return nil
+        // 1. Exact commonIdentifierArtwork match
+        let items = AVMetadataItem.metadataItems(from: metadata, filteredByIdentifier: identifier)
+        for item in items {
+            if let data = try? await item.load(.dataValue), LocalArtworkExtractor.isValidImageData(data) {
+                return data
+            }
         }
 
+        // 2. Vorbis picture block or attached picture metadata
+        for item in metadata {
+            let idStr = item.identifier?.rawValue.lowercased() ?? ""
+            let keyStr = (item.key as? String)?.lowercased() ?? ""
+            if idStr.contains("picture") || keyStr.contains("picture") || idStr.contains("artwork") || keyStr.contains("artwork") {
+                if let data = try? await item.load(.dataValue), LocalArtworkExtractor.isValidImageData(data) {
+                    return data
+                }
+            }
+        }
 
-        return try? await item.load(
-            .dataValue
-        )
+        // 3. Fallback: check any item with valid image data
+        for item in metadata {
+            if let data = try? await item.load(.dataValue), LocalArtworkExtractor.isValidImageData(data) {
+                return data
+            }
+        }
+
+        return nil
     }
 
 

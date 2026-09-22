@@ -128,7 +128,7 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
             let artistName = item.artistCredit?.first?.name ?? fallbackArtist
             return ExternalReleaseMatch(
                 releaseMBID: item.id,
-                releaseGroupMBID: nil,
+                releaseGroupMBID: item.releaseGroup?.id,
                 title: item.title,
                 artist: artistName,
                 date: item.date,
@@ -139,21 +139,91 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
         }
     }
 
+    public static func cleanAlbumTitle(_ album: String) -> String {
+        var cleaned = album
+        cleaned = cleaned.replacingOccurrences(of: #"(?i)\[(sacd|deluxe|flac|remaster|remastered|bonus|edition|hi-res).*?\]"#, with: "", options: .regularExpression)
+        cleaned = cleaned.replacingOccurrences(of: #"(?i)\((sacd|deluxe|flac|remaster|remastered|bonus|edition|hi-res).*?\)"#, with: "", options: .regularExpression)
+        cleaned = cleaned.replacingOccurrences(of: #"(?i)\s*-\s*(sacd|deluxe|flac|remaster|remastered|edition).*$"#, with: "", options: .regularExpression)
+        cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? album : cleaned
+    }
+
     private func searchLiveReleases(artist: String, album: String) async -> [ExternalReleaseMatch] {
+        let cleanArt = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanAlb = Self.cleanAlbumTitle(album)
+
         var queryParts: [String] = []
-        if !artist.isEmpty { queryParts.append("artist:\"\(artist)\"") }
-        if !album.isEmpty { queryParts.append("release:\"\(album)\"") }
+        if !cleanArt.isEmpty { queryParts.append("artistname:\"\(cleanArt)\"") }
+        if !cleanAlb.isEmpty { queryParts.append("release:\"\(cleanAlb)\"") }
         guard !queryParts.isEmpty else { return [] }
 
         let queryString = queryParts.joined(separator: " AND ")
         var results = await executeReleaseSearch(queryString: queryString, fallbackArtist: artist)
 
-        // Fallback: If artist + album returned 0, try release alone
-        if results.isEmpty && !artist.isEmpty && !album.isEmpty {
-            results = await executeReleaseSearch(queryString: "release:\"\(album)\"", fallbackArtist: artist)
+        // Fallback 1: If cleaned title yielded 0, try original album title
+        if results.isEmpty && cleanAlb != album && !album.isEmpty {
+            let altQuery = "artistname:\"\(cleanArt)\" AND release:\"\(album)\""
+            results = await executeReleaseSearch(queryString: altQuery, fallbackArtist: artist)
+        }
+
+        // Fallback 2: If artist + album returned 0, try release alone
+        if results.isEmpty && !cleanAlb.isEmpty {
+            results = await executeReleaseSearch(queryString: "release:\"\(cleanAlb)\"", fallbackArtist: artist)
         }
 
         return results
+    }
+
+    public func searchRecordings(artist: String, title: String) async -> [ExternalRecordingMatch] {
+        await rateLimiter.waitIfNeeded()
+
+        var queryParts: [String] = []
+        let cleanArtist = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if !cleanArtist.isEmpty {
+            queryParts.append("artistname:\"\(cleanArtist)\"")
+        }
+        if !cleanTitle.isEmpty {
+            queryParts.append("recording:\"\(cleanTitle)\"")
+        }
+        guard !queryParts.isEmpty else { return [] }
+
+        let queryString = queryParts.joined(separator: " AND ")
+        guard let encodedQuery = queryString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://musicbrainz.org/ws/2/recording/?query=\(encodedQuery)&fmt=json&limit=5") else {
+            return []
+        }
+
+        var request = URLRequest(url: url, timeoutInterval: 10.0)
+        request.setValue("MSRU/1.0 (contact@msru.local)", forHTTPHeaderField: "User-Agent")
+
+        guard let (data, response) = try? await urlSession.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            return []
+        }
+
+        guard let parsed = try? JSONDecoder().decode(MBRecordingSearchResponse.self, from: data),
+              let items = parsed.recordings else {
+            return []
+        }
+
+        return items.map { item in
+            let artistName = item.artistCredit?.first?.name ?? cleanArtist
+            let firstRel = item.releases?.first
+            let duration = item.length.map { Double($0) / 1000.0 }
+            let relMBIDs = item.releases?.map(\.id) ?? []
+            return ExternalRecordingMatch(
+                recordingMBID: item.id,
+                title: item.title,
+                artist: artistName,
+                albumTitle: firstRel?.title,
+                releaseGroupMBID: firstRel?.releaseGroup?.id,
+                duration: duration,
+                acoustIDScore: 1.0,
+                releaseMBIDs: relMBIDs
+            )
+        }
     }
 
     private func queryLiveAcoustID(fingerprint: String, duration: TimeInterval) async -> [ExternalRecordingMatch]? {
@@ -223,7 +293,7 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
     private func fetchLiveRelease(releaseMBID: String) async -> ExternalReleaseMatch? {
         await rateLimiter.waitIfNeeded()
 
-        guard let url = URL(string: "https://musicbrainz.org/ws/2/release/\(releaseMBID)?inc=recordings+artists&fmt=json") else {
+        guard let url = URL(string: "https://musicbrainz.org/ws/2/release/\(releaseMBID)?inc=recordings+artists+release-groups&fmt=json") else {
             return nil
         }
 
@@ -257,7 +327,7 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
 
         return ExternalReleaseMatch(
             releaseMBID: item.id,
-            releaseGroupMBID: nil,
+            releaseGroupMBID: item.releaseGroup?.id,
             title: item.title,
             artist: artistName,
             date: item.date,
@@ -365,6 +435,18 @@ private struct MBReleaseSearchResponse: Codable {
     let releases: [MBReleaseItem]?
 }
 
+private struct MBReleaseGroupSummaryItem: Codable {
+    let id: String
+    let title: String?
+    let primaryType: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case primaryType = "primary-type"
+    }
+}
+
 private struct MBReleaseItem: Codable {
     let id: String
     let title: String
@@ -374,6 +456,7 @@ private struct MBReleaseItem: Codable {
     let trackCount: Int?
     let artistCredit: [MBArtistCreditItem]?
     let media: [MBMediaItem]?
+    let releaseGroup: MBReleaseGroupSummaryItem?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -384,6 +467,27 @@ private struct MBReleaseItem: Codable {
         case trackCount = "track-count"
         case artistCredit = "artist-credit"
         case media
+        case releaseGroup = "release-group"
+    }
+}
+
+private struct MBRecordingSearchResponse: Codable {
+    let recordings: [MBRecordingSearchItem]?
+}
+
+private struct MBRecordingSearchItem: Codable {
+    let id: String
+    let title: String
+    let length: Int?
+    let artistCredit: [MBArtistCreditItem]?
+    let releases: [MBReleaseItem]?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case length
+        case artistCredit = "artist-credit"
+        case releases
     }
 }
 
@@ -425,4 +529,5 @@ private struct MBArtistItem: Codable {
     let id: String?
     let name: String?
 }
+
 
