@@ -13,15 +13,6 @@ import AppFoundation
 import AppFoundationUI
 
 
-// MARK: - Platform File Viewer
-
-enum PlatformFileViewer {
-    @MainActor
-    static func revealInFinder(url: URL) {
-        NSWorkspace.shared.activateFileViewerSelecting([url])
-    }
-}
-
 // MARK: - MSRU macOS Window Composition
 
 /// Product/platform composition boundary for one MSRU window.

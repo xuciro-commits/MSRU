@@ -10,6 +10,7 @@ import AppFoundation
 
 #if canImport(AppKit)
 import AppKit
+#endif
 
 /// Semantic update plan calculated before touching the virtualized view hierarchy.
 nonisolated public enum LibrarySurfaceUpdatePlan: Sendable, Equatable {
@@ -32,6 +33,7 @@ nonisolated public enum LibrarySurfaceUpdatePlan: Sendable, Equatable {
     case noOp
 }
 
+#if canImport(AppKit)
 /// Interaction delegate callback contract from native surfaces to SwiftUI feature container.
 @MainActor
 public protocol LibrarySurfaceDelegate: AnyObject {
@@ -47,6 +49,7 @@ public extension LibrarySurfaceDelegate {
     func surfaceWillDisplay(indices: IndexSet) {}
     func surfaceDidRequestContextMenu(forID id: String, event: NSEvent) -> NSMenu? { nil }
 }
+#endif
 
 /// Lightweight presentation model for virtualized card grids (Tracks, Albums, Playlists, Artists).
 nonisolated public struct LibraryCardSummary: Identifiable, Sendable, Hashable {
@@ -343,4 +346,3 @@ public extension Playlist {
         )
     }
 }
-#endif
