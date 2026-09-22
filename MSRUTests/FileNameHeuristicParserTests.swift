@@ -133,8 +133,9 @@ struct FileNameHeuristicParserTests {
         #expect(FileNameHeuristicParser.isGenericFolderName("Music"))
         #expect(FileNameHeuristicParser.isGenericFolderName("Unsorted"))
         #expect(FileNameHeuristicParser.isGenericFolderName("01-Download"))
-        #expect(FileNameHeuristicParser.isGenericFolderName("71"))
         #expect(FileNameHeuristicParser.isGenericFolderName("新建文件夹"))
+        #expect(!FileNameHeuristicParser.isGenericFolderName("21"))
+        #expect(!FileNameHeuristicParser.isGenericFolderName("1989"))
 
         let meta1 = FileNameHeuristicParser.parseFolderMetadata("71-音乐库")
         #expect(meta1.artist == nil)

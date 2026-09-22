@@ -127,7 +127,14 @@ public final class ImportReviewStore {
                 let cand = match.candidate
                 let title = cand?.title ?? local.matchedMemory?.title ?? local.title
                 let artist = cand?.artist ?? local.matchedMemory?.artist ?? local.artist ?? clusterResult.cluster.tracks.compactMap(\.artist).first ?? "Unknown Artist"
-                let album = cand?.album ?? local.matchedMemory?.album ?? local.album ?? clusterResult.cluster.albumName
+
+                let rawCandidateAlbum = cand?.album ?? clusterResult.matchedRelease?.title
+                let cleanCandidateAlbum = (rawCandidateAlbum.map(FileNameHeuristicParser.isGenericFolderName) == true) ? nil : rawCandidateAlbum
+                let cleanMemoryAlbum = (local.matchedMemory?.album.map(FileNameHeuristicParser.isGenericFolderName) == true) ? nil : local.matchedMemory?.album
+                let cleanLocalAlbum = (local.album.map(FileNameHeuristicParser.isGenericFolderName) == true) ? nil : local.album
+                let cleanClusterAlbum = (clusterResult.cluster.albumName.map(FileNameHeuristicParser.isGenericFolderName) == true) ? nil : clusterResult.cluster.albumName
+
+                let album = cleanCandidateAlbum ?? cleanMemoryAlbum ?? cleanLocalAlbum ?? cleanClusterAlbum
                 let artworkData = local.artworkData ?? local.matchedMemory?.artworkData
                 let track = LocalTrack(
                     fileURL: local.fileURL,
@@ -169,7 +176,14 @@ public final class ImportReviewStore {
                 let cand = match.candidate
                 let title = cand?.title ?? local.matchedMemory?.title ?? local.title
                 let artist = cand?.artist ?? local.matchedMemory?.artist ?? local.artist ?? clusterResult.cluster.tracks.compactMap(\.artist).first ?? "Unknown Artist"
-                let album = cand?.album ?? local.matchedMemory?.album ?? local.album ?? clusterResult.cluster.albumName ?? "Unknown Album"
+
+                let rawCandidateAlbum = cand?.album ?? clusterResult.matchedRelease?.title
+                let cleanCandidateAlbum = (rawCandidateAlbum.map(FileNameHeuristicParser.isGenericFolderName) == true) ? nil : rawCandidateAlbum
+                let cleanMemoryAlbum = (local.matchedMemory?.album.map(FileNameHeuristicParser.isGenericFolderName) == true) ? nil : local.matchedMemory?.album
+                let cleanLocalAlbum = (local.album.map(FileNameHeuristicParser.isGenericFolderName) == true) ? nil : local.album
+                let cleanClusterAlbum = (clusterResult.cluster.albumName.map(FileNameHeuristicParser.isGenericFolderName) == true) ? nil : clusterResult.cluster.albumName
+
+                let album = cleanCandidateAlbum ?? cleanMemoryAlbum ?? cleanLocalAlbum ?? cleanClusterAlbum ?? "Unknown Album"
                 let artworkData = local.artworkData ?? local.matchedMemory?.artworkData
                 let trackNumber = cand?.trackNumber ?? local.trackNumber
                 let recordingMBID = cand?.trackMBID ?? local.trackMBID ?? local.matchedMemory?.recordingMBID
@@ -288,7 +302,9 @@ public final class ImportReviewStore {
                 let local = match.localTrack
                 let title = local.title
                 let artist = local.artist ?? clusterResult.cluster.tracks.compactMap(\.artist).first ?? "Unknown Artist"
-                let album = local.album ?? clusterResult.cluster.albumName
+                let cleanLocalAlbum = (local.album.map(FileNameHeuristicParser.isGenericFolderName) == true) ? nil : local.album
+                let cleanClusterAlbum = (clusterResult.cluster.albumName.map(FileNameHeuristicParser.isGenericFolderName) == true) ? nil : clusterResult.cluster.albumName
+                let album = cleanLocalAlbum ?? cleanClusterAlbum
                 let artworkData = local.artworkData ?? local.matchedMemory?.artworkData
                 let track = LocalTrack(
                     fileURL: local.fileURL,

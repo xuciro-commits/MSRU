@@ -192,17 +192,37 @@ public actor LocalFingerprintRegistry: Sendable {
         self.signatures = loaded.signatures
     }
 
+    private func sanitizeRecord(_ record: AcousticFingerprintRecord) -> AcousticFingerprintRecord {
+        if let alb = record.album, FileNameHeuristicParser.isGenericFolderName(alb) {
+            return AcousticFingerprintRecord(
+                fingerprint: record.fingerprint,
+                duration: record.duration,
+                algorithm: record.algorithm,
+                title: record.title,
+                artist: record.artist,
+                album: nil,
+                trackNumber: record.trackNumber,
+                releaseMBID: record.releaseMBID,
+                recordingMBID: record.recordingMBID,
+                artworkReference: record.artworkReference,
+                dateLearned: record.dateLearned,
+                matchCount: record.matchCount
+            )
+        }
+        return record
+    }
+
     /// Fast lookup by exact fingerprint or duration proximity.
     public func lookup(fingerprint: String, duration: TimeInterval, tolerance: TimeInterval = 2.0) -> AcousticFingerprintRecord? {
         // 1. Exact fingerprint match
         if let exact = records.first(where: { $0.fingerprint == fingerprint }) {
-            return exact
+            return sanitizeRecord(exact)
         }
 
         // 2. Duration proximity match if duration matches closely
         for record in records {
             if abs(record.duration - duration) <= tolerance && record.fingerprint == fingerprint {
-                return record
+                return sanitizeRecord(record)
             }
         }
 
@@ -298,6 +318,8 @@ public actor LocalFingerprintRegistry: Sendable {
     private func updateInMemory(_ item: FingerprintRegistrationItem) -> Bool {
         var changed = false
 
+        let cleanAlbum = (item.album.map(FileNameHeuristicParser.isGenericFolderName) == true) ? nil : item.album
+
         if let idx = records.firstIndex(where: { $0.fingerprint == item.fingerprint }) {
             if records[idx].title != item.title {
                 records[idx].title = item.title
@@ -307,8 +329,11 @@ public actor LocalFingerprintRegistry: Sendable {
                 records[idx].artist = item.artist
                 changed = true
             }
-            if let album = item.album, records[idx].album != album {
-                records[idx].album = album
+            if let cleanAlbum, records[idx].album != cleanAlbum {
+                records[idx].album = cleanAlbum
+                changed = true
+            } else if records[idx].album.map(FileNameHeuristicParser.isGenericFolderName) == true {
+                records[idx].album = cleanAlbum
                 changed = true
             }
             if let trackNumber = item.trackNumber, records[idx].trackNumber != trackNumber {
@@ -333,7 +358,7 @@ public actor LocalFingerprintRegistry: Sendable {
                 duration: item.duration,
                 title: item.title,
                 artist: item.artist,
-                album: item.album,
+                album: cleanAlbum,
                 trackNumber: item.trackNumber,
                 releaseMBID: item.releaseMBID,
                 recordingMBID: item.recordingMBID,

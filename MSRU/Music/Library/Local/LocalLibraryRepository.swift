@@ -406,7 +406,10 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
             let rule = PathHeuristicRuleStore.shared.match(fileURL: url)
             let title = dsfMeta.title ?? parsed.title
             let artist = dsfMeta.artist ?? rule?.targetArtist ?? parsed.artist ?? "Unknown Artist"
-            let album = dsfMeta.album ?? rule?.targetAlbum ?? parsed.album
+            var album = dsfMeta.album ?? rule?.targetAlbum ?? parsed.album
+            if let alb = album, FileNameHeuristicParser.isGenericFolderName(alb) {
+                album = nil
+            }
             let artworkData = dsfMeta.artworkData ?? LocalArtworkExtractor.extractFromDirectory(folderURL: url.deletingLastPathComponent())
             let trackNumber = dsfMeta.trackNumber ?? parsed.trackNumber
             let year = dsfMeta.year ?? parsed.year
@@ -488,9 +491,12 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
             ? rawAlbum
             : (rule?.targetAlbum ?? parsed.album)
 
-        // Safety gate: never allow album == artist
-        if let alb = finalAlbum, alb.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-            finalAlbum = nil
+        // Safety gate: never allow album == artist or generic folder name
+        if let alb = finalAlbum {
+            let trimmed = alb.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.lowercased() == artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() || FileNameHeuristicParser.isGenericFolderName(trimmed) {
+                finalAlbum = nil
+            }
         }
 
 

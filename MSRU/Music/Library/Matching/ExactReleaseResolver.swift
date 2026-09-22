@@ -86,7 +86,8 @@ public struct ExactReleaseResolver: Sendable {
 
         var scored: [ScoredReleaseCandidate] = []
 
-        let clusterAlbum = cluster.albumName ?? ""
+        let rawClusterAlbum = cluster.albumName ?? ""
+        let clusterAlbum = FileNameHeuristicParser.isGenericFolderName(rawClusterAlbum) ? "" : rawClusterAlbum
         let clusterArtists = cluster.tracks.compactMap { $0.artist }
         let clusterArtist = clusterArtists.first ?? ""
         let folderPath = cluster.folderURL?.path.lowercased() ?? ""
@@ -96,7 +97,7 @@ public struct ExactReleaseResolver: Sendable {
             let sAcoustID = min(1.0, max(0.0, baseAcoustIDScore))
 
             // 2. Album Title Similarity (15%)
-            let sAlbum = StringDistance.similarity(clusterAlbum, candidate.title)
+            let sAlbum = clusterAlbum.isEmpty ? 0.7 : StringDistance.similarity(clusterAlbum, candidate.title)
 
             // 3. Artist Similarity (10%)
             let sArtist = StringDistance.similarity(clusterArtist, candidate.artist)

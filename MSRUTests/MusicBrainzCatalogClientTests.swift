@@ -203,5 +203,35 @@ struct MusicBrainzCatalogClientTests {
         #expect(result.tier == .medium || result.tier == .high)
         #expect(result.trackMatches.first?.candidate?.title == "晴天")
     }
+
+    @Test
+    func resolveAlbumClusterWithGenericFolderAlbumOverridesGenericWithCatalogReleaseAlbum() async throws {
+        let track = ClusterTrackItem(
+            fileURL: URL(fileURLWithPath: "/music/71-音乐库/2234.mp3"),
+            title: "晴天",
+            artist: "周杰伦",
+            album: "71-音乐库",
+            trackNumber: 4,
+            duration: 269.0
+        )
+
+        let cluster = AlbumCluster(
+            folderURL: URL(fileURLWithPath: "/music/71-音乐库"),
+            candidateAlbumTitle: "71-音乐库",
+            candidateArtist: "周杰伦",
+            tracks: [track]
+        )
+
+        let result = try await PicardAlbumLookupResolver.resolve(
+            cluster: cluster,
+            catalog: MusicBrainzCatalogClient.shared
+        )
+
+        #expect(result.matchedRelease != nil)
+        let resolvedAlbum = result.trackMatches.first?.candidate?.album
+        #expect(resolvedAlbum != nil)
+        #expect(resolvedAlbum != "71-音乐库")
+        #expect(!FileNameHeuristicParser.isGenericFolderName(resolvedAlbum ?? ""))
+    }
 }
 

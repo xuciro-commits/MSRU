@@ -574,15 +574,16 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
 // MARK: - Internal HTTP Serialization Models
 
 private actor MusicBrainzClientRateLimiter {
-    private var lastRequestTime: Date = .distantPast
+    private var nextAllowedTime: Date = .distantPast
 
     func waitIfNeeded() async {
-        let elapsed = Date().timeIntervalSince(lastRequestTime)
-        if elapsed < 1.0 {
-            let waitTime = 1.0 - elapsed
-            try? await Task.sleep(nanoseconds: UInt64(waitTime * 1_000_000_000))
+        let now = Date()
+        let scheduled = max(now, nextAllowedTime)
+        nextAllowedTime = scheduled.addingTimeInterval(1.0)
+        let delay = scheduled.timeIntervalSince(now)
+        if delay > 0 {
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
         }
-        lastRequestTime = Date()
     }
 }
 

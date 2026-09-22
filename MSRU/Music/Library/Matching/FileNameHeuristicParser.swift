@@ -59,9 +59,6 @@ nonisolated public enum FileNameHeuristicParser {
     public static func isGenericFolderName(_ name: String) -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return true }
-        if CharacterSet.decimalDigits.isSuperset(of: CharacterSet(charactersIn: trimmed)) {
-            return true
-        }
         if let regex = genericFolderRegex {
             let range = NSRange(trimmed.startIndex..., in: trimmed)
             if regex.firstMatch(in: trimmed, range: range) != nil {

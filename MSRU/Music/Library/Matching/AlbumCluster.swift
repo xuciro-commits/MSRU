@@ -162,11 +162,21 @@ nonisolated public enum AlbumClusterer {
                 var consensusAlbum = consensusValue(from: sorted.compactMap(\.album))
                 var consensusArtist = consensusValue(from: sorted.compactMap(\.artist))
 
+                if let ca = consensusAlbum, FileNameHeuristicParser.isGenericFolderName(ca) {
+                    consensusAlbum = nil
+                }
+
                 // Fallback to directory name heuristic if album or artist clues are absent
                 if consensusAlbum == nil || consensusArtist == nil {
                     let folderMeta = FileNameHeuristicParser.parseFolderMetadata(folder.lastPathComponent)
-                    if consensusAlbum == nil { consensusAlbum = folderMeta.album }
+                    if consensusAlbum == nil, let fa = folderMeta.album, !FileNameHeuristicParser.isGenericFolderName(fa) {
+                        consensusAlbum = fa
+                    }
                     if consensusArtist == nil { consensusArtist = folderMeta.artist }
+                }
+
+                if let ca = consensusAlbum, FileNameHeuristicParser.isGenericFolderName(ca) {
+                    consensusAlbum = nil
                 }
 
                 clusters.append(AlbumCluster(

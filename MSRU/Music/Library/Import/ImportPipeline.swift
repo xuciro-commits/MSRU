@@ -120,7 +120,10 @@ public final class ImportPipeline: Sendable {
                     } else if (keyStr.contains("artist") || keyStr.hasSuffix("/artist")), let val = try? await item.load(.stringValue), !val.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, detectedArtist == nil {
                         detectedArtist = val.trimmingCharacters(in: .whitespacesAndNewlines)
                     } else if (keyStr.contains("album") || keyStr.hasSuffix("/album")), let val = try? await item.load(.stringValue), !val.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, detectedAlbum == nil {
-                        detectedAlbum = val.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let trimmed = val.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !FileNameHeuristicParser.isGenericFolderName(trimmed) {
+                            detectedAlbum = trimmed
+                        }
                     } else if (keyStr.contains("picture") || keyStr.contains("artwork") || keyStr.hasSuffix("artwork")), artworkData == nil {
                         if let d = try? await item.load(.dataValue), LocalArtworkExtractor.isValidImageData(d) {
                             artworkData = d
@@ -145,7 +148,9 @@ public final class ImportPipeline: Sendable {
                 matchedMemoryRecord = memory
                 if detectedTitle == nil { detectedTitle = memory.title }
                 if detectedArtist == nil { detectedArtist = memory.artist }
-                if detectedAlbum == nil { detectedAlbum = memory.album }
+                if detectedAlbum == nil, let alb = memory.album, !FileNameHeuristicParser.isGenericFolderName(alb) {
+                    detectedAlbum = alb
+                }
                 if artworkData == nil { artworkData = memory.artworkData }
             }
 
@@ -160,7 +165,7 @@ public final class ImportPipeline: Sendable {
                     if detectedTitle == nil { detectedTitle = bestMatch.title }
                     if detectedArtist == nil { detectedArtist = bestMatch.artist }
                     if recordingMBID == nil { recordingMBID = bestMatch.recordingMBID }
-                    if detectedAlbum == nil, let alb = bestMatch.albumTitle, !alb.isEmpty {
+                    if detectedAlbum == nil, let alb = bestMatch.albumTitle, !alb.isEmpty, !FileNameHeuristicParser.isGenericFolderName(alb) {
                         detectedAlbum = alb
                     }
                 }
@@ -173,7 +178,7 @@ public final class ImportPipeline: Sendable {
             if detectedArtist == nil, let pa = parsed.artist, !pa.isEmpty, pa != "Unknown Artist" {
                 detectedArtist = pa
             }
-            if detectedAlbum == nil, let pal = parsed.album, !pal.isEmpty {
+            if detectedAlbum == nil, let pal = parsed.album, !pal.isEmpty, !FileNameHeuristicParser.isGenericFolderName(pal) {
                 detectedAlbum = pal
             }
 
@@ -184,7 +189,7 @@ public final class ImportPipeline: Sendable {
                     if detectedArtist == nil || detectedArtist?.isEmpty == true || detectedArtist == "Unknown Artist" {
                         detectedArtist = rule.targetArtist
                     }
-                    if let album = rule.targetAlbum, detectedAlbum == nil {
+                    if let album = rule.targetAlbum, detectedAlbum == nil, !FileNameHeuristicParser.isGenericFolderName(album) {
                         detectedAlbum = album
                     }
                 }
@@ -192,7 +197,10 @@ public final class ImportPipeline: Sendable {
 
             let finalTitle = detectedTitle ?? (parsed.title.isEmpty ? url.deletingPathExtension().lastPathComponent : parsed.title)
             let finalArtist = detectedArtist ?? (parsed.artist?.isEmpty == false ? parsed.artist : nil)
-            let finalAlbum = detectedAlbum ?? (parsed.album?.isEmpty == false ? parsed.album : nil)
+            var finalAlbum = detectedAlbum ?? (parsed.album?.isEmpty == false ? parsed.album : nil)
+            if let fa = finalAlbum, FileNameHeuristicParser.isGenericFolderName(fa) {
+                finalAlbum = nil
+            }
 
             // Discover Artwork if not already found from memory
             if artworkData == nil {

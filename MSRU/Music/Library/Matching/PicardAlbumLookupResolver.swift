@@ -68,9 +68,13 @@ public enum PicardAlbumLookupResolver {
         var artistClue = cluster.tracks.compactMap { $0.artist }.first ?? ""
         var albumClue = cluster.albumName ?? ""
 
+        if FileNameHeuristicParser.isGenericFolderName(albumClue) {
+            albumClue = ""
+        }
+
         if (albumClue.isEmpty || artistClue.isEmpty), let folder = cluster.folderURL?.lastPathComponent {
             let folderMeta = FileNameHeuristicParser.parseFolderMetadata(folder)
-            if albumClue.isEmpty, let a = folderMeta.album { albumClue = a }
+            if albumClue.isEmpty, let a = folderMeta.album, !FileNameHeuristicParser.isGenericFolderName(a) { albumClue = a }
             if artistClue.isEmpty, let art = folderMeta.artist { artistClue = art }
         }
 
@@ -293,16 +297,34 @@ public enum PicardAlbumLookupResolver {
         release: ExternalReleaseMatch? = nil,
         clusterAlbum: String? = nil
     ) -> ClusterTrackMatch {
+        let cleanClusterAlbum = (clusterAlbum.map(FileNameHeuristicParser.isGenericFolderName) == true) ? nil : clusterAlbum
+        let cleanTrackAlbum = (track.album.map(FileNameHeuristicParser.isGenericFolderName) == true) ? nil : track.album
+
+        // If release has tracks, try to find matching track from the release first
+        let matchingReleaseTrack = release?.tracks.first(where: { rTrack in
+            if let tMBID = track.trackMBID, !tMBID.isEmpty, let rMBID = rTrack.recordingMBID, !rMBID.isEmpty {
+                return tMBID == rMBID
+            }
+            if let ln = track.trackNumber, ln == rTrack.position {
+                return true
+            }
+            return StringDistance.similarity(track.title, rTrack.title) >= 0.7
+        })
+
+        let candidateReleaseMBID = release?.releaseMBID ?? track.matchedMemory?.releaseMBID ?? ""
+        let candidateAlbum = release?.title ?? cleanClusterAlbum ?? cleanTrackAlbum
+
         if let memory = track.matchedMemory {
+            let cleanMemoryAlbum = (memory.album.map(FileNameHeuristicParser.isGenericFolderName) == true) ? nil : memory.album
             let cand = CatalogTrackCandidate(
-                trackMBID: memory.recordingMBID ?? "",
-                releaseMBID: memory.releaseMBID ?? (release?.releaseMBID ?? ""),
-                title: memory.title,
-                artist: memory.artist,
+                trackMBID: matchingReleaseTrack?.recordingMBID ?? memory.recordingMBID ?? "",
+                releaseMBID: candidateReleaseMBID.isEmpty ? (memory.releaseMBID ?? "") : candidateReleaseMBID,
+                title: matchingReleaseTrack?.title ?? memory.title,
+                artist: release?.artist ?? memory.artist,
                 artistAliases: [],
-                album: memory.album ?? release?.title ?? clusterAlbum,
-                duration: memory.duration,
-                trackNumber: memory.trackNumber ?? track.trackNumber
+                album: candidateAlbum ?? cleanMemoryAlbum,
+                duration: matchingReleaseTrack?.duration ?? memory.duration,
+                trackNumber: matchingReleaseTrack?.position ?? memory.trackNumber ?? track.trackNumber
             )
             return ClusterTrackMatch(
                 localTrack: track,
@@ -317,14 +339,14 @@ public enum PicardAlbumLookupResolver {
             )
         } else if let trackMBID = track.trackMBID, !trackMBID.isEmpty {
             let cand = CatalogTrackCandidate(
-                trackMBID: trackMBID,
-                releaseMBID: release?.releaseMBID ?? "",
-                title: track.title,
-                artist: track.artist ?? (release?.artist ?? "Unknown Artist"),
+                trackMBID: matchingReleaseTrack?.recordingMBID ?? trackMBID,
+                releaseMBID: candidateReleaseMBID,
+                title: matchingReleaseTrack?.title ?? track.title,
+                artist: release?.artist ?? (track.artist ?? "Unknown Artist"),
                 artistAliases: [],
-                album: track.album ?? release?.title ?? clusterAlbum,
-                duration: track.duration,
-                trackNumber: track.trackNumber
+                album: candidateAlbum,
+                duration: matchingReleaseTrack?.duration ?? track.duration,
+                trackNumber: matchingReleaseTrack?.position ?? track.trackNumber
             )
             return ClusterTrackMatch(
                 localTrack: track,
