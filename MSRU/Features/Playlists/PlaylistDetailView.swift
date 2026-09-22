@@ -18,6 +18,7 @@ struct PlaylistDetailView: View {
 
     @State private var isEditSheetPresented = false
     @State private var isDeleteConfirmationPresented = false
+    @State private var selectedTrackIDs: Set<String> = []
 
     private var resolvedTracks: [LocalTrack] {
         playlist.trackIDs.compactMap { id in
@@ -153,6 +154,13 @@ struct PlaylistDetailView: View {
             .padding(.bottom, 48)
         }
         .hideScrollIndicatorsCompletely()
+        .overlay(alignment: .bottom) {
+            if selectedTrackIDs.count > 1 {
+                floatingBatchBar
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: selectedTrackIDs.count)
         .sheet(isPresented: $isEditSheetPresented) {
             NewPlaylistSheetView(
                 initialTitle: playlist.title,
@@ -210,6 +218,7 @@ struct PlaylistDetailView: View {
 
     private func trackRow(index: Int, track: LocalTrack) -> some View {
         let isCurrent = playback.currentTrack?.id == track.id
+        let isSelected = selectedTrackIDs.contains(track.id)
         return HStack(spacing: 12) {
             // Index or Speaker
             ZStack {
@@ -295,12 +304,23 @@ struct PlaylistDetailView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isCurrent ? Color.accentColor.opacity(0.08) : Color.clear)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isSelected ? Color.accentColor.opacity(0.18) : (isCurrent ? Color.accentColor.opacity(0.08) : Color.clear))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
         )
         .contentShape(Rectangle())
         .onTapGesture {
-            onSelectTrack?(track)
+            SelectionHelper.handleTap(
+                for: track.id,
+                selectedIDs: $selectedTrackIDs,
+                allIDs: resolvedTracks.map(\.id)
+            )
+            if selectedTrackIDs.count == 1 {
+                onSelectTrack?(track)
+            }
         }
         .simultaneousGesture(
             TapGesture(count: 2).onEnded {
@@ -329,6 +349,50 @@ struct PlaylistDetailView: View {
         let m = total / 60
         let s = total % 60
         return String(format: "%d:%02d", m, s)
+    }
+
+    private var floatingBatchBar: some View {
+        FloatingBatchBar(
+            count: selectedTrackIDs.count,
+            title: "\(selectedTrackIDs.count) songs",
+            onDeselect: { selectedTrackIDs.removeAll() }
+        ) {
+            Button {
+                let selected = resolvedTracks.filter { selectedTrackIDs.contains($0.id) }
+                if let first = selected.first {
+                    playback.toggle(track: first, queue: selected)
+                }
+            } label: {
+                Label("Play Selected", systemImage: "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+
+            Button {
+                let selected = resolvedTracks.filter { selectedTrackIDs.contains($0.id) }
+                for t in selected {
+                    playback.addToQueue(t)
+                }
+            } label: {
+                Label("Add to Queue", systemImage: "text.badge.plus")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            Button(role: .destructive) {
+                let toRemove = selectedTrackIDs
+                Task {
+                    for id in toRemove {
+                        await playlistStore.removeTrack(id, from: playlist.id)
+                    }
+                    selectedTrackIDs.removeAll()
+                }
+            } label: {
+                Label(LocalizedStringKey("Remove from Playlist"), systemImage: "minus.circle")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
     }
 }
 

@@ -18,6 +18,7 @@ struct RadioView: View {
 
     @Bindable private var state: RadioFeature.State
     @State private var isShowingAddStationSheet = false
+    @State private var selectedStationIDs: Set<String> = []
 
     private let columns = [
         GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 18)
@@ -60,6 +61,13 @@ struct RadioView: View {
         }
         .scrollIndicators(.hidden)
         .hideScrollIndicatorsCompletely()
+        .overlay(alignment: .bottom) {
+            if selectedStationIDs.count > 1 {
+                floatingBatchBar
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: selectedStationIDs.count)
         .sheet(isPresented: $isShowingAddStationSheet) {
             AddStationSheetView { newStation in
                 feature.send(.addCustomStationRequested(newStation))
@@ -272,29 +280,84 @@ struct RadioView: View {
                 )
                 .frame(maxWidth: .infinity, minHeight: 200)
             } else {
-                LazyVGrid(columns: columns, spacing: 18) {
-                    ForEach(state.stations) { station in
-                        RadioStationCardView(
-                            station: station,
-                            isSelected: selectedStation?.id == station.id,
-                            isCurrent: feature.isCurrent(station),
-                            playbackState: feature.state(for: station),
-                            isFavorite: state.isFavorite(station),
-                            onToggleFavorite: {
-                                feature.send(.toggleFavoriteRequested(station))
-                            },
-                            onDelete: station.isCustom ? {
-                                feature.send(.deleteCustomStationRequested(station.id))
-                            } : nil,
-                            onPlayPause: {
-                                feature.send(.playPauseRequested(station))
-                            },
-                            onSelect: {
-                                onSelectStation?(station)
-                            }
-                        )
+                MarqueeSelectionContainer(selectedIDs: $selectedStationIDs) {
+                    LazyVGrid(columns: columns, spacing: 18) {
+                        ForEach(state.stations) { station in
+                            RadioStationCardView(
+                                station: station,
+                                isSelected: selectedStationIDs.contains(station.id) || selectedStation?.id == station.id,
+                                isCurrent: feature.isCurrent(station),
+                                playbackState: feature.state(for: station),
+                                isFavorite: state.isFavorite(station),
+                                onToggleFavorite: {
+                                    feature.send(.toggleFavoriteRequested(station))
+                                },
+                                onDelete: station.isCustom ? {
+                                    feature.send(.deleteCustomStationRequested(station.id))
+                                } : nil,
+                                onPlayPause: {
+                                    feature.send(.playPauseRequested(station))
+                                },
+                                onSelect: {
+                                    SelectionHelper.handleTap(
+                                        for: station.id,
+                                        selectedIDs: $selectedStationIDs,
+                                        allIDs: state.stations.map(\.id)
+                                    )
+                                    if selectedStationIDs.count == 1 {
+                                        onSelectStation?(station)
+                                    }
+                                }
+                            )
+                            .marqueeItem(id: station.id)
+                        }
                     }
                 }
+            }
+        }
+    }
+
+    private var floatingBatchBar: some View {
+        FloatingBatchBar(
+            count: selectedStationIDs.count,
+            title: "\(selectedStationIDs.count) stations",
+            onDeselect: { selectedStationIDs.removeAll() }
+        ) {
+            Button {
+                let selected = state.stations.filter { selectedStationIDs.contains($0.id) }
+                for s in selected where !state.isFavorite(s) {
+                    feature.send(.toggleFavoriteRequested(s))
+                }
+            } label: {
+                Label("Favorite", systemImage: "heart.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+
+            Button {
+                let selected = state.stations.filter { selectedStationIDs.contains($0.id) }
+                for s in selected where state.isFavorite(s) {
+                    feature.send(.toggleFavoriteRequested(s))
+                }
+            } label: {
+                Label("Unfavorite", systemImage: "heart.slash")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            let customCount = state.stations.filter { selectedStationIDs.contains($0.id) && $0.isCustom }.count
+            if customCount > 0 {
+                Button(role: .destructive) {
+                    let selected = state.stations.filter { selectedStationIDs.contains($0.id) && $0.isCustom }
+                    for s in selected {
+                        feature.send(.deleteCustomStationRequested(s.id))
+                    }
+                    selectedStationIDs.removeAll()
+                } label: {
+                    Label("Delete (\(customCount))", systemImage: "trash")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
         }
     }

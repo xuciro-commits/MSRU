@@ -17,6 +17,7 @@ struct AlbumDetailView: View {
     var onFetchArtwork: (() -> Void)? = nil
 
     @State private var isDeleteConfirmationPresented: Bool = false
+    @State private var selectedTrackIDs: Set<String> = []
 
     var body: some View {
         ScrollView {
@@ -142,6 +143,13 @@ struct AlbumDetailView: View {
             .padding(.bottom, 40)
         }
         .hideScrollIndicatorsCompletely()
+        .overlay(alignment: .bottom) {
+            if selectedTrackIDs.count > 1 {
+                floatingBatchBar
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: selectedTrackIDs.count)
         .confirmationDialog(
             "Delete album \"\(album.title)\"?",
             isPresented: $isDeleteConfirmationPresented,
@@ -161,71 +169,91 @@ struct AlbumDetailView: View {
         let isCurrent = matchingLocal != nil && playback.currentTrack?.id == matchingLocal?.id
         let isPlaying = isCurrent && playback.isPlaying
 
-        return HStack(spacing: 14) {
-            Text("\(trackModel.trackNumber)")
-                .font(.callout.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .frame(width: 24, alignment: .trailing)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(trackModel.title)
-                    .font(.body.weight(isCurrent ? .semibold : .regular))
-                    .foregroundStyle(isCurrent ? Color.accentColor : .primary)
-                    .lineLimit(1)
-
-                if trackModel.artist != album.artist {
-                    Text(trackModel.artist)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer()
-
-            if let badge = trackModel.formatBadge {
-                Text(badge)
-                    .font(.caption2.bold())
+            let isSelected = selectedTrackIDs.contains(trackModel.id)
+            return HStack(spacing: 14) {
+                Text("\(trackModel.trackNumber)")
+                    .font(.callout.monospacedDigit())
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+                    .frame(width: 24, alignment: .trailing)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(trackModel.title)
+                        .font(.body.weight(isCurrent ? .semibold : .regular))
+                        .foregroundStyle(isCurrent ? Color.accentColor : .primary)
+                        .lineLimit(1)
+
+                    if trackModel.artist != album.artist {
+                        Text(trackModel.artist)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                if let badge = trackModel.formatBadge {
+                    Text(badge)
+                        .font(.caption2.bold())
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+                }
+
+                Text(trackModel.formattedDuration)
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.secondary)
+
+                Button {
+                    if let local = matchingLocal {
+                        playback.toggle(track: local, queue: localTracks)
+                    }
+                } label: {
+                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                        .font(.caption)
+                        .foregroundStyle(isCurrent ? Color.accentColor : .secondary)
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 8)
             }
-
-            Text(trackModel.formattedDuration)
-                .font(.callout.monospacedDigit())
-                .foregroundStyle(.secondary)
-
-            Button {
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isSelected ? Color.accentColor.opacity(0.18) : (isCurrent ? Color.accentColor.opacity(0.08) : Color.clear))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
+            )
+            .contentShape(Rectangle())
+            .onTapGesture {
+                SelectionHelper.handleTap(
+                    for: trackModel.id,
+                    selectedIDs: $selectedTrackIDs,
+                    allIDs: album.discs.flatMap(\.tracks).map(\.id)
+                )
+                if let local = matchingLocal, selectedTrackIDs.count == 1 {
+                    onSelectTrack(local)
+                }
+            }
+            .simultaneousGesture(
+                TapGesture(count: 2).onEnded {
+                    if let local = matchingLocal {
+                        playback.play(local)
+                    }
+                }
+            )
+            .contextMenu {
                 if let local = matchingLocal {
-                    playback.toggle(track: local, queue: localTracks)
-                }
-            } label: {
-                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                    .font(.caption)
-                    .foregroundStyle(isCurrent ? Color.accentColor : .secondary)
-            }
-            .buttonStyle(.plain)
-            .padding(.leading, 8)
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .background(isCurrent ? Color.accentColor.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if let local = matchingLocal {
-                onSelectTrack(local)
-            }
-        }
-        .contextMenu {
-            if let local = matchingLocal {
-                Button("Play Next") {
-                    playback.playNext(local)
-                }
-                Button("Add to Queue") {
-                    playback.addToQueue(local)
+                    Button("Play Next") {
+                        playback.playNext(local)
+                    }
+                    Button("Add to Queue") {
+                        playback.addToQueue(local)
+                    }
                 }
             }
-        }
     }
 
     private func playAll() {
@@ -258,6 +286,36 @@ struct AlbumDetailView: View {
                     .font(.system(size: 60))
                     .foregroundStyle(.secondary.opacity(0.4))
             }
+    }
+
+    private var floatingBatchBar: some View {
+        FloatingBatchBar(
+            count: selectedTrackIDs.count,
+            title: "\(selectedTrackIDs.count) songs",
+            onDeselect: { selectedTrackIDs.removeAll() }
+        ) {
+            Button {
+                let selected = localTracks.filter { selectedTrackIDs.contains($0.id) }
+                if let first = selected.first {
+                    playback.toggle(track: first, queue: selected)
+                }
+            } label: {
+                Label("Play Selected", systemImage: "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+
+            Button {
+                let selected = localTracks.filter { selectedTrackIDs.contains($0.id) }
+                for t in selected {
+                    playback.addToQueue(t)
+                }
+            } label: {
+                Label("Add to Queue", systemImage: "text.badge.plus")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
     }
 }
 

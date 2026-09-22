@@ -245,17 +245,20 @@ extension FoundationCard where
 
 public struct AlbumCardView<Cover: View>: View {
     public let album: AlbumPresentationModel
+    public let isSelected: Bool
     public let onSelect: () -> Void
     public let onPlay: () -> Void
     private let customCover: Cover?
 
     public init(
         album: AlbumPresentationModel,
+        isSelected: Bool = false,
         onSelect: @escaping () -> Void,
         onPlay: @escaping () -> Void = {},
         @ViewBuilder cover: () -> Cover
     ) {
         self.album = album
+        self.isSelected = isSelected
         self.onSelect = onSelect
         self.onPlay = onPlay
         self.customCover = cover()
@@ -266,6 +269,7 @@ public struct AlbumCardView<Cover: View>: View {
             titleText: album.title,
             subtitleText: album.artist,
             footerText: album.year != nil ? String(album.year!) : nil,
+            isSelected: isSelected,
             onSelect: onSelect
         ) {
             if let customCover {
@@ -324,10 +328,12 @@ public struct AlbumCardView<Cover: View>: View {
 extension AlbumCardView where Cover == EmptyView {
     public init(
         album: AlbumPresentationModel,
+        isSelected: Bool = false,
         onSelect: @escaping () -> Void,
         onPlay: @escaping () -> Void = {}
     ) {
         self.album = album
+        self.isSelected = isSelected
         self.onSelect = onSelect
         self.onPlay = onPlay
         self.customCover = nil
@@ -338,6 +344,7 @@ extension AlbumCardView where Cover == EmptyView {
 
 public struct ArtistAvatarView<Avatar: View>: View {
     public let artist: ArtistPresentationModel
+    public let isSelected: Bool
     public let onSelect: () -> Void
     private let customAvatar: Avatar?
 
@@ -345,10 +352,12 @@ public struct ArtistAvatarView<Avatar: View>: View {
 
     public init(
         artist: ArtistPresentationModel,
+        isSelected: Bool = false,
         onSelect: @escaping () -> Void,
         @ViewBuilder avatar: () -> Avatar
     ) {
         self.artist = artist
+        self.isSelected = isSelected
         self.onSelect = onSelect
         self.customAvatar = avatar()
     }
@@ -378,6 +387,17 @@ public struct ArtistAvatarView<Avatar: View>: View {
                     .font(.caption)
                     .lineLimit(1)
                     .foregroundStyle(.secondary)
+            }
+        }
+        .padding(8)
+        .background {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.accentColor.opacity(0.12))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .strokeBorder(Color.accentColor, lineWidth: 2)
+                    }
             }
         }
         .contentShape(Rectangle())
@@ -433,9 +453,11 @@ public struct ArtistAvatarView<Avatar: View>: View {
 extension ArtistAvatarView where Avatar == EmptyView {
     public init(
         artist: ArtistPresentationModel,
+        isSelected: Bool = false,
         onSelect: @escaping () -> Void
     ) {
         self.artist = artist
+        self.isSelected = isSelected
         self.onSelect = onSelect
         self.customAvatar = nil
     }

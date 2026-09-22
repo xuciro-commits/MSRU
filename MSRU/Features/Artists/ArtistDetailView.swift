@@ -19,6 +19,7 @@ struct ArtistDetailView: View {
     @State private var isDeleteConfirmationPresented: Bool = false
     @State private var biographyRecord: ArtistBiographyRecord? = nil
     @State private var isBioExpanded: Bool = false
+    @State private var selectedTrackIDs: Set<String> = []
 
     private var albums: [AlbumPresentationModel] {
         LibraryPresentationAggregator.buildAlbums(from: tracks).filter {
@@ -172,6 +173,13 @@ struct ArtistDetailView: View {
             .padding(.bottom, 40)
         }
         .hideScrollIndicatorsCompletely()
+        .overlay(alignment: .bottom) {
+            if selectedTrackIDs.count > 1 {
+                floatingBatchBar
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: selectedTrackIDs.count)
         .task {
             if biographyRecord == nil {
                 biographyRecord = await ArtistBiographyService.shared.fetchBiography(artistName: artist.name)
@@ -258,6 +266,7 @@ struct ArtistDetailView: View {
     private func trackRow(_ track: LocalTrack, number: Int) -> some View {
         let isCurrent = playback.currentTrack?.id == track.id
         let isPlaying = isCurrent && playback.isPlaying
+        let isSelected = selectedTrackIDs.contains(track.id)
 
         return HStack(spacing: 14) {
             Text("\(number)")
@@ -296,10 +305,37 @@ struct ArtistDetailView: View {
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 12)
-        .background(isCurrent ? Color.accentColor.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isSelected ? Color.accentColor.opacity(0.18) : (isCurrent ? Color.accentColor.opacity(0.08) : Color.clear))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
+        )
         .contentShape(Rectangle())
         .onTapGesture {
-            onSelectTrack(track)
+            SelectionHelper.handleTap(
+                for: track.id,
+                selectedIDs: $selectedTrackIDs,
+                allIDs: topTracks.map(\.id)
+            )
+            if selectedTrackIDs.count == 1 {
+                onSelectTrack(track)
+            }
+        }
+        .simultaneousGesture(
+            TapGesture(count: 2).onEnded {
+                playback.play(track)
+            }
+        )
+        .contextMenu {
+            Button("Play Next") {
+                playback.playNext(track)
+            }
+            Button("Add to Queue") {
+                playback.addToQueue(track)
+            }
         }
     }
 
@@ -340,6 +376,36 @@ struct ArtistDetailView: View {
                     .font(.system(size: 50))
                     .foregroundStyle(.secondary.opacity(0.5))
             }
+    }
+
+    private var floatingBatchBar: some View {
+        FloatingBatchBar(
+            count: selectedTrackIDs.count,
+            title: "\(selectedTrackIDs.count) songs",
+            onDeselect: { selectedTrackIDs.removeAll() }
+        ) {
+            Button {
+                let selected = tracks.filter { selectedTrackIDs.contains($0.id) }
+                if let first = selected.first {
+                    playback.toggle(track: first, queue: selected)
+                }
+            } label: {
+                Label("Play Selected", systemImage: "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+
+            Button {
+                let selected = tracks.filter { selectedTrackIDs.contains($0.id) }
+                for t in selected {
+                    playback.addToQueue(t)
+                }
+            } label: {
+                Label("Add to Queue", systemImage: "text.badge.plus")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
     }
 }
 

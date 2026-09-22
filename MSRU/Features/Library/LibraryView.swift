@@ -108,6 +108,15 @@ struct LibraryView:
     private var isDropTargeted:
         Bool = false
 
+    @State
+    private var selectedSavedTrackIDs: Set<UUID> = []
+
+    @State
+    private var selectedLocalTrackIDs: Set<String> = []
+
+    @State
+    private var isDeleteConfirmationPresented: Bool = false
+
 
     // MARK: - Init
 
@@ -160,6 +169,17 @@ struct LibraryView:
                     .padding(24)
                 }
                 .hideScrollIndicatorsCompletely()
+                .overlay(alignment: .bottom) {
+                    if scope == .saved && selectedSavedTrackIDs.count > 1 {
+                        savedGridBatchBar
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    } else if scope == .local && selectedLocalTrackIDs.count > 1 {
+                        localGridBatchBar
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
+                .animation(.easeInOut(duration: 0.2), value: selectedSavedTrackIDs.count)
+                .animation(.easeInOut(duration: 0.2), value: selectedLocalTrackIDs.count)
 
             case .table:
                 VStack(spacing: 0) {
@@ -191,6 +211,35 @@ struct LibraryView:
             return true
         } isTargeted: { targeted in
             isDropTargeted = targeted
+        }
+        .confirmationDialog(
+            "Delete selected songs?",
+            isPresented: $isDeleteConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("Remove from Library (\(selectedLocalTrackIDs.count) items)", role: .destructive) {
+                Task {
+                    await localStore.deleteTracks(withIDs: selectedLocalTrackIDs)
+                    selectedLocalTrackIDs.removeAll()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Selected songs will be removed from local library. Original files will remain on disk.")
+        }
+        .onChange(of: selectedSavedTrackIDs) { _, newIDs in
+            if newIDs.count == 1, let found = filteredSavedTracks.first(where: { $0.id == newIDs.first }) {
+                selectedLibraryTrack = found
+            } else if newIDs.isEmpty {
+                selectedLibraryTrack = nil
+            }
+        }
+        .onChange(of: selectedLocalTrackIDs) { _, newIDs in
+            if newIDs.count == 1, let found = filteredLocalTracks.first(where: { $0.id == newIDs.first }) {
+                selectedLocalTrack = found
+            } else if newIDs.isEmpty {
+                selectedLocalTrack = nil
+            }
         }
     }
 
@@ -323,19 +372,33 @@ struct LibraryView:
         } else if filteredSavedTracks.isEmpty {
             emptySearchView
         } else {
-            LazyVGrid(columns: gridColumns, spacing: 24) {
-                ForEach(filteredSavedTracks) { track in
-                    LibrarySavedTrackCardItemView(
-                        track: track,
-                        isRemoving: feature.isRemoving(track),
-                        isSelected: selectedLibraryTrack?.id == track.id,
-                        isPlaying: playback.currentItem?.id == PlaybackItem(library: track)?.id && playback.isPlaying,
-                        onSelect: { selectedLibraryTrack = track },
-                        onPlay: { feature.send(.playRequested(id: track.id)) },
-                        onPlayNext: { feature.send(.playNextRequested(id: track.id)) },
-                        onEnqueue: { feature.send(.enqueueRequested(id: track.id)) },
-                        onRemove: { feature.send(.removeRequested(id: track.id)) }
-                    )
+            MarqueeSelectionContainer(selectedIDs: $selectedSavedTrackIDs) {
+                LazyVGrid(columns: gridColumns, spacing: 24) {
+                    ForEach(filteredSavedTracks) { track in
+                        LibrarySavedTrackCardItemView(
+                            track: track,
+                            isRemoving: feature.isRemoving(track),
+                            isSelected: selectedSavedTrackIDs.contains(track.id) || selectedLibraryTrack?.id == track.id,
+                            isPlaying: playback.currentItem?.id == PlaybackItem(library: track)?.id && playback.isPlaying,
+                            onSelect: {
+                                SelectionHelper.handleTap(
+                                    for: track.id,
+                                    selectedIDs: $selectedSavedTrackIDs,
+                                    allIDs: filteredSavedTracks.map(\.id)
+                                )
+                                if selectedSavedTrackIDs.count == 1, let found = filteredSavedTracks.first(where: { $0.id == selectedSavedTrackIDs.first }) {
+                                    selectedLibraryTrack = found
+                                } else if selectedSavedTrackIDs.isEmpty {
+                                    selectedLibraryTrack = nil
+                                }
+                            },
+                            onPlay: { feature.send(.playRequested(id: track.id)) },
+                            onPlayNext: { feature.send(.playNextRequested(id: track.id)) },
+                            onEnqueue: { feature.send(.enqueueRequested(id: track.id)) },
+                            onRemove: { feature.send(.removeRequested(id: track.id)) }
+                        )
+                        .marqueeItem(id: track.id)
+                    }
                 }
             }
         }
@@ -350,35 +413,136 @@ struct LibraryView:
         } else if filteredLocalTracks.isEmpty {
             emptySearchView
         } else {
-            LazyVGrid(columns: gridColumns, spacing: 24) {
-                ForEach(filteredLocalTracks) { track in
-                    LibraryLocalTrackCardItemView(
-                        track: track,
-                        isSelected: selectedLocalTrack?.id == track.id,
-                        isPlaying: playback.isPlaying(trackID: track.id),
-                        isSaved: feature.libraryStore.contains(local: track),
-                        onSelect: { selectedLocalTrack = track },
-                        onPlay: { playback.toggle(track: track, queue: localStore.tracks) },
-                        onPlayNext: { playback.playNext(track) },
-                        onEnqueue: { playback.addToQueue(track) },
-                        onToggleLibrary: {
-                            Task {
-                                if feature.libraryStore.contains(local: track) {
-                                    await feature.libraryStore.remove(local: track)
-                                } else {
-                                    await feature.libraryStore.add(local: track)
+            MarqueeSelectionContainer(selectedIDs: $selectedLocalTrackIDs) {
+                LazyVGrid(columns: gridColumns, spacing: 24) {
+                    ForEach(filteredLocalTracks) { track in
+                        LibraryLocalTrackCardItemView(
+                            track: track,
+                            isSelected: selectedLocalTrackIDs.contains(track.id) || selectedLocalTrack?.id == track.id,
+                            isPlaying: playback.isPlaying(trackID: track.id),
+                            isSaved: feature.libraryStore.contains(local: track),
+                            onSelect: {
+                                SelectionHelper.handleTap(
+                                    for: track.id,
+                                    selectedIDs: $selectedLocalTrackIDs,
+                                    allIDs: filteredLocalTracks.map(\.id)
+                                )
+                                if selectedLocalTrackIDs.count == 1, let found = filteredLocalTracks.first(where: { $0.id == selectedLocalTrackIDs.first }) {
+                                    selectedLocalTrack = found
+                                } else if selectedLocalTrackIDs.isEmpty {
+                                    selectedLocalTrack = nil
+                                }
+                            },
+                            onPlay: { playback.toggle(track: track, queue: localStore.tracks) },
+                            onPlayNext: { playback.playNext(track) },
+                            onEnqueue: { playback.addToQueue(track) },
+                            onToggleLibrary: {
+                                Task {
+                                    if feature.libraryStore.contains(local: track) {
+                                        await feature.libraryStore.remove(local: track)
+                                    } else {
+                                        await feature.libraryStore.add(local: track)
+                                    }
+                                }
+                            },
+                            onReveal: { PlatformFileViewer.revealInFinder(url: track.fileURL) },
+                            onDelete: {
+                                Task {
+                                    await localStore.deleteTracks(withIDs: [track.id])
                                 }
                             }
-                        },
-                        onReveal: { PlatformFileViewer.revealInFinder(url: track.fileURL) },
-                        onDelete: {
-                            Task {
-                                await localStore.deleteTracks(withIDs: [track.id])
-                            }
-                        }
-                    )
+                        )
+                        .marqueeItem(id: track.id)
+                    }
                 }
             }
+        }
+    }
+
+    // MARK: - Grid Batch Bars
+
+    @ViewBuilder
+    private var savedGridBatchBar: some View {
+        FloatingBatchBar(
+            count: selectedSavedTrackIDs.count,
+            title: "\(selectedSavedTrackIDs.count) songs",
+            onDeselect: { selectedSavedTrackIDs.removeAll() }
+        ) {
+            Button {
+                let selected = filteredSavedTracks.filter { selectedSavedTrackIDs.contains($0.id) }
+                if let first = selected.first {
+                    feature.send(.playRequested(id: first.id))
+                    for track in selected.dropFirst() {
+                        feature.send(.enqueueRequested(id: track.id))
+                    }
+                }
+            } label: {
+                Label("Play Selected", systemImage: "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+
+            Button {
+                let selected = filteredSavedTracks.filter { selectedSavedTrackIDs.contains($0.id) }
+                for track in selected {
+                    feature.send(.enqueueRequested(id: track.id))
+                }
+            } label: {
+                Label("Add to Queue", systemImage: "text.badge.plus")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            Button(role: .destructive) {
+                let selected = filteredSavedTracks.filter { selectedSavedTrackIDs.contains($0.id) }
+                for track in selected {
+                    feature.send(.removeRequested(id: track.id))
+                }
+                selectedSavedTrackIDs.removeAll()
+            } label: {
+                Label("Remove from Library", systemImage: "trash")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+    }
+
+    @ViewBuilder
+    private var localGridBatchBar: some View {
+        FloatingBatchBar(
+            count: selectedLocalTrackIDs.count,
+            title: "\(selectedLocalTrackIDs.count) songs",
+            onDeselect: { selectedLocalTrackIDs.removeAll() }
+        ) {
+            Button {
+                let selected = filteredLocalTracks.filter { selectedLocalTrackIDs.contains($0.id) }
+                if let first = selected.first {
+                    playback.toggle(track: first, queue: selected)
+                }
+            } label: {
+                Label("Play Selected", systemImage: "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+
+            Button {
+                let selected = filteredLocalTracks.filter { selectedLocalTrackIDs.contains($0.id) }
+                for track in selected {
+                    playback.addToQueue(track)
+                }
+            } label: {
+                Label("Add to Queue", systemImage: "text.badge.plus")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            Button(role: .destructive) {
+                isDeleteConfirmationPresented = true
+            } label: {
+                Label("Delete from Library", systemImage: "trash")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
     }
 

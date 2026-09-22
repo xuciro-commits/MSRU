@@ -28,6 +28,8 @@ struct PlaylistsView: View {
     @State private var isNewPlaylistSheetPresented: Bool = false
     @State private var playlistPendingDelete: Playlist?
     @State private var isDeleteConfirmationPresented: Bool = false
+    @State private var selectedPlaylistIDs: Set<UUID> = []
+    @State private var isBatchDeleteConfirmationPresented: Bool = false
 
     private var filteredPlaylists: [Playlist] {
         let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -132,20 +134,29 @@ struct PlaylistsView: View {
                         headerBar
                         Divider()
 
-                        LazyVGrid(
-                            columns: [
-                                GridItem(.adaptive(minimum: 160, maximum: 200), spacing: 20)
-                            ],
-                            spacing: 24
-                        ) {
-                            ForEach(filteredPlaylists) { playlist in
-                                playlistCard(playlist)
+                        MarqueeSelectionContainer(selectedIDs: $selectedPlaylistIDs) {
+                            LazyVGrid(
+                                columns: [
+                                    GridItem(.adaptive(minimum: 160, maximum: 200), spacing: 20)
+                                ],
+                                spacing: 24
+                            ) {
+                                ForEach(filteredPlaylists) { playlist in
+                                    playlistCard(playlist)
+                                }
                             }
                         }
                     }
                     .padding(24)
                 }
                 .hideScrollIndicatorsCompletely()
+                .overlay(alignment: .bottom) {
+                    if selectedPlaylistIDs.count > 1 {
+                        floatingBatchBar
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
+                .animation(.easeInOut(duration: 0.2), value: selectedPlaylistIDs.count)
             }
         }
         .sheet(isPresented: $isNewPlaylistSheetPresented) {
@@ -175,6 +186,24 @@ struct PlaylistsView: View {
         } message: {
             Text(LocalizedStringKey("Are you sure you want to delete this playlist? This action cannot be undone."))
         }
+        .confirmationDialog(
+            "Delete \(selectedPlaylistIDs.count) Playlists?",
+            isPresented: $isBatchDeleteConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("Delete \(selectedPlaylistIDs.count) Playlists", role: .destructive) {
+                let ids = selectedPlaylistIDs
+                Task {
+                    for id in ids {
+                        await playlistStore.deletePlaylist(id: id)
+                    }
+                    selectedPlaylistIDs.removeAll()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to delete these playlists? This action cannot be undone.")
+        }
     }
 
     // MARK: - Playlist Card
@@ -183,8 +212,14 @@ struct PlaylistsView: View {
         FoundationCard(
             aspectRatio: 1.0,
             cornerRadius: 10,
-            isSelected: selectedPlaylist?.id == playlist.id,
-            onSelect: { selectedPlaylist = playlist }
+            isSelected: selectedPlaylistIDs.contains(playlist.id),
+            onSelect: {
+                SelectionHelper.handleTap(
+                    for: playlist.id,
+                    selectedIDs: $selectedPlaylistIDs,
+                    allIDs: filteredPlaylists.map(\.id)
+                )
+            }
         ) {
             cardArtwork(for: playlist)
         } topTrailingBadges: {
@@ -209,7 +244,17 @@ struct PlaylistsView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
+        .marqueeItem(id: playlist.id)
+        .simultaneousGesture(
+            TapGesture(count: 2).onEnded {
+                selectedPlaylist = playlist
+            }
+        )
         .contextMenu {
+            Button("Open Playlist") {
+                selectedPlaylist = playlist
+            }
+
             Button {
                 let resolved = playlist.trackIDs.compactMap { id in
                     localStore.tracks.first { $0.id == id }
@@ -291,6 +336,54 @@ struct PlaylistsView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var floatingBatchBar: some View {
+        FloatingBatchBar(
+            count: selectedPlaylistIDs.count,
+            title: "\(selectedPlaylistIDs.count) playlists",
+            onDeselect: { selectedPlaylistIDs.removeAll() }
+        ) {
+            Button {
+                let selected = filteredPlaylists.filter { selectedPlaylistIDs.contains($0.id) }
+                let tracks = selected.flatMap { playlist in
+                    playlist.trackIDs.compactMap { id in
+                        localStore.tracks.first { $0.id == id }
+                    }
+                }
+                if let first = tracks.first {
+                    playback.play(first, queue: tracks)
+                }
+            } label: {
+                Label("Play Selected", systemImage: "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+
+            Button {
+                let selected = filteredPlaylists.filter { selectedPlaylistIDs.contains($0.id) }
+                let tracks = selected.flatMap { playlist in
+                    playlist.trackIDs.compactMap { id in
+                        localStore.tracks.first { $0.id == id }
+                    }
+                }
+                for t in tracks {
+                    playback.addToQueue(t)
+                }
+            } label: {
+                Label("Add to Queue", systemImage: "text.badge.plus")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            Button(role: .destructive) {
+                isBatchDeleteConfirmationPresented = true
+            } label: {
+                Label("Delete Playlists", systemImage: "trash")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
     }
 }
 

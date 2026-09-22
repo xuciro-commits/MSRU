@@ -16,39 +16,51 @@ struct LibraryTrackTableView: View {
 
     var onRevealInFinder: ((URL) -> Void)? = nil
 
-    @State private var selectedTrackID: UUID?
+    @State private var selectedTrackIDs: Set<UUID> = []
 
     var body: some View {
         GeometryReader { proxy in
-            if proxy.size.width < 500 {
-                compactListView
-            } else {
-                tableView
+            Group {
+                if proxy.size.width < 500 {
+                    compactListView
+                } else {
+                    tableView
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .overlay(alignment: .bottom) {
+                if selectedTrackIDs.count > 1 {
+                    floatingBatchBar
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
         }
-        .onChange(of: selectedTrackID) { _, newID in
-            if let newID, let found = tracks.first(where: { $0.id == newID }) {
+        .animation(.easeInOut(duration: 0.2), value: selectedTrackIDs.count)
+        .onChange(of: selectedTrackIDs) { _, newIDs in
+            if let firstID = newIDs.first, let found = tracks.first(where: { $0.id == firstID }) {
                 if selectedTrack?.id != found.id {
                     selectedTrack = found
                 }
-            } else if newID == nil {
+            } else if newIDs.isEmpty {
                 selectedTrack = nil
             }
         }
         .onChange(of: selectedTrack?.id) { _, newSelectedID in
-            if selectedTrackID != newSelectedID {
-                selectedTrackID = newSelectedID
+            if let newSelectedID, !selectedTrackIDs.contains(newSelectedID) {
+                selectedTrackIDs = [newSelectedID]
             }
         }
         .onAppear {
-            selectedTrackID = selectedTrack?.id
+            if let id = selectedTrack?.id {
+                selectedTrackIDs = [id]
+            }
         }
     }
 
     // MARK: - Table View
 
     private var tableView: some View {
-        Table(tracks, selection: $selectedTrackID) {
+        Table(tracks, selection: $selectedTrackIDs) {
             // Playing indicator / Index column
             TableColumn("#") { track in
                 let isCurrent = isCurrentTrack(track)
@@ -140,6 +152,16 @@ struct LibraryTrackTableView: View {
         }
         .tint(Color.accentColor)
         .hideScrollIndicatorsCompletely()
+        .contextMenu(forSelectionType: UUID.self) { selection in
+            if let firstID = selection.first, let track = tracks.first(where: { $0.id == firstID }) {
+                trackContextMenu(track)
+            }
+        } primaryAction: { selection in
+            let selected = tracks.filter { selection.contains($0.id) }
+            if let first = selected.first {
+                playback.toggle(library: first, queue: selected.isEmpty ? tracks : selected)
+            }
+        }
     }
 
     // MARK: - Compact List View
@@ -158,7 +180,7 @@ struct LibraryTrackTableView: View {
     }
 
     private func compactRow(index: Int, track: LibraryTrack) -> some View {
-        let isSelected = selectedTrackID == track.id
+        let isSelected = selectedTrackIDs.contains(track.id)
         let isCurrent = isCurrentTrack(track)
         let isSaved = library.contains(id: track.id)
 
@@ -229,7 +251,7 @@ struct LibraryTrackTableView: View {
         )
         .contentShape(Rectangle())
         .onTapGesture {
-            selectedTrackID = track.id
+            SelectionHelper.handleTap(clickedID: track.id, allIDs: tracks.map(\.id), selection: &selectedTrackIDs)
             selectedTrack = track
         }
         .simultaneousGesture(
@@ -239,6 +261,57 @@ struct LibraryTrackTableView: View {
         )
         .contextMenu {
             trackContextMenu(track)
+        }
+    }
+
+    // MARK: - Floating Batch Bar
+
+    private var floatingBatchBar: some View {
+        FloatingBatchBar(
+            count: selectedTrackIDs.count,
+            title: String(localized: "\(selectedTrackIDs.count) songs"),
+            onDeselect: { selectedTrackIDs.removeAll() }
+        ) {
+            Button {
+                let selected = tracks.filter { selectedTrackIDs.contains($0.id) }
+                if let first = selected.first {
+                    playback.toggle(library: first, queue: selected)
+                }
+            } label: {
+                Label("Play Selected", systemImage: "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+
+            Button {
+                let selected = tracks.filter { selectedTrackIDs.contains($0.id) }
+                for track in selected {
+                    if let item = PlaybackItem(library: track) {
+                        playback.addToQueue(item)
+                    }
+                }
+            } label: {
+                Label("Add to Queue", systemImage: "text.badge.plus")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            Button {
+                let selected = tracks.filter { selectedTrackIDs.contains($0.id) }
+                Task {
+                    for track in selected {
+                        if library.contains(id: track.id) {
+                            await library.remove(id: track.id)
+                        } else {
+                            await library.add(track)
+                        }
+                    }
+                }
+            } label: {
+                Label("Toggle Favorites", systemImage: "heart")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
     }
 

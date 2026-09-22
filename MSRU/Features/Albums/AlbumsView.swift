@@ -34,6 +34,8 @@ struct AlbumsView: View {
     @State private var selectedAlbum: AlbumPresentationModel?
     @State private var albumPendingDelete: AlbumPresentationModel?
     @State private var isDeleteConfirmationPresented: Bool = false
+    @State private var selectedAlbumIDs: Set<String> = []
+    @State private var isBatchDeleteConfirmationPresented: Bool = false
 
     private var allAlbums: [AlbumPresentationModel] {
         localStore.albums
@@ -116,6 +118,24 @@ struct AlbumsView: View {
         } message: {
             Text("This operation will perform a cascade delete, removing all songs under this album from the local library.")
         }
+        .confirmationDialog(
+            "Delete \(selectedAlbumIDs.count) albums?",
+            isPresented: $isBatchDeleteConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("Cascade delete \(selectedAlbumIDs.count) albums and all songs", role: .destructive) {
+                let toDelete = filteredAlbums.filter { selectedAlbumIDs.contains($0.id) }
+                Task {
+                    for album in toDelete {
+                        await localStore.deleteAlbum(title: album.title, artist: album.artist)
+                    }
+                    selectedAlbumIDs.removeAll()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This operation will perform a cascade delete, removing all songs under the selected albums from the local library.")
+        }
     }
 
     @ViewBuilder
@@ -139,43 +159,57 @@ struct AlbumsView: View {
                     header
                     Divider()
 
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 180, maximum: 200), spacing: 20)],
-                        spacing: 24
-                    ) {
-                        ForEach(filteredAlbums) { album in
-                            AlbumCardView(
-                                album: album,
-                                onSelect: {
-                                    selectedAlbum = album
-                                },
-                                onPlay: {
-                                    playAlbum(album)
-                                }
-                            ) {
-                                ArtworkThumbnailView(
-                                    reference: album.artworkReference,
-                                    thumbnailPixelSize: CGSize(width: 240, height: 240),
-                                    placeholderSystemImage: "square.stack",
-                                    cornerRadius: 10
-                                )
-                            }
-                            .frame(height: 240)
-                            .contextMenu {
-                                Button("Play Album") { playAlbum(album) }
-                                Button {
-                                    Task {
-                                        await localStore.reidentifyAlbum(albumTitle: album.title, artist: album.artist)
+                    MarqueeSelectionContainer(selectedIDs: $selectedAlbumIDs) {
+                        LazyVGrid(
+                            columns: [GridItem(.adaptive(minimum: 180, maximum: 200), spacing: 20)],
+                            spacing: 24
+                        ) {
+                            ForEach(filteredAlbums) { album in
+                                AlbumCardView(
+                                    album: album,
+                                    isSelected: selectedAlbumIDs.contains(album.id),
+                                    onSelect: {
+                                        SelectionHelper.handleTap(
+                                            for: album.id,
+                                            selectedIDs: $selectedAlbumIDs,
+                                            allIDs: filteredAlbums.map(\.id)
+                                        )
+                                    },
+                                    onPlay: {
+                                        playAlbum(album)
                                     }
-                                } label: {
-                                    Label("Fetch Album Artwork", systemImage: "arrow.clockwise")
+                                ) {
+                                    ArtworkThumbnailView(
+                                        reference: album.artworkReference,
+                                        thumbnailPixelSize: CGSize(width: 240, height: 240),
+                                        placeholderSystemImage: "square.stack",
+                                        cornerRadius: 10
+                                    )
                                 }
-                                Divider()
-                                Button(role: .destructive) {
-                                    albumPendingDelete = album
-                                    isDeleteConfirmationPresented = true
-                                } label: {
-                                    Label("Delete Album (Cascade)", systemImage: "trash")
+                                .marqueeItem(id: album.id)
+                                .frame(height: 240)
+                                .simultaneousGesture(
+                                    TapGesture(count: 2).onEnded {
+                                        selectedAlbum = album
+                                    }
+                                )
+                                .contextMenu {
+                                    Button("Open Album") { selectedAlbum = album }
+                                    Button("Play Album") { playAlbum(album) }
+                                    Button {
+                                        Task {
+                                            await localStore.reidentifyAlbum(albumTitle: album.title, artist: album.artist)
+                                        }
+                                    } label: {
+                                        Label("Fetch Album Artwork", systemImage: "arrow.clockwise")
+                                    }
+                                    Divider()
+                                    Button(role: .destructive) {
+                                        albumPendingDelete = album
+                                        isDeleteConfirmationPresented = true
+                                    } label: {
+                                        Label("Delete Album (Cascade)", systemImage: "trash")
+                                    }
                                 }
                             }
                         }
@@ -184,6 +218,13 @@ struct AlbumsView: View {
                 .padding(24)
             }
             .hideScrollIndicatorsCompletely()
+            .overlay(alignment: .bottom) {
+                if selectedAlbumIDs.count > 1 {
+                    floatingBatchBar
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: selectedAlbumIDs.count)
         }
     }
 
@@ -271,6 +312,69 @@ struct AlbumsView: View {
         }
         if let first = matching.first {
             playback.play(first)
+        }
+    }
+
+    private var floatingBatchBar: some View {
+        FloatingBatchBar(
+            count: selectedAlbumIDs.count,
+            title: "\(selectedAlbumIDs.count) albums",
+            onDeselect: { selectedAlbumIDs.removeAll() }
+        ) {
+            Button {
+                let selected = filteredAlbums.filter { selectedAlbumIDs.contains($0.id) }
+                let tracks = localStore.tracks.filter { t in
+                    selected.contains { a in
+                        (t.album?.trimmingCharacters(in: .whitespacesAndNewlines) == a.title) ||
+                        (t.artist.trimmingCharacters(in: .whitespacesAndNewlines) == a.artist)
+                    }
+                }
+                if let first = tracks.first {
+                    playback.toggle(track: first, queue: tracks)
+                }
+            } label: {
+                Label("Play Selected", systemImage: "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+
+            Button {
+                let selected = filteredAlbums.filter { selectedAlbumIDs.contains($0.id) }
+                let tracks = localStore.tracks.filter { t in
+                    selected.contains { a in
+                        (t.album?.trimmingCharacters(in: .whitespacesAndNewlines) == a.title) ||
+                        (t.artist.trimmingCharacters(in: .whitespacesAndNewlines) == a.artist)
+                    }
+                }
+                for t in tracks {
+                    playback.addToQueue(t)
+                }
+            } label: {
+                Label("Add to Queue", systemImage: "text.badge.plus")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            Button {
+                let selected = filteredAlbums.filter { selectedAlbumIDs.contains($0.id) }
+                Task {
+                    for a in selected {
+                        await localStore.reidentifyAlbum(albumTitle: a.title, artist: a.artist)
+                    }
+                }
+            } label: {
+                Label("Fetch Artwork", systemImage: "arrow.clockwise")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            Button(role: .destructive) {
+                isBatchDeleteConfirmationPresented = true
+            } label: {
+                Label("Delete Albums", systemImage: "trash")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
     }
 }

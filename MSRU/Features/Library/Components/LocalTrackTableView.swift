@@ -250,7 +250,11 @@ struct LocalTrackTableView: View {
         )
         .contentShape(Rectangle())
         .onTapGesture {
-            selectedTrackIDs = [track.id]
+            SelectionHelper.handleTap(
+                for: track.id,
+                selectedIDs: $selectedTrackIDs,
+                allIDs: tracks.map(\.id)
+            )
             selectedTrack = track
         }
         .simultaneousGesture(
@@ -328,7 +332,7 @@ struct LocalTrackTableView: View {
         )
         .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
         .padding(.horizontal, 16)
-        .padding(.bottom, 16)
+        .padding(.bottom, 90)
     }
 
     // MARK: - Helpers

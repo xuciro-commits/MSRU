@@ -18,6 +18,8 @@ struct ArtistsView: View {
     @State private var selectedAlbum: AlbumPresentationModel?
     @State private var artistPendingDelete: ArtistPresentationModel?
     @State private var isDeleteConfirmationPresented: Bool = false
+    @State private var selectedArtistIDs: Set<String> = []
+    @State private var isBatchDeleteConfirmationPresented: Bool = false
 
     private var allArtists: [ArtistPresentationModel] {
         localStore.artists
@@ -89,6 +91,24 @@ struct ArtistsView: View {
         } message: {
             Text("This operation will perform a cascade delete, removing all albums and songs of this artist from the local library.")
         }
+        .confirmationDialog(
+            "Delete \(selectedArtistIDs.count) artists?",
+            isPresented: $isBatchDeleteConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("Cascade delete \(selectedArtistIDs.count) artists and all content", role: .destructive) {
+                let toDelete = filteredArtists.filter { selectedArtistIDs.contains($0.id) }
+                Task {
+                    for artist in toDelete {
+                        await localStore.deleteArtist(name: artist.name)
+                    }
+                    selectedArtistIDs.removeAll()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This operation will perform a cascade delete, removing all albums and songs of the selected artists from the local library.")
+        }
     }
 
     @ViewBuilder
@@ -112,30 +132,46 @@ struct ArtistsView: View {
                     header
                     Divider()
 
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 140, maximum: 180), spacing: 24)],
-                        spacing: 28
-                    ) {
-                        ForEach(filteredArtists) { artist in
-                            ArtistAvatarView(
-                                artist: artist,
-                                onSelect: {
-                                    selectedArtist = artist
+                    MarqueeSelectionContainer(selectedIDs: $selectedArtistIDs) {
+                        LazyVGrid(
+                            columns: [GridItem(.adaptive(minimum: 140, maximum: 180), spacing: 24)],
+                            spacing: 28
+                        ) {
+                            ForEach(filteredArtists) { artist in
+                                ArtistAvatarView(
+                                    artist: artist,
+                                    isSelected: selectedArtistIDs.contains(artist.id),
+                                    onSelect: {
+                                        SelectionHelper.handleTap(
+                                            for: artist.id,
+                                            selectedIDs: $selectedArtistIDs,
+                                            allIDs: filteredArtists.map(\.id)
+                                        )
+                                    }
+                                ) {
+                                    ArtworkThumbnailView(
+                                        reference: artist.artworkReference,
+                                        thumbnailPixelSize: CGSize(width: 240, height: 240),
+                                        placeholderSystemImage: "music.mic",
+                                        isCircular: true
+                                    )
                                 }
-                            ) {
-                                ArtworkThumbnailView(
-                                    reference: artist.artworkReference,
-                                    thumbnailPixelSize: CGSize(width: 240, height: 240),
-                                    placeholderSystemImage: "music.mic",
-                                    isCircular: true
+                                .marqueeItem(id: artist.id)
+                                .simultaneousGesture(
+                                    TapGesture(count: 2).onEnded {
+                                        selectedArtist = artist
+                                    }
                                 )
-                            }
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    artistPendingDelete = artist
-                                    isDeleteConfirmationPresented = true
-                                } label: {
-                                    Label("Delete Artist (Cascade)", systemImage: "trash")
+                                .contextMenu {
+                                    Button("Open Artist") { selectedArtist = artist }
+                                    Button("Play Artist") { playArtist(artist) }
+                                    Divider()
+                                    Button(role: .destructive) {
+                                        artistPendingDelete = artist
+                                        isDeleteConfirmationPresented = true
+                                    } label: {
+                                        Label("Delete Artist (Cascade)", systemImage: "trash")
+                                    }
                                 }
                             }
                         }
@@ -144,6 +180,13 @@ struct ArtistsView: View {
                 .padding(28)
             }
             .hideScrollIndicatorsCompletely()
+            .overlay(alignment: .bottom) {
+                if selectedArtistIDs.count > 1 {
+                    floatingBatchBar
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: selectedArtistIDs.count)
         }
     }
 
@@ -216,6 +259,59 @@ struct ArtistsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(40)
+    }
+
+    private func playArtist(_ artist: ArtistPresentationModel) {
+        let matching = localStore.tracks.filter {
+            $0.artist.trimmingCharacters(in: .whitespacesAndNewlines) == artist.name
+        }
+        if let first = matching.first {
+            playback.toggle(track: first, queue: matching)
+        }
+    }
+
+    private var floatingBatchBar: some View {
+        FloatingBatchBar(
+            count: selectedArtistIDs.count,
+            title: "\(selectedArtistIDs.count) artists",
+            onDeselect: { selectedArtistIDs.removeAll() }
+        ) {
+            Button {
+                let selected = filteredArtists.filter { selectedArtistIDs.contains($0.id) }
+                let tracks = localStore.tracks.filter { t in
+                    selected.contains { $0.name == t.artist.trimmingCharacters(in: .whitespacesAndNewlines) }
+                }
+                if let first = tracks.first {
+                    playback.toggle(track: first, queue: tracks)
+                }
+            } label: {
+                Label("Play Selected", systemImage: "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+
+            Button {
+                let selected = filteredArtists.filter { selectedArtistIDs.contains($0.id) }
+                let tracks = localStore.tracks.filter { t in
+                    selected.contains { $0.name == t.artist.trimmingCharacters(in: .whitespacesAndNewlines) }
+                }
+                for t in tracks {
+                    playback.addToQueue(t)
+                }
+            } label: {
+                Label("Add to Queue", systemImage: "text.badge.plus")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            Button(role: .destructive) {
+                isBatchDeleteConfirmationPresented = true
+            } label: {
+                Label("Delete Artists", systemImage: "trash")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
     }
 }
 
