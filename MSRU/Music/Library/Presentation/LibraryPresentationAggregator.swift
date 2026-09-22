@@ -10,24 +10,46 @@ import AppFoundation
 final class LibraryPresentationAggregator {
 
     static func buildAlbums(from localTracks: [LocalTrack], libraryTracks: [LibraryTrack] = []) -> [AlbumPresentationModel] {
-        var albumGroups: [String: [LocalTrack]] = [:]
+        // 1. Group tracks by album title (or artist if unknown)
+        var rawAlbumGroups: [String: [LocalTrack]] = [:]
 
         for track in localTracks {
-            let key = (track.album?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
-                ? "\(track.artist) — \(track.album!)"
-                : "\(track.artist) — Unknown Album"
-            albumGroups[key, default: []].append(track)
+            let albumKey = (track.album?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+                ? track.album!.trimmingCharacters(in: .whitespacesAndNewlines)
+                : "Unknown Album (\(track.artist))"
+            rawAlbumGroups[albumKey, default: []].append(track)
+        }
+
+        var albumGroups: [String: (albumTitle: String, primaryArtist: String, tracks: [LocalTrack])] = [:]
+
+        for (_, tracks) in rawAlbumGroups {
+            // Determine primary artist for this album:
+            // Find the most frequent artist, or the primary artist before any comma/slash
+            let artistCounts = tracks.reduce(into: [String: Int]()) { counts, t in
+                counts[t.artist, default: 0] += 1
+            }
+            let primaryCandidate = artistCounts.max(by: { $0.value < $1.value })?.key ?? tracks.first?.artist ?? "Unknown Artist"
+            let primaryArtist: String
+            if let firstArt = primaryCandidate.components(separatedBy: CharacterSet(charactersIn: ",/&")).first?.trimmingCharacters(in: .whitespacesAndNewlines), !firstArt.isEmpty {
+                primaryArtist = firstArt
+            } else {
+                primaryArtist = primaryCandidate
+            }
+
+            let displayAlbumTitle = (tracks.first?.album?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+                ? tracks.first!.album!.trimmingCharacters(in: .whitespacesAndNewlines)
+                : "Unknown Album"
+
+            let groupKey = "\(primaryArtist) — \(displayAlbumTitle)"
+            albumGroups[groupKey] = (displayAlbumTitle, primaryArtist, tracks)
         }
 
         var models: [AlbumPresentationModel] = []
 
-        for (key, tracks) in albumGroups {
-            guard let first = tracks.first else { continue }
-            let artist = first.artist
-            let albumTitle = (first.album?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
-                ? first.album!
-                : "Unknown Album"
-
+        for (key, group) in albumGroups {
+            let tracks = group.tracks
+            let artist = group.primaryArtist
+            let albumTitle = group.albumTitle
             let totalDuration = tracks.reduce(0.0) { $0 + $1.duration }
 
             // Extract tracks with normalized trackNumber and title
@@ -75,8 +97,10 @@ final class LibraryPresentationAggregator {
         var artistGroups: [String: [LocalTrack]] = [:]
 
         for track in localTracks {
-            let artist = track.artist.trimmingCharacters(in: .whitespacesAndNewlines)
-            let key = artist.isEmpty ? "Unknown Artist" : artist
+            let rawArtist = track.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+            // If track has guest artists like "Priscilla Chan, Leon Lai", associate with primary artist
+            let primaryArtist = rawArtist.components(separatedBy: CharacterSet(charactersIn: ",/&")).first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawArtist
+            let key = primaryArtist.isEmpty ? (rawArtist.isEmpty ? "Unknown Artist" : rawArtist) : primaryArtist
             artistGroups[key, default: []].append(track)
         }
 

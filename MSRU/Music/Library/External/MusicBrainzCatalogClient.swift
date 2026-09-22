@@ -17,6 +17,8 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
     private var mockReleases: [String: ExternalReleaseMatch] = [:]
     private var mockRecordings: [String: [ExternalRecordingMatch]] = [:]
     private var mockAliases: [String: [EntityAlias]] = [:]
+    private var artistMBIDCache: [String: String] = [:]
+    private var artistReleaseGroupsCache: [String: [MBReleaseGroupSearchItem]] = [:]
 
     private let rateLimiter = MusicBrainzClientRateLimiter()
 
@@ -171,7 +173,116 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
             results = await executeReleaseSearch(queryString: "release:\"\(cleanAlb)\"", fallbackArtist: artist)
         }
 
+        // Fallback 3: Query artist release groups and match by Pinyin / Latin transliteration
+        if results.isEmpty && !cleanArt.isEmpty && !cleanAlb.isEmpty {
+            let primaryArt = cleanArt.components(separatedBy: CharacterSet(charactersIn: ",/&")).first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? cleanArt
+            if let mbid = await resolveArtistMBID(artist: primaryArt) {
+                let rgs = await fetchArtistReleaseGroups(artistMBID: mbid)
+                let normQ = Self.toPinyinLatin(cleanAlb)
+                var bestRG: (MBReleaseGroupSearchItem, Double)? = nil
+
+                for rg in rgs {
+                    let normRG = Self.toPinyinLatin(rg.title)
+                    let score: Double
+                    if normQ == normRG {
+                        score = 1.0
+                    } else if normQ.contains(normRG) || normRG.contains(normQ) {
+                        score = 0.95
+                    } else {
+                        score = StringDistance.similarity(normQ, normRG)
+                    }
+
+                    if score >= 0.8 {
+                        if bestRG == nil || score > bestRG!.1 {
+                            bestRG = (rg, score)
+                        }
+                    }
+                }
+
+                if let (matchedRG, _) = bestRG {
+                    print("[MusicBrainz] Transliteration matched release group: [\(matchedRG.title)] (MBID: \(matchedRG.id)) for query: [\(cleanAlb)]")
+                    let match = ExternalReleaseMatch(
+                        releaseMBID: matchedRG.id,
+                        releaseGroupMBID: matchedRG.id,
+                        title: matchedRG.title,
+                        artist: artist,
+                        date: matchedRG.firstReleaseDate,
+                        country: nil,
+                        trackCount: 0,
+                        tracks: []
+                    )
+                    results.append(match)
+                }
+            }
+        }
+
         return results
+    }
+
+    /// Normalizes Chinese characters or Latin text to standardized whitespace-delimited Pinyin Latin tokens.
+    public static func toPinyinLatin(_ text: String) -> String {
+        let cleaned = cleanAlbumTitle(text)
+        let mut = NSMutableString(string: cleaned)
+        CFStringTransform(mut, nil, kCFStringTransformMandarinLatin, false)
+        CFStringTransform(mut, nil, kCFStringTransformStripDiacritics, false)
+        return (mut as String).lowercased()
+            .replacingOccurrences(of: "[^a-z0-9]", with: " ", options: .regularExpression)
+            .split(separator: " ")
+            .joined(separator: " ")
+    }
+
+    /// Resolves canonical MusicBrainz Artist MBID using text or alias search with in-memory caching.
+    public func resolveArtistMBID(artist: String) async -> String? {
+        let clean = artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !clean.isEmpty else { return nil }
+        if let cached = artistMBIDCache[clean] {
+            return cached
+        }
+
+        await rateLimiter.waitIfNeeded()
+        let query = "artist:\"\(artist)\" OR alias:\"\(artist)\""
+        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://musicbrainz.org/ws/2/artist/?query=\(encoded)&fmt=json&limit=3") else {
+            return nil
+        }
+
+        var request = URLRequest(url: url, timeoutInterval: 10.0)
+        request.setValue("MSRU/1.0 (contact@msru.local)", forHTTPHeaderField: "User-Agent")
+
+        guard let (data, response) = try? await urlSession.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let parsed = try? JSONDecoder().decode(MBArtistSearchResponse.self, from: data),
+              let firstArtist = parsed.artists?.first else {
+            return nil
+        }
+
+        artistMBIDCache[clean] = firstArtist.id
+        return firstArtist.id
+    }
+
+    /// Fetches all Release Groups under a specific Artist MBID with in-memory caching.
+    public func fetchArtistReleaseGroups(artistMBID: String) async -> [MBReleaseGroupSearchItem] {
+        if let cached = artistReleaseGroupsCache[artistMBID] {
+            return cached
+        }
+
+        await rateLimiter.waitIfNeeded()
+        guard let url = URL(string: "https://musicbrainz.org/ws/2/release-group?artist=\(artistMBID)&limit=100&fmt=json") else {
+            return []
+        }
+
+        var request = URLRequest(url: url, timeoutInterval: 10.0)
+        request.setValue("MSRU/1.0 (contact@msru.local)", forHTTPHeaderField: "User-Agent")
+
+        guard let (data, response) = try? await urlSession.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let parsed = try? JSONDecoder().decode(MBReleaseGroupSearchResponse.self, from: data),
+              let rgs = parsed.releaseGroups else {
+            return []
+        }
+
+        artistReleaseGroupsCache[artistMBID] = rgs
+        return rgs
     }
 
     public func searchRecordings(artist: String, title: String) async -> [ExternalRecordingMatch] {
@@ -530,4 +641,30 @@ private struct MBArtistItem: Codable {
     let name: String?
 }
 
+private struct MBReleaseGroupSearchResponse: Codable {
+    let releaseGroups: [MBReleaseGroupSearchItem]?
+    enum CodingKeys: String, CodingKey {
+        case releaseGroups = "release-groups"
+    }
+}
 
+public struct MBReleaseGroupSearchItem: Codable, Sendable {
+    public let id: String
+    public let title: String
+    public let primaryType: String?
+    public let firstReleaseDate: String?
+    enum CodingKeys: String, CodingKey {
+        case id, title
+        case primaryType = "primary-type"
+        case firstReleaseDate = "first-release-date"
+    }
+}
+
+private struct MBArtistSearchResponse: Codable {
+    let artists: [MBArtistSearchItem]?
+}
+
+private struct MBArtistSearchItem: Codable {
+    let id: String
+    let name: String
+}

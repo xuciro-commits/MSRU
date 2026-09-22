@@ -90,6 +90,7 @@ final class LocalLibraryStore {
 
             await syncTracksToDatabase(tracks)
             await refreshQuerySnapshot()
+            triggerBackgroundArtworkBackfillIfNeeded()
         } catch {
             didLoad = false
             errorMessage = error.localizedDescription
@@ -112,6 +113,7 @@ final class LocalLibraryStore {
             await self.syncTracksToDatabase(newTracks)
             await self.refreshQuerySnapshot()
             await LocalLibraryIndexingService.shared.enqueue(newTracks)
+            self.triggerBackgroundArtworkBackfillIfNeeded()
         }
     }
 
@@ -139,22 +141,47 @@ final class LocalLibraryStore {
         var artistCredits: [(artistID: ArtistID, entityType: String, entityID: String)] = []
         var assets: [PersistedAssetRecord] = []
 
+        // Group tracks by album title to derive stable primary albumArtist (prevent duet fragmentation)
+        var tracksByAlbum: [String: [LocalTrack]] = [:]
+        for t in newTracks {
+            let alb = (t.album?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+                ? t.album!.trimmingCharacters(in: .whitespacesAndNewlines)
+                : "Unknown Album"
+            tracksByAlbum[alb, default: []].append(t)
+        }
+
+        var primaryArtistByAlbum: [String: String] = [:]
+        for (alb, tList) in tracksByAlbum {
+            let counts = tList.reduce(into: [String: Int]()) { $0[$1.artist, default: 0] += 1 }
+            let cand = counts.max(by: { $0.value < $1.value })?.key ?? tList.first?.artist ?? "Unknown Artist"
+            let primary = cand.components(separatedBy: CharacterSet(charactersIn: ",/&")).first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? cand
+            primaryArtistByAlbum[alb] = primary.isEmpty ? cand : primary
+        }
+
         for track in newTracks {
-            let relTitle = track.album ?? "Unknown Album"
+            let relTitle = (track.album?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+                ? track.album!.trimmingCharacters(in: .whitespacesAndNewlines)
+                : "Unknown Album"
+            let albumArtist = primaryArtistByAlbum[relTitle] ?? track.artist
             let recID = DeterministicID.recording(title: track.title, artist: track.artist)
-            let artID = DeterministicID.artist(name: track.artist)
-            let rgID = DeterministicID.releaseGroup(artist: track.artist, title: relTitle)
-            let relID = DeterministicID.release(artist: track.artist, title: relTitle)
+            let albumArtID = DeterministicID.artist(name: albumArtist)
+            let trackArtID = DeterministicID.artist(name: track.artist)
+            let rgID = DeterministicID.releaseGroup(artist: albumArtist, title: relTitle)
+            let relID = DeterministicID.release(artist: albumArtist, title: relTitle)
             let trkID = DeterministicID.releaseTrack(releaseID: relID, medium: 1, track: track.trackNumber ?? 1)
             let astID = DeterministicID.asset(sourceID: sourceID, relativePath: track.fileURL.standardizedFileURL.path)
 
-            artists.append((id: artID, name: track.artist))
+            artists.append((id: trackArtID, name: track.artist))
+            if trackArtID != albumArtID {
+                artists.append((id: albumArtID, name: albumArtist))
+            }
+
             recordings.append((id: recID, title: track.title, duration: track.duration))
             releaseGroups.append((id: rgID, title: relTitle))
             releases.append((id: relID, releaseGroupID: rgID, title: relTitle, year: track.year, artworkAssetID: track.artworkReference))
             releaseTracks.append((id: trkID, releaseID: relID, trackNumber: track.trackNumber ?? 1, title: track.title, duration: track.duration, recordingID: recID))
-            artistCredits.append((artistID: artID, entityType: "recording", entityID: recID.rawValue))
-            artistCredits.append((artistID: artID, entityType: "release", entityID: relID.rawValue))
+            artistCredits.append((artistID: trackArtID, entityType: "recording", entityID: recID.rawValue))
+            artistCredits.append((artistID: albumArtID, entityType: "release", entityID: relID.rawValue))
 
             assets.append(PersistedAssetRecord(
                 id: astID,
@@ -387,6 +414,24 @@ final class LocalLibraryStore {
                 }
             }
 
+            // 4. Remote artwork resolution fallback (MusicBrainz Pinyin + Apple Music)
+            if newArtRef == nil {
+                if let remoteResult = await LocalArtworkExtractor.resolveRemoteArtwork(
+                    artist: newArtist,
+                    album: newAlbum,
+                    title: newTitle
+                ) {
+                    let artRef = LocalArtworkStorage.shared.storeArtwork(remoteResult.data)
+                    newArtRef = artRef
+                    if let canonical = remoteResult.canonicalAlbum, !canonical.isEmpty,
+                       newAlbum == nil || newAlbum?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == newArtist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+                        newAlbum = canonical
+                    }
+                    artworkAdded += 1
+                    modified = true
+                }
+            }
+
             if modified {
                 repaired += 1
                 let updated = LocalTrack(
@@ -462,8 +507,10 @@ final class LocalLibraryStore {
             }
             tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
             updateCachedPresentations()
+            await syncTracksToDatabase(newlyImported)
             await refreshQuerySnapshot()
             await LocalLibraryIndexingService.shared.enqueue(newlyImported)
+            triggerBackgroundArtworkBackfillIfNeeded()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -513,4 +560,94 @@ final class LocalLibraryStore {
         ==============================
         """)
     }
+
+    private var backfillTask: Task<Void, Never>?
+
+    /// Triggers an asynchronous, non-blocking background task to resolve artwork for albums missing covers.
+    func triggerBackgroundArtworkBackfillIfNeeded() {
+        guard backfillTask == nil else { return }
+
+        backfillTask = Task(priority: .utility) { [weak self] in
+            guard let self else { return }
+
+            // 1. Identify all albums missing artwork
+            let tracksSnapshot = self.tracks
+            var missingAlbums: [String: (artist: String, album: String?, sampleTitle: String, trackIndices: [Int])] = [:]
+
+            for (idx, track) in tracksSnapshot.enumerated() {
+                if track.artworkReference == nil {
+                    let albumKey = track.album ?? "Unknown Album (\(track.artist))"
+                    let primaryArtist = track.artist.components(separatedBy: CharacterSet(charactersIn: ",/&")).first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? track.artist
+                    let key = "\(primaryArtist) — \(albumKey)"
+
+                    if missingAlbums[key] == nil {
+                        missingAlbums[key] = (primaryArtist, track.album, track.title, [idx])
+                    } else {
+                        missingAlbums[key]?.trackIndices.append(idx)
+                    }
+                }
+            }
+
+            guard !missingAlbums.isEmpty else {
+                self.backfillTask = nil
+                return
+            }
+
+            print("[ArtworkBackfill] Starting background artwork backfill for \(missingAlbums.count) albums...")
+
+            for (_, group) in missingAlbums {
+                if Task.isCancelled { break }
+
+                // Rate limiting pause
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                if Task.isCancelled { break }
+
+                guard let resolved = await LocalArtworkExtractor.resolveRemoteArtwork(
+                    artist: group.artist,
+                    album: group.album,
+                    title: group.sampleTitle
+                ) else {
+                    continue
+                }
+
+                let artRef = LocalArtworkStorage.shared.storeArtwork(resolved.data)
+                var updatedBatch: [LocalTrack] = []
+
+                for idx in group.trackIndices {
+                    guard idx < self.tracks.count else { continue }
+                    let oldTrack = self.tracks[idx]
+                    var updatedAlbum = oldTrack.album
+                    if let canonical = resolved.canonicalAlbum, !canonical.isEmpty,
+                       updatedAlbum == nil || updatedAlbum?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == group.artist.lowercased() {
+                        updatedAlbum = canonical
+                    }
+
+                    let updated = LocalTrack(
+                        fileURL: oldTrack.fileURL,
+                        title: oldTrack.title,
+                        artist: oldTrack.artist,
+                        album: updatedAlbum,
+                        duration: oldTrack.duration,
+                        artworkReference: artRef,
+                        trackNumber: oldTrack.trackNumber,
+                        year: oldTrack.year
+                    )
+                    self.tracks[idx] = updated
+                    updatedBatch.append(updated)
+                }
+
+                if !updatedBatch.isEmpty {
+                    try? await self.repository.saveTracksInPlace(updatedBatch)
+                    self.updateCachedPresentations()
+                    await self.syncTracksToDatabase(updatedBatch)
+                    await self.refreshQuerySnapshot()
+                    print("[ArtworkBackfill] Backfilled artwork for album: [\(group.album ?? "Unknown")] (\(updatedBatch.count) tracks)")
+                }
+            }
+
+            self.backfillTask = nil
+            print("[ArtworkBackfill] Background backfill completed.")
+        }
+    }
 }
+

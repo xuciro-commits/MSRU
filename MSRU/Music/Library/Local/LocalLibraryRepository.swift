@@ -454,8 +454,6 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
             : parsed.title
 
 
-        // MARK: Artist
-
         let rawArtist =
             await metadataString(
                 identifier: .commonIdentifierArtist,
@@ -469,6 +467,14 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
             artist = rule?.targetArtist ?? parsed.artist ?? "Unknown Artist"
         }
 
+        // Clean redundant artist prefix from title if present (e.g. "李克勤-一生不变" -> "一生不变")
+        var finalTitle = title
+        if finalTitle.lowercased().hasPrefix(artist.lowercased()) {
+            let stripped = finalTitle.dropFirst(artist.count).trimmingCharacters(in: CharacterSet(charactersIn: " -–—_"))
+            if !stripped.isEmpty {
+                finalTitle = stripped
+            }
+        }
 
         // MARK: Album
 
@@ -478,9 +484,14 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
                 alternateKeys: ["album"],
                 metadata: metadata
             )
-        let album = (rawAlbum != nil && !rawAlbum!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        var finalAlbum = (rawAlbum != nil && !rawAlbum!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             ? rawAlbum
             : (rule?.targetAlbum ?? parsed.album)
+
+        // Safety gate: never allow album == artist
+        if let alb = finalAlbum, alb.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            finalAlbum = nil
+        }
 
 
         // MARK: Artwork
@@ -558,9 +569,9 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
             Local Metadata ✓
             file: \(url.lastPathComponent)
             format: \(url.pathExtension.lowercased())
-            title: \(title)
+            title: \(finalTitle)
             artist: \(artist)
-            album: \(album ?? "—")
+            album: \(finalAlbum ?? "—")
             duration: \(duration)
             artwork: \(artworkData != nil)
             """
@@ -569,9 +580,9 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
 
         return LocalTrack(
             fileURL: url,
-            title: title,
+            title: finalTitle,
             artist: artist,
-            album: album,
+            album: finalAlbum,
             duration: duration,
             artworkData: artworkData,
             trackNumber: trackNumber,

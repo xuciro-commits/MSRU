@@ -282,8 +282,18 @@ nonisolated public enum FileNameHeuristicParser {
             detectedArtist = parts[0]
             detectedTitle = parts[1]
         } else {
-            // Single chunk
-            detectedTitle = working
+            // Single chunk: check if tight hyphen divides Artist-Title when there are no spaces (e.g. "李克勤-护花使者")
+            if !working.contains(" ") {
+                let subparts = working.components(separatedBy: CharacterSet(charactersIn: "-–—－")).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                if subparts.count == 2 {
+                    detectedArtist = subparts[0]
+                    detectedTitle = subparts[1]
+                } else {
+                    detectedTitle = working
+                }
+            } else {
+                detectedTitle = working
+            }
         }
 
         // Secondary track check inside title (e.g. if title is "04. 晴天")

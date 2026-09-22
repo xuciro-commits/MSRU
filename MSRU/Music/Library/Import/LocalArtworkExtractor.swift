@@ -10,7 +10,7 @@ import AVFoundation
 import AppFoundation
 
 /// Discovers and extracts cover artwork for music tracks from directory files, embedded tags, or remote archive.
-public enum LocalArtworkExtractor {
+nonisolated public enum LocalArtworkExtractor {
 
     private static let commonImageFileNames: [String] = [
         "cover.jpg", "cover.jpeg", "cover.png",
@@ -190,6 +190,39 @@ public enum LocalArtworkExtractor {
                 return data
             }
         }
+
+        // If release-group direct front failed (e.g. 500/404), probe child releases under the release group
+        if let rg = releaseGroupMBID, !rg.isEmpty {
+            if let childCover = await fetchCoverFromChildReleases(releaseGroupMBID: rg) {
+                return childCover
+            }
+        }
+
+        return nil
+    }
+
+    private static func fetchCoverFromChildReleases(releaseGroupMBID: String) async -> Data? {
+        guard let url = URL(string: "https://musicbrainz.org/ws/2/release?release-group=\(releaseGroupMBID)&fmt=json") else {
+            return nil
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 8
+        request.setValue("MSRU/1.0 (contact@msru.local)", forHTTPHeaderField: "User-Agent")
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let releases = json["releases"] as? [[String: Any]] else {
+            return nil
+        }
+
+        for rel in releases.prefix(5) {
+            if let rid = rel["id"] as? String {
+                if let data = await fetchRemoteCover(releaseMBID: rid, releaseGroupMBID: nil) {
+                    return data
+                }
+            }
+        }
         return nil
     }
 
@@ -222,6 +255,80 @@ public enum LocalArtworkExtractor {
                 let firstRelMBID = rec.releaseMBIDs.first
                 if let imgData = await fetchRemoteCover(releaseMBID: firstRelMBID, releaseGroupMBID: rec.releaseGroupMBID) {
                     return (imgData, rec.albumTitle, firstRelMBID, rec.releaseGroupMBID)
+                }
+            }
+        }
+
+        // Strategy 3: Apple Music / iTunes Public Search API fallback (high-resolution official artwork)
+        if let appleResult = await fetchAppleMusicCover(artist: cleanArt, album: album, title: title) {
+            return (appleResult.data, appleResult.canonicalAlbum, nil, nil)
+        }
+
+        return nil
+    }
+
+    /// Searches Apple Music / iTunes Public Search API for high-resolution 600x600 artwork and canonical album metadata.
+    public static func fetchAppleMusicCover(
+        artist: String,
+        album: String? = nil,
+        title: String? = nil
+    ) async -> (data: Data, canonicalAlbum: String?)? {
+        let cleanArt = artist.components(separatedBy: CharacterSet(charactersIn: ",/&")).first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? artist
+
+        // 1. Try Album Search
+        if let alb = album?.trimmingCharacters(in: .whitespacesAndNewlines), !alb.isEmpty, alb.lowercased() != cleanArt.lowercased() {
+            let cleanedAlb = MusicBrainzCatalogClient.cleanAlbumTitle(alb)
+            let term = "\(cleanArt) \(cleanedAlb)"
+            if let result = await queryITunes(term: term, entity: "album") {
+                return result
+            }
+        }
+
+        // 2. Try Song Search if album search didn't succeed or was missing
+        if let trkTitle = title?.trimmingCharacters(in: .whitespacesAndNewlines), !trkTitle.isEmpty {
+            var cleanedTitle = trkTitle
+            if cleanedTitle.lowercased().hasPrefix(cleanArt.lowercased()) {
+                cleanedTitle = cleanedTitle.dropFirst(cleanArt.count).trimmingCharacters(in: CharacterSet(charactersIn: " -–—_"))
+            }
+            let term = "\(cleanArt) \(cleanedTitle)"
+            if let result = await queryITunes(term: term, entity: "song") {
+                return result
+            }
+        }
+
+        return nil
+    }
+
+    private static func queryITunes(term: String, entity: String) async -> (data: Data, canonicalAlbum: String?)? {
+        guard let encoded = term.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://itunes.apple.com/search?term=\(encoded)&entity=\(entity)&limit=5") else {
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 8
+        request.setValue("MSRU/1.0", forHTTPHeaderField: "User-Agent")
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let items = json["results"] as? [[String: Any]] else {
+            return nil
+        }
+
+        for item in items {
+            let collection = item["collectionName"] as? String
+            if let artUrlStr = item["artworkUrl100"] as? String {
+                let hiResStr = artUrlStr.replacingOccurrences(of: "100x100bb.jpg", with: "600x600bb.jpg")
+                    .replacingOccurrences(of: "100x100bb.png", with: "600x600bb.png")
+                if let imgURL = URL(string: hiResStr) {
+                    var imgReq = URLRequest(url: imgURL)
+                    imgReq.timeoutInterval = 8
+                    if let (imgData, imgResp) = try? await URLSession.shared.data(for: imgReq),
+                       let imgHttp = imgResp as? HTTPURLResponse, (200...299).contains(imgHttp.statusCode),
+                       isValidImageData(imgData) {
+                        return (imgData, collection)
+                    }
                 }
             }
         }
