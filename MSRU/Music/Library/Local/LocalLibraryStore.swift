@@ -102,12 +102,33 @@ final class LocalLibraryStore {
             errorMessage = nil
 
             await syncTracksToDatabase(tracks)
+            await reconcileDatabaseOrphans(validTracks: tracks)
             await refreshQuerySnapshot()
             triggerBackgroundArtworkBackfillIfNeeded()
         } catch {
             didLoad = false
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func reconcileDatabaseOrphans(validTracks: [LocalTrack]) async {
+        var validPaths = Set<String>()
+        var validFilenames = Set<String>()
+        var validRecIDs = Set<RecordingID>()
+
+        for t in validTracks {
+            validPaths.insert(t.fileURL.standardizedFileURL.path)
+            validPaths.insert(t.fileURL.path)
+            validFilenames.insert(t.fileURL.lastPathComponent)
+            validRecIDs.insert(DeterministicID.recording(title: t.title, artist: t.artist))
+        }
+
+        let identityRepo = IdentityRepository(db: self.db)
+        try? await identityRepo.reconcileLocalAssets(
+            validPaths: validPaths,
+            validFilenames: validFilenames,
+            validRecordingIDs: validRecIDs
+        )
     }
 
     func addTracks(_ newTracks: [LocalTrack]) async throws {
@@ -231,8 +252,31 @@ final class LocalLibraryStore {
 
             let deletedTrackIDs = Set(deletedTracks.map(\.id))
             let deletedURLs = Set(deletedTracks.map(\.fileURL))
-            let deletedPaths = Set(deletedTracks.map { $0.fileURL.standardizedFileURL.path })
-            let deletedRelativePaths = Set(deletedTracks.map(\.fileURL.lastPathComponent))
+
+            var deletedPaths = Set<String>()
+            var deletedRelativePaths = Set<String>()
+            for t in deletedTracks {
+                let std = t.fileURL.standardizedFileURL.path
+                let raw = t.fileURL.path
+                let unenc = t.fileURL.path.removingPercentEncoding ?? raw
+                deletedPaths.insert(std)
+                deletedPaths.insert(raw)
+                deletedPaths.insert(unenc)
+                if std.hasPrefix("/private") {
+                    deletedPaths.insert(String(std.dropFirst(8)))
+                } else {
+                    deletedPaths.insert("/private" + std)
+                }
+                deletedRelativePaths.insert(t.fileURL.lastPathComponent)
+            }
+
+            let sourceID = SourceID("src_local_default")
+            let deletedRecIDs = Set(deletedTracks.map {
+                DeterministicID.recording(title: $0.title, artist: $0.artist)
+            })
+            let deletedAssetIDs = Set(deletedPaths.map {
+                DeterministicID.asset(sourceID: sourceID, relativePath: $0)
+            })
 
             // 1. Remove from in-memory tracks
             self.tracks.removeAll { deletedTrackIDs.contains($0.id) }
@@ -242,7 +286,11 @@ final class LocalLibraryStore {
 
             // 3. Sync deletion to SQLite database (assets, recordings, release_tracks, fts, orphan releases/artists)
             let identityRepo = IdentityRepository(db: self.db)
-            try? await identityRepo.deleteTracks(relativePaths: deletedPaths.union(deletedRelativePaths))
+            try? await identityRepo.deleteTracks(
+                assetIDs: deletedAssetIDs,
+                recordingIDs: deletedRecIDs,
+                relativePaths: deletedPaths.union(deletedRelativePaths)
+            )
 
             // 4. Cross-store cleanup: LibraryStore, PlaylistStore, PlaybackController
             await self.libraryStore?.purgeTracks(matchingIDs: deletedTrackIDs, localURLs: deletedURLs)
@@ -270,10 +318,10 @@ final class LocalLibraryStore {
             await deleteTracks(withIDs: trackIDsToDelete, deletePhysical: deletePhysical)
         }
 
-        // Also explicitly delete release in SQLite if present
+        // Always delete release in SQLite (even if in-memory tracks were already cleared)
         let releaseID = DeterministicID.release(artist: artist, title: title)
         let identityRepo = IdentityRepository(db: self.db)
-        try? await identityRepo.deleteRelease(id: releaseID)
+        try? await identityRepo.deleteRelease(id: releaseID, title: title, artist: artist)
 
         await serialized {
             self.updateCachedPresentations()
@@ -327,10 +375,10 @@ final class LocalLibraryStore {
             await deleteTracks(withIDs: trackIDsToDelete, deletePhysical: deletePhysical)
         }
 
-        // 3. Delete artist entity and credits in SQLite
+        // 3. Always delete artist entity and credits in SQLite (even if in-memory tracks were already cleared)
         let artistID = DeterministicID.artist(name: cleanName)
         let identityRepo = IdentityRepository(db: self.db)
-        try? await identityRepo.deleteArtist(id: artistID)
+        try? await identityRepo.deleteArtist(id: artistID, name: cleanName)
 
         await serialized {
             self.updateCachedPresentations()

@@ -1,44 +1,26 @@
 {
-  "fill-specializations" : [
-    {
-      "value" : {
-        "linear-gradient" : [
-          "display-p3:0.92455,0.62304,0.38036,1.00000",
-          "display-p3:0.90446,0.38987,0.52755,1.00000"
-        ],
-        "orientation" : {
-          "start" : {
-            "x" : 0.5,
-            "y" : 1
-          },
-          "stop" : {
-            "x" : 0.5,
-            "y" : 0.3
-          }
-        }
-      }
-    },
-    {
-      "appearance" : "dark",
-      "value" : "system-dark"
-    }
-  ],
+  "fill" : {
+    "linear-gradient" : [
+      "display-p3:0.35778,0.98904,0.91467,1.00000",
+      "display-p3:0.09374,0.08989,0.37344,1.00000"
+    ]
+  },
   "groups" : [
     {
       "layers" : [
         {
           "blend-mode" : "normal",
           "fill" : "none",
-          "glass" : true,
+          "glass" : false,
           "hidden" : false,
-          "image-name" : "MSRU_iOS_Any_1024.png",
-          "name" : "MSRU_iOS_Any_1024",
+          "image-name" : "2.png",
+          "name" : "2",
           "opacity" : 1,
           "position" : {
-            "scale" : 0.9,
+            "scale" : 0.7,
             "translation-in-points" : [
-              0,
-              0
+              -17.200000000000045,
+              75.00000000000006
             ]
           }
         }

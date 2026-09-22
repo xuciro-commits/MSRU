@@ -387,13 +387,14 @@ nonisolated public final class IdentityRepository: Sendable {
 
     // MARK: - Cascade Deletion & Orphan Garbage Collection
 
-    /// Deletes assets by IDs or relative paths, cascades through empty recordings, and cleans orphan releases/artists.
+    /// Deletes assets by IDs, recording IDs, or relative paths, cascades through empty recordings, and cleans orphan releases/artists.
     @discardableResult
     public func deleteTracks(
         assetIDs: Set<AssetID> = [],
+        recordingIDs: Set<RecordingID> = [],
         relativePaths: Set<String> = []
     ) async throws -> (prunedReleases: Int, prunedArtists: Int) {
-        guard !assetIDs.isEmpty || !relativePaths.isEmpty else { return (0, 0) }
+        guard !assetIDs.isEmpty || !recordingIDs.isEmpty || !relativePaths.isEmpty else { return (0, 0) }
 
         return try await db.dbWriter.write { db in
             var matchedAssetIDs = Set<String>()
@@ -412,7 +413,20 @@ nonisolated public final class IdentityRepository: Sendable {
                 }
             }
 
-            // 2. Collect asset IDs & recording IDs by relativePaths
+            // 2. Collect asset IDs & recording IDs by recordingIDs
+            if !recordingIDs.isEmpty {
+                let recPlaceholders = recordingIDs.map { _ in "?" }.joined(separator: ",")
+                let args = StatementArguments(recordingIDs.map(\.rawValue))
+                let rows = try Row.fetchAll(db, sql: "SELECT id, recording_id FROM assets WHERE recording_id IN (\(recPlaceholders))", arguments: args)
+                for row in rows {
+                    matchedAssetIDs.insert(row["id"])
+                }
+                for recID in recordingIDs {
+                    recIDsToCheck.insert(recID.rawValue)
+                }
+            }
+
+            // 3. Collect asset IDs & recording IDs by relativePaths (exact match + suffix / filename match)
             if !relativePaths.isEmpty {
                 let pathPlaceholders = relativePaths.map { _ in "?" }.joined(separator: ",")
                 let args = StatementArguments(Array(relativePaths))
@@ -423,16 +437,33 @@ nonisolated public final class IdentityRepository: Sendable {
                         recIDsToCheck.insert(recID)
                     }
                 }
+
+                // Suffix / filename match for iOS sandbox / symlink path variants
+                for path in relativePaths {
+                    let filename = (path as NSString).lastPathComponent
+                    guard !filename.isEmpty else { continue }
+                    let suffixRows = try Row.fetchAll(
+                        db,
+                        sql: "SELECT id, recording_id FROM assets WHERE relative_path LIKE ? OR relative_path LIKE ?",
+                        arguments: ["%/\(filename)", "%\(filename)"]
+                    )
+                    for row in suffixRows {
+                        matchedAssetIDs.insert(row["id"])
+                        if let recID: String = row["recording_id"] {
+                            recIDsToCheck.insert(recID)
+                        }
+                    }
+                }
             }
 
-            // 3. Delete matched assets (SQLite cascades to file_assets, fingerprints, metadata_claims)
+            // 4. Delete matched assets (SQLite cascades to file_assets, fingerprints, metadata_claims)
             if !matchedAssetIDs.isEmpty {
                 let placeholders = matchedAssetIDs.map { _ in "?" }.joined(separator: ",")
                 let args = StatementArguments(Array(matchedAssetIDs)) ?? StatementArguments()
                 try db.execute(sql: "DELETE FROM assets WHERE id IN (\(placeholders))", arguments: args)
             }
 
-            // 4. Check if any recording has 0 remaining assets
+            // 5. Check if any recording has 0 remaining assets
             for recID in recIDsToCheck {
                 let remainingAssets = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM assets WHERE recording_id = ?", arguments: [recID]) ?? 0
                 if remainingAssets == 0 {
@@ -444,34 +475,55 @@ nonisolated public final class IdentityRepository: Sendable {
                 }
             }
 
-            // 5. Prune orphan releases and artists
+            // 6. Prune orphan releases and artists
             return try Self.pruneOrphans(db: db)
         }
     }
 
-    /// Deletes a release (album). Recordings only belonging to this album are deleted; multi-release recordings are preserved.
+    /// Deletes a release (album) by ID or title/artist. Recordings only belonging to this album are deleted; multi-release recordings are preserved.
     @discardableResult
-    public func deleteRelease(id: ReleaseID) async throws -> (prunedReleases: Int, prunedArtists: Int) {
+    public func deleteRelease(
+        id: ReleaseID? = nil,
+        title: String? = nil,
+        artist: String? = nil
+    ) async throws -> (prunedReleases: Int, prunedArtists: Int) {
         try await db.dbWriter.write { db in
-            // Find all recordings associated with this release
-            let recRows = try Row.fetchAll(db, sql: "SELECT DISTINCT recording_id FROM release_tracks WHERE release_id = ?", arguments: [id.rawValue])
-            let recIDs: [String] = recRows.compactMap { $0["recording_id"] }
+            var targetReleaseIDs = Set<String>()
+            if let id { targetReleaseIDs.insert(id.rawValue) }
 
-            // Delete release_tracks for this release
-            try db.execute(sql: "DELETE FROM release_tracks WHERE release_id = ?", arguments: [id.rawValue])
-            try db.execute(sql: "DELETE FROM artist_credits WHERE entity_type = 'release' AND entity_id = ?", arguments: [id.rawValue])
-            try db.execute(sql: "DELETE FROM releases WHERE id = ?", arguments: [id.rawValue])
+            if let title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                let rows = try Row.fetchAll(db, sql: "SELECT id FROM releases WHERE LOWER(TRIM(title)) = ? OR TRIM(title, \"'\") = ?", arguments: [cleanTitle, cleanTitle])
+                for row in rows {
+                    targetReleaseIDs.insert(row["id"])
+                }
+            }
 
-            // For each recording, check if it's on any other release
-            for recID in recIDs {
-                let otherReleases = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM release_tracks WHERE recording_id = ?", arguments: [recID]) ?? 0
-                if otherReleases == 0 {
-                    // Sole recording: delete assets and recording
-                    try db.execute(sql: "DELETE FROM assets WHERE recording_id = ?", arguments: [recID])
-                    try db.execute(sql: "DELETE FROM library_entries WHERE recording_id = ?", arguments: [recID])
-                    try db.execute(sql: "DELETE FROM artist_credits WHERE entity_type = 'recording' AND entity_id = ?", arguments: [recID])
-                    try db.execute(sql: "DELETE FROM library_fts WHERE recording_id = ?", arguments: [recID])
-                    try db.execute(sql: "DELETE FROM recordings WHERE id = ?", arguments: [recID])
+            guard !targetReleaseIDs.isEmpty else {
+                return try Self.pruneOrphans(db: db)
+            }
+
+            for relID in targetReleaseIDs {
+                // Find all recordings associated with this release
+                let recRows = try Row.fetchAll(db, sql: "SELECT DISTINCT recording_id FROM release_tracks WHERE release_id = ?", arguments: [relID])
+                let recIDs: [String] = recRows.compactMap { $0["recording_id"] }
+
+                // Delete release_tracks for this release
+                try db.execute(sql: "DELETE FROM release_tracks WHERE release_id = ?", arguments: [relID])
+                try db.execute(sql: "DELETE FROM artist_credits WHERE entity_type = 'release' AND entity_id = ?", arguments: [relID])
+                try db.execute(sql: "DELETE FROM releases WHERE id = ?", arguments: [relID])
+
+                // For each recording, check if it's on any other release
+                for recID in recIDs {
+                    let otherReleases = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM release_tracks WHERE recording_id = ?", arguments: [recID]) ?? 0
+                    if otherReleases == 0 {
+                        // Sole recording: delete assets and recording
+                        try db.execute(sql: "DELETE FROM assets WHERE recording_id = ?", arguments: [recID])
+                        try db.execute(sql: "DELETE FROM library_entries WHERE recording_id = ?", arguments: [recID])
+                        try db.execute(sql: "DELETE FROM artist_credits WHERE entity_type = 'recording' AND entity_id = ?", arguments: [recID])
+                        try db.execute(sql: "DELETE FROM library_fts WHERE recording_id = ?", arguments: [recID])
+                        try db.execute(sql: "DELETE FROM recordings WHERE id = ?", arguments: [recID])
+                    }
                 }
             }
 
@@ -479,35 +531,116 @@ nonisolated public final class IdentityRepository: Sendable {
         }
     }
 
-    /// Deletes an artist. Sole-owned tracks/releases are deleted; collaborations are preserved and credit is removed.
+    /// Deletes an artist by ID or name. Sole-owned tracks/releases are deleted; collaborations are preserved and credit is removed.
     @discardableResult
-    public func deleteArtist(id: ArtistID) async throws -> (prunedReleases: Int, prunedArtists: Int) {
+    public func deleteArtist(
+        id: ArtistID? = nil,
+        name: String? = nil
+    ) async throws -> (prunedReleases: Int, prunedArtists: Int) {
         try await db.dbWriter.write { db in
-            // 1. Find all recordings this artist participated in
-            let recRows = try Row.fetchAll(
-                db,
-                sql: "SELECT entity_id FROM artist_credits WHERE entity_type = 'recording' AND artist_id = ?",
-                arguments: [id.rawValue]
-            )
-            let recIDs: [String] = recRows.compactMap { $0["entity_id"] }
+            var targetArtistIDs = Set<String>()
+            if let id { targetArtistIDs.insert(id.rawValue) }
 
-            for recID in recIDs {
-                // Check other artists credited on this recording
-                let otherArtistsCount = try Int.fetchOne(
+            if let name, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                let rows = try Row.fetchAll(db, sql: "SELECT id FROM artists WHERE LOWER(TRIM(name)) = ?", arguments: [cleanName])
+                for row in rows {
+                    targetArtistIDs.insert(row["id"])
+                }
+            }
+
+            guard !targetArtistIDs.isEmpty else {
+                return try Self.pruneOrphans(db: db)
+            }
+
+            for artID in targetArtistIDs {
+                // 1. Find all recordings this artist participated in
+                let recRows = try Row.fetchAll(
                     db,
-                    sql: "SELECT COUNT(*) FROM artist_credits WHERE entity_type = 'recording' AND entity_id = ? AND artist_id != ?",
-                    arguments: [recID, id.rawValue]
-                ) ?? 0
+                    sql: "SELECT entity_id FROM artist_credits WHERE entity_type = 'recording' AND artist_id = ?",
+                    arguments: [artID]
+                )
+                let recIDs: [String] = recRows.compactMap { $0["entity_id"] }
 
-                if otherArtistsCount > 0 {
-                    // Collaboration! Protect recording, remove credit for this artist
-                    try db.execute(
-                        sql: "DELETE FROM artist_credits WHERE entity_type = 'recording' AND entity_id = ? AND artist_id = ?",
-                        arguments: [recID, id.rawValue]
-                    )
-                } else {
-                    // Sole artist: delete recording and assets
-                    try db.execute(sql: "DELETE FROM assets WHERE recording_id = ?", arguments: [recID])
+                for recID in recIDs {
+                    // Check other artists credited on this recording
+                    let otherArtistsCount = try Int.fetchOne(
+                        db,
+                        sql: "SELECT COUNT(*) FROM artist_credits WHERE entity_type = 'recording' AND entity_id = ? AND artist_id != ?",
+                        arguments: [recID, artID]
+                    ) ?? 0
+
+                    if otherArtistsCount > 0 {
+                        // Collaboration! Protect recording, remove credit for this artist
+                        try db.execute(
+                            sql: "DELETE FROM artist_credits WHERE entity_type = 'recording' AND entity_id = ? AND artist_id = ?",
+                            arguments: [recID, artID]
+                        )
+                    } else {
+                        // Sole artist: delete recording and assets
+                        try db.execute(sql: "DELETE FROM assets WHERE recording_id = ?", arguments: [recID])
+                        try db.execute(sql: "DELETE FROM release_tracks WHERE recording_id = ?", arguments: [recID])
+                        try db.execute(sql: "DELETE FROM library_entries WHERE recording_id = ?", arguments: [recID])
+                        try db.execute(sql: "DELETE FROM artist_credits WHERE entity_type = 'recording' AND entity_id = ?", arguments: [recID])
+                        try db.execute(sql: "DELETE FROM library_fts WHERE recording_id = ?", arguments: [recID])
+                        try db.execute(sql: "DELETE FROM recordings WHERE id = ?", arguments: [recID])
+                    }
+                }
+
+                // 2. Remove artist credits on releases & release groups
+                try db.execute(sql: "DELETE FROM artist_credits WHERE entity_type = 'release' AND artist_id = ?", arguments: [artID])
+                try db.execute(sql: "DELETE FROM artist_credits WHERE entity_type = 'release_group' AND artist_id = ?", arguments: [artID])
+
+                // 3. Delete artist entity
+                try db.execute(sql: "DELETE FROM artists WHERE id = ?", arguments: [artID])
+            }
+
+            // 4. Prune orphans
+            return try Self.pruneOrphans(db: db)
+        }
+    }
+
+    /// Reconciles local SQLite assets against the authoritative list of active local tracks.
+    /// Any assets belonging to 'src_local_default' that no longer correspond to an active track
+    /// are removed, cascading through empty recordings, releases, and artists.
+    @discardableResult
+    public func reconcileLocalAssets(
+        validPaths: Set<String>,
+        validFilenames: Set<String>,
+        validRecordingIDs: Set<RecordingID>
+    ) async throws -> (prunedReleases: Int, prunedArtists: Int) {
+        try await db.dbWriter.write { db in
+            let assetRows = try Row.fetchAll(db, sql: "SELECT id, relative_path, recording_id FROM assets WHERE source_id = 'src_local_default'")
+            var deadAssetIDs = Set<String>()
+            var recIDsToCheck = Set<String>()
+
+            for row in assetRows {
+                let assetID: String = row["id"]
+                let relPath: String = row["relative_path"]
+                let recID: String? = row["recording_id"]
+                let filename = (relPath as NSString).lastPathComponent
+
+                let isPathValid = validPaths.contains(relPath) ||
+                                  validPaths.contains(relPath.removingPercentEncoding ?? "") ||
+                                  (relPath.hasPrefix("/private") && validPaths.contains(String(relPath.dropFirst(8)))) ||
+                                  (!relPath.hasPrefix("/private") && validPaths.contains("/private" + relPath))
+                let isFilenameValid = validFilenames.contains(filename)
+                let isRecordingValid = recID.map { validRecordingIDs.contains(RecordingID($0)) } ?? false
+
+                if !isPathValid && !isFilenameValid && !isRecordingValid {
+                    deadAssetIDs.insert(assetID)
+                    if let recID { recIDsToCheck.insert(recID) }
+                }
+            }
+
+            if !deadAssetIDs.isEmpty {
+                let placeholders = deadAssetIDs.map { _ in "?" }.joined(separator: ",")
+                try db.execute(sql: "DELETE FROM assets WHERE id IN (\(placeholders))", arguments: StatementArguments(Array(deadAssetIDs))!)
+            }
+
+            for recID in recIDsToCheck {
+                let remainingAssets = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM assets WHERE recording_id = ?", arguments: [recID]) ?? 0
+                if remainingAssets == 0 {
                     try db.execute(sql: "DELETE FROM release_tracks WHERE recording_id = ?", arguments: [recID])
                     try db.execute(sql: "DELETE FROM library_entries WHERE recording_id = ?", arguments: [recID])
                     try db.execute(sql: "DELETE FROM artist_credits WHERE entity_type = 'recording' AND entity_id = ?", arguments: [recID])
@@ -516,14 +649,6 @@ nonisolated public final class IdentityRepository: Sendable {
                 }
             }
 
-            // 2. Remove artist credits on releases & release groups
-            try db.execute(sql: "DELETE FROM artist_credits WHERE entity_type = 'release' AND artist_id = ?", arguments: [id.rawValue])
-            try db.execute(sql: "DELETE FROM artist_credits WHERE entity_type = 'release_group' AND artist_id = ?", arguments: [id.rawValue])
-
-            // 3. Delete artist entity
-            try db.execute(sql: "DELETE FROM artists WHERE id = ?", arguments: [id.rawValue])
-
-            // 4. Prune orphans
             return try Self.pruneOrphans(db: db)
         }
     }

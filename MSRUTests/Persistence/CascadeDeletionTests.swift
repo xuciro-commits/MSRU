@@ -294,4 +294,71 @@ struct CascadeDeletionTests {
         // Playback queue is cleared
         #expect(playbackController.playbackQueue.upcoming.isEmpty)
     }
+
+    @Test
+    func reconcileLocalAssetsPrunesZombiesAndOrphanReleasesArtists() async throws {
+        let appDb = try TestDatabase.makeEphemeral()
+        let sourceID = try await TestDatabase.seedSource(in: appDb, id: SourceID("src_local_default"))
+        let identityRepo = IdentityRepository(db: appDb)
+        let assetRepo = AssetRepository(db: appDb)
+
+        let artistID = ArtistID("art_zombie")
+        try await identityRepo.upsertArtist(id: artistID, name: "张学友")
+
+        let releaseID = ReleaseID("rel_zombie")
+        try await identityRepo.upsertRelease(id: releaseID, title: "313240672581865")
+
+        let recID = RecordingID("rec_zombie")
+        try await identityRepo.upsertRecording(id: recID, title: "遥远的她-48k")
+
+        let rtID = ReleaseTrackID("rt_zombie")
+        try await identityRepo.upsertReleaseTrack(
+            id: rtID,
+            releaseID: releaseID,
+            mediumPosition: 1,
+            trackPosition: 1,
+            trackNumber: "1",
+            title: "遥远的她-48k",
+            recordingID: recID
+        )
+
+        let assetID = AssetID("ast_zombie")
+        let asset = PersistedAssetRecord(
+            id: assetID,
+            sourceID: sourceID,
+            relativePath: "/private/var/mobile/Containers/Shared/AppGroup/UUID/File Provider Storage/张学友 - 遥远的她-48k.mp3",
+            fileSize: 1024,
+            mtime: 1000.0,
+            format: "MP3",
+            recordingID: recID
+        )
+        try await assetRepo.batchUpsert([asset])
+
+        try await identityRepo.insertArtistCredit(artistID: artistID, entityType: "recording", entityID: recID.rawValue)
+        try await identityRepo.insertArtistCredit(artistID: artistID, entityType: "release", entityID: releaseID.rawValue)
+
+        // Act: Reconcile with an empty active track set (user deleted songs externally or previously)
+        let (prunedReleases, prunedArtists) = try await identityRepo.reconcileLocalAssets(
+            validPaths: [],
+            validFilenames: [],
+            validRecordingIDs: []
+        )
+
+        #expect(prunedReleases == 1)
+        #expect(prunedArtists == 1)
+
+        try await appDb.reader.read { db in
+            let artCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM artists WHERE id = ?", arguments: [artistID.rawValue]) ?? 0
+            #expect(artCount == 0)
+
+            let relCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM releases WHERE id = ?", arguments: [releaseID.rawValue]) ?? 0
+            #expect(relCount == 0)
+
+            let recCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM recordings WHERE id = ?", arguments: [recID.rawValue]) ?? 0
+            #expect(recCount == 0)
+
+            let astCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM assets WHERE id = ?", arguments: [assetID.rawValue]) ?? 0
+            #expect(astCount == 0)
+        }
+    }
 }
