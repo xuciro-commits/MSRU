@@ -126,5 +126,29 @@ struct FileNameHeuristicParserTests {
         #expect(pcParsed.album == nil) // Heuristic leaves album nil so DSF ID3 can supply By Heart
         #expect(pcParsed.title == "Snowflake")
     }
+
+    @Test
+    func testGenericFolderFiltering() {
+        #expect(FileNameHeuristicParser.isGenericFolderName("71-音乐库"))
+        #expect(FileNameHeuristicParser.isGenericFolderName("Music"))
+        #expect(FileNameHeuristicParser.isGenericFolderName("Unsorted"))
+        #expect(FileNameHeuristicParser.isGenericFolderName("01-Download"))
+        #expect(FileNameHeuristicParser.isGenericFolderName("71"))
+        #expect(FileNameHeuristicParser.isGenericFolderName("新建文件夹"))
+
+        let meta1 = FileNameHeuristicParser.parseFolderMetadata("71-音乐库")
+        #expect(meta1.artist == nil)
+        #expect(meta1.album == nil)
+
+        let meta2 = FileNameHeuristicParser.parseFolderMetadata("Music")
+        #expect(meta2.artist == nil)
+        #expect(meta2.album == nil)
+
+        let fileURL = URL(fileURLWithPath: "/Volumes/Music/71-音乐库/2234.mp3")
+        let parsed = FileNameHeuristicParser.parse(fileURL: fileURL)
+        #expect(parsed.artist == nil)
+        #expect(parsed.album == nil)
+        #expect(parsed.title == "2234")
+    }
 }
 

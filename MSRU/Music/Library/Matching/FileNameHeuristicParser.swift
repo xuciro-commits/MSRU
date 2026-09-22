@@ -50,9 +50,35 @@ nonisolated public enum FileNameHeuristicParser {
     private static let prefixRegex = try? NSRegularExpression(pattern: #"^(?:茶壶专辑|精选|华语|欧美|1\.歌曲)\s*-\s*"#)
     private static let trackRegex = try? NSRegularExpression(pattern: #"^(\d{1,3})[\s\.\-_]+\s*"#)
 
+    private static let genericFolderRegex = try? NSRegularExpression(
+        pattern: #"^(?:\d{1,4}[-_\s]+)?(?:音乐库|音乐|曲库|我的音乐|本地音乐|下载|下载音乐|新建文件夹|未分类|精选|杂项|music|my\s*music|library|music\s*library|audio|sound|songs|tracks|unsorted|download|downloads|unknown|misc|various|various[\s\-_]artists|hi[\-_]?res|dsd|flac|mp3|wav|lossless|classical|soundtracks|live)$"#,
+        options: .caseInsensitive
+    )
+
+    /// Checks if a folder name is a generic storage or organization container rather than a specific album or artist.
+    public static func isGenericFolderName(_ name: String) -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return true }
+        if CharacterSet.decimalDigits.isSuperset(of: CharacterSet(charactersIn: trimmed)) {
+            return true
+        }
+        if let regex = genericFolderRegex {
+            let range = NSRange(trimmed.startIndex..., in: trimmed)
+            if regex.firstMatch(in: trimmed, range: range) != nil {
+                return true
+            }
+        }
+        return false
+    }
+
     /// Cleans and extracts structured clues (artist, album, year) from a folder name that may contain release specs or format tags.
     public static func parseFolderMetadata(_ folderName: String) -> (artist: String?, album: String?, year: Int?) {
         var working = folderName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // If the entire folder is a generic directory (e.g. "71-音乐库", "Music", "Unsorted"), ignore it
+        if isGenericFolderName(working) {
+            return (nil, nil, nil)
+        }
 
         // 1. Extract optional 4-digit year like (2020) or [2020]
         var detectedYear: Int? = nil
@@ -102,8 +128,10 @@ nonisolated public enum FileNameHeuristicParser {
            leftIdx < rightIdx {
             let artistPart = String(working[..<leftIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
             let albumPart = String(working[working.index(after: leftIdx)..<rightIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
-            if !albumPart.isEmpty {
-                return (artistPart.isEmpty ? nil : artistPart, albumPart, detectedYear)
+            let cleanArtist = isGenericFolderName(artistPart) ? nil : (artistPart.isEmpty ? nil : artistPart)
+            let cleanAlbum = isGenericFolderName(albumPart) ? nil : (albumPart.isEmpty ? nil : albumPart)
+            if cleanAlbum != nil || cleanArtist != nil {
+                return (cleanArtist, cleanAlbum, detectedYear)
             }
         }
 
@@ -115,9 +143,14 @@ nonisolated public enum FileNameHeuristicParser {
         if parts.count >= 2 {
             let artist = parts[0]
             let album = parts[1]
-            return (artist.isEmpty ? nil : artist, album.isEmpty ? nil : album, detectedYear)
+            let cleanArtist = isGenericFolderName(artist) ? nil : (artist.isEmpty ? nil : artist)
+            let cleanAlbum = isGenericFolderName(album) ? nil : (album.isEmpty ? nil : album)
+            return (cleanArtist, cleanAlbum, detectedYear)
         } else if parts.count == 1 {
             let single = parts[0]
+            if isGenericFolderName(single) {
+                return (nil, nil, detectedYear)
+            }
             return (nil, single.isEmpty ? nil : single, detectedYear)
         }
 
@@ -189,7 +222,7 @@ nonisolated public enum FileNameHeuristicParser {
                 finalArtist = folderMeta.artist
             }
             if finalAlbum == nil {
-                finalAlbum = folderMeta.album ?? parentFolder
+                finalAlbum = folderMeta.album ?? (isGenericFolderName(parentFolder) ? nil : parentFolder)
             }
         } else {
             if folderMeta.artist != nil && finalArtist == nil {
@@ -198,7 +231,7 @@ nonisolated public enum FileNameHeuristicParser {
             if folderMeta.album != nil && finalAlbum == nil {
                 finalAlbum = folderMeta.album
             }
-            if finalArtist == nil && !["music", "download", "downloads", "1.歌曲", "歌曲", "desktop", "documents", "audio"].contains(parentFolder.lowercased()) {
+            if finalArtist == nil && !isGenericFolderName(parentFolder) && !["desktop", "documents"].contains(parentFolder.lowercased()) {
                 finalArtist = folderMeta.album ?? parentFolder
             }
         }

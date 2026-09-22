@@ -385,8 +385,10 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
                         artistName = firstArt["name"] as? String ?? artistName
                     }
                     var albumTitle: String? = nil
+                    var releaseGroupMBID: String? = nil
                     if let rgs = rec["releasegroups"] as? [[String: Any]], let firstRg = rgs.first {
                         albumTitle = firstRg["title"] as? String
+                        releaseGroupMBID = firstRg["id"] as? String
                     }
                     var releaseIDs: [String] = []
                     if let rels = rec["releases"] as? [[String: Any]] {
@@ -396,6 +398,8 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
                         recordingMBID: mbid,
                         title: title,
                         artist: artistName,
+                        albumTitle: albumTitle,
+                        releaseGroupMBID: releaseGroupMBID,
                         duration: duration,
                         acoustIDScore: resScore,
                         releaseMBIDs: releaseIDs
@@ -404,6 +408,41 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
             }
         }
         return matches.isEmpty ? nil : matches
+    }
+
+    /// Fetches all release candidates that contain a specific Recording MBID.
+    public func fetchReleasesForRecording(recordingMBID: String) async -> [ExternalReleaseMatch] {
+        await rateLimiter.waitIfNeeded()
+        guard let url = URL(string: "https://musicbrainz.org/ws/2/recording/\(recordingMBID)?inc=releases+artists+release-groups&fmt=json") else {
+            return []
+        }
+
+        var request = URLRequest(url: url, timeoutInterval: 10.0)
+        request.setValue("MSRU/1.0 (contact@msru.local)", forHTTPHeaderField: "User-Agent")
+
+        guard let (data, response) = try? await urlSession.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let releases = json["releases"] as? [[String: Any]] else {
+            return []
+        }
+
+        return releases.compactMap { item -> ExternalReleaseMatch? in
+            guard let id = item["id"] as? String, let title = item["title"] as? String else { return nil }
+            let artist = (item["artist-credit"] as? [[String: Any]])?.first?["name"] as? String ?? "Unknown Artist"
+            let date = item["date"] as? String
+            let country = item["country"] as? String
+            let trackCount = item["track-count"] as? Int ?? 0
+            return ExternalReleaseMatch(
+                releaseMBID: id,
+                title: title,
+                artist: artist,
+                date: date,
+                country: country,
+                trackCount: trackCount,
+                tracks: []
+            )
+        }
     }
 
     private func fetchLiveRelease(releaseMBID: String) async -> ExternalReleaseMatch? {

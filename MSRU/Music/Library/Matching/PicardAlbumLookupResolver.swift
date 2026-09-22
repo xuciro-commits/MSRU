@@ -74,18 +74,63 @@ public enum PicardAlbumLookupResolver {
             if artistClue.isEmpty, let art = folderMeta.artist { artistClue = art }
         }
 
-        var candidateReleases = try await catalog.searchReleases(artist: artistClue, album: albumClue)
+        var candidateReleases: [ExternalReleaseMatch] = []
+        if !albumClue.isEmpty {
+            candidateReleases = try await catalog.searchReleases(artist: artistClue, album: albumClue)
 
-        // Fallback: If artist + album returned empty, try album alone
-        if candidateReleases.isEmpty && !albumClue.isEmpty && !artistClue.isEmpty {
-            candidateReleases = try await catalog.searchReleases(artist: "", album: albumClue)
+            // Fallback: If artist + album returned empty, try album alone
+            if candidateReleases.isEmpty && !artistClue.isEmpty {
+                candidateReleases = try await catalog.searchReleases(artist: "", album: albumClue)
+            }
         }
 
-        // If no candidate by text search, try looking up release via recording MBID of first track
-        if candidateReleases.isEmpty, let firstMBID = cluster.tracks.compactMap({ $0.trackMBID }).first {
-            // Simulated fallback or recording lookup
-            if let release = try await catalog.lookupRelease(releaseMBID: firstMBID) {
-                candidateReleases = [release]
+        // Fallback: If no candidate release found by album name, resolve via Recording -> Release
+        if candidateReleases.isEmpty {
+            for track in cluster.tracks {
+                let trackArtist = track.artist ?? artistClue
+                let trackTitle = track.title
+
+                // A. Check if track has recording MBID (e.g. from AcoustID or local memory)
+                if let trackMBID = track.trackMBID, !trackMBID.isEmpty {
+                    if let mbClient = catalog as? MusicBrainzCatalogClient {
+                        let rels = await mbClient.fetchReleasesForRecording(recordingMBID: trackMBID)
+                        for r in rels where !candidateReleases.contains(where: { $0.releaseMBID == r.releaseMBID }) {
+                            candidateReleases.append(r)
+                        }
+                    }
+                    if candidateReleases.isEmpty, let rel = try? await catalog.lookupRelease(releaseMBID: trackMBID) {
+                        candidateReleases.append(rel)
+                    }
+                }
+
+                // B. Check if track has title and artist clues to search recordings
+                if candidateReleases.isEmpty, !trackTitle.isEmpty, !trackArtist.isEmpty, trackArtist != "Unknown Artist" {
+                    let recMatches: [ExternalRecordingMatch]
+                    if let mbClient = catalog as? MusicBrainzCatalogClient {
+                        recMatches = await mbClient.searchRecordings(artist: trackArtist, title: trackTitle)
+                    } else {
+                        recMatches = []
+                    }
+
+                    for rec in recMatches {
+                        for relMBID in rec.releaseMBIDs.prefix(3) {
+                            if let rel = try? await catalog.lookupRelease(releaseMBID: relMBID),
+                               !candidateReleases.contains(where: { $0.releaseMBID == rel.releaseMBID }) {
+                                candidateReleases.append(rel)
+                            }
+                        }
+                        if candidateReleases.isEmpty, let albTitle = rec.albumTitle, !albTitle.isEmpty {
+                            let textRels = (try? await catalog.searchReleases(artist: trackArtist, album: albTitle)) ?? []
+                            for r in textRels where !candidateReleases.contains(where: { $0.releaseMBID == r.releaseMBID }) {
+                                candidateReleases.append(r)
+                            }
+                        }
+                    }
+                }
+
+                if !candidateReleases.isEmpty {
+                    break
+                }
             }
         }
 

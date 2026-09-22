@@ -172,5 +172,36 @@ struct MusicBrainzCatalogClientTests {
         #expect(unwrapped.canonicalAlbum?.contains("By Heart") == true)
         #expect(LocalArtworkExtractor.isValidImageData(unwrapped.data))
     }
+
+    @Test
+    func resolveAlbumClusterWithMissingAlbumResolvesViaRecordingFallback() async throws {
+        // Track with title "晴天", artist "周杰伦", but album is nil / missing
+        let track = ClusterTrackItem(
+            fileURL: URL(fileURLWithPath: "/music/71-音乐库/2234.mp3"),
+            title: "晴天",
+            artist: "周杰伦",
+            album: nil,
+            trackNumber: 4,
+            duration: 269.0
+        )
+
+        let cluster = AlbumCluster(
+            folderURL: URL(fileURLWithPath: "/music/71-音乐库"),
+            candidateAlbumTitle: nil,
+            candidateArtist: "周杰伦",
+            tracks: [track]
+        )
+
+        let result = try await PicardAlbumLookupResolver.resolve(
+            cluster: cluster,
+            catalog: MusicBrainzCatalogClient.shared
+        )
+
+        #expect(result.matchedRelease != nil)
+        #expect(!result.candidateReleases.isEmpty)
+        #expect(result.confidence >= 0.70)
+        #expect(result.tier == .medium || result.tier == .high)
+        #expect(result.trackMatches.first?.candidate?.title == "晴天")
+    }
 }
 

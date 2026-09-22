@@ -166,7 +166,7 @@ struct ImportReviewView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                Text("Fingerprint Confidence")
+                Text("Match Confidence")
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
                     .frame(width: 140, alignment: .leading)

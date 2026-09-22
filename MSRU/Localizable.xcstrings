@@ -4439,6 +4439,29 @@
         }
       }
     },
+    "Match Confidence" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "སྒྲིག་སྦྱོར་ཡིད་ཆེས་ཚད།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Match Confidence"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匹配置信度"
+          }
+        }
+      }
+    },
     "Fingerprint Memory" : {
       "extractionState" : "manual",
       "localizations" : {

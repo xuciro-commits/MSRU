@@ -129,7 +129,13 @@ public final class ImportPipeline: Sendable {
                 }
             }
 
-            let hasAuthoritativeEmbedded = (detectedTitle != nil && detectedArtist != nil && detectedArtist != "Unknown Artist")
+            let hasAuthoritativeEmbedded = (detectedTitle != nil && detectedArtist != nil && detectedArtist != "Unknown Artist" && detectedAlbum != nil && !detectedAlbum!.isEmpty)
+
+            // Extract genuine Chromaprint acoustic fingerprint for AcoustID compatibility
+            let chromaprintExtractor = ChromaprintFingerprintExtractor()
+            let chromaFP = try? await chromaprintExtractor.generateFingerprint(for: url)
+            let chromaFingerprint = chromaFP?.value
+            let effectiveDuration = chromaFP?.duration ?? fp?.duration ?? 0.0
 
             // Priority 2: Local Acoustic Fingerprint Memory Registry (0ms in-memory lookup)
             if let fp = fp,
@@ -144,15 +150,19 @@ public final class ImportPipeline: Sendable {
             }
 
             // Priority 3: Remote Acoustic Fingerprint (AcoustID / MusicBrainz)
-            // SKIPPED when embedded tags or local memory are already authoritative!
-            if !hasAuthoritativeEmbedded && matchedMemoryRecord == nil {
-                let chromaprintExtractor = ChromaprintFingerprintExtractor()
-                if let chromaFP = try? await chromaprintExtractor.generateFingerprint(for: url),
-                   let onlineMatches = try? await catalog.lookupRecording(fingerprint: chromaFP),
-                   let bestMatch = onlineMatches.max(by: { ($0.acoustIDScore ?? 0) < ($1.acoustIDScore ?? 0) }) {
-                    detectedTitle = bestMatch.title
-                    detectedArtist = bestMatch.artist
-                    recordingMBID = bestMatch.recordingMBID
+            // Triggered if local memory has no record and either:
+            // 1. Embedded tags are incomplete (e.g. missing album or missing title/artist), OR
+            // 2. We don't have a verified recordingMBID yet
+            let shouldQueryRemoteAcoustID = (matchedMemoryRecord == nil) && (recordingMBID == nil || detectedAlbum == nil || !hasAuthoritativeEmbedded)
+            if shouldQueryRemoteAcoustID, let cFP = chromaFP {
+                if let onlineMatches = try? await catalog.lookupRecording(fingerprint: cFP),
+                   let bestMatch = onlineMatches.max(by: { ($0.acoustIDScore) < ($1.acoustIDScore) }) {
+                    if detectedTitle == nil { detectedTitle = bestMatch.title }
+                    if detectedArtist == nil { detectedArtist = bestMatch.artist }
+                    if recordingMBID == nil { recordingMBID = bestMatch.recordingMBID }
+                    if detectedAlbum == nil, let alb = bestMatch.albumTitle, !alb.isEmpty {
+                        detectedAlbum = alb
+                    }
                 }
             }
 
@@ -201,8 +211,8 @@ public final class ImportPipeline: Sendable {
                 artist: finalArtist,
                 album: finalAlbum,
                 trackNumber: parsed.trackNumber,
-                duration: fp?.duration,
-                acoustID: fp?.fingerprint,
+                duration: effectiveDuration,
+                acoustID: chromaFingerprint ?? fp?.fingerprint,
                 trackMBID: recordingMBID,
                 artworkData: artworkData,
                 matchedMemory: matchedMemoryRecord
