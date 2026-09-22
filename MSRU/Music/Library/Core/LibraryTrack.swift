@@ -71,10 +71,14 @@ struct LibraryTrack: Identifiable, Codable, Hashable, Sendable {
     var album: String?
     var duration: TimeInterval?
     var artworkURL: URL?
-    var artworkData: Data?
+    var artworkReference: String?
     var sources: [LibraryPlaybackSource]
     let dateAdded: Date
     var lastPlayedAt: Date?
+
+    var artworkData: Data? {
+        artworkReference.flatMap { LocalArtworkStorage.shared.loadArtwork(relativePath: $0) }
+    }
 
     init(
         id: UUID = UUID(),
@@ -83,6 +87,7 @@ struct LibraryTrack: Identifiable, Codable, Hashable, Sendable {
         album: String? = nil,
         duration: TimeInterval? = nil,
         artworkURL: URL? = nil,
+        artworkReference: String? = nil,
         artworkData: Data? = nil,
         sources: [LibraryPlaybackSource] = [],
         dateAdded: Date = Date(),
@@ -94,7 +99,13 @@ struct LibraryTrack: Identifiable, Codable, Hashable, Sendable {
         self.album = album
         self.duration = duration
         self.artworkURL = artworkURL
-        self.artworkData = artworkData
+        if let artworkReference, !artworkReference.isEmpty {
+            self.artworkReference = artworkReference
+        } else if let artworkData, !artworkData.isEmpty {
+            self.artworkReference = LocalArtworkStorage.shared.storeArtwork(artworkData)
+        } else {
+            self.artworkReference = nil
+        }
         self.sources = sources
         self.dateAdded = dateAdded
         self.lastPlayedAt = lastPlayedAt
@@ -107,7 +118,7 @@ struct LibraryTrack: Identifiable, Codable, Hashable, Sendable {
             artist: track.artist,
             album: track.album,
             duration: track.duration > 0 ? track.duration : nil,
-            artworkData: track.artworkData,
+            artworkReference: track.artworkReference,
             sources: [source]
         )
     }

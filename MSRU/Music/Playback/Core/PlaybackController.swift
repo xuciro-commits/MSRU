@@ -278,6 +278,11 @@ private struct WeakSessionObserver {
         displayItem?.artworkData
     }
 
+    var unifiedArtworkReference: MediaImageReference? {
+
+        displayItem?.artworkImageReference
+    }
+
     var unifiedProviderLabel: String {
 
         displayItem?.providerLabel ?? "LOCAL"

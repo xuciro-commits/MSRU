@@ -242,6 +242,15 @@ final class SystemNowPlayingCoordinator: NSObject, PlaybackSessionObserving, Sys
         if let artworkData = playback.unifiedArtworkData,
            let artwork = makeMediaItemArtwork(from: artworkData) {
             info[MPMediaItemPropertyArtwork] = artwork
+        } else if let ref = playback.unifiedArtworkReference {
+            Task { @MainActor [weak self] in
+                guard let self, let image = await MediaImagePipeline.shared.loadThumbnail(for: ref, bucket: .px512) else { return }
+                guard var currentInfo = self.nowPlayingCenter.nowPlayingInfo ?? self.currentNowPlayingInfo else { return }
+                let size = image.size
+                currentInfo[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: size) { _ in image }
+                self.nowPlayingCenter.nowPlayingInfo = currentInfo
+                self.currentNowPlayingInfo = currentInfo
+            }
         }
 
         nowPlayingCenter.nowPlayingInfo = info

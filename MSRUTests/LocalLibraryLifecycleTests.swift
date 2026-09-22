@@ -74,7 +74,8 @@ struct LocalLibraryLifecycleTests {
         }
 
         let repo = MockManifestRepository(initialTracks: initialTracks)
-        let store = LocalLibraryStore(repository: repo)
+        let db = try AppDatabase.makeEphemeral()
+        let store = LocalLibraryStore(repository: repo, db: db)
 
         // 1. Hydrate
         await store.loadIfNeeded()
@@ -129,7 +130,8 @@ struct LocalLibraryLifecycleTests {
         try Data(repeating: 0x9A, count: 1024).write(to: newFile2)
 
         let repo = MockManifestRepository(initialTracks: initialTracks)
-        let store = LocalLibraryStore(repository: repo)
+        let db = try AppDatabase.makeEphemeral()
+        let store = LocalLibraryStore(repository: repo, db: db)
         await store.loadIfNeeded()
 
         let scanner = WatchedFolderScanner()
@@ -181,7 +183,8 @@ struct LocalLibraryLifecycleTests {
         #expect(await !registry.hasValidRecord(for: fileURL))
 
         let repo = MockManifestRepository(initialTracks: [track])
-        let store = LocalLibraryStore(repository: repo)
+        let db = try AppDatabase.makeEphemeral()
+        let store = LocalLibraryStore(repository: repo, db: db)
         await store.loadIfNeeded()
 
         let scanner = WatchedFolderScanner()
@@ -212,7 +215,8 @@ struct LocalLibraryLifecycleTests {
         let track2 = LocalTrack(fileURL: file2, title: "Delete Me", artist: "Artist", duration: 100)
 
         let repo = MockManifestRepository(initialTracks: [track1, track2])
-        let store = LocalLibraryStore(repository: repo)
+        let db = try AppDatabase.makeEphemeral()
+        let store = LocalLibraryStore(repository: repo, db: db)
         await store.loadIfNeeded()
         #expect(store.tracks.count == 2)
 
@@ -240,7 +244,8 @@ struct LocalLibraryLifecycleTests {
     @Test
     func test_batchIngestion_savesManifestExactlyOnce() async throws {
         let repo = MockManifestRepository()
-        let store = LocalLibraryStore(repository: repo)
+        let db = try AppDatabase.makeEphemeral()
+        let store = LocalLibraryStore(repository: repo, db: db)
 
         var tracks: [LocalTrack] = []
         for i in 1...100 {
@@ -262,7 +267,8 @@ struct LocalLibraryLifecycleTests {
         let repo = MockManifestRepository()
         repo.shouldFailSave = true
 
-        let store = LocalLibraryStore(repository: repo)
+        let db = (try? AppDatabase.makeEphemeral()) ?? AppDatabase.shared
+        let store = LocalLibraryStore(repository: repo, db: db)
         let track = LocalTrack(fileURL: URL(fileURLWithPath: "/music/fail.flac"), title: "Fail", artist: "Artist", duration: 100)
 
         var didCatchError = false
@@ -365,7 +371,8 @@ struct LocalLibraryOrderingTests {
     func suspendedScanCannotOverwriteLaterImport() async {
         let repository = SuspendedLocalRepository()
         repository.suspendLoad = true
-        let store = LocalLibraryStore(repository: repository)
+        let db = (try? AppDatabase.makeEphemeral()) ?? AppDatabase.shared
+        let store = LocalLibraryStore(repository: repository, db: db)
         var loading: Task<Void, Never>?
         await withCheckedContinuation { started in
             repository.started = { started.resume() }
@@ -391,7 +398,8 @@ struct LocalLibraryOrderingTests {
     func secondImportIsQueuedInsteadOfSilentlyDiscarded() async {
         let repository = SuspendedLocalRepository()
         repository.suspendImport = true
-        let store = LocalLibraryStore(repository: repository)
+        let db = (try? AppDatabase.makeEphemeral()) ?? AppDatabase.shared
+        let store = LocalLibraryStore(repository: repository, db: db)
         var first: Task<Void, Never>?
         await withCheckedContinuation { started in
             repository.started = { started.resume() }
@@ -454,7 +462,8 @@ struct LocalLibraryCascadeDeletionTests {
         let t1 = LocalTrack(fileURL: URL(fileURLWithPath: "/music/track1.flac"), title: "Track 1", artist: "Artist A", album: "Album 1", duration: 180)
         let t2 = LocalTrack(fileURL: URL(fileURLWithPath: "/music/track2.flac"), title: "Track 2", artist: "Artist B", album: "Album 2", duration: 200)
 
-        let store = LocalLibraryStore(repository: repo)
+        let db1 = (try? AppDatabase.makeEphemeral()) ?? AppDatabase.shared
+        let store = LocalLibraryStore(repository: repo, db: db1)
         try? await store.addTracks([t1, t2])
         #expect(store.tracks.count == 2)
 
@@ -471,7 +480,8 @@ struct LocalLibraryCascadeDeletionTests {
         let t2 = LocalTrack(fileURL: URL(fileURLWithPath: "/music/a2.flac"), title: "泥河", artist: "万能青年旅店", album: "冀西南林路行", duration: 240)
         let t3 = LocalTrack(fileURL: URL(fileURLWithPath: "/music/b1.flac"), title: "晴天", artist: "周杰伦", album: "叶惠美", duration: 269)
 
-        let store = LocalLibraryStore(repository: repo)
+        let db2 = (try? AppDatabase.makeEphemeral()) ?? AppDatabase.shared
+        let store = LocalLibraryStore(repository: repo, db: db2)
         try? await store.addTracks([t1, t2, t3])
         #expect(store.tracks.count == 3)
 
@@ -490,7 +500,8 @@ struct LocalLibraryCascadeDeletionTests {
         let t3 = LocalTrack(fileURL: URL(fileURLWithPath: "/music/j3.flac"), title: "七里香", artist: "周杰伦", album: "七里香", duration: 299)
         let t4 = LocalTrack(fileURL: URL(fileURLWithPath: "/music/ad1.flac"), title: "Rolling in the Deep", artist: "Adele", album: "21", duration: 228)
 
-        let store = LocalLibraryStore(repository: repo)
+        let db3 = (try? AppDatabase.makeEphemeral()) ?? AppDatabase.shared
+        let store = LocalLibraryStore(repository: repo, db: db3)
         try? await store.addTracks([t1, t2, t3, t4])
         #expect(store.tracks.count == 4)
 

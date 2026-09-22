@@ -762,15 +762,12 @@ struct TrackInspectorView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .center, spacing: 14) {
-                    AsyncImage(url: content.artworkURL) { phase in
-                        if case .success(let image) = phase {
-                            image.resizable().scaledToFill()
-                        } else {
-                            placeholderArtwork
-                        }
-                    }
-                    .frame(width: 160, height: 160)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    MediaImageView(
+                        url: content.artworkURL,
+                        fixedSize: CGSize(width: 160, height: 160),
+                        thumbnailPixelSize: CGSize(width: 320, height: 320),
+                        cornerRadius: 14
+                    )
                     .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
 
                     VStack(spacing: 4) {
@@ -840,51 +837,22 @@ struct TrackInspectorView: View {
 
     @ViewBuilder
     private func artwork(_ track: LibraryTrack) -> some View {
-        if let data = track.artworkData, let image = Image(artworkData: data) {
-            image
-                .resizable()
-                .scaledToFill()
-        } else if let url = track.artworkURL {
-            AsyncImage(url: url) { phase in
-                if case .success(let image) = phase {
-                    image
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    placeholderArtwork
-                }
-            }
-        } else {
-            placeholderArtwork
-        }
+        MediaImageView(
+            reference: track.artworkReference ?? track.artworkURL?.absoluteString,
+            thumbnailPixelSize: CGSize(width: 320, height: 320),
+            placeholderSystemImage: "music.note",
+            cornerRadius: 14
+        )
     }
 
     @ViewBuilder
     private func artwork(_ track: LocalTrack) -> some View {
-        if let ref = track.artworkReference {
-            ArtworkThumbnailView(
-                reference: ref,
-                thumbnailPixelSize: CGSize(width: 320, height: 320),
-                placeholderSystemImage: "music.note",
-                cornerRadius: 14
-            )
-        } else if let data = track.artworkData, let image = Image(artworkData: data) {
-            image
-                .resizable()
-                .scaledToFill()
-        } else {
-            placeholderArtwork
-        }
-    }
-
-    private var placeholderArtwork: some View {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(Color.secondary.opacity(0.15))
-            .overlay {
-                Image(systemName: "music.note")
-                    .font(.system(size: 44))
-                    .foregroundStyle(.secondary)
-            }
+        MediaImageView(
+            reference: track.artworkReference,
+            thumbnailPixelSize: CGSize(width: 320, height: 320),
+            placeholderSystemImage: "music.note",
+            cornerRadius: 14
+        )
     }
 
     // MARK: - Formatters

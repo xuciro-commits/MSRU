@@ -743,75 +743,12 @@ struct BrowseView: View {
     // MARK: - Artwork
 
     @ViewBuilder
-    private func artwork(
-        _ item:
-            OpenverseAudio
-    ) -> some View {
-
-        AsyncImage(
-            url:
-                item.thumbnailURL
-        ) {
-            phase in
-
-            switch phase {
-
-            case .success(
-                let image
-            ):
-
-                image
-                    .resizable()
-                    .scaledToFill()
-
-
-            default:
-
-                artworkPlaceholder
-            }
-        }
-        .frame(
-            maxWidth:
-                .infinity
+    private func artwork(_ item: OpenverseAudio) -> some View {
+        MediaImageView(
+            url: item.thumbnailURL,
+            thumbnailPixelSize: CGSize(width: 256, height: 256),
+            cornerRadius: 12
         )
-        .aspectRatio(
-            1,
-            contentMode:
-                .fit
-        )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius:
-                    12,
-                style:
-                    .continuous
-            )
-        )
-    }
-
-
-    private var artworkPlaceholder:
-        some View {
-
-        ZStack {
-
-            Rectangle()
-                .fill(
-                    .quaternary
-                )
-
-
-            Image(
-                systemName:
-                    "music.note"
-            )
-            .font(
-                .largeTitle
-            )
-            .foregroundStyle(
-                .secondary
-            )
-        }
     }
 }
 

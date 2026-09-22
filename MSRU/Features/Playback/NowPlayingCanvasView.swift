@@ -25,8 +25,8 @@ struct NowPlayingCanvasView: View {
         ZStack {
             // Ambient dynamic backdrop
             AmbientBackdropView(
-                artworkData: playback.unifiedArtworkData,
-                artworkURL: playback.unifiedArtworkURL
+                artworkReference: playback.unifiedArtworkReference,
+                primaryTint: .accentColor
             )
 
             // Main Canvas Content
@@ -163,40 +163,16 @@ struct NowPlayingCanvasView: View {
     }
 
     private var artworkCard: some View {
-        Group {
-            if let data = playback.unifiedArtworkData,
-               let image = Image(artworkData: data) {
-                image
-                    .resizable()
-                    .scaledToFill()
-            } else if let url = playback.unifiedArtworkURL {
-                AsyncImage(url: url) { phase in
-                    if case .success(let img) = phase {
-                        img.resizable().scaledToFill()
-                    } else {
-                        artworkPlaceholder
-                    }
-                }
-            } else {
-                artworkPlaceholder
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        MediaImageView(
+            reference: playback.unifiedArtworkReference,
+            thumbnailPixelSize: CGSize(width: 512, height: 512),
+            placeholderSystemImage: "music.note",
+            cornerRadius: 18
+        )
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
         )
-    }
-
-    private var artworkPlaceholder: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white.opacity(0.08))
-
-            Image(systemName: "music.note")
-                .font(.system(size: 72, weight: .light))
-                .foregroundStyle(.white.opacity(0.45))
-        }
     }
 
     // MARK: - Bottom Controls Section

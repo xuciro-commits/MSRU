@@ -80,6 +80,7 @@ nonisolated public struct LocalTrack:
         case album
         case duration
         case artworkReference
+        case artworkRelativePath
         case artworkData
         case trackNumber
         case year
@@ -97,6 +98,8 @@ nonisolated public struct LocalTrack:
 
         if let ref = try container.decodeIfPresent(String.self, forKey: .artworkReference), !ref.isEmpty {
             artworkReference = ref
+        } else if let relPath = try container.decodeIfPresent(String.self, forKey: .artworkRelativePath), !relPath.isEmpty {
+            artworkReference = relPath
         } else if let legacyData = try container.decodeIfPresent(Data.self, forKey: .artworkData), !legacyData.isEmpty {
             artworkReference = LocalArtworkStorage.shared.storeArtwork(legacyData)
         } else {

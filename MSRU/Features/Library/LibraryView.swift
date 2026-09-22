@@ -104,6 +104,10 @@ struct LibraryView:
     private var searchQuery:
         String = ""
 
+    @State
+    private var isDropTargeted:
+        Bool = false
+
 
     // MARK: - Init
 
@@ -135,25 +139,44 @@ struct LibraryView:
     var body:
         some View {
 
-        VStack(
-            spacing:
-                0
-        ) {
+        Group {
+            switch viewMode {
+            case .grid:
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        header
+                        Divider()
+                        filterBar
+                        Divider()
+                        errorBanners
 
-            header
+                        switch scope {
+                        case .saved:
+                            savedGridContent
+                        case .local:
+                            localGridContent
+                        }
+                    }
+                    .padding(24)
+                }
+                .hideScrollIndicatorsCompletely()
 
+            case .table:
+                VStack(spacing: 0) {
+                    header
+                    Divider()
+                    filterBar
+                    Divider()
+                    errorBanners
 
-            Divider()
-            if let error = feature.errorMessage {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label(error, systemImage: "exclamationmark.triangle")
-                    Button("Reload Library") { Task { await feature.libraryStore.load() } }
-                }.font(.callout).padding()
+                    switch scope {
+                    case .saved:
+                        savedTableContent
+                    case .local:
+                        localTableContent
+                    }
+                }
             }
-            if let error = playback.playbackErrorMessage {
-                Label(error, systemImage: "speaker.slash").font(.callout).padding()
-            }
-            content
         }
         .frame(
             maxWidth:
@@ -161,6 +184,14 @@ struct LibraryView:
             maxHeight:
                 .infinity
         )
+        .dropDestination(for: URL.self) { urls, _ in
+            Task {
+                await localStore.importFiles(urls)
+            }
+            return true
+        } isTargeted: { targeted in
+            isDropTargeted = targeted
+        }
     }
 
 
@@ -227,330 +258,389 @@ struct LibraryView:
     }
 
 
-    // MARK: - Content
+    // MARK: - Filter Bar
+
+    private var filterBar: some View {
+        LibraryFilterBar(
+            viewMode: $viewMode,
+            sortField: $sortField,
+            sortAscending: $sortAscending,
+            searchQuery: $searchQuery
+        )
+    }
+
+    // MARK: - Error Banners
 
     @ViewBuilder
-    private var content:
-        some View {
+    private var errorBanners: some View {
+        if let error = feature.errorMessage {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(error, systemImage: "exclamationmark.triangle")
+                Button("Reload Library") { Task { await feature.libraryStore.load() } }
+            }
+            .font(.callout)
+            .padding(.horizontal, 20)
+        }
+        if let error = playback.playbackErrorMessage {
+            Label(error, systemImage: "speaker.slash")
+                .font(.callout)
+                .padding(.horizontal, 20)
+        }
+    }
 
-        switch scope {
+    // MARK: - Filtered Queries
 
-        case .saved:
+    private var filteredSavedTracks: [LibraryTrack] {
+        LibraryCollectionSortFilter.filterAndSort(
+            tracks: feature.tracks,
+            query: searchQuery,
+            field: sortField,
+            ascending: sortAscending
+        )
+    }
 
-            savedLibrary
+    private var filteredLocalTracks: [LocalTrack] {
+        LibraryCollectionSortFilter.filterAndSort(
+            tracks: localStore.tracks,
+            query: searchQuery,
+            field: sortField,
+            ascending: sortAscending
+        )
+    }
 
+    private var gridColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 180, maximum: 200), spacing: 20)]
+    }
 
-        case .local:
+    // MARK: - Grid Contents
 
-            LocalLibraryView(
-                store:
-                    localStore,
-                library:
-                    feature
-                        .libraryStore,
-                playback:
-                    playback,
-                selectedTrack:
-                    $selectedLocalTrack,
-                onAddMusic:
-                    onAddMusic
+    @ViewBuilder
+    private var savedGridContent: some View {
+        if feature.isLoading {
+            loadingView
+        } else if feature.tracks.isEmpty {
+            emptySavedView
+        } else if filteredSavedTracks.isEmpty {
+            emptySearchView
+        } else {
+            LazyVGrid(columns: gridColumns, spacing: 24) {
+                ForEach(filteredSavedTracks) { track in
+                    LibrarySavedTrackCardItemView(
+                        track: track,
+                        isRemoving: feature.isRemoving(track),
+                        isSelected: selectedLibraryTrack?.id == track.id,
+                        isPlaying: playback.currentItem?.id == PlaybackItem(library: track)?.id && playback.isPlaying,
+                        onSelect: { selectedLibraryTrack = track },
+                        onPlay: { feature.send(.playRequested(id: track.id)) },
+                        onPlayNext: { feature.send(.playNextRequested(id: track.id)) },
+                        onEnqueue: { feature.send(.enqueueRequested(id: track.id)) },
+                        onRemove: { feature.send(.removeRequested(id: track.id)) }
+                    )
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var localGridContent: some View {
+        if localStore.isLoading {
+            loadingView
+        } else if localStore.tracks.isEmpty {
+            emptyLocalView
+        } else if filteredLocalTracks.isEmpty {
+            emptySearchView
+        } else {
+            LazyVGrid(columns: gridColumns, spacing: 24) {
+                ForEach(filteredLocalTracks) { track in
+                    LibraryLocalTrackCardItemView(
+                        track: track,
+                        isSelected: selectedLocalTrack?.id == track.id,
+                        isPlaying: playback.isPlaying(trackID: track.id),
+                        isSaved: feature.libraryStore.contains(local: track),
+                        onSelect: { selectedLocalTrack = track },
+                        onPlay: { playback.toggle(track: track, queue: localStore.tracks) },
+                        onPlayNext: { playback.playNext(track) },
+                        onEnqueue: { playback.addToQueue(track) },
+                        onToggleLibrary: {
+                            Task {
+                                if feature.libraryStore.contains(local: track) {
+                                    await feature.libraryStore.remove(local: track)
+                                } else {
+                                    await feature.libraryStore.add(local: track)
+                                }
+                            }
+                        },
+                        onReveal: { PlatformFileViewer.revealInFinder(url: track.fileURL) },
+                        onDelete: {
+                            Task {
+                                await localStore.deleteTracks(withIDs: [track.id])
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: - Table Contents
+
+    @ViewBuilder
+    private var savedTableContent: some View {
+        if feature.isLoading {
+            loadingView
+        } else if feature.tracks.isEmpty {
+            emptySavedView
+        } else if filteredSavedTracks.isEmpty {
+            emptySearchView
+        } else {
+            LibraryTrackTableView(
+                tracks: filteredSavedTracks,
+                selectedTrack: $selectedLibraryTrack,
+                playback: playback,
+                library: feature.libraryStore
             )
         }
     }
 
-
-    // MARK: - Saved Library
-
     @ViewBuilder
-    private var savedLibrary:
-        some View {
-
-        if feature.isLoading {
-
-            VStack(
-                spacing:
-                    12
-            ) {
-
-                ProgressView()
-
-
-                Text(
-                    "Loading library…"
-                )
-                .foregroundStyle(
-                    .secondary
-                )
-            }
-            .frame(
-                maxWidth:
-                    .infinity,
-                maxHeight:
-                    .infinity
+    private var localTableContent: some View {
+        if localStore.isLoading {
+            loadingView
+        } else if localStore.tracks.isEmpty {
+            emptyLocalView
+        } else if filteredLocalTracks.isEmpty {
+            emptySearchView
+        } else {
+            LocalTrackTableView(
+                tracks: filteredLocalTracks,
+                positionLookup: localStore.positionLookup,
+                isFiltered: !searchQuery.isEmpty,
+                selectedTrack: $selectedLocalTrack,
+                playback: playback,
+                library: feature.libraryStore,
+                onRevealInFinder: { url in
+                    PlatformFileViewer.revealInFinder(url: url)
+                },
+                onDeleteTracks: { ids in
+                    Task {
+                        await localStore.deleteTracks(withIDs: ids)
+                    }
+                }
             )
+        }
+    }
+
+    // MARK: - Empty & Loading Views
+
+    private var emptySavedView: some View {
+        ContentUnavailableView {
+            Label("Library is empty", systemImage: "music.note.house")
+        } description: {
+            Text("Add songs from Browse or local files.")
+        } actions: {
+            Button("Add Music") { onAddMusic() }
+        }
+        .frame(maxWidth: .infinity, minHeight: 280)
+    }
+
+    private var emptyLocalView: some View {
+        ContentUnavailableView {
+            Label("No Local Music", systemImage: "externaldrive")
+        } description: {
+            Text("Import audio files, or drag files into MSRU.")
+        } actions: {
+            Button("Add Music") { onAddMusic() }
+        }
+        .frame(maxWidth: .infinity, minHeight: 280)
+    }
+
+    private var emptySearchView: some View {
+        ContentUnavailableView.search(text: searchQuery)
+            .frame(maxWidth: .infinity, minHeight: 280)
+    }
+
+    private var loadingView: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+            Text("Loading library…").foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 280)
+    }
 
 
-        } else if
-            feature
-                .tracks
-                .isEmpty {
+    // MARK: - Card Views
 
-            ContentUnavailableView {
+    private struct LibrarySavedTrackCardItemView: View {
+        let track: LibraryTrack
+        let isRemoving: Bool
+        let isSelected: Bool
+        let isPlaying: Bool
+        let onSelect: () -> Void
+        let onPlay: () -> Void
+        let onPlayNext: () -> Void
+        let onEnqueue: () -> Void
+        let onRemove: () -> Void
 
-                Label(
-                    "Library is empty",
-                    systemImage:
-                        "music.note.house"
+        @State private var isHovered: Bool = false
+
+        private var durationText: String? {
+            track.duration.map { duration in
+                let seconds = max(0, Int(duration.rounded()))
+                return String(format: "%d:%02d", seconds / 60, seconds % 60)
+            }
+        }
+
+        var body: some View {
+            UnifiedTrackCardView(
+                title: track.title,
+                subtitle: track.artist,
+                secondaryText: track.album,
+                durationText: durationText,
+                qualityBadge: track.sources.first?.kind.rawValue.uppercased(),
+                isPlaying: isPlaying,
+                isSelected: isSelected,
+                onSelect: onSelect,
+                onPlay: onPlay
+            ) {
+                MediaImageView(
+                    reference: track.artworkReference,
+                    thumbnailPixelSize: CGSize(width: 240, height: 240),
+                    placeholderSystemImage: "music.note",
+                    cornerRadius: 10
                 )
-
-            } description: {
-
-                Text(
-                    "Add songs from Browse or local files."
-                )
-
-            } actions: {
-
-                Button(
-                    "Add Music"
-                ) {
-
-                    onAddMusic()
+            } actionsMenu: {
+                if isRemoving {
+                    ProgressView()
+                        .controlSize(.small)
+                } else if isHovered {
+                    Menu {
+                        menuContent
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .frame(width: 22, height: 18)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                } else {
+                    Color.clear
+                        .frame(width: 22, height: 18)
                 }
             }
-            .frame(
-                maxWidth:
-                    .infinity,
-                maxHeight:
-                    .infinity
-            )
+            .frame(height: 236)
+            .contextMenu {
+                menuContent
+            }
+            .onHover { hovering in
+                if isHovered != hovering {
+                    isHovered = hovering
+                }
+            }
+        }
 
+        @ViewBuilder
+        private var menuContent: some View {
+            let supported = PlaybackItem(library: track) != nil
+            Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward", action: onPlayNext)
+                .disabled(!supported)
+            Button("Add to Queue", systemImage: "text.badge.plus", action: onEnqueue)
+                .disabled(!supported)
+            if !isRemoving {
+                Button(role: .destructive, action: onRemove) {
+                    Label("Remove from Library", systemImage: "trash")
+                }
+            }
+        }
+    }
 
-        } else {
+    private struct LibraryLocalTrackCardItemView: View {
+        let track: LocalTrack
+        let isSelected: Bool
+        let isPlaying: Bool
+        let isSaved: Bool
+        let onSelect: () -> Void
+        let onPlay: () -> Void
+        let onPlayNext: () -> Void
+        let onEnqueue: () -> Void
+        let onToggleLibrary: () -> Void
+        let onReveal: () -> Void
+        let onDelete: () -> Void
 
-            let tracks =
-                LibraryCollectionSortFilter
-                    .filterAndSort(
-                        tracks:
-                            feature.tracks,
-                        query:
-                            searchQuery,
-                        field:
-                            sortField,
-                        ascending:
-                            sortAscending
-                    )
+        @State private var isHovered: Bool = false
 
+        private var durationText: String {
+            let seconds = max(0, Int(track.duration.rounded()))
+            return String(format: "%d:%02d", seconds / 60, seconds % 60)
+        }
 
-            VStack(
-                spacing: 0
+        var body: some View {
+            UnifiedTrackCardView(
+                title: track.title,
+                subtitle: track.artist,
+                secondaryText: track.album,
+                durationText: durationText,
+                qualityBadge: track.fileURL.pathExtension.uppercased(),
+                isPlaying: isPlaying,
+                isSelected: isSelected,
+                onSelect: onSelect,
+                onPlay: onPlay
             ) {
-
-                LibraryFilterBar(
-                    viewMode:
-                        $viewMode,
-                    sortField:
-                        $sortField,
-                    sortAscending:
-                        $sortAscending,
-                    searchQuery:
-                        $searchQuery
+                MediaImageView(
+                    reference: track.artworkReference,
+                    thumbnailPixelSize: CGSize(width: 240, height: 240),
+                    placeholderSystemImage: "music.note",
+                    cornerRadius: 10
                 )
+            } actionsMenu: {
+                HStack(spacing: 4) {
+                    if isSaved {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(Color.accentColor)
+                            .font(.caption)
+                    }
 
-
-                Divider()
-
-
-                if tracks.isEmpty {
-
-                    ContentUnavailableView
-                        .search(
-                            text: searchQuery
-                        )
-                        .frame(
-                            maxWidth: .infinity,
-                            maxHeight: .infinity
-                        )
-
-                } else {
-
-                    switch viewMode {
-
-                    case .table:
-
-                        LibraryTrackTableView(
-                            tracks:
-                                tracks,
-                            selectedTrack:
-                                $selectedLibraryTrack,
-                            playback:
-                                playback,
-                            library:
-                                feature.libraryStore
-                        )
-
-
-                    case .grid:
-
-                        savedGrid(
-                            tracks
-                        )
+                    if isHovered {
+                        Menu {
+                            menuContent
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .frame(width: 22, height: 18)
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                    } else {
+                        Color.clear
+                            .frame(width: 22, height: 18)
                     }
                 }
             }
-        }
-    }
-
-
-    // MARK: - Saved Grid
-
-    private func savedGrid(
-        _ tracks: [LibraryTrack]
-    ) -> some View {
-
-        ScrollView {
-
-            LazyVGrid(
-                columns: [
-
-                    GridItem(
-                        .adaptive(
-                            minimum:
-                                170,
-                            maximum:
-                                220
-                        ),
-                        spacing:
-                            20
-                    )
-                ],
-                alignment:
-                    .leading,
-                spacing:
-                    26
-            ) {
-
-                ForEach(
-                    tracks
-                ) {
-                    track in
-
-                    savedCard(
-                        track
-                    )
+            .frame(height: 236)
+            .contextMenu {
+                menuContent
+            }
+            .onHover { hovering in
+                if isHovered != hovering {
+                    isHovered = hovering
                 }
             }
-            .padding(
-                28
-            )
         }
-        .hideScrollIndicatorsCompletely()
-    }
 
-
-    // MARK: - Card
-
-    private func savedCard(
-        _ track:
-            LibraryTrack
-    ) -> some View {
-
-        let isRemoving =
-            feature
-                .isRemoving(
-                    track
+        @ViewBuilder
+        private var menuContent: some View {
+            Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward", action: onPlayNext)
+            Button("Add to Queue", systemImage: "text.badge.plus", action: onEnqueue)
+            Divider()
+            Button(action: onToggleLibrary) {
+                Label(
+                    isSaved ? "Remove from Library" : "Add to Library",
+                    systemImage: isSaved ? "heart.slash" : "heart"
                 )
-
-        let isSelected =
-            selectedLibraryTrack?.id == track.id
-
-        let item = PlaybackItem(library: track)
-        let isPlaying = playback.currentItem?.id == item?.id && playback.isPlaying
-
-        return UnifiedTrackCardView(
-            title: track.title,
-            subtitle: track.artist,
-            secondaryText: track.album,
-            durationText: track.duration.map { durationText($0) },
-            qualityBadge: track.sources.first?.kind.rawValue.uppercased(),
-            isPlaying: isPlaying,
-            isSelected: isSelected,
-            onSelect: {
-                selectedLibraryTrack = track
-            },
-            onPlay: {
-                feature.send(.playRequested(id: track.id))
             }
-        ) {
-            artwork(track)
-        } actionsMenu: {
-            if isRemoving {
-                ProgressView()
-                    .controlSize(.small)
-            } else {
-                Menu {
-                    playbackActions(track)
-                    removeButton(track)
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .frame(width: 22, height: 18)
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
+            Divider()
+            Button("Show in Finder", systemImage: "folder", action: onReveal)
+            Divider()
+            Button(role: .destructive, action: onDelete) {
+                Label("Delete from Library", systemImage: "trash")
             }
-        }
-        .contextMenu {
-            playbackActions(track)
-            if !isRemoving {
-                removeButton(track)
-            }
-        }
-    }
-
-    private func durationText(_ duration: TimeInterval) -> String {
-        let seconds = max(0, Int(duration.rounded()))
-        return String(format: "%d:%02d", seconds / 60, seconds % 60)
-    }
-
-
-    @ViewBuilder
-    private func playbackActions(_ track: LibraryTrack) -> some View {
-        let supported = PlaybackItem(library: track) != nil
-        Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") {
-            feature.send(.playNextRequested(id: track.id))
-        }.disabled(!supported)
-        Button("Add to Queue", systemImage: "text.badge.plus") {
-            feature.send(.enqueueRequested(id: track.id))
-        }.disabled(!supported)
-    }
-
-    // MARK: - Remove
-
-    private func removeButton(
-        _ track:
-            LibraryTrack
-    ) -> some View {
-
-        Button(
-            role:
-                .destructive
-        ) {
-
-            feature
-                .send(
-                    .removeRequested(
-                        id:
-                            track.id
-                    )
-                )
-
-        } label: {
-
-            Label(
-                "Remove from Library",
-                systemImage:
-                    "trash"
-            )
         }
     }
 
@@ -666,100 +756,13 @@ struct LibraryView:
 
     // MARK: - Artwork
 
-    @ViewBuilder
-    private func artwork(
-        _ track:
-            LibraryTrack
-    ) -> some View {
-
-        if
-            let data =
-                track.artworkData {
-
-            localArtwork(
-                data
-            )
-
-
-        } else if
-            let url =
-                track.artworkURL {
-
-            AsyncImage(
-                url:
-                    url
-            ) {
-                phase in
-
-                switch phase {
-
-                case .success(
-                    let image
-                ):
-
-                    image
-                        .resizable()
-                        .scaledToFill()
-
-
-                default:
-
-                    artworkPlaceholder
-                }
-            }
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius:
-                        12,
-                    style:
-                        .continuous
-                )
-            )
-
-
-        } else {
-
-            artworkPlaceholder
-        }
-    }
-
-
-    @ViewBuilder
-    private func localArtwork(_ data: Data) -> some View {
-        if let image = Image(artworkData: data) {
-            image.resizable().scaledToFill()
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        } else {
-            artworkPlaceholder
-        }
-    }
-
-
-    private var artworkPlaceholder:
-        some View {
-
-        RoundedRectangle(
-            cornerRadius:
-                12,
-            style:
-                .continuous
+    private func artwork(_ track: LibraryTrack) -> some View {
+        MediaImageView(
+            reference: track.artworkReference ?? track.artworkURL?.absoluteString,
+            thumbnailPixelSize: CGSize(width: 240, height: 240),
+            placeholderSystemImage: "music.note",
+            cornerRadius: 10
         )
-        .fill(
-            .quaternary
-        )
-        .overlay {
-
-            Image(
-                systemName:
-                    "music.note"
-            )
-            .font(
-                .title2
-            )
-            .foregroundStyle(
-                .secondary
-            )
-        }
     }
 }
 

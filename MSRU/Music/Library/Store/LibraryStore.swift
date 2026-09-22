@@ -7,6 +7,7 @@ import Observation
 @Observable
 final class LibraryStore {
     private(set) var tracks: [LibraryTrack] = []
+    private(set) var savedLocalURLs: Set<URL> = []
     private(set) var isLoading = false
     private(set) var isSaving = false
     private(set) var hasLoaded = false
@@ -16,7 +17,10 @@ final class LibraryStore {
     private var operationID: UUID?
 
     convenience init() { self.init(repository: JSONLibraryRepository()) }
-    init(repository: any LibraryRepository) { self.repository = repository }
+    init(repository: any LibraryRepository) {
+        self.repository = repository
+        rebuildIndex()
+    }
 
     func load() async {
         _ = await serialized { await self.loadNow() }
@@ -28,6 +32,7 @@ final class LibraryStore {
         defer { isLoading = false }
         do {
             tracks = try await repository.loadTracks().sorted { $0.dateAdded > $1.dateAdded }
+            rebuildIndex()
             hasLoaded = true
             return true
         } catch {
@@ -42,7 +47,11 @@ final class LibraryStore {
     func track(containing source: LibraryPlaybackSource) -> LibraryTrack? {
         tracks.first { track in track.sources.contains { isSameSource($0, source) } }
     }
-    func contains(local track: LocalTrack) -> Bool { contains(source: LibraryPlaybackSource(local: track)) }
+    func contains(local track: LocalTrack) -> Bool {
+        savedLocalURLs.contains(track.fileURL)
+            || savedLocalURLs.contains(track.fileURL.standardizedFileURL)
+            || savedLocalURLs.contains(track.fileURL.resolvingSymlinksInPath().standardizedFileURL)
+    }
     func libraryTrack(for localTrack: LocalTrack) -> LibraryTrack? {
         track(containing: LibraryPlaybackSource(local: localTrack))
     }
@@ -135,12 +144,27 @@ final class LibraryStore {
             do {
                 try await self.repository.saveTracks(updated)
                 self.tracks = updated
+                self.rebuildIndex()
                 return true
             } catch {
                 self.errorMessage = error.localizedDescription
                 return false
             }
         }
+    }
+
+    private func rebuildIndex() {
+        var urls = Set<URL>()
+        for track in tracks {
+            for source in track.sources {
+                if let url = source.localFileURL {
+                    urls.insert(url.resolvingSymlinksInPath().standardizedFileURL)
+                    urls.insert(url.standardizedFileURL)
+                    urls.insert(url)
+                }
+            }
+        }
+        self.savedLocalURLs = urls
     }
 
     private func serialized(_ operation: @escaping @MainActor () async -> Bool) async -> Bool {

@@ -123,7 +123,11 @@ public actor LibraryQueryEngine {
             let artistRows = try Row.fetchAll(db, sql: """
                 SELECT a.id, a.name,
                        (SELECT COUNT(*) FROM artist_credits ac WHERE ac.artist_id = a.id AND ac.entity_type = 'recording') as track_count,
-                       (SELECT COUNT(DISTINCT ac.entity_id) FROM artist_credits ac WHERE ac.artist_id = a.id AND ac.entity_type = 'release') as album_count
+                       (SELECT COUNT(DISTINCT ac.entity_id) FROM artist_credits ac WHERE ac.artist_id = a.id AND ac.entity_type = 'release') as album_count,
+                       (SELECT rel.artwork_asset_id FROM releases rel
+                        JOIN artist_credits ac ON ac.entity_id = rel.id AND ac.entity_type = 'release'
+                        WHERE ac.artist_id = a.id AND rel.artwork_asset_id IS NOT NULL
+                        LIMIT 1) as artwork_ref
                 FROM artists a
                 ORDER BY a.sort_name ASC
             """)
@@ -135,12 +139,14 @@ public actor LibraryQueryEngine {
                 let name: String = row["name"] ?? "Unknown Artist"
                 let trackCount: Int = row["track_count"] ?? 0
                 let albumCount: Int = row["album_count"] ?? 0
+                let artRef: String? = row["artwork_ref"]
 
                 artists.append(ArtistPresentationModel(
                     id: id,
                     name: name,
                     albumCount: albumCount,
-                    trackCount: trackCount
+                    trackCount: trackCount,
+                    artworkReference: artRef
                 ))
             }
 

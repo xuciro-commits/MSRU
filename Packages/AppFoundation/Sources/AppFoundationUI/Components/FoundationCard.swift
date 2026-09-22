@@ -137,44 +137,31 @@ public struct FoundationCard<
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Media Frame
-            ZStack(alignment: .bottomTrailing) {
-                media
-                    .aspectRatio(aspectRatio, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                    .shadow(
-                        color: .black.opacity(isHovered ? 0.16 : 0.06),
-                        radius: isHovered ? 10 : 5,
-                        y: isHovered ? 6 : 2
-                    )
-
-                // Top Leading Badges
-                VStack {
-                    HStack {
-                        topLeadingBadges
-                        Spacer()
-                    }
-                    Spacer()
-                }
-                .padding(8)
-
-                // Top Trailing Badges
-                VStack {
-                    HStack {
-                        Spacer()
-                        topTrailingBadges
-                    }
-                    Spacer()
-                }
-                .padding(8)
-
-                // Action Overlay on Hover
-                if isHovered {
-                    actionOverlay
+            // Media Frame with rigid, deterministic aspect-ratio anchor
+            media
+                .aspectRatio(aspectRatio, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                .shadow(
+                    color: isHovered ? .black.opacity(0.16) : .clear,
+                    radius: isHovered ? 6 : 0,
+                    y: isHovered ? 3 : 0
+                )
+                .overlay(alignment: .topLeading) {
+                    topLeadingBadges
                         .padding(8)
-                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
                 }
-            }
+                .overlay(alignment: .topTrailing) {
+                    topTrailingBadges
+                        .padding(8)
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if isHovered {
+                        actionOverlay
+                            .padding(8)
+                            .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                    }
+                }
+                .animation(.easeInOut(duration: 0.15), value: isHovered)
 
             // Text Stack
             VStack(alignment: .leading, spacing: 2) {
@@ -196,20 +183,22 @@ public struct FoundationCard<
             }
         }
         .padding(8)
-        .background(
-            RoundedRectangle(cornerRadius: cornerRadius + 4, style: .continuous)
-                .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: cornerRadius + 4, style: .continuous)
-                .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
-        )
+        .background {
+            if isSelected {
+                RoundedRectangle(cornerRadius: cornerRadius + 4, style: .continuous)
+                    .fill(Color.accentColor.opacity(0.12))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: cornerRadius + 4, style: .continuous)
+                            .strokeBorder(Color.accentColor, lineWidth: 2)
+                    }
+            }
+        }
         .contentShape(Rectangle())
         .onTapGesture {
             onSelect()
         }
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            if isHovered != hovering {
                 isHovered = hovering
             }
         }
@@ -295,38 +284,40 @@ public struct AlbumCardView<Cover: View>: View {
 
     @ViewBuilder
     private var coverImageView: some View {
-        if let data = album.artworkData, let image = Image(foundationArtworkData: data) {
-            image
-                .resizable()
-                .scaledToFill()
-        } else if let url = album.artworkURL {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .empty:
-                    ProgressView()
-                case .success(let image):
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(Color.secondary.opacity(0.15))
+            .aspectRatio(1.0, contentMode: .fit)
+            .overlay {
+                if let data = album.artworkData, let image = Image(foundationArtworkData: data) {
                     image
                         .resizable()
                         .scaledToFill()
-                case .failure:
-                    placeholderNoteView
-                @unknown default:
+                } else if let url = album.artworkURL {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .empty:
+                            ProgressView()
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure:
+                            placeholderNoteView
+                        @unknown default:
+                            placeholderNoteView
+                        }
+                    }
+                } else {
                     placeholderNoteView
                 }
             }
-        } else {
-            placeholderNoteView
-        }
+            .clipped()
     }
 
     private var placeholderNoteView: some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(Color.secondary.opacity(0.15))
-            .overlay {
-                Image(systemName: "music.note")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.secondary.opacity(0.5))
-            }
+        Image(systemName: "music.note")
+            .font(.system(size: 40))
+            .foregroundStyle(.secondary.opacity(0.5))
     }
 }
 
@@ -373,8 +364,9 @@ public struct ArtistAvatarView<Avatar: View>: View {
             }
             .aspectRatio(1, contentMode: .fit)
             .clipShape(Circle())
-            .shadow(color: .black.opacity(isHovered ? 0.15 : 0.05), radius: isHovered ? 12 : 5, y: isHovered ? 6 : 2)
+            .shadow(color: .black.opacity(0.08), radius: 6, y: 3)
             .scaleEffect(isHovered ? 1.03 : 1.0)
+            .animation(.easeOut(duration: 0.16), value: isHovered)
 
             VStack(spacing: 2) {
                 Text(artist.name)
@@ -393,7 +385,7 @@ public struct ArtistAvatarView<Avatar: View>: View {
             onSelect()
         }
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            if isHovered != hovering {
                 isHovered = hovering
             }
         }
@@ -401,38 +393,40 @@ public struct ArtistAvatarView<Avatar: View>: View {
 
     @ViewBuilder
     private var avatarImageView: some View {
-        if let data = artist.artworkData, let image = Image(foundationArtworkData: data) {
-            image
-                .resizable()
-                .scaledToFill()
-        } else if let url = artist.artworkURL {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .empty:
-                    ProgressView()
-                case .success(let image):
+        Circle()
+            .fill(Color.secondary.opacity(0.15))
+            .aspectRatio(1.0, contentMode: .fit)
+            .overlay {
+                if let data = artist.artworkData, let image = Image(foundationArtworkData: data) {
                     image
                         .resizable()
                         .scaledToFill()
-                case .failure:
-                    placeholderAvatarView
-                @unknown default:
+                } else if let url = artist.artworkURL {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .empty:
+                            ProgressView()
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure:
+                            placeholderAvatarView
+                        @unknown default:
+                            placeholderAvatarView
+                        }
+                    }
+                } else {
                     placeholderAvatarView
                 }
             }
-        } else {
-            placeholderAvatarView
-        }
+            .clipped()
     }
 
     private var placeholderAvatarView: some View {
-        Circle()
-            .fill(Color.secondary.opacity(0.15))
-            .overlay {
-                Image(systemName: "music.mic")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.secondary.opacity(0.5))
-            }
+        Image(systemName: "music.mic")
+            .font(.system(size: 40))
+            .foregroundStyle(.secondary.opacity(0.5))
     }
 }
 

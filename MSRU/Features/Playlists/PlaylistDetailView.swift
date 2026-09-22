@@ -183,16 +183,26 @@ struct PlaylistDetailView: View {
 
     // MARK: - Hero Artwork
 
+    @ViewBuilder
     private var heroArtwork: some View {
-        ZStack {
-            LinearGradient(
-                colors: [Color.accentColor.opacity(0.8), Color.purple.opacity(0.8)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+        if let ref = playlist.artworkReference {
+            MediaImageView(
+                reference: ref,
+                thumbnailPixelSize: CGSize(width: 320, height: 320),
+                placeholderSystemImage: "music.note.list",
+                cornerRadius: 12
             )
-            Image(systemName: "music.note.list")
-                .font(.system(size: 56, weight: .light))
-                .foregroundStyle(.white.opacity(0.85))
+        } else {
+            ZStack {
+                LinearGradient(
+                    colors: [Color.accentColor.opacity(0.8), Color.purple.opacity(0.8)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                Image(systemName: "music.note.list")
+                    .font(.system(size: 56, weight: .light))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
         }
     }
 
@@ -216,22 +226,11 @@ struct PlaylistDetailView: View {
             .frame(width: 24)
 
             // Small artwork
-            if let data = track.artworkData, let image = Image(artworkData: data) {
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 36, height: 36)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-            } else {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.secondary.opacity(0.15))
-                    .frame(width: 36, height: 36)
-                    .overlay {
-                        Image(systemName: "music.note")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-            }
+            MediaImageView(
+                reference: track.artworkReference,
+                fixedSize: CGSize(width: 36, height: 36),
+                cornerRadius: 6
+            )
 
             // Title & Artist
             VStack(alignment: .leading, spacing: 2) {

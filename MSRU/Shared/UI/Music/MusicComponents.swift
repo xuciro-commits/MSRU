@@ -14,53 +14,12 @@ struct MusicArtworkView: View {
     var cornerRadius: CGFloat = 10
 
     var body: some View {
-        GeometryReader { geometry in
-            artwork
-                .frame(width: geometry.size.width, height: geometry.size.height)
-                .clipped()
-        }
-        .aspectRatio(aspectRatio, contentMode: .fit)
-        .clipShape(
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        MediaImageView(
+            url: url,
+            thumbnailPixelSize: CGSize(width: 256, height: 256),
+            cornerRadius: cornerRadius
         )
-    }
-
-    @ViewBuilder
-    private var artwork: some View {
-        if let url {
-            AsyncImage(
-                url: url,
-                transaction: Transaction(animation: .easeOut(duration: 0.2))
-            ) { phase in
-                switch phase {
-                case .empty:
-                    placeholder
-                        .overlay {
-                            ProgressView().controlSize(.small)
-                        }
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure:
-                    placeholder
-                @unknown default:
-                    placeholder
-                }
-            }
-        } else {
-            placeholder
-        }
-    }
-
-    private var placeholder: some View {
-        Rectangle()
-            .fill(.quaternary)
-            .overlay {
-                Image(systemName: "music.note")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
-            }
+        .aspectRatio(aspectRatio, contentMode: .fit)
     }
 }
 

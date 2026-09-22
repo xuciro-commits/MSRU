@@ -91,15 +91,27 @@ struct ArtistsView: View {
         }
     }
 
+    @ViewBuilder
     private var mainArtistsGrid: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-
-            if filteredArtists.isEmpty {
+        if localStore.isLoading {
+            VStack(spacing: 0) {
+                header
+                Divider()
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        } else if filteredArtists.isEmpty {
+            VStack(spacing: 0) {
+                header
+                Divider()
                 emptyState
-            } else {
-                ScrollView {
+            }
+        } else {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 20) {
+                    header
+                    Divider()
+
                     LazyVGrid(
                         columns: [GridItem(.adaptive(minimum: 140, maximum: 180), spacing: 24)],
                         spacing: 28
@@ -128,10 +140,10 @@ struct ArtistsView: View {
                             }
                         }
                     }
-                    .padding(28)
                 }
-                .hideScrollIndicatorsCompletely()
+                .padding(28)
             }
+            .hideScrollIndicatorsCompletely()
         }
     }
 
@@ -262,6 +274,8 @@ enum ArtistsFeature: ApplicationFeaturePresentation {
         ]
     }
 }
+
+
 
 // MARK: - Preview
 

@@ -7,7 +7,9 @@
 
 import Testing
 import Foundation
+import SwiftUI
 import AppFoundation
+import AppFoundationUI
 import ImageIO
 #if canImport(AppKit)
 import AppKit
@@ -20,7 +22,7 @@ struct LibraryPerformanceBenchmarkTests {
 
     // MARK: - Synthetic Data Generators
 
-    private static func generateSyntheticTracks(count: Int) -> [LocalTrack] {
+    static func generateSyntheticTracks(count: Int) -> [LocalTrack] {
         var tracks: [LocalTrack] = []
         tracks.reserveCapacity(count)
 
@@ -258,4 +260,356 @@ struct LibraryPerformanceBenchmarkTests {
 
         print("Decoded \(iterations) thumbnails: total \(String(format: "%.2f", totalElapsed)) ms | per-thumbnail: \(String(format: "%.2f", perImageMs)) ms | max throughput: \(String(format: "%.1f", fps)) images/sec")
     }
+}
+
+// MARK: - Card Grid Performance Tests
+
+@Suite("Card Grid Performance Tests")
+@MainActor
+struct CardGridPerformanceTests {
+
+    @Test("Card Grid Layout Cost Isolation across 4 variants")
+    func auditCardGridLayoutIsolation() async throws {
+        print("\n=== AUDIT: Card Grid Layout Cost Isolation (200 items) ===")
+        let tracks: [LocalTrack] = (0..<200).map { i in
+            LocalTrack(
+                fileURL: URL(fileURLWithPath: "/Music/Track_\(i).flac"),
+                title: "Symphonic Melody \(i)",
+                artist: "Artist \(i % 15)",
+                album: "Album \(i % 8)",
+                duration: 215.0,
+                artworkReference: "art_\(i % 8).jpg"
+            )
+        }
+
+        struct FixedPlaceholderCard: View {
+            let track: LocalTrack
+            var body: some View {
+                VStack(alignment: .leading, spacing: 6) {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.secondary.opacity(0.12))
+                        .aspectRatio(1.0, contentMode: .fit)
+                    Text(track.title).lineLimit(1).font(.callout.weight(.semibold))
+                    Text(track.artist).lineLimit(1).font(.caption).foregroundStyle(.secondary)
+                }
+                .padding(8)
+                .frame(width: 180, height: 240)
+            }
+        }
+
+        func measureLayout<V: View>(_ view: V) -> Double {
+            let host = NSHostingView(rootView: view)
+            host.frame = NSRect(x: 0, y: 0, width: 1200, height: 800)
+
+            let start = CFAbsoluteTimeGetCurrent()
+            host.layoutSubtreeIfNeeded()
+            let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000.0
+            return elapsed
+        }
+
+        let columns = [GridItem(.adaptive(minimum: 160, maximum: 200), spacing: 18)]
+
+        // Variant 2: Card replaced by fixed-size lightweight placeholder
+        let v2View = ScrollView {
+            LazyVGrid(columns: columns, spacing: 24) {
+                ForEach(tracks) { track in
+                    FixedPlaceholderCard(track: track)
+                }
+            }
+            .padding(28)
+        }
+        let v2Elapsed = measureLayout(v2View)
+        print("Variant 2 (Fixed-size lightweight placeholder): \(String(format: "%.2f", v2Elapsed)) ms")
+
+        // Variant 1: artwork replaced by fixed-size Rectangle (in FoundationCard)
+        let v1View = ScrollView {
+            LazyVGrid(columns: columns, spacing: 24) {
+                ForEach(tracks) { track in
+                    FoundationCard(
+                        titleText: track.title,
+                        subtitleText: track.artist,
+                        footerText: track.album,
+                        onSelect: {}
+                    ) {
+                        Rectangle()
+                            .fill(Color.gray)
+                            .aspectRatio(1.0, contentMode: .fit)
+                    }
+                }
+            }
+            .padding(28)
+        }
+        let v1Elapsed = measureLayout(v1View)
+        print("Variant 1 (Artwork replaced with Rectangle in FoundationCard): \(String(format: "%.2f", v1Elapsed)) ms")
+
+        // Variant 4: Remove Menu/action lookup from Card body
+        let v4View = ScrollView {
+            LazyVGrid(columns: columns, spacing: 24) {
+                ForEach(tracks) { track in
+                    UnifiedTrackCardView(
+                        title: track.title,
+                        subtitle: track.artist,
+                        secondaryText: track.album,
+                        durationText: "3:20",
+                        qualityBadge: "FLAC",
+                        isPlaying: false,
+                        isSelected: false,
+                        onSelect: {},
+                        onPlay: {}
+                    ) {
+                        ArtworkThumbnailView(
+                            reference: track.artworkReference,
+                            thumbnailPixelSize: CGSize(width: 240, height: 240),
+                            cornerRadius: 10
+                        )
+                    }
+                }
+            }
+            .padding(28)
+        }
+        let v4Elapsed = measureLayout(v4View)
+        print("Variant 4 (UnifiedTrackCardView without Menu/Context actions): \(String(format: "%.2f", v4Elapsed)) ms")
+
+        // Variant 0: Full Baseline (with Menu and contextMenu in every Card)
+        let v0View = ScrollView {
+            LazyVGrid(columns: columns, spacing: 24) {
+                ForEach(tracks) { track in
+                    UnifiedTrackCardView(
+                        title: track.title,
+                        subtitle: track.artist,
+                        secondaryText: track.album,
+                        durationText: "3:20",
+                        qualityBadge: "FLAC",
+                        isPlaying: false,
+                        isSelected: false,
+                        onSelect: {},
+                        onPlay: {}
+                    ) {
+                        ArtworkThumbnailView(
+                            reference: track.artworkReference,
+                            thumbnailPixelSize: CGSize(width: 240, height: 240),
+                            cornerRadius: 10
+                        )
+                    } actionsMenu: {
+                        HStack(spacing: 4) {
+                            Menu {
+                                Button("Play Next") {}
+                                Button("Add to Queue") {}
+                                Divider()
+                                Button("Delete") {}
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .frame(width: 22, height: 18)
+                            }
+                            .menuStyle(.borderlessButton)
+                        }
+                    }
+                    .contextMenu {
+                        Button("Play Next") {}
+                        Button("Add to Queue") {}
+                        Divider()
+                        Button("Delete") {}
+                    }
+                }
+            }
+            .padding(28)
+        }
+        let v0Elapsed = measureLayout(v0View)
+        print("Variant 0 (Baseline with Menu & contextMenu): \(String(format: "%.2f", v0Elapsed)) ms")
+
+        // Variant 4A: With only contextMenu (no inline Menu)
+        let v4AView = ScrollView {
+            LazyVGrid(columns: columns, spacing: 24) {
+                ForEach(tracks) { track in
+                    UnifiedTrackCardView(
+                        title: track.title,
+                        subtitle: track.artist,
+                        secondaryText: track.album,
+                        durationText: "3:20",
+                        qualityBadge: "FLAC",
+                        isPlaying: false,
+                        isSelected: false,
+                        onSelect: {},
+                        onPlay: {}
+                    ) {
+                        ArtworkThumbnailView(
+                            reference: track.artworkReference,
+                            thumbnailPixelSize: CGSize(width: 240, height: 240),
+                            cornerRadius: 10
+                        )
+                    }
+                    .contextMenu {
+                        Button("Play Next") {}
+                        Button("Add to Queue") {}
+                        Divider()
+                        Button("Delete") {}
+                    }
+                }
+            }
+            .padding(28)
+        }
+        let v4AElapsed = measureLayout(v4AView)
+        print("Variant 4A (With only contextMenu): \(String(format: "%.2f", v4AElapsed)) ms")
+
+        // Variant 4B: With only inline Menu (no contextMenu)
+        let v4BView = ScrollView {
+            LazyVGrid(columns: columns, spacing: 24) {
+                ForEach(tracks) { track in
+                    UnifiedTrackCardView(
+                        title: track.title,
+                        subtitle: track.artist,
+                        secondaryText: track.album,
+                        durationText: "3:20",
+                        qualityBadge: "FLAC",
+                        isPlaying: false,
+                        isSelected: false,
+                        onSelect: {},
+                        onPlay: {}
+                    ) {
+                        ArtworkThumbnailView(
+                            reference: track.artworkReference,
+                            thumbnailPixelSize: CGSize(width: 240, height: 240),
+                            cornerRadius: 10
+                        )
+                    } actionsMenu: {
+                        Menu {
+                            Button("Play Next") {}
+                            Button("Add to Queue") {}
+                            Divider()
+                            Button("Delete") {}
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .frame(width: 22, height: 18)
+                        }
+                        .menuStyle(.borderlessButton)
+                    }
+                }
+            }
+            .padding(28)
+        }
+        let v4BElapsed = measureLayout(v4BView)
+        print("Variant 4B (With only inline Menu): \(String(format: "%.2f", v4BElapsed)) ms")
+
+        // Variant 4D: On-demand Menu (placeholder 22x18 when not hovered)
+        let v4DView = ScrollView {
+            LazyVGrid(columns: columns, spacing: 24) {
+                ForEach(tracks) { track in
+                    UnifiedTrackCardView(
+                        title: track.title,
+                        subtitle: track.artist,
+                        secondaryText: track.album,
+                        durationText: "3:20",
+                        qualityBadge: "FLAC",
+                        isPlaying: false,
+                        isSelected: false,
+                        onSelect: {},
+                        onPlay: {}
+                    ) {
+                        ArtworkThumbnailView(
+                            reference: track.artworkReference,
+                            thumbnailPixelSize: CGSize(width: 240, height: 240),
+                            cornerRadius: 10
+                        )
+                    } actionsMenu: {
+                        HStack(spacing: 4) {
+                            Color.clear.frame(width: 22, height: 18)
+                        }
+                    }
+                    .contextMenu {
+                        Button("Play Next") {}
+                        Button("Add to Queue") {}
+                        Divider()
+                        Button("Delete") {}
+                    }
+                }
+            }
+            .padding(28)
+        }
+        let v4DElapsed = measureLayout(v4DView)
+        print("Variant 4D (On-demand Menu with 22x18 stable placeholder): \(String(format: "%.2f", v4DElapsed)) ms")
+
+        // Variant 5: LazyVStack of Chunked Rows (10 cards per row)
+        let chunkedTracks: [[LocalTrack]] = stride(from: 0, to: tracks.count, by: 10).map {
+            Array(tracks[$0..<min($0 + 10, tracks.count)])
+        }
+        let v5View = ScrollView {
+            LazyVStack(alignment: .leading, spacing: 24) {
+                ForEach(0..<chunkedTracks.count, id: \.self) { rowIdx in
+                    HStack(spacing: 18) {
+                        ForEach(chunkedTracks[rowIdx]) { track in
+                            UnifiedTrackCardView(
+                                title: track.title,
+                                subtitle: track.artist,
+                                secondaryText: track.album,
+                                durationText: "3:20",
+                                qualityBadge: "FLAC",
+                                isPlaying: false,
+                                isSelected: false,
+                                onSelect: {},
+                                onPlay: {}
+                            ) {
+                                ArtworkThumbnailView(
+                                    reference: track.artworkReference,
+                                    thumbnailPixelSize: CGSize(width: 240, height: 240),
+                                    cornerRadius: 10
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(28)
+        }
+        let v5Elapsed = measureLayout(v5View)
+        print("Variant 5 (LazyVStack with Chunked Rows of 10): \(String(format: "%.2f", v5Elapsed)) ms")
+
+        // Variant 6: Native NSCollectionView (LibraryGridSurface)
+        #if canImport(AppKit)
+        let v6View = LibraryGridSurface(
+            revision: 1,
+            items: tracks.map { $0.toCardSummary() },
+            itemSize: CGSize(width: 170, height: 236)
+        )
+        let v6Elapsed = measureLayout(v6View)
+        print("Variant 6 (Native NSCollectionView / LibraryGridSurface): \(String(format: "%.2f", v6Elapsed)) ms")
+        #expect(v6Elapsed >= 0)
+        #endif
+
+        #expect(v0Elapsed >= 0)
+        #expect(v2Elapsed >= 0)
+        #expect(v1Elapsed >= 0)
+        #expect(v4Elapsed >= 0)
+        #expect(v4AElapsed >= 0)
+        #expect(v4BElapsed >= 0)
+        #expect(v4DElapsed >= 0)
+        #expect(v5Elapsed >= 0)
+    }
+
+    #if canImport(AppKit)
+    @Test("Route B: LibraryGridSurface virtualization and contract verification")
+    func verifyLibraryGridSurfaceVirtualization() {
+        let tracks = LibraryPerformanceBenchmarkTests.generateSyntheticTracks(count: 2_000)
+        let summaries = tracks.map { $0.toCardSummary() }
+        let dataSource = ArrayLibraryCardDataSource(items: summaries)
+
+        #expect(dataSource.totalCount == 2_000)
+        #expect(dataSource.item(at: 0)?.title == summaries[0].title)
+        #expect(dataSource.item(at: 1_999)?.title == summaries[1_999].title)
+        #expect(dataSource.item(at: 2_000) == nil)
+
+        let surface = LibraryGridSurface(
+            revision: 1,
+            dataSource: dataSource,
+            selectedIDs: [summaries[0].id],
+            playingTrackID: summaries[0].id,
+            isPlaying: true,
+            itemSize: CGSize(width: 170, height: 236)
+        )
+        #expect(surface.revision == 1)
+        #expect(surface.itemSize == CGSize(width: 170, height: 236))
+        #expect(surface.selectedIDs.contains(summaries[0].id))
+        #expect(surface.playingTrackID == summaries[0].id)
+        #expect(surface.isPlaying == true)
+    }
+    #endif
 }

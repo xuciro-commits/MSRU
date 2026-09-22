@@ -77,30 +77,13 @@ struct WatchNowPlayingView: View {
 
     private var artworkAndProgress: some View {
         VStack(spacing: 4) {
-            if let data = playback.unifiedArtworkData,
-               let image = Image(artworkData: data) {
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 44, height: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .shadow(radius: 2)
-            } else if let url = playback.unifiedArtworkURL {
-                AsyncImage(url: url) { phase in
-                    if case .success(let image) = phase {
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 44, height: 44)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .shadow(radius: 2)
-                    } else {
-                        artworkPlaceholder
-                    }
-                }
-            } else {
-                artworkPlaceholder
-            }
+            MediaImageView(
+                reference: playback.unifiedArtworkReference,
+                fixedSize: CGSize(width: 44, height: 44),
+                thumbnailPixelSize: CGSize(width: 88, height: 88),
+                cornerRadius: 8
+            )
+            .shadow(radius: 2)
 
             // Compact Progress Bar
             GeometryReader { geo in
@@ -116,17 +99,6 @@ struct WatchNowPlayingView: View {
             }
             .frame(height: 3)
             .padding(.horizontal, 8)
-        }
-    }
-
-    private var artworkPlaceholder: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.white.opacity(0.1))
-                .frame(width: 44, height: 44)
-            Image(systemName: "music.note")
-                .font(.system(size: 18))
-                .foregroundStyle(.secondary)
         }
     }
 

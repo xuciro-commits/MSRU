@@ -6,7 +6,10 @@ import AppFoundation
 @Observable
 final class LocalLibraryStore {
     private(set) var tracks: [LocalTrack] = []
+    private(set) var revision: UInt64 = 0
     private(set) var querySnapshot: LibraryQuerySnapshot = LibraryQuerySnapshot()
+    private var cachedAlbums: [AlbumPresentationModel] = []
+    private var cachedArtists: [ArtistPresentationModel] = []
     private(set) var isImporting = false
     private(set) var errorMessage: String?
     private var didLoad = false
@@ -14,30 +17,54 @@ final class LocalLibraryStore {
     private var operationID: UUID?
     private var pendingImports = 0
     private let repository: any LocalLibraryRepository
+    private let db: AppDatabase
+    private let queryEngine: LibraryQueryEngine
 
     var albums: [AlbumPresentationModel] {
-        querySnapshot.albumSummaries
+        if !cachedAlbums.isEmpty {
+            return cachedAlbums
+        }
+        return querySnapshot.albumSummaries
     }
 
     var artists: [ArtistPresentationModel] {
-        querySnapshot.artistSummaries
+        if !cachedArtists.isEmpty {
+            return cachedArtists
+        }
+        return querySnapshot.artistSummaries
     }
 
     var positionLookup: [String: Int] {
         querySnapshot.positionLookup
     }
 
+    var isLoading: Bool {
+        !didLoad
+    }
+
+    var isLoaded: Bool {
+        didLoad
+    }
+
+    private func updateCachedPresentations() {
+        self.cachedAlbums = LibraryPresentationAggregator.buildAlbums(from: tracks)
+        self.cachedArtists = LibraryPresentationAggregator.buildArtists(from: tracks)
+        self.revision &+= 1
+    }
+
     private func refreshQuerySnapshot() async {
-        let snapshot = await LibraryQueryEngine.shared.querySnapshot()
+        let snapshot = await queryEngine.querySnapshot()
         self.querySnapshot = snapshot
     }
 
     convenience init() {
-        self.init(repository: FileLocalLibraryRepository())
+        self.init(repository: FileLocalLibraryRepository(), db: AppDatabase.shared)
     }
 
-    init(repository: any LocalLibraryRepository) {
+    init(repository: any LocalLibraryRepository, db: AppDatabase = AppDatabase.shared) {
         self.repository = repository
+        self.db = db
+        self.queryEngine = LibraryQueryEngine(db: db)
     }
 
     func loadIfNeeded() async {
@@ -54,14 +81,15 @@ final class LocalLibraryStore {
     private func reloadNow() async {
         do {
             tracks = try await repository.loadTracks()
+            updateCachedPresentations()
 
             printArtworkMemoryDiagnostics()
 
-            await syncTracksToDatabase(tracks)
-            await refreshQuerySnapshot()
-
             didLoad = true
             errorMessage = nil
+
+            await syncTracksToDatabase(tracks)
+            await refreshQuerySnapshot()
         } catch {
             didLoad = false
             errorMessage = error.localizedDescription
@@ -80,6 +108,7 @@ final class LocalLibraryStore {
                 }
             }
             self.tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+            self.updateCachedPresentations()
             await self.syncTracksToDatabase(newTracks)
             await self.refreshQuerySnapshot()
             await LocalLibraryIndexingService.shared.enqueue(newTracks)
@@ -87,14 +116,25 @@ final class LocalLibraryStore {
     }
 
     private func syncTracksToDatabase(_ newTracks: [LocalTrack]) async {
-        let identityRepo = IdentityRepository(db: AppDatabase.shared)
-        let assetRepo = AssetRepository(db: AppDatabase.shared)
+        let identityRepo = IdentityRepository(db: self.db)
+        let assetRepo = AssetRepository(db: self.db)
+        let sourceRepo = SourceRepository(db: self.db)
         let sourceID = SourceID("src_local_default")
+
+        let defaultSource = Source(
+            id: sourceID,
+            sourceType: .localFolder,
+            uri: "local://default",
+            displayName: "Local Media Library",
+            capabilities: .localFolderDefault,
+            isEnabled: true
+        )
+        try? await sourceRepo.insertOrUpdate(defaultSource)
 
         var artists: [(id: ArtistID, name: String)] = []
         var recordings: [(id: RecordingID, title: String, duration: Double?)] = []
         var releaseGroups: [(id: ReleaseGroupID, title: String)] = []
-        var releases: [(id: ReleaseID, releaseGroupID: ReleaseGroupID?, title: String, year: Int?)] = []
+        var releases: [(id: ReleaseID, releaseGroupID: ReleaseGroupID?, title: String, year: Int?, artworkAssetID: String?)] = []
         var releaseTracks: [(id: ReleaseTrackID, releaseID: ReleaseID, trackNumber: Int, title: String, duration: Double?, recordingID: RecordingID)] = []
         var artistCredits: [(artistID: ArtistID, entityType: String, entityID: String)] = []
         var assets: [PersistedAssetRecord] = []
@@ -111,9 +151,10 @@ final class LocalLibraryStore {
             artists.append((id: artID, name: track.artist))
             recordings.append((id: recID, title: track.title, duration: track.duration))
             releaseGroups.append((id: rgID, title: relTitle))
-            releases.append((id: relID, releaseGroupID: rgID, title: relTitle, year: track.year))
+            releases.append((id: relID, releaseGroupID: rgID, title: relTitle, year: track.year, artworkAssetID: track.artworkReference))
             releaseTracks.append((id: trkID, releaseID: relID, trackNumber: track.trackNumber ?? 1, title: track.title, duration: track.duration, recordingID: recID))
             artistCredits.append((artistID: artID, entityType: "recording", entityID: recID.rawValue))
+            artistCredits.append((artistID: artID, entityType: "release", entityID: relID.rawValue))
 
             assets.append(PersistedAssetRecord(
                 id: astID,
@@ -151,6 +192,7 @@ final class LocalLibraryStore {
                 ids.contains($0.fileURL.standardizedFileURL.path) ||
                 ids.contains($0.fileURL.path)
             }
+            self.updateCachedPresentations()
             try? await self.repository.deleteTracks(withIDs: ids, deletePhysicalFiles: deletePhysical)
             self.deregisterTracks(deletedTracks)
             await self.refreshQuerySnapshot()
@@ -231,6 +273,7 @@ final class LocalLibraryStore {
                 }
             }
             tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+            updateCachedPresentations()
             await refreshQuerySnapshot()
             await LocalLibraryIndexingService.shared.enqueue(newlyImported)
         } catch {

@@ -21,24 +21,32 @@ public enum MacScrollIndicatorSuppressor {
     }
 
     public static func suppress(scrollView: NSScrollView) {
+        var didChange = false
         if scrollView.scrollerStyle != .overlay {
             scrollView.scrollerStyle = .overlay
+            didChange = true
         }
         if scrollView.hasVerticalScroller {
             scrollView.hasVerticalScroller = false
+            didChange = true
         }
         if scrollView.hasHorizontalScroller {
             scrollView.hasHorizontalScroller = false
+            didChange = true
         }
         if let v = scrollView.verticalScroller, (!v.isHidden || v.alphaValue > 0) {
             v.alphaValue = 0
             v.isHidden = true
+            didChange = true
         }
         if let h = scrollView.horizontalScroller, (!h.isHidden || h.alphaValue > 0) {
             h.alphaValue = 0
             h.isHidden = true
+            didChange = true
         }
-        scrollView.tile()
+        if didChange {
+            scrollView.tile()
+        }
     }
 }
 
@@ -46,17 +54,16 @@ public final class MacScrollIndicatorSuppressorView: NSView {
 
     public override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        suppressNow()
+        if window != nil {
+            suppressNow()
+        }
     }
 
     public override func viewDidMoveToSuperview() {
         super.viewDidMoveToSuperview()
-        suppressNow()
-    }
-
-    public override func layout() {
-        super.layout()
-        suppressNow()
+        if superview != nil {
+            suppressNow()
+        }
     }
 
     public func suppressNow() {
@@ -87,7 +94,8 @@ public struct MacScrollIndicatorRemover: NSViewRepresentable {
     }
 
     public func updateNSView(_ nsView: NSView, context: Context) {
-        (nsView as? MacScrollIndicatorSuppressorView)?.suppressNow()
+        // Once applied, the scroll indicator suppression is persistent on the enclosing NSScrollView.
+        // No-op here prevents repeated hierarchy traversals on every SwiftUI state render pass.
     }
 }
 #endif

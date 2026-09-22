@@ -122,7 +122,10 @@ struct LocalLibraryView: View {
     private var content:
         some View {
 
-        if store.tracks.isEmpty {
+        if !store.isLoaded {
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if store.tracks.isEmpty {
 
             emptyState
 
@@ -178,20 +181,16 @@ struct LocalLibraryView: View {
                     switch viewMode {
 
                     case .table:
-
                         LocalTrackTableView(
-                            tracks:
-                                tracks,
-                            positionLookup:
-                                store.positionLookup,
-                            isFiltered:
-                                isFiltered,
-                            selectedTrack:
-                                $selectedTrack,
-                            playback:
-                                playback,
-                            library:
-                                library,
+                            tracks: tracks,
+                            positionLookup: store.positionLookup,
+                            isFiltered: isFiltered,
+                            selectedTrack: $selectedTrack,
+                            playback: playback,
+                            library: library,
+                            onRevealInFinder: { url in
+                                PlatformFileViewer.revealInFinder(url: url)
+                            },
                             onDeleteTracks: { ids in
                                 Task {
                                     await store.deleteTracks(withIDs: ids)
@@ -203,12 +202,8 @@ struct LocalLibraryView: View {
                             maxHeight: .infinity
                         )
 
-
                     case .grid:
-
-                        trackGrid(
-                            tracks
-                        )
+                        trackGrid(tracks)
                         .frame(
                             maxWidth: .infinity,
                             maxHeight: .infinity
@@ -301,13 +296,10 @@ struct LocalLibraryView: View {
                 columns: [
                     GridItem(
                         .adaptive(
-                            minimum:
-                                160,
-                            maximum:
-                                200
+                            minimum: 180,
+                            maximum: 200
                         ),
-                        spacing:
-                            18
+                        spacing: 20
                     )
                 ],
                 alignment:
@@ -315,7 +307,6 @@ struct LocalLibraryView: View {
                 spacing:
                     24
             ) {
-
                 ForEach(
                     tracks
                 ) {
@@ -326,7 +317,7 @@ struct LocalLibraryView: View {
                     )
                 }
             }
-            .padding(28)
+            .padding(24)
         }
         .hideScrollIndicatorsCompletely()
         .overlay {
@@ -367,17 +358,17 @@ struct LocalLibraryView: View {
     ) -> some View {
         LocalLibraryTrackCardView(
             track: track,
+            isPlaying: playback.isPlaying(trackID: track.id),
+            isSaved: library.contains(local: track),
             isSelected: selectedTrack?.id == track.id,
-            playback: playback,
-            library: library,
             onSelect: {
                 selectedTrack = track
             },
             onPlay: {
                 playback.toggle(track: track, queue: store.tracks)
             },
-            artwork: { AnyView(artwork(track)) },
-            actions: { AnyView(trackActions(track)) }
+            artwork: artwork(track),
+            actions: trackActions(track)
         )
     }
 
@@ -495,47 +486,12 @@ struct LocalLibraryView: View {
 
     @ViewBuilder
     private func artwork(_ track: LocalTrack) -> some View {
-        if let ref = track.artworkReference {
-            ArtworkThumbnailView(
-                reference: ref,
-                thumbnailPixelSize: CGSize(width: 240, height: 240),
-                placeholderSystemImage: "music.note",
-                cornerRadius: 10
-            )
-        } else if let data = track.artworkData, let image = Image(artworkData: data) {
-            image.resizable().scaledToFill()
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        } else {
-            artworkPlaceholder
-        }
-    }
-
-
-    private var artworkPlaceholder:
-        some View {
-
-        RoundedRectangle(
-            cornerRadius:
-                12,
-            style:
-                .continuous
+        MediaImageView(
+            reference: track.artworkReference,
+            thumbnailPixelSize: CGSize(width: 240, height: 240),
+            placeholderSystemImage: "music.note",
+            cornerRadius: 10
         )
-        .fill(
-            .quaternary
-        )
-        .overlay {
-
-            Image(
-                systemName:
-                    "music.note"
-            )
-            .font(
-                .title
-            )
-            .foregroundStyle(
-                .secondary
-            )
-        }
     }
 
 
@@ -545,20 +501,19 @@ struct LocalLibraryView: View {
 
 // MARK: - Isolated Track Card Component (Sub-tree Invalidation Firewall)
 
-private struct LocalLibraryTrackCardView: View {
+private struct LocalLibraryTrackCardView<Artwork: View, Actions: View>: View {
     let track: LocalTrack
+    let isPlaying: Bool
+    let isSaved: Bool
     let isSelected: Bool
-    @Bindable var playback: PlaybackController
-    @Bindable var library: LibraryStore
     let onSelect: () -> Void
     let onPlay: () -> Void
-    let artwork: () -> AnyView
-    let actions: () -> AnyView
+    let artwork: Artwork
+    let actions: Actions
+
+    @State private var isHovered: Bool = false
 
     var body: some View {
-        let isPlaying = playback.isPlaying(trackID: track.id)
-        let isSaved = library.contains(local: track)
-
         UnifiedTrackCardView(
             title: track.title,
             subtitle: track.artist,
@@ -570,7 +525,7 @@ private struct LocalLibraryTrackCardView: View {
             onSelect: onSelect,
             onPlay: onPlay
         ) {
-            artwork()
+            artwork
         } actionsMenu: {
             HStack(spacing: 4) {
                 if isSaved {
@@ -579,24 +534,60 @@ private struct LocalLibraryTrackCardView: View {
                         .font(.caption)
                 }
 
-                Menu {
-                    actions()
-                } label: {
-                    Image(systemName: "ellipsis")
+                if isHovered {
+                    Menu {
+                        actions
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .frame(width: 22, height: 18)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                } else {
+                    Color.clear
                         .frame(width: 22, height: 18)
                 }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
             }
         }
+        .frame(height: 236)
         .contextMenu {
-            actions()
+            actions
+        }
+        .onHover { hovering in
+            if isHovered != hovering {
+                isHovered = hovering
+            }
         }
     }
 
     private func durationText(_ duration: TimeInterval) -> String {
         let seconds = max(0, Int(duration.rounded()))
         return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+}
+
+
+
+extension LocalTrack {
+    func toCardSummary(isPlaying: Bool = false, isSaved: Bool = false) -> LibraryCardSummary {
+        let mins = Int(duration) / 60
+        let secs = Int(duration) % 60
+        let dur = duration > 0 ? String(format: "%d:%02d", mins, secs) : nil
+        let ext = fileURL.pathExtension.uppercased()
+        let badge = ext.isEmpty ? nil : ext
+
+        return LibraryCardSummary(
+            id: id,
+            title: title,
+            subtitle: artist,
+            secondaryText: album,
+            badgeText: badge,
+            durationText: dur,
+            artworkReference: artworkReference,
+            isCircularArtwork: false,
+            isFavorite: false,
+            isSaved: isSaved
+        )
     }
 }
 

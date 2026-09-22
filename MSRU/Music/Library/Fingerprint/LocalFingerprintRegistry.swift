@@ -18,9 +18,13 @@ nonisolated public struct AcousticFingerprintRecord: Identifiable, Codable, Send
     public var trackNumber: Int?
     public var releaseMBID: String?
     public var recordingMBID: String?
-    public var artworkData: Data?
+    public var artworkReference: String?
     public let dateLearned: Date
     public var matchCount: Int
+
+    public var artworkData: Data? {
+        artworkReference.flatMap { LocalArtworkStorage.shared.loadArtwork(relativePath: $0) }
+    }
 
     public init(
         fingerprint: String,
@@ -31,6 +35,7 @@ nonisolated public struct AcousticFingerprintRecord: Identifiable, Codable, Send
         trackNumber: Int? = nil,
         releaseMBID: String? = nil,
         recordingMBID: String? = nil,
+        artworkReference: String? = nil,
         artworkData: Data? = nil,
         dateLearned: Date = Date(),
         matchCount: Int = 0
@@ -43,7 +48,13 @@ nonisolated public struct AcousticFingerprintRecord: Identifiable, Codable, Send
         self.trackNumber = trackNumber
         self.releaseMBID = releaseMBID
         self.recordingMBID = recordingMBID
-        self.artworkData = artworkData
+        if let artworkReference, !artworkReference.isEmpty {
+            self.artworkReference = artworkReference
+        } else if let artworkData, !artworkData.isEmpty {
+            self.artworkReference = LocalArtworkStorage.shared.storeArtwork(artworkData)
+        } else {
+            self.artworkReference = nil
+        }
         self.dateLearned = dateLearned
         self.matchCount = matchCount
     }
@@ -72,7 +83,6 @@ nonisolated public struct AssetFingerprintEntry: Codable, Sendable, Equatable {
     }
 }
 
-/// Registration payload for a batch fingerprint ingestion item.
 nonisolated public struct FingerprintRegistrationItem: Sendable {
     public let fingerprint: String
     public let duration: TimeInterval
@@ -82,8 +92,12 @@ nonisolated public struct FingerprintRegistrationItem: Sendable {
     public let trackNumber: Int?
     public let releaseMBID: String?
     public let recordingMBID: String?
-    public let artworkData: Data?
+    public let artworkReference: String?
     public let fileURL: URL?
+
+    public var artworkData: Data? {
+        artworkReference.flatMap { LocalArtworkStorage.shared.loadArtwork(relativePath: $0) }
+    }
 
     public init(
         fingerprint: String,
@@ -94,6 +108,7 @@ nonisolated public struct FingerprintRegistrationItem: Sendable {
         trackNumber: Int? = nil,
         releaseMBID: String? = nil,
         recordingMBID: String? = nil,
+        artworkReference: String? = nil,
         artworkData: Data? = nil,
         fileURL: URL? = nil
     ) {
@@ -105,7 +120,13 @@ nonisolated public struct FingerprintRegistrationItem: Sendable {
         self.trackNumber = trackNumber
         self.releaseMBID = releaseMBID
         self.recordingMBID = recordingMBID
-        self.artworkData = artworkData
+        if let artworkReference, !artworkReference.isEmpty {
+            self.artworkReference = artworkReference
+        } else if let artworkData, !artworkData.isEmpty {
+            self.artworkReference = LocalArtworkStorage.shared.storeArtwork(artworkData)
+        } else {
+            self.artworkReference = nil
+        }
         self.fileURL = fileURL
     }
 }
@@ -278,14 +299,11 @@ public actor LocalFingerprintRegistry: Sendable {
                 records[idx].recordingMBID = recordingMBID
                 changed = true
             }
-            // Only update artwork if smaller than 64KB to prevent bloating registry JSON
-            if let artworkData = item.artworkData, artworkData.count < 65536, records[idx].artworkData != artworkData {
-                records[idx].artworkData = artworkData
+            if let artworkReference = item.artworkReference, records[idx].artworkReference != artworkReference {
+                records[idx].artworkReference = artworkReference
                 changed = true
             }
         } else {
-            // Guard against storing giant image blobs in registry
-            let safeArtwork: Data? = (item.artworkData != nil && item.artworkData!.count < 65536) ? item.artworkData : nil
             let record = AcousticFingerprintRecord(
                 fingerprint: item.fingerprint,
                 duration: item.duration,
@@ -295,7 +313,7 @@ public actor LocalFingerprintRegistry: Sendable {
                 trackNumber: item.trackNumber,
                 releaseMBID: item.releaseMBID,
                 recordingMBID: item.recordingMBID,
-                artworkData: safeArtwork,
+                artworkReference: item.artworkReference,
                 matchCount: 0
             )
             records.append(record)

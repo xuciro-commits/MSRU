@@ -267,29 +267,12 @@ struct LibraryTrackTableView: View {
 
     @ViewBuilder
     private func trackArtwork(_ track: LibraryTrack) -> some View {
-        if let data = track.artworkData, let image = Image(artworkData: data) {
-            image.resizable().scaledToFill()
-        } else if let url = track.artworkURL {
-            AsyncImage(url: url) { phase in
-                if case .success(let image) = phase {
-                    image.resizable().scaledToFill()
-                } else {
-                    placeholderArtwork
-                }
-            }
-        } else {
-            placeholderArtwork
-        }
-    }
-
-    private var placeholderArtwork: some View {
-        RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .fill(Color.secondary.opacity(0.15))
-            .overlay {
-                Image(systemName: "music.note")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
+        MediaImageView(
+            reference: track.artworkReference ?? track.artworkURL?.absoluteString,
+            fixedSize: CGSize(width: 36, height: 36),
+            thumbnailPixelSize: CGSize(width: 72, height: 72),
+            cornerRadius: 6
+        )
     }
 
     @ViewBuilder

@@ -320,31 +320,12 @@ struct MiniPlayerBar: View {
     }
 
     private func artworkImage(size: CGFloat = 42) -> some View {
-        Group {
-            if let data = playback.unifiedArtworkData,
-               let image = Image(artworkData: data) {
-                image.resizable().scaledToFill()
-            } else if let url = playback.unifiedArtworkURL {
-                AsyncImage(url: url) { phase in
-                    if case .success(let image) = phase {
-                        image.resizable().scaledToFill()
-                    } else {
-                        artworkPlaceholder(size: size)
-                    }
-                }
-            } else {
-                artworkPlaceholder(size: size)
-            }
-        }
-        .frame(width: size, height: size)
-        .clipped()
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: size > 36 ? 7 : 6,
-                style: .continuous
-            )
+        MediaImageView(
+            reference: playback.unifiedArtworkReference,
+            fixedSize: CGSize(width: size, height: size),
+            placeholderSystemImage: "music.note",
+            cornerRadius: size > 36 ? 7 : 6
         )
-        .fixedSize()
     }
 
     private func artworkPlaceholder(size: CGFloat = 42) -> some View {

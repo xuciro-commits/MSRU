@@ -231,6 +231,17 @@ struct PlaybackItem:
         }
     }
 
+    var artworkImageReference: MediaImageReference? {
+        switch payload {
+        case .local(let track):
+            return track.artworkReference.map { MediaImageReference(relativePath: $0) }
+        case .openverse(let track):
+            return track.thumbnailURL.map { MediaImageReference(url: $0) }
+        case .radio(let station):
+            return station.artworkURL.map { MediaImageReference(url: $0) }
+        }
+    }
+
 
     // MARK: - Duration
 

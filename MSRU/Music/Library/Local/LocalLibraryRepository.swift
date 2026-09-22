@@ -310,16 +310,8 @@ actor FileLocalLibraryRepository: LocalLibraryRepository {
 
         var tracks: [LocalTrack] = []
         for record in records {
-            let targetURL: URL
-            if let bookmark = record.bookmarkData,
-               let resolved = SecurityScopePolicy.resolveBookmark(bookmark) {
-                targetURL = resolved.url
-            } else {
-                targetURL = record.fileURL
-            }
-
             tracks.append(LocalTrack(
-                fileURL: targetURL,
+                fileURL: record.fileURL,
                 title: record.title,
                 artist: record.artist,
                 album: record.album,

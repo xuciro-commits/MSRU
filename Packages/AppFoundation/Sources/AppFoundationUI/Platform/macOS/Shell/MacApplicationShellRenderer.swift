@@ -178,6 +178,13 @@ public final class MacApplicationShellRenderer {
             configuration
 
 
+        let initialInsets = EdgeInsets(
+            top: 0,
+            leading: 0,
+            bottom: configuration.applicationAccessory?.height ?? 0,
+            trailing: isContextPresented ? (configuration.context?.region.minimumThickness ?? 300) : 0
+        )
+
         let initialWorkspace =
             Self.wrapWorkspaceContent(
                 shell
@@ -191,6 +198,8 @@ public final class MacApplicationShellRenderer {
                     configuration
                         .applicationAccessory?
                         .height,
+                safeAreaInsets:
+                    initialInsets,
                 locale:
                     locale
             )
@@ -535,6 +544,8 @@ public final class MacApplicationShellRenderer {
             AnyView,
         accessoryHeight:
             CGFloat?,
+        safeAreaInsets:
+            EdgeInsets = EdgeInsets(),
         locale:
             Locale?
     ) -> AnyView {
@@ -565,7 +576,9 @@ public final class MacApplicationShellRenderer {
         return AnyView(
             WorkspaceSafeAreaContainer(
                 content:
-                    localized
+                    localized,
+                safeAreaInsets:
+                    safeAreaInsets
             )
         )
     }
@@ -576,26 +589,40 @@ private struct WorkspaceSafeAreaContainer: View {
     let content:
         AnyView
 
+    let safeAreaInsets:
+        EdgeInsets
+
     var body: some View {
 
-        GeometryReader { proxy in
-
-            content
-                .frame(
-                    width:
-                        proxy.size.width,
-                    height:
-                        proxy.size.height
-                )
-                .environment(
-                    \.workspaceSafeAreaInsets,
-                    proxy.safeAreaInsets
-                )
-        }
+        content
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity
+            )
+            .environment(
+                \.workspaceSafeAreaInsets,
+                safeAreaInsets
+            )
     }
 }
 
 extension MacApplicationShellRenderer {
+
+    private var currentSafeAreaInsets: EdgeInsets {
+        let fallbackBottom = configuration.applicationAccessory?.height ?? 0
+        let fallbackTrailing = isContextPresented ? (configuration.context?.region.minimumThickness ?? 300) : 0
+
+        guard workspaceHost.isViewLoaded else {
+            return EdgeInsets(top: 0, leading: 0, bottom: fallbackBottom, trailing: fallbackTrailing)
+        }
+
+        let insets = workspaceHost.view.safeAreaInsets
+        let top = insets.top
+        let bottom = insets.bottom > 0 ? insets.bottom : fallbackBottom
+        let trailing = insets.right > 0 ? insets.right : fallbackTrailing
+        let leading = insets.left
+        return EdgeInsets(top: top, leading: leading, bottom: bottom, trailing: trailing)
+    }
 
     private func wrapWorkspaceContent(
         _ content:
@@ -608,6 +635,8 @@ extension MacApplicationShellRenderer {
                 configuration
                     .applicationAccessory?
                     .height,
+            safeAreaInsets:
+                currentSafeAreaInsets,
             locale:
                 locale
         )

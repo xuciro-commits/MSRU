@@ -19,8 +19,12 @@ nonisolated public struct AlbumTrackItem: Identifiable, Sendable, Equatable, Cod
     public let duration: TimeInterval
     public let acoustID: String?
     public let trackMBID: String?
-    public let artworkData: Data?
+    public let artworkReference: String?
     public let matchedMemory: AcousticFingerprintRecord?
+
+    public var artworkData: Data? {
+        artworkReference.flatMap { LocalArtworkStorage.shared.loadArtwork(relativePath: $0) }
+    }
 
     public var fingerprint: String? {
         acoustID
@@ -37,6 +41,7 @@ nonisolated public struct AlbumTrackItem: Identifiable, Sendable, Equatable, Cod
         acoustID: String? = nil,
         trackMBID: String? = nil,
         fingerprint: String? = nil,
+        artworkReference: String? = nil,
         artworkData: Data? = nil,
         matchedMemory: AcousticFingerprintRecord? = nil
     ) {
@@ -49,7 +54,13 @@ nonisolated public struct AlbumTrackItem: Identifiable, Sendable, Equatable, Cod
         self.duration = duration ?? 0.0
         self.acoustID = acoustID ?? fingerprint
         self.trackMBID = trackMBID
-        self.artworkData = artworkData
+        if let artworkReference, !artworkReference.isEmpty {
+            self.artworkReference = artworkReference
+        } else if let artworkData, !artworkData.isEmpty {
+            self.artworkReference = LocalArtworkStorage.shared.storeArtwork(artworkData)
+        } else {
+            self.artworkReference = nil
+        }
         self.matchedMemory = matchedMemory
     }
 }

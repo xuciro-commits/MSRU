@@ -133,19 +133,33 @@ struct LocalTrackTableView: View {
                     }
                 }
             }
-            .width(min: 140, ideal: 200)
+            .width(min: 180, ideal: 240)
 
-            // Artist column (Native text cell, 0 NSHostingView)
-            TableColumn("Artist", value: \.artist)
-                .width(min: 100, ideal: 130)
+            // Artist column
+            TableColumn("Artist") { track in
+                Text(track.artist)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .width(min: 120, ideal: 160)
 
-            // Album column (Native text cell, 0 NSHostingView)
-            TableColumn("Album", value: \.displayAlbum)
-                .width(min: 100, ideal: 130)
+            // Album column
+            TableColumn("Album") { track in
+                Text(track.displayAlbum)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .width(min: 120, ideal: 160)
 
-            // Duration column (Native text cell, 0 NSHostingView)
-            TableColumn("Duration", value: \.formattedDuration)
-                .width(min: 45, ideal: 55, max: 65)
+            // Duration column
+            TableColumn("Duration") { track in
+                Text(track.formattedDuration)
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            .width(min: 50, ideal: 60, max: 70)
 
             // Favorite column (isolated favorite store observation)
             TableColumn("Favorite") { track in
@@ -332,9 +346,10 @@ struct LocalTrackTableView: View {
 
     @ViewBuilder
     private func trackArtwork(_ track: LocalTrack) -> some View {
-        ArtworkThumbnailView(
+        MediaImageView(
             reference: track.artworkReference,
             fixedSize: CGSize(width: 36, height: 36),
+            thumbnailPixelSize: CGSize(width: 72, height: 72),
             placeholderSystemImage: "music.note",
             cornerRadius: 6
         )

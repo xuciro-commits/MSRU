@@ -16,7 +16,8 @@ enum AudioHardwareTestSuite {
         let source = root.appendingPathComponent("Fixture.wav")
         try waveData().write(to: source)
         let directory = root.appendingPathComponent("Media")
-        let store = LocalLibraryStore(repository: FileLocalLibraryRepository(directory: directory))
+        let ephemeralDB = try AppDatabase.makeEphemeral()
+        let store = LocalLibraryStore(repository: FileLocalLibraryRepository(directory: directory), db: ephemeralDB)
         await store.importFiles([source])
         #expect(store.errorMessage == nil)
         let imported = try #require(store.tracks.first)
@@ -25,7 +26,7 @@ enum AudioHardwareTestSuite {
         #expect(abs(imported.duration - 0.2) < 0.01)
         #expect(try Data(contentsOf: imported.fileURL) == Data(contentsOf: source))
 
-        let reopened = LocalLibraryStore(repository: FileLocalLibraryRepository(directory: directory))
+        let reopened = LocalLibraryStore(repository: FileLocalLibraryRepository(directory: directory), db: ephemeralDB)
         await reopened.loadIfNeeded()
         #expect(reopened.tracks.map(\.id) == [imported.id])
         let item = PlaybackItem(local: try #require(reopened.tracks.first))

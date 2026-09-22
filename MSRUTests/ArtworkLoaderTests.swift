@@ -108,8 +108,53 @@ struct ArtworkLoaderTests {
     func testArtworkLoaderPrefetch() async {
         let loader = ArtworkLoader()
         // Prefetch with non-existent references should safely no-op without error or crash
-        await loader.prefetch(references: ["non_existent_artwork_1.jpg", "non_existent_2.jpg"], bucket: .pt64)
+        loader.prefetch(references: ["non_existent_artwork_1.jpg", "non_existent_2.jpg"], bucket: .pt64)
         let result = await loader.loadThumbnail(for: "non_existent.jpg", bucket: .pt64)
         #expect(result == nil)
+    }
+
+    @Test("Verify MediaImageReference parsing and equality")
+    func testMediaImageReference() {
+        let localRef = MediaImageReference(string: "Artworks/abcd1234.jpg")
+        #expect(localRef != nil)
+        if case .local(let path) = localRef?.source {
+            #expect(path == "Artworks/abcd1234.jpg")
+        } else {
+            Issue.record("Expected local source")
+        }
+
+        let remoteRef = MediaImageReference(string: "https://example.com/artwork.jpg")
+        #expect(remoteRef != nil)
+        if case .remote(let url) = remoteRef?.source {
+            #expect(url.absoluteString == "https://example.com/artwork.jpg")
+        } else {
+            Issue.record("Expected remote source")
+        }
+
+        #expect(MediaImageReference(string: "") == nil)
+        #expect(MediaImageReference(string: "   ") == nil)
+    }
+
+    @Test("Verify PixelBucket normalization from pixels and points")
+    func testPixelBucketNormalization() {
+        #expect(PixelBucket.bucket(for: 50) == .px64)
+        #expect(PixelBucket.bucket(for: 100) == .px128)
+        #expect(PixelBucket.bucket(for: 200) == .px256)
+        #expect(PixelBucket.bucket(for: 400) == .px512)
+        #expect(PixelBucket.bucket(for: 800) == .px1024)
+
+        // Point size mapping at @2x scale
+        #expect(PixelBucket.bucket(for: CGSize(width: 32, height: 32), scale: 2.0) == .px64)
+        #expect(PixelBucket.bucket(for: CGSize(width: 64, height: 64), scale: 2.0) == .px128)
+        #expect(PixelBucket.bucket(for: CGSize(width: 120, height: 120), scale: 2.0) == .px256)
+        #expect(PixelBucket.bucket(for: CGSize(width: 200, height: 200), scale: 2.0) == .px512)
+    }
+
+    @Test("Verify MediaImagePipeline bounded disk cache clear")
+    func testMediaImagePipelineDiskCacheClear() async {
+        let pipeline = MediaImagePipeline(maxMemoryBytes: 1024 * 1024, maxCount: 10, maxDiskBytes: 1024 * 1024)
+        await pipeline.clearDiskCache()
+        await pipeline.clearMemoryCache()
+        await pipeline.clearCache()
     }
 }

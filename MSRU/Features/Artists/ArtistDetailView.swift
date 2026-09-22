@@ -322,35 +322,14 @@ struct ArtistDetailView: View {
 
     @ViewBuilder
     private var artistArtworkView: some View {
-        if let ref = artist.artworkReference {
-            ArtworkThumbnailView(
-                reference: ref,
-                thumbnailPixelSize: CGSize(width: 320, height: 320),
-                placeholderSystemImage: "music.mic",
-                isCircular: true
-            )
-        } else if let data = artist.artworkData, let image = Image(artworkData: data) {
-            image
-                .resizable()
-                .scaledToFill()
-        } else if let url = artist.artworkURL {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .empty:
-                    ProgressView()
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure:
-                    placeholderArtistView
-                @unknown default:
-                    placeholderArtistView
-                }
-            }
-        } else {
-            placeholderArtistView
-        }
+        let reference = artist.artworkReference.map { MediaImageReference(relativePath: $0) }
+            ?? artist.artworkURL.map { MediaImageReference(url: $0) }
+        MediaImageView(
+            reference: reference,
+            thumbnailPixelSize: CGSize(width: 320, height: 320),
+            placeholderSystemImage: "music.mic",
+            isCircular: true
+        )
     }
 
     private var placeholderArtistView: some View {

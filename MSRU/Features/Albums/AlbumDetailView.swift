@@ -229,35 +229,14 @@ struct AlbumDetailView: View {
 
     @ViewBuilder
     private var heroArtworkView: some View {
-        if let ref = album.artworkReference {
-            ArtworkThumbnailView(
-                reference: ref,
-                thumbnailPixelSize: CGSize(width: 360, height: 360),
-                placeholderSystemImage: "music.note",
-                cornerRadius: 12
-            )
-        } else if let data = album.artworkData, let image = Image(artworkData: data) {
-            image
-                .resizable()
-                .scaledToFill()
-        } else if let url = album.artworkURL {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .empty:
-                    ProgressView()
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure:
-                    placeholderHeroView
-                @unknown default:
-                    placeholderHeroView
-                }
-            }
-        } else {
-            placeholderHeroView
-        }
+        let reference = album.artworkReference.map { MediaImageReference(relativePath: $0) }
+            ?? album.artworkURL.map { MediaImageReference(url: $0) }
+        MediaImageView(
+            reference: reference,
+            thumbnailPixelSize: CGSize(width: 360, height: 360),
+            placeholderSystemImage: "music.note",
+            cornerRadius: 12
+        )
     }
 
     private var placeholderHeroView: some View {

@@ -207,13 +207,32 @@ nonisolated public final class IdentityRepository: Sendable {
         }
     }
 
+    /// Backward-compatible overload accepting releases without artworkAssetID.
+    public func batchUpsertEntities(
+        artists: [(id: ArtistID, name: String)],
+        recordings: [(id: RecordingID, title: String, duration: Double?)],
+        releaseGroups: [(id: ReleaseGroupID, title: String)],
+        releases: [(id: ReleaseID, releaseGroupID: ReleaseGroupID?, title: String, year: Int?)],
+        releaseTracks: [(id: ReleaseTrackID, releaseID: ReleaseID, trackNumber: Int, title: String, duration: Double?, recordingID: RecordingID)],
+        artistCredits: [(artistID: ArtistID, entityType: String, entityID: String)]
+    ) async throws {
+        try await batchUpsertEntities(
+            artists: artists,
+            recordings: recordings,
+            releaseGroups: releaseGroups,
+            releases: releases.map { ($0.id, $0.releaseGroupID, $0.title, $0.year, nil as String?) },
+            releaseTracks: releaseTracks,
+            artistCredits: artistCredits
+        )
+    }
+
     /// High-performance bulk insertion of music knowledge entities executed within a SINGLE transaction.
     /// Ingests 10,000+ entities in under 100ms.
     public func batchUpsertEntities(
         artists: [(id: ArtistID, name: String)],
         recordings: [(id: RecordingID, title: String, duration: Double?)],
         releaseGroups: [(id: ReleaseGroupID, title: String)],
-        releases: [(id: ReleaseID, releaseGroupID: ReleaseGroupID?, title: String, year: Int?)],
+        releases: [(id: ReleaseID, releaseGroupID: ReleaseGroupID?, title: String, year: Int?, artworkAssetID: String?)],
         releaseTracks: [(id: ReleaseTrackID, releaseID: ReleaseID, trackNumber: Int, title: String, duration: Double?, recordingID: RecordingID)],
         artistCredits: [(artistID: ArtistID, entityType: String, entityID: String)]
     ) async throws {
@@ -240,14 +259,30 @@ nonisolated public final class IdentityRepository: Sendable {
                 try rgStmt.execute(arguments: [rg.id.rawValue, rg.title, sortTitle, date])
             }
 
+            // 2.5 Artwork Assets (ensure FK integrity for releases.artwork_asset_id)
+            let artAssetStmt = try db.makeStatement(sql: """
+                INSERT OR IGNORE INTO artwork_assets (id, sha256, mime_type, byte_size, storage_relative_path, created_at)
+                VALUES (?, ?, 'image/jpeg', 0, ?, ?)
+            """)
+            for r in releases {
+                if let art = r.artworkAssetID, !art.isEmpty {
+                    try artAssetStmt.execute(arguments: [art, art, art, date])
+                }
+            }
+
             // 3. Releases
             let relStmt = try db.makeStatement(sql: """
-                INSERT OR IGNORE INTO releases (id, release_group_id, title, sort_title, release_year, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO releases (id, release_group_id, title, sort_title, release_year, artwork_asset_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    title = excluded.title,
+                    sort_title = excluded.sort_title,
+                    release_year = COALESCE(excluded.release_year, releases.release_year),
+                    artwork_asset_id = COALESCE(excluded.artwork_asset_id, releases.artwork_asset_id)
             """)
             for r in releases {
                 let sortTitle = r.title.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-                try relStmt.execute(arguments: [r.id.rawValue, r.releaseGroupID?.rawValue, r.title, sortTitle, r.year, date])
+                try relStmt.execute(arguments: [r.id.rawValue, r.releaseGroupID?.rawValue, r.title, sortTitle, r.year, r.artworkAssetID, date])
             }
 
             // 4. Recordings

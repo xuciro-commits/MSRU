@@ -61,35 +61,12 @@ struct QueuePaneView: View {
     }
 
     private func artwork(_ item: PlaybackItem) -> some View {
-        Group {
-            if let data = item.artworkData {
-                platformArtwork(data: data)
-            } else {
-                AsyncImage(url: item.artworkURL) { phase in
-                    if case .success(let image) = phase { image.resizable().scaledToFill() }
-                    else { queuePlaceholder }
-                }
-            }
-        }
-        .frame(width: 42, height: 42)
-        .clipShape(RoundedRectangle(cornerRadius: 7))
-    }
-
-    // MARK: - Platform Artwork Adapter
-
-    /*
-     SwiftUI owns the view API.
-
-     Platform decoding is centralized in Image+ArtworkData.
-     */
-
-    @ViewBuilder
-    private func platformArtwork(data: Data) -> some View {
-        if let image = Image(artworkData: data) {
-            image.resizable().scaledToFill()
-        } else {
-            queuePlaceholder
-        }
+        MediaImageView(
+            reference: item.artworkImageReference,
+            fixedSize: CGSize(width: 42, height: 42),
+            placeholderSystemImage: "music.note",
+            cornerRadius: 7
+        )
     }
 
 

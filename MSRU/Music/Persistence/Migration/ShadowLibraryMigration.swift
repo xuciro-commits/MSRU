@@ -120,7 +120,7 @@ public actor ShadowLibraryMigration {
                 var artistsToInsert: [(id: ArtistID, name: String)] = []
                 var recordingsToInsert: [(id: RecordingID, title: String, duration: Double?)] = []
                 var releaseGroupsToInsert: [(id: ReleaseGroupID, title: String)] = []
-                var releasesToInsert: [(id: ReleaseID, releaseGroupID: ReleaseGroupID?, title: String, year: Int?)] = []
+                var releasesToInsert: [(id: ReleaseID, releaseGroupID: ReleaseGroupID?, title: String, year: Int?, artworkAssetID: String?)] = []
                 var releaseTracksToInsert: [(id: ReleaseTrackID, releaseID: ReleaseID, trackNumber: Int, title: String, duration: Double?, recordingID: RecordingID)] = []
                 var artistCreditsToInsert: [(artistID: ArtistID, entityType: String, entityID: String)] = []
                 var assetRecords: [PersistedAssetRecord] = []
@@ -159,7 +159,8 @@ public actor ShadowLibraryMigration {
 
                     if !seenReleases.contains(releaseID) {
                         seenReleases.insert(releaseID)
-                        releasesToInsert.append((id: releaseID, releaseGroupID: releaseGroupID, title: releaseTitle, year: track.year))
+                        releasesToInsert.append((id: releaseID, releaseGroupID: releaseGroupID, title: releaseTitle, year: track.year, artworkAssetID: track.artworkReference))
+                        artistCreditsToInsert.append((artistID: artistID, entityType: "release", entityID: releaseID.rawValue))
                         releaseCount += 1
                     }
 

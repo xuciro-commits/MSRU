@@ -11,16 +11,21 @@ public struct Playlist: Identifiable, Codable, Hashable, Sendable {
     public var title: String
     public var description: String?
     public var trackIDs: [String]
-    public var artworkData: Data?
+    public var artworkReference: String?
     public var isPinned: Bool
     public let createdAt: Date
     public var updatedAt: Date
+
+    public var artworkData: Data? {
+        artworkReference.flatMap { LocalArtworkStorage.shared.loadArtwork(relativePath: $0) }
+    }
 
     public init(
         id: UUID = UUID(),
         title: String,
         description: String? = nil,
         trackIDs: [String] = [],
+        artworkReference: String? = nil,
         artworkData: Data? = nil,
         isPinned: Bool = false,
         createdAt: Date = Date(),
@@ -30,7 +35,13 @@ public struct Playlist: Identifiable, Codable, Hashable, Sendable {
         self.title = title
         self.description = description
         self.trackIDs = trackIDs
-        self.artworkData = artworkData
+        if let artworkReference, !artworkReference.isEmpty {
+            self.artworkReference = artworkReference
+        } else if let artworkData, !artworkData.isEmpty {
+            self.artworkReference = LocalArtworkStorage.shared.storeArtwork(artworkData)
+        } else {
+            self.artworkReference = nil
+        }
         self.isPinned = isPinned
         self.createdAt = createdAt
         self.updatedAt = updatedAt

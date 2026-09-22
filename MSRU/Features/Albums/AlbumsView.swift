@@ -110,17 +110,29 @@ struct AlbumsView: View {
         }
     }
 
+    @ViewBuilder
     private var mainAlbumsGrid: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-
-            if filteredAlbums.isEmpty {
+        if localStore.isLoading {
+            VStack(spacing: 0) {
+                header
+                Divider()
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        } else if filteredAlbums.isEmpty {
+            VStack(spacing: 0) {
+                header
+                Divider()
                 emptyState
-            } else {
-                ScrollView {
+            }
+        } else {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    header
+                    Divider()
+
                     LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 160, maximum: 220), spacing: 20)],
+                        columns: [GridItem(.adaptive(minimum: 180, maximum: 200), spacing: 20)],
                         spacing: 24
                     ) {
                         ForEach(filteredAlbums) { album in
@@ -140,6 +152,7 @@ struct AlbumsView: View {
                                     cornerRadius: 10
                                 )
                             }
+                            .frame(height: 240)
                             .contextMenu {
                                 Button("Play Album") { playAlbum(album) }
                                 Divider()
@@ -152,10 +165,10 @@ struct AlbumsView: View {
                             }
                         }
                     }
-                    .padding(24)
                 }
-                .hideScrollIndicatorsCompletely()
+                .padding(24)
             }
+            .hideScrollIndicatorsCompletely()
         }
     }
 

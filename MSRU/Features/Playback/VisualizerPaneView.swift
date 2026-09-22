@@ -14,28 +14,13 @@ struct VisualizerPaneView: View {
             VStack(spacing: 20) {
                 // Artwork & Track Details
                 VStack(spacing: 12) {
-                    if let data = playback.unifiedArtworkData,
-                       let image = Image(artworkData: data) {
-                        image
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 140, height: 140)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
-                    } else if let url = playback.unifiedArtworkURL {
-                        AsyncImage(url: url) { phase in
-                            if case .success(let img) = phase {
-                                img.resizable().scaledToFill()
-                            } else {
-                                fallbackArtwork
-                            }
-                        }
-                        .frame(width: 140, height: 140)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
-                    } else {
-                        fallbackArtwork
-                    }
+                    MediaImageView(
+                        reference: playback.unifiedArtworkReference,
+                        fixedSize: CGSize(width: 140, height: 140),
+                        thumbnailPixelSize: CGSize(width: 280, height: 280),
+                        cornerRadius: 12
+                    )
+                    .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
 
                     VStack(spacing: 4) {
                         Text(LocalizedStringKey(playback.unifiedTitle))
@@ -131,17 +116,6 @@ struct VisualizerPaneView: View {
         .scrollIndicators(.hidden)
     }
 
-    private var fallbackArtwork: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.primary.opacity(0.08))
-            Image(systemName: "music.note")
-                .font(.system(size: 40))
-                .foregroundStyle(.secondary)
-        }
-        .frame(width: 140, height: 140)
-    }
-
     private func specRow(label: String, value: String) -> some View {
         HStack {
             Text(LocalizedStringKey(label))
@@ -234,11 +208,23 @@ struct AudioVisualizerView: View {
 /// Fluid ambient backdrop that creates an ethereal, blurred, dynamic atmosphere
 /// tailored to the currently playing media artwork and tone.
 struct AmbientBackdropView: View {
+    var artworkReference: MediaImageReference? = nil
     var artworkData: Data? = nil
     var artworkURL: URL? = nil
     var primaryTint: Color = .accentColor
 
     @State private var driftPhase: Double = 0.0
+    @State private var backdropImage: PlatformImage? = nil
+
+    private var effectiveReference: MediaImageReference? {
+        if let artworkReference {
+            return artworkReference
+        }
+        if let artworkURL {
+            return MediaImageReference(url: artworkURL)
+        }
+        return nil
+    }
 
     var body: some View {
         ZStack {
@@ -250,14 +236,24 @@ struct AmbientBackdropView: View {
                 let height = proxy.size.height
 
                 ZStack {
-                    if let artworkData, let image = Image(artworkData: artworkData) {
-                        image
+                    if let backdropImage {
+                        #if canImport(AppKit)
+                        Image(nsImage: backdropImage)
                             .resizable()
                             .scaledToFill()
                             .frame(width: width * 1.2, height: height * 1.2)
                             .blur(radius: 70)
                             .opacity(0.65)
                             .scaleEffect(1.0 + 0.05 * sin(driftPhase))
+                        #elseif canImport(UIKit)
+                        Image(uiImage: backdropImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: width * 1.2, height: height * 1.2)
+                            .blur(radius: 70)
+                            .opacity(0.65)
+                            .scaleEffect(1.0 + 0.05 * sin(driftPhase))
+                        #endif
                     } else {
                         Circle()
                             .fill(primaryTint.opacity(0.55))
@@ -284,13 +280,19 @@ struct AmbientBackdropView: View {
                                 x: -width * 0.05 + 20 * sin(driftPhase * 1.5),
                                 y: height * 0.2 - 20 * cos(driftPhase * 1.2)
                             )
-                            .blur(radius: 70)
                     }
                 }
                 .frame(width: width, height: height)
                 .clipped()
             }
             .ignoresSafeArea()
+            .task(id: effectiveReference) {
+                guard let effectiveReference else {
+                    backdropImage = nil
+                    return
+                }
+                backdropImage = await MediaImagePipeline.shared.loadThumbnail(for: effectiveReference, bucket: .px128)
+            }
 
             Color.black.opacity(0.42)
                 .ignoresSafeArea()

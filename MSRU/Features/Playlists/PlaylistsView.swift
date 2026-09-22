@@ -69,70 +69,78 @@ struct PlaylistsView: View {
 
     // MARK: - Overview Content
 
-    private var overviewContent: some View {
-        VStack(spacing: 0) {
-            // Header Bar
-            HStack(spacing: 12) {
-                // Search
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                    TextField(LocalizedStringKey("Search Playlists"), text: $searchQuery)
-                        .textFieldStyle(.plain)
-                    if !searchQuery.isEmpty {
-                        Button {
-                            searchQuery = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
+    private var headerBar: some View {
+        HStack(spacing: 12) {
+            // Search
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField(LocalizedStringKey("Search Playlists"), text: $searchQuery)
+                    .textFieldStyle(.plain)
+                if !searchQuery.isEmpty {
+                    Button {
+                        searchQuery = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
                     }
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
-                .frame(maxWidth: 240)
-
-                Spacer()
-
-                // Sort Menu
-                Picker(selection: $sortField) {
-                    ForEach(PlaylistSortField.allCases) { field in
-                        Text(LocalizedStringKey(field.rawValue)).tag(field)
-                    }
-                } label: {
-                    Label(LocalizedStringKey("Sort"), systemImage: "arrow.up.arrow.down")
-                }
-                .pickerStyle(.menu)
-                .frame(width: 140)
-
-                // New Playlist Button
-                Button {
-                    isNewPlaylistSheetPresented = true
-                } label: {
-                    Label(LocalizedStringKey("New Playlist"), systemImage: "plus")
-                }
-                .buttonStyle(.borderedProminent)
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+            .frame(maxWidth: 240)
 
-            Divider()
+            Spacer()
 
-            // Playlists Grid / Empty
+            // Sort Menu
+            Picker(selection: $sortField) {
+                ForEach(PlaylistSortField.allCases) { field in
+                    Text(LocalizedStringKey(field.rawValue)).tag(field)
+                }
+            } label: {
+                Label(LocalizedStringKey("Sort"), systemImage: "arrow.up.arrow.down")
+            }
+            .pickerStyle(.menu)
+            .frame(width: 140)
+
+            // New Playlist Button
+            Button {
+                isNewPlaylistSheetPresented = true
+            } label: {
+                Label(LocalizedStringKey("New Playlist"), systemImage: "plus")
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 12)
+    }
+
+    @ViewBuilder
+    private var overviewContent: some View {
+        Group {
             if filteredPlaylists.isEmpty {
-                emptyView
+                VStack(spacing: 0) {
+                    headerBar
+                    Divider()
+                    emptyView
+                }
             } else {
                 ScrollView {
-                    LazyVGrid(
-                        columns: [
-                            GridItem(.adaptive(minimum: 160, maximum: 200), spacing: 20)
-                        ],
-                        spacing: 24
-                    ) {
-                        ForEach(filteredPlaylists) { playlist in
-                            playlistCard(playlist)
+                    LazyVStack(alignment: .leading, spacing: 20) {
+                        headerBar
+                        Divider()
+
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.adaptive(minimum: 160, maximum: 200), spacing: 20)
+                            ],
+                            spacing: 24
+                        ) {
+                            ForEach(filteredPlaylists) { playlist in
+                                playlistCard(playlist)
+                            }
                         }
                     }
                     .padding(24)
@@ -229,15 +237,17 @@ struct PlaylistsView: View {
 
     @ViewBuilder
     private func cardArtwork(for playlist: Playlist) -> some View {
-        // Find first track's artwork if available
-        let firstTrackArtwork = playlist.trackIDs.lazy.compactMap { id in
-            localStore.tracks.first { $0.id == id }?.artworkData
+        let artworkRef = playlist.artworkReference ?? playlist.trackIDs.lazy.compactMap { id in
+            localStore.tracks.first { $0.id == id }?.artworkReference
         }.first
 
-        if let data = firstTrackArtwork, let image = Image(artworkData: data) {
-            image
-                .resizable()
-                .scaledToFill()
+        if let artworkRef {
+            MediaImageView(
+                reference: artworkRef,
+                thumbnailPixelSize: CGSize(width: 256, height: 256),
+                placeholderSystemImage: "music.note.list",
+                cornerRadius: 10
+            )
         } else {
             ZStack {
                 LinearGradient(
@@ -281,7 +291,6 @@ struct PlaylistsView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(32)
     }
 }
 
@@ -404,6 +413,8 @@ enum PlaylistsFeature: ApplicationFeaturePresentation {
         ]
     }
 }
+
+
 
 // MARK: - Previews
 
