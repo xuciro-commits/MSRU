@@ -65,11 +65,13 @@ struct ImportPipelineTests {
 
     @Test
     func genericFolderNamesAreSanitizedAndRejectedAsAlbum() async throws {
-        // Arrange: Create a file inside a generic folder "71-音乐库"
-        let genericDir = FileManager.default.temporaryDirectory
+        // Arrange: Create a file inside a generic folder "71-音乐库" in an isolated container
+        let testContainer = FileManager.default.temporaryDirectory
+            .appendingPathComponent("TestGeneric_\(UUID().uuidString)", isDirectory: true)
+        let genericDir = testContainer
             .appendingPathComponent("71-音乐库", isDirectory: true)
         try FileManager.default.createDirectory(at: genericDir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: genericDir) }
+        defer { try? FileManager.default.removeItem(at: testContainer) }
 
         let wavFile = genericDir.appendingPathComponent("周杰伦 - 晴天.wav")
         let sourceWav = try Fixtures.createDeterministicWAV(durationSeconds: 0.5)
