@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import AppFoundation
+import GRDB
 
 /// A locally learned exact-content audio signature association (Exactness Evidence).
 nonisolated public struct AcousticFingerprintRecord: Identifiable, Codable, Sendable, Equatable {
@@ -171,9 +173,11 @@ public actor LocalFingerprintRegistry: Sendable {
     public private(set) var signatures: [String: AudioFileSignature]
     public private(set) var persistenceWriteCount: Int = 0
 
+    private let db: AppDatabase
     private let storageURL: URL
 
-    public init(storageURL: URL? = nil) {
+    public init(db: AppDatabase = AppDatabase.shared, storageURL: URL? = nil) {
+        self.db = db
         let finalURL: URL
         if let storageURL {
             finalURL = storageURL
@@ -186,7 +190,7 @@ public actor LocalFingerprintRegistry: Sendable {
         }
         self.storageURL = finalURL
 
-        let loaded = Self.load(from: finalURL)
+        let loaded = Self.load(db: db, from: finalURL)
         self.records = loaded.records
         self.assetCache = loaded.assetCache
         self.signatures = loaded.signatures
@@ -432,36 +436,162 @@ public actor LocalFingerprintRegistry: Sendable {
         return removed
     }
 
-    nonisolated private static func load(from storageURL: URL) -> (records: [AcousticFingerprintRecord], assetCache: [String: AssetFingerprintEntry], signatures: [String: AudioFileSignature]) {
-        guard FileManager.default.fileExists(atPath: storageURL.path),
-              let data = try? Data(contentsOf: storageURL) else {
-            return ([], [:], [:])
-        }
-        if let decoded = try? JSONDecoder().decode(RegistryStorage.self, from: data) {
-            let records = decoded.records
-            let assetCache = decoded.assetCache
-            var signatures = decoded.signatures ?? [:]
-            if decoded.signatures == nil {
-                // Version migration: populate signatures from assetCache
-                for (path, entry) in decoded.assetCache {
-                    signatures[path] = AudioFileSignature(
-                        canonicalPath: entry.canonicalPath,
-                        fileSize: entry.fileSize,
-                        modificationTime: entry.modificationTime
-                    )
+    nonisolated private static func load(db: AppDatabase, from storageURL: URL) -> (records: [AcousticFingerprintRecord], assetCache: [String: AssetFingerprintEntry], signatures: [String: AudioFileSignature]) {
+        // 1. One-time migration of legacy JSON file if present
+        if FileManager.default.fileExists(atPath: storageURL.path),
+           let data = try? Data(contentsOf: storageURL) {
+            var legacyRecords: [AcousticFingerprintRecord] = []
+            var legacyCache: [String: AssetFingerprintEntry] = [:]
+            var legacySignatures: [String: AudioFileSignature] = [:]
+
+            if let decoded = try? JSONDecoder().decode(RegistryStorage.self, from: data) {
+                legacyRecords = decoded.records
+                legacyCache = decoded.assetCache
+                legacySignatures = decoded.signatures ?? [:]
+            } else if let recs = try? JSONDecoder().decode([AcousticFingerprintRecord].self, from: data) {
+                legacyRecords = recs
+            }
+
+            if !legacyRecords.isEmpty || !legacyCache.isEmpty || !legacySignatures.isEmpty {
+                try? db.dbWriter.write { db in
+                    for r in legacyRecords {
+                        try db.execute(
+                            sql: """
+                            INSERT OR REPLACE INTO fingerprint_records (fingerprint, duration, algorithm, title, artist, album, track_number, release_mbid, recording_mbid, artwork_reference, date_learned, match_count)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            arguments: [r.fingerprint, r.duration, r.algorithm, r.title, r.artist, r.album, r.trackNumber, r.releaseMBID, r.recordingMBID, r.artworkReference, r.dateLearned, r.matchCount]
+                        )
+                    }
+                    for (p, c) in legacyCache {
+                        try db.execute(
+                            sql: """
+                            INSERT OR REPLACE INTO asset_fingerprint_cache (file_path, fingerprint, duration, mtime, file_size)
+                            VALUES (?, ?, ?, ?, ?)
+                            """,
+                            arguments: [p, c.fingerprint, 0.0, c.modificationTime, c.fileSize]
+                        )
+                    }
+                    for (p, s) in legacySignatures {
+                        try db.execute(
+                            sql: """
+                            INSERT OR REPLACE INTO audio_file_signatures (file_path, file_size, mtime, inode, sha256)
+                            VALUES (?, ?, ?, ?, ?)
+                            """,
+                            arguments: [s.canonicalPath, s.fileSize, s.modificationTime, nil, ""]
+                        )
+                    }
                 }
             }
-            return (records, assetCache, signatures)
-        } else if let legacyRecords = try? JSONDecoder().decode([AcousticFingerprintRecord].self, from: data) {
-            return (legacyRecords, [:], [:])
+            try? FileManager.default.removeItem(at: storageURL)
         }
-        return ([], [:], [:])
+
+        // 2. Load from SQLite tables
+        let loaded = try? db.reader.read { db -> (records: [AcousticFingerprintRecord], assetCache: [String: AssetFingerprintEntry], signatures: [String: AudioFileSignature]) in
+            let recRows = try Row.fetchAll(db, sql: "SELECT * FROM fingerprint_records")
+            let records = recRows.compactMap { row -> AcousticFingerprintRecord? in
+                guard let fp: String = row["fingerprint"],
+                      let dur: Double = row["duration"],
+                      let algo: String = row["algorithm"],
+                      let title: String = row["title"],
+                      let artist: String = row["artist"],
+                      let dateLearned: Date = row["date_learned"] else { return nil }
+                let alb: String? = row["album"]
+                let trkNum: Int? = row["track_number"]
+                let relMBID: String? = row["release_mbid"]
+                let recMBID: String? = row["recording_mbid"]
+                let artRef: String? = row["artwork_reference"]
+                let matchCount: Int = row["match_count"] ?? 1
+
+                return AcousticFingerprintRecord(
+                    fingerprint: fp,
+                    duration: dur,
+                    algorithm: algo,
+                    title: title,
+                    artist: artist,
+                    album: alb,
+                    trackNumber: trkNum,
+                    releaseMBID: relMBID,
+                    recordingMBID: recMBID,
+                    artworkReference: artRef,
+                    dateLearned: dateLearned,
+                    matchCount: matchCount
+                )
+            }
+
+            let cacheRows = try Row.fetchAll(db, sql: "SELECT * FROM asset_fingerprint_cache")
+            var assetCache: [String: AssetFingerprintEntry] = [:]
+            for row in cacheRows {
+                guard let path: String = row["file_path"],
+                      let fp: String = row["fingerprint"],
+                      let mtime: Double = row["mtime"],
+                      let fsize: Int64 = row["file_size"] else { continue }
+                assetCache[path] = AssetFingerprintEntry(
+                    canonicalPath: path,
+                    fileSize: fsize,
+                    modificationDate: Date(timeIntervalSince1970: mtime),
+                    fingerprint: fp
+                )
+            }
+
+            let sigRows = try Row.fetchAll(db, sql: "SELECT * FROM audio_file_signatures")
+            var signatures: [String: AudioFileSignature] = [:]
+            for row in sigRows {
+                guard let path: String = row["file_path"],
+                      let fsize: Int64 = row["file_size"],
+                      let mtime: Double = row["mtime"] else { continue }
+                signatures[path] = AudioFileSignature(
+                    canonicalPath: path,
+                    fileSize: fsize,
+                    modificationTime: mtime
+                )
+            }
+
+            return (records, assetCache, signatures)
+        }
+
+        return loaded ?? ([], [:], [:])
     }
 
     private func save() {
-        let storage = RegistryStorage(records: records, assetCache: assetCache, signatures: signatures)
-        guard let encoded = try? JSONEncoder().encode(storage) else { return }
-        try? encoded.write(to: storageURL, options: .atomic)
+        let currentRecords = records
+        let currentCache = assetCache
+        let currentSigs = signatures
+
+        try? db.dbWriter.write { db in
+            try db.execute(sql: "DELETE FROM fingerprint_records")
+            for r in currentRecords {
+                try db.execute(
+                    sql: """
+                    INSERT INTO fingerprint_records (fingerprint, duration, algorithm, title, artist, album, track_number, release_mbid, recording_mbid, artwork_reference, date_learned, match_count)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    arguments: [r.fingerprint, r.duration, r.algorithm, r.title, r.artist, r.album, r.trackNumber, r.releaseMBID, r.recordingMBID, r.artworkReference, r.dateLearned, r.matchCount]
+                )
+            }
+
+            try db.execute(sql: "DELETE FROM asset_fingerprint_cache")
+            for (p, c) in currentCache {
+                try db.execute(
+                    sql: """
+                    INSERT INTO asset_fingerprint_cache (file_path, fingerprint, duration, mtime, file_size)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    arguments: [p, c.fingerprint, 0.0, c.modificationTime, c.fileSize]
+                )
+            }
+
+            try db.execute(sql: "DELETE FROM audio_file_signatures")
+            for (p, s) in currentSigs {
+                try db.execute(
+                    sql: """
+                    INSERT INTO audio_file_signatures (file_path, file_size, mtime, inode, sha256)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    arguments: [s.canonicalPath, s.fileSize, s.modificationTime, nil, ""]
+                )
+            }
+        }
         persistenceWriteCount += 1
     }
 }

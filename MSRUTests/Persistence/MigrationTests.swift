@@ -27,6 +27,7 @@ struct MigrationTests {
 
         #expect(appliedMigrations.contains("v1_create_music_identity_schema"))
         #expect(appliedMigrations.contains("v2_release_groups_file_assets_and_metadata_resolutions"))
+        #expect(appliedMigrations.contains("v3_playlists_radio_rules_and_domain_storage"))
     }
 
     @Test

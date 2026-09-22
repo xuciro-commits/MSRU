@@ -7,6 +7,7 @@
 
 import Foundation
 import Observation
+import GRDB
 
 /// A directory path pattern that maps to an artist entity and optional album.
 public struct PathHeuristicRule: Identifiable, Codable, Sendable, Equatable {
@@ -42,19 +43,25 @@ public final class PathHeuristicRuleStore {
 
     public private(set) var rules: [PathHeuristicRule] = []
     public private(set) var persistenceWriteCount: Int = 0
-    private let storageURL: URL
+    private let db: AppDatabase
+    private let legacyStorageURL: URL?
 
-    public init(storageURL: URL? = nil) {
-        if let storageURL {
-            self.storageURL = storageURL
+    public init(db: AppDatabase = .shared, legacyStorageURL: URL? = nil) {
+        self.db = db
+        if let legacyStorageURL {
+            self.legacyStorageURL = legacyStorageURL
         } else {
             let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
                 ?? FileManager.default.temporaryDirectory
             let dir = support.appendingPathComponent("MSRU/Rules", isDirectory: true)
-            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            self.storageURL = dir.appendingPathComponent("path_heuristic_rules.json")
+            self.legacyStorageURL = dir.appendingPathComponent("path_heuristic_rules.json")
         }
+        migrateLegacyFileIfNeeded()
         load()
+    }
+
+    public convenience init(storageURL: URL?) {
+        self.init(db: .shared, legacyStorageURL: storageURL)
     }
 
     /// Evaluates a file URL against all rules. Returns the best matching rule.
@@ -184,50 +191,123 @@ public final class PathHeuristicRuleStore {
         return nil
     }
 
-    private func load() {
-        guard FileManager.default.fileExists(atPath: storageURL.path),
-              let data = try? Data(contentsOf: storageURL),
-              let decoded = try? JSONDecoder().decode([PathHeuristicRule].self, from: data) else {
-            return
-        }
-
-        var repaired: [PathHeuristicRule] = []
-        var didModify = false
-
-        for var rule in decoded {
-            let pattern = rule.pathPattern.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-            if Self.genericFolderNames.contains(pattern) {
-                didModify = true
-                continue
-            }
-            let cleanArtist = rule.targetArtist.trimmingCharacters(in: .whitespacesAndNewlines)
-            if cleanArtist.isEmpty || cleanArtist == "Unknown Artist" {
-                // Auto-repair if pattern has "Artist - Album"
-                if let extracted = Self.extractArtistAndAlbum(from: rule.pathPattern) {
-                    rule.targetArtist = extracted.artist
-                    if rule.targetAlbum == nil {
-                        rule.targetAlbum = extracted.album
-                    }
-                    repaired.append(rule)
-                    didModify = true
-                } else {
-                    // Drop invalid Unknown Artist rule
-                    didModify = true
+    private func migrateLegacyFileIfNeeded() {
+        guard let legacyStorageURL, FileManager.default.fileExists(atPath: legacyStorageURL.path) else { return }
+        do {
+            let data = try Data(contentsOf: legacyStorageURL)
+            let legacyRules = try JSONDecoder().decode([PathHeuristicRule].self, from: data)
+            try db.dbWriter.write { db in
+                for rule in legacyRules {
+                    try db.execute(
+                        sql: """
+                        INSERT OR IGNORE INTO path_heuristic_rules
+                        (id, path_pattern, target_artist, target_album, confidence, learned_at, hit_count)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        arguments: [
+                            rule.id.uuidString,
+                            rule.pathPattern,
+                            rule.targetArtist,
+                            rule.targetAlbum,
+                            1.0,
+                            rule.dateAdded,
+                            rule.matchCount
+                        ]
+                    )
                 }
-            } else {
-                repaired.append(rule)
             }
+            try? FileManager.default.removeItem(at: legacyStorageURL)
+            print("[PathHeuristicRuleStore] Migrated legacy path_heuristic_rules.json to SQLite and removed file.")
+        } catch {
+            print("[PathHeuristicRuleStore] Failed migrating legacy rules: \(error)")
+            try? FileManager.default.removeItem(at: legacyStorageURL)
         }
+    }
 
-        self.rules = repaired
-        if didModify {
-            save()
+    private func load() {
+        do {
+            let rows = try db.reader.read { db in
+                try Row.fetchAll(db, sql: "SELECT id, path_pattern, target_artist, target_album, hit_count, learned_at FROM path_heuristic_rules ORDER BY learned_at DESC")
+            }
+
+            var loadedRules: [PathHeuristicRule] = []
+            var didModify = false
+
+            for row in rows {
+                let idStr: String = row["id"]
+                let patternStr: String = row["path_pattern"]
+                let artistStr: String? = row["target_artist"]
+                let albumStr: String? = row["target_album"]
+                let hitCount: Int = row["hit_count"]
+                let learnedAt: Date = row["learned_at"]
+
+                let pattern = patternStr.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                if Self.genericFolderNames.contains(pattern) {
+                    didModify = true
+                    continue
+                }
+
+                var cleanArtist = (artistStr ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                var cleanAlbum = albumStr?.trimmingCharacters(in: .whitespacesAndNewlines)
+                if cleanArtist.isEmpty || cleanArtist == "Unknown Artist" {
+                    if let extracted = Self.extractArtistAndAlbum(from: patternStr) {
+                        cleanArtist = extracted.artist
+                        if cleanAlbum == nil || cleanAlbum?.isEmpty == true {
+                            cleanAlbum = extracted.album
+                        }
+                        didModify = true
+                    } else {
+                        didModify = true
+                        continue
+                    }
+                }
+
+                let id = UUID(uuidString: idStr) ?? UUID()
+                loadedRules.append(PathHeuristicRule(
+                    id: id,
+                    pathPattern: patternStr,
+                    targetArtist: cleanArtist,
+                    targetAlbum: cleanAlbum,
+                    matchCount: hitCount,
+                    dateAdded: learnedAt
+                ))
+            }
+
+            self.rules = loadedRules
+            if didModify {
+                save()
+            }
+        } catch {
+            print("[PathHeuristicRuleStore] Failed to load rules from SQLite: \(error)")
         }
     }
 
     private func save() {
-        guard let encoded = try? JSONEncoder().encode(rules) else { return }
-        try? encoded.write(to: storageURL, options: .atomic)
-        persistenceWriteCount += 1
+        do {
+            try db.dbWriter.write { db in
+                try db.execute(sql: "DELETE FROM path_heuristic_rules")
+                for rule in self.rules {
+                    try db.execute(
+                        sql: """
+                        INSERT OR REPLACE INTO path_heuristic_rules
+                        (id, path_pattern, target_artist, target_album, confidence, learned_at, hit_count)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        arguments: [
+                            rule.id.uuidString,
+                            rule.pathPattern,
+                            rule.targetArtist,
+                            rule.targetAlbum,
+                            1.0,
+                            rule.dateAdded,
+                            rule.matchCount
+                        ]
+                    )
+                }
+            }
+            persistenceWriteCount += 1
+        } catch {
+            print("[PathHeuristicRuleStore] Failed to save rules to SQLite: \(error)")
+        }
     }
 }

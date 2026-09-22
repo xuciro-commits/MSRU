@@ -5,6 +5,7 @@
 
 import Foundation
 import Observation
+import GRDB
 
 @MainActor
 @Observable
@@ -15,15 +16,26 @@ final class RadioStore {
     private(set) var favoriteIDs: Set<String> = []
     private(set) var recentStationIDs: [String] = []
 
-    private let persistenceURL: URL?
+    private let db: AppDatabase
+    private let legacyPersistenceURL: URL?
 
     init(
         stations: [RadioStation] = RadioStation.defaultStations,
-        persistenceURL: URL? = RadioStore.defaultPersistenceURL
+        db: AppDatabase = .shared,
+        legacyPersistenceURL: URL? = RadioStore.defaultPersistenceURL
     ) {
         self.stations = stations
-        self.persistenceURL = persistenceURL
+        self.db = db
+        self.legacyPersistenceURL = legacyPersistenceURL
+        migrateLegacyFileIfNeeded()
         loadState()
+    }
+
+    convenience init(
+        stations: [RadioStation] = RadioStation.defaultStations,
+        persistenceURL: URL?
+    ) {
+        self.init(stations: stations, db: .shared, legacyPersistenceURL: persistenceURL)
     }
 
     // MARK: - Computed Projections
@@ -125,27 +137,171 @@ final class RadioStore {
         return base.appendingPathComponent("MSRU/radio_store.json")
     }
 
-    private func loadState() {
-        guard let persistenceURL, FileManager.default.fileExists(atPath: persistenceURL.path) else { return }
-        guard let data = try? Data(contentsOf: persistenceURL),
-              let payload = try? JSONDecoder().decode(RadioPersistentPayload.self, from: data) else {
-            return
+    private func migrateLegacyFileIfNeeded() {
+        guard let legacyPersistenceURL, FileManager.default.fileExists(atPath: legacyPersistenceURL.path) else { return }
+        do {
+            let data = try Data(contentsOf: legacyPersistenceURL)
+            let payload = try JSONDecoder().decode(RadioPersistentPayload.self, from: data)
+            let now = Date()
+            try db.dbWriter.write { db in
+                for station in payload.customStations {
+                    try db.execute(
+                        sql: """
+                        INSERT OR REPLACE INTO radio_stations
+                        (id, title, stream_url, homepage_url, genre, country, language, codec, bitrate_kbps, is_featured, description, artwork_reference, is_custom, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        arguments: [
+                            station.id,
+                            station.name,
+                            station.streamURL.absoluteString,
+                            station.homepageURL?.absoluteString,
+                            station.genre.rawValue,
+                            station.country,
+                            station.language,
+                            station.codec,
+                            station.bitrateKbps,
+                            station.isFeatured,
+                            station.description,
+                            station.artworkURL?.absoluteString,
+                            true,
+                            now
+                        ]
+                    )
+                }
+
+                for favID in payload.favoriteIDs {
+                    try db.execute(
+                        sql: "INSERT OR REPLACE INTO radio_favorites (station_id) VALUES (?)",
+                        arguments: [favID]
+                    )
+                }
+
+                for (idx, recentID) in payload.recentStationIDs.enumerated() {
+                    let playedAt = now.addingTimeInterval(-Double(idx))
+                    try db.execute(
+                        sql: "INSERT OR REPLACE INTO radio_recents (station_id, played_at) VALUES (?, ?)",
+                        arguments: [recentID, playedAt]
+                    )
+                }
+            }
+            try? FileManager.default.removeItem(at: legacyPersistenceURL)
+            print("[RadioStore] Successfully migrated legacy radio_store.json to SQLite and removed file.")
+        } catch {
+            print("[RadioStore] Failed migrating legacy radio_store.json: \(error)")
+            try? FileManager.default.removeItem(at: legacyPersistenceURL)
         }
-        self.customStations = payload.customStations
-        self.favoriteIDs = Set(payload.favoriteIDs)
-        self.recentStationIDs = payload.recentStationIDs
+    }
+
+    private func loadState() {
+        do {
+            let (customs, favs, recents) = try db.reader.read { db -> ([RadioStation], Set<String>, [String]) in
+                let stationRows = try Row.fetchAll(db, sql: "SELECT * FROM radio_stations WHERE is_custom = 1 ORDER BY created_at DESC")
+                var stations: [RadioStation] = []
+                for row in stationRows {
+                    let id: String = row["id"]
+                    let title: String = row["title"]
+                    let streamUrlStr: String = row["stream_url"]
+                    guard let streamURL = URL(string: streamUrlStr) else { continue }
+                    let homepageUrlStr: String? = row["homepage_url"]
+                    let homepageURL = homepageUrlStr.flatMap { URL(string: $0) }
+                    let genreStr: String? = row["genre"]
+                    let genre = genreStr.flatMap { RadioGenre(rawValue: $0) } ?? .all
+                    let country: String = row["country"] ?? "Global"
+                    let language: String = row["language"] ?? "English"
+                    let codec: String = row["codec"] ?? "AAC"
+                    let bitrateKbps: Int? = row["bitrate_kbps"]
+                    let isFeatured: Bool = row["is_featured"] ?? false
+                    let description: String = row["description"] ?? ""
+                    let artworkRef: String? = row["artwork_reference"]
+                    let artworkURL = artworkRef.flatMap { URL(string: $0) }
+
+                    stations.append(RadioStation(
+                        id: id,
+                        name: title,
+                        description: description,
+                        genre: genre,
+                        streamURL: streamURL,
+                        homepageURL: homepageURL,
+                        artworkURL: artworkURL,
+                        country: country,
+                        language: language,
+                        codec: codec,
+                        bitrateKbps: bitrateKbps,
+                        isFeatured: isFeatured,
+                        isCustom: true
+                    ))
+                }
+
+                let favRows = try Row.fetchAll(db, sql: "SELECT station_id FROM radio_favorites")
+                let favIDs = Set(favRows.map { (row: Row) -> String in row["station_id"] })
+
+                let recentRows = try Row.fetchAll(db, sql: "SELECT station_id FROM radio_recents ORDER BY played_at DESC LIMIT 10")
+                let recentIDs = recentRows.map { (row: Row) -> String in row["station_id"] }
+
+                return (stations, favIDs, recentIDs)
+            }
+
+            self.customStations = customs
+            self.favoriteIDs = favs
+            self.recentStationIDs = recents
+        } catch {
+            print("[RadioStore] Failed to load radio state from SQLite: \(error)")
+        }
     }
 
     private func saveState() {
-        guard let persistenceURL else { return }
-        let payload = RadioPersistentPayload(
-            customStations: customStations,
-            favoriteIDs: Array(favoriteIDs),
-            recentStationIDs: recentStationIDs
-        )
-        guard let data = try? JSONEncoder().encode(payload) else { return }
-        try? FileManager.default.createDirectory(at: persistenceURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? data.write(to: persistenceURL, options: .atomic)
+        do {
+            try db.dbWriter.write { db in
+                try db.execute(sql: "DELETE FROM radio_stations WHERE is_custom = 1")
+                let now = Date()
+                for (idx, station) in self.customStations.enumerated() {
+                    let createdAt = now.addingTimeInterval(-Double(idx))
+                    try db.execute(
+                        sql: """
+                        INSERT OR REPLACE INTO radio_stations
+                        (id, title, stream_url, homepage_url, genre, country, language, codec, bitrate_kbps, is_featured, description, artwork_reference, is_custom, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        arguments: [
+                            station.id,
+                            station.name,
+                            station.streamURL.absoluteString,
+                            station.homepageURL?.absoluteString,
+                            station.genre.rawValue,
+                            station.country,
+                            station.language,
+                            station.codec,
+                            station.bitrateKbps,
+                            station.isFeatured,
+                            station.description,
+                            station.artworkURL?.absoluteString,
+                            true,
+                            createdAt
+                        ]
+                    )
+                }
+
+                try db.execute(sql: "DELETE FROM radio_favorites")
+                for favID in self.favoriteIDs {
+                    try db.execute(
+                        sql: "INSERT OR REPLACE INTO radio_favorites (station_id) VALUES (?)",
+                        arguments: [favID]
+                    )
+                }
+
+                try db.execute(sql: "DELETE FROM radio_recents")
+                for (idx, recentID) in self.recentStationIDs.enumerated() {
+                    let playedAt = now.addingTimeInterval(-Double(idx))
+                    try db.execute(
+                        sql: "INSERT OR REPLACE INTO radio_recents (station_id, played_at) VALUES (?, ?)",
+                        arguments: [recentID, playedAt]
+                    )
+                }
+            }
+        } catch {
+            print("[RadioStore] Failed to save radio state to SQLite: \(error)")
+        }
     }
 }
 

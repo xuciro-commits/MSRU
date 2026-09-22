@@ -82,12 +82,8 @@ struct PlaylistTests {
     }
 
     @Test
-    func jsonPlaylistRepositoryRoundTripPersistence() async throws {
-        // Arrange: Temporary isolated JSON file
-        let tempFile = FileManager.default.temporaryDirectory
-            .appendingPathComponent("playlists_test_\(UUID().uuidString).json")
-        defer { try? FileManager.default.removeItem(at: tempFile) }
-
+    func sqlitePlaylistRepositoryRoundTripPersistence() async throws {
+        let db = try TestDatabase.makeEphemeral()
         let originalPlaylists = [
             Playlist(
                 title: "Road Trip",
@@ -102,21 +98,49 @@ struct PlaylistTests {
             )
         ]
 
-        // Act 1: Save through JSON repository
-        let repo1 = JSONPlaylistRepository(fileURL: tempFile)
+        // Act 1: Save through SQLite repository
+        let repo1 = SQLitePlaylistRepository(db: db)
         try await repo1.savePlaylists(originalPlaylists)
 
-        // Act 2: Load through a fresh JSON repository instance
-        let repo2 = JSONPlaylistRepository(fileURL: tempFile)
+        // Act 2: Load through a fresh SQLite repository instance
+        let repo2 = SQLitePlaylistRepository(db: db)
         let loaded = try await repo2.loadPlaylists()
 
         // Assert: Data matches original exactly
         #expect(loaded.count == 2)
-        #expect(loaded[0].title == "Road Trip")
-        #expect(loaded[0].description == "Upbeat drives")
-        #expect(loaded[0].trackIDs == ["track_a", "track_b"])
-        #expect(loaded[0].isPinned == true)
-        #expect(loaded[1].title == "Late Night Lo-Fi")
-        #expect(loaded[1].trackIDs == ["track_c"])
+        let first = try #require(loaded.first)
+        #expect(first.title == "Road Trip")
+        #expect(first.description == "Upbeat drives")
+        #expect(first.trackIDs == ["track_a", "track_b"])
+        #expect(first.isPinned == true)
+        let second = try #require(loaded.count > 1 ? loaded[1] : nil)
+        #expect(second.title == "Late Night Lo-Fi")
+        #expect(second.trackIDs == ["track_c"])
+    }
+
+    @Test
+    func sqlitePlaylistRepositoryMigratesLegacyJSON() async throws {
+        let db = try TestDatabase.makeEphemeral()
+        let tempFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent("playlists_legacy_\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: tempFile) }
+
+        let legacyPlaylist = Playlist(
+            title: "Legacy Party",
+            description: "From JSON",
+            trackIDs: ["legacy_trk_1"]
+        )
+        let data = try JSONEncoder().encode([legacyPlaylist])
+        try data.write(to: tempFile)
+
+        // Initializing repository with legacyFileURL should import to SQLite and delete legacy file
+        let repo = SQLitePlaylistRepository(db: db, legacyFileURL: tempFile)
+        let loaded = try await repo.loadPlaylists()
+
+        #expect(loaded.count == 1)
+        let migrated = try #require(loaded.first)
+        #expect(migrated.title == "Legacy Party")
+        #expect(migrated.trackIDs == ["legacy_trk_1"])
+        #expect(!FileManager.default.fileExists(atPath: tempFile.path))
     }
 }

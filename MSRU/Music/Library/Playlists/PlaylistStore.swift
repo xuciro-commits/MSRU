@@ -5,8 +5,9 @@
 
 import Foundation
 import Observation
+import GRDB
 
-public struct Playlist: Identifiable, Codable, Hashable, Sendable {
+nonisolated public struct Playlist: Identifiable, Codable, Hashable, Sendable {
     public let id: UUID
     public var title: String
     public var description: String?
@@ -16,17 +17,17 @@ public struct Playlist: Identifiable, Codable, Hashable, Sendable {
     public let createdAt: Date
     public var updatedAt: Date
 
+    @MainActor
     public var artworkData: Data? {
         artworkReference.flatMap { LocalArtworkStorage.shared.loadArtwork(relativePath: $0) }
     }
 
-    public init(
+    nonisolated public init(
         id: UUID = UUID(),
         title: String,
         description: String? = nil,
         trackIDs: [String] = [],
         artworkReference: String? = nil,
-        artworkData: Data? = nil,
         isPinned: Bool = false,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
@@ -35,16 +36,42 @@ public struct Playlist: Identifiable, Codable, Hashable, Sendable {
         self.title = title
         self.description = description
         self.trackIDs = trackIDs
-        if let artworkReference, !artworkReference.isEmpty {
-            self.artworkReference = artworkReference
-        } else if let artworkData, !artworkData.isEmpty {
-            self.artworkReference = LocalArtworkStorage.shared.storeArtwork(artworkData)
-        } else {
-            self.artworkReference = nil
-        }
+        self.artworkReference = artworkReference
         self.isPinned = isPinned
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+
+    @MainActor
+    public init(
+        id: UUID = UUID(),
+        title: String,
+        description: String? = nil,
+        trackIDs: [String] = [],
+        artworkReference: String? = nil,
+        artworkData: Data?,
+        isPinned: Bool = false,
+        createdAt: Date = Date(),
+        updatedAt: Date = Date()
+    ) {
+        let artRef: String?
+        if let artworkReference, !artworkReference.isEmpty {
+            artRef = artworkReference
+        } else if let artworkData, !artworkData.isEmpty {
+            artRef = LocalArtworkStorage.shared.storeArtwork(artworkData)
+        } else {
+            artRef = nil
+        }
+        self.init(
+            id: id,
+            title: title,
+            description: description,
+            trackIDs: trackIDs,
+            artworkReference: artRef,
+            isPinned: isPinned,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
     }
 
     public var trackCount: Int {
@@ -59,33 +86,125 @@ protocol PlaylistRepository: Sendable {
     func savePlaylists(_ playlists: [Playlist]) async throws
 }
 
-final class JSONPlaylistRepository: PlaylistRepository, @unchecked Sendable {
-    private let fileURL: URL
+// MARK: - SQLite Playlist Repository
 
-    init(fileURL: URL? = nil) {
-        if let fileURL {
-            self.fileURL = fileURL
-        } else {
-            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            let msruDir = appSupport.appendingPathComponent("com.msru.cn.MSRU", isDirectory: true)
-            try? FileManager.default.createDirectory(at: msruDir, withIntermediateDirectories: true)
-            self.fileURL = msruDir.appendingPathComponent("playlists.json")
-        }
+final class SQLitePlaylistRepository: PlaylistRepository {
+    private let db: AppDatabase
+    private let legacyFileURL: URL?
+
+    init(db: AppDatabase = .shared, legacyFileURL: URL? = nil) {
+        self.db = db
+        self.legacyFileURL = legacyFileURL
+    }
+
+    convenience init(fileURL: URL) {
+        self.init(db: .shared, legacyFileURL: fileURL)
     }
 
     func loadPlaylists() async throws -> [Playlist] {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            return []
+        await migrateLegacyPlaylistsIfPresent()
+
+        return try await db.reader.read { db in
+            let playlistRows = try Row.fetchAll(db, sql: "SELECT * FROM playlists ORDER BY created_at DESC")
+            guard !playlistRows.isEmpty else { return [] }
+
+            let trackRows = try Row.fetchAll(db, sql: "SELECT playlist_id, track_id FROM playlist_tracks ORDER BY playlist_id ASC, position ASC")
+            var tracksByPlaylistID: [String: [String]] = [:]
+            for row in trackRows {
+                guard let plID: String = row["playlist_id"], let trkID: String = row["track_id"] else { continue }
+                tracksByPlaylistID[plID, default: []].append(trkID)
+            }
+
+            var playlists: [Playlist] = []
+            for row in playlistRows {
+                guard let idStr: String = row["id"],
+                      let id = UUID(uuidString: idStr),
+                      let title: String = row["title"],
+                      let createdAt: Date = row["created_at"],
+                      let updatedAt: Date = row["updated_at"] else { continue }
+                let desc: String? = row["description"]
+                let artworkRef: String? = row["artwork_reference"]
+                let isPinned: Bool = row["is_pinned"] ?? false
+                let trackIDs = tracksByPlaylistID[idStr] ?? []
+
+                playlists.append(Playlist(
+                    id: id,
+                    title: title,
+                    description: desc,
+                    trackIDs: trackIDs,
+                    artworkReference: artworkRef,
+                    isPinned: isPinned,
+                    createdAt: createdAt,
+                    updatedAt: updatedAt
+                ))
+            }
+            return playlists
         }
-        let data = try Data(contentsOf: fileURL)
-        return try JSONDecoder().decode([Playlist].self, from: data)
     }
 
     func savePlaylists(_ playlists: [Playlist]) async throws {
-        let data = try JSONEncoder().encode(playlists)
-        try data.write(to: fileURL, options: .atomic)
+        try await db.dbWriter.write { db in
+            try db.execute(sql: "DELETE FROM playlists")
+
+            for pl in playlists {
+                try db.execute(
+                    sql: """
+                    INSERT INTO playlists (id, title, description, artwork_reference, is_pinned, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    arguments: [
+                        pl.id.uuidString,
+                        pl.title,
+                        pl.description,
+                        pl.artworkReference,
+                        pl.isPinned ? 1 : 0,
+                        pl.createdAt,
+                        pl.updatedAt
+                    ]
+                )
+
+                for (pos, trackID) in pl.trackIDs.enumerated() {
+                    try db.execute(
+                        sql: """
+                        INSERT INTO playlist_tracks (playlist_id, track_id, position, added_at)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        arguments: [
+                            pl.id.uuidString,
+                            trackID,
+                            pos,
+                            Date()
+                        ]
+                    )
+                }
+            }
+        }
+    }
+
+    private func migrateLegacyPlaylistsIfPresent() async {
+        guard let legacyURL = legacyFileURL ?? defaultLegacyPlaylistsURL(),
+              FileManager.default.fileExists(atPath: legacyURL.path),
+              let data = try? Data(contentsOf: legacyURL),
+              !data.isEmpty else { return }
+
+        let isoDecoder = JSONDecoder()
+        isoDecoder.dateDecodingStrategy = .iso8601
+        let legacy = (try? isoDecoder.decode([Playlist].self, from: data))
+            ?? (try? JSONDecoder().decode([Playlist].self, from: data))
+        if let legacy, !legacy.isEmpty {
+            try? await savePlaylists(legacy)
+        }
+        try? FileManager.default.removeItem(at: legacyURL)
+    }
+
+    private func defaultLegacyPlaylistsURL() -> URL? {
+        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
+        let msruDir = appSupport.appendingPathComponent("com.msru.cn.MSRU", isDirectory: true)
+        return msruDir.appendingPathComponent("playlists.json")
     }
 }
+
+typealias JSONPlaylistRepository = SQLitePlaylistRepository
 
 final class PreviewPlaylistRepository: PlaylistRepository, @unchecked Sendable {
     private var playlists: [Playlist]
@@ -122,7 +241,7 @@ final class PlaylistStore {
     // MARK: - Init
 
     convenience init() {
-        self.init(repository: JSONPlaylistRepository())
+        self.init(repository: SQLitePlaylistRepository())
     }
 
     init(repository: any PlaylistRepository) {

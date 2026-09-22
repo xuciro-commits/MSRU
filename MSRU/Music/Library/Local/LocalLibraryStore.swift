@@ -71,7 +71,7 @@ final class LocalLibraryStore {
     }
 
     convenience init() {
-        self.init(repository: FileLocalLibraryRepository(), db: AppDatabase.shared)
+        self.init(repository: SQLiteLocalLibraryRepository(db: AppDatabase.shared), db: AppDatabase.shared)
     }
 
     init(repository: any LocalLibraryRepository, db: AppDatabase = AppDatabase.shared) {

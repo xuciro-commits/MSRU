@@ -24,14 +24,14 @@ enum LibraryPlaybackSourceKind: String, Codable, Hashable, Sendable {
     case openSubsonic
 }
 
-struct LibraryPlaybackSource: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct LibraryPlaybackSource: Identifiable, Codable, Hashable, Sendable {
     let id: UUID
     let kind: LibraryPlaybackSourceKind
     let externalID: String?
     let localFileURL: URL?
     let remoteURL: URL?
 
-    init(
+    nonisolated init(
         id: UUID = UUID(),
         kind: LibraryPlaybackSourceKind,
         externalID: String? = nil,
@@ -64,7 +64,7 @@ struct LibraryPlaybackSource: Identifiable, Codable, Hashable, Sendable {
 
 // MARK: - Library Track
 
-struct LibraryTrack: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct LibraryTrack: Identifiable, Codable, Hashable, Sendable {
     let id: UUID
     var title: String
     var artist: String
@@ -76,11 +76,12 @@ struct LibraryTrack: Identifiable, Codable, Hashable, Sendable {
     let dateAdded: Date
     var lastPlayedAt: Date?
 
+    @MainActor
     var artworkData: Data? {
         artworkReference.flatMap { LocalArtworkStorage.shared.loadArtwork(relativePath: $0) }
     }
 
-    init(
+    nonisolated init(
         id: UUID = UUID(),
         title: String,
         artist: String,
@@ -88,7 +89,6 @@ struct LibraryTrack: Identifiable, Codable, Hashable, Sendable {
         duration: TimeInterval? = nil,
         artworkURL: URL? = nil,
         artworkReference: String? = nil,
-        artworkData: Data? = nil,
         sources: [LibraryPlaybackSource] = [],
         dateAdded: Date = Date(),
         lastPlayedAt: Date? = nil
@@ -99,16 +99,46 @@ struct LibraryTrack: Identifiable, Codable, Hashable, Sendable {
         self.album = album
         self.duration = duration
         self.artworkURL = artworkURL
-        if let artworkReference, !artworkReference.isEmpty {
-            self.artworkReference = artworkReference
-        } else if let artworkData, !artworkData.isEmpty {
-            self.artworkReference = LocalArtworkStorage.shared.storeArtwork(artworkData)
-        } else {
-            self.artworkReference = nil
-        }
+        self.artworkReference = artworkReference
         self.sources = sources
         self.dateAdded = dateAdded
         self.lastPlayedAt = lastPlayedAt
+    }
+
+    @MainActor
+    init(
+        id: UUID = UUID(),
+        title: String,
+        artist: String,
+        album: String? = nil,
+        duration: TimeInterval? = nil,
+        artworkURL: URL? = nil,
+        artworkReference: String? = nil,
+        artworkData: Data?,
+        sources: [LibraryPlaybackSource] = [],
+        dateAdded: Date = Date(),
+        lastPlayedAt: Date? = nil
+    ) {
+        let artRef: String?
+        if let artworkReference, !artworkReference.isEmpty {
+            artRef = artworkReference
+        } else if let artworkData, !artworkData.isEmpty {
+            artRef = LocalArtworkStorage.shared.storeArtwork(artworkData)
+        } else {
+            artRef = nil
+        }
+        self.init(
+            id: id,
+            title: title,
+            artist: artist,
+            album: album,
+            duration: duration,
+            artworkURL: artworkURL,
+            artworkReference: artRef,
+            sources: sources,
+            dateAdded: dateAdded,
+            lastPlayedAt: lastPlayedAt
+        )
     }
 
     init(local track: LocalTrack) {

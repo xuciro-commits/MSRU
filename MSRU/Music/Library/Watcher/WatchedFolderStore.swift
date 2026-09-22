@@ -8,6 +8,7 @@
 import Foundation
 import Observation
 import AppFoundation
+import GRDB
 
 /// Central state store managing watched folders, background file-system events, and automatic continuous ingestion.
 @MainActor
@@ -24,7 +25,7 @@ final class WatchedFolderStore {
     private let localStore: LocalLibraryStore
     private let watcherService: FolderWatcherService
     private let scanner: WatchedFolderScanner
-    private let manifestURL: URL?
+    private let db: AppDatabase
     private var debounceTasks: [UUID: Task<Void, Never>] = [:]
     private var activeScopedFolders: [UUID: URL] = [:]
 
@@ -32,13 +33,14 @@ final class WatchedFolderStore {
         localStore: LocalLibraryStore,
         watcherService: FolderWatcherService = FolderWatcherService(),
         scanner: WatchedFolderScanner = WatchedFolderScanner(),
+        db: AppDatabase = AppDatabase.shared,
         manifestURL: URL? = nil,
         seedDefaultFolder: Bool = true
     ) {
         self.localStore = localStore
         self.watcherService = watcherService
         self.scanner = scanner
-        self.manifestURL = manifestURL ?? Self.defaultManifestURL()
+        self.db = db
         loadPersistedFolders()
         if seedDefaultFolder {
             checkAndSeedDefaultFolderIfNeeded()
@@ -281,29 +283,77 @@ final class WatchedFolderStore {
 
     // MARK: - Persistence
 
-    private static func defaultManifestURL() -> URL? {
-        guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            return nil
-        }
-        let dir = support.appendingPathComponent("MSRU", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("watched_folders.json")
-    }
-
     private func persistFolders() {
-        guard let manifestURL else { return }
-        if let data = try? JSONEncoder().encode(folders) {
-            try? data.write(to: manifestURL, options: .atomic)
+        try? db.dbWriter.write { db in
+            try db.execute(sql: "DELETE FROM watched_folders")
+            for folder in self.folders {
+                try db.execute(
+                    sql: """
+                    INSERT INTO watched_folders (id, url, bookmark_blob, is_active, track_count, last_scanned_at, added_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    arguments: [
+                        folder.id.uuidString,
+                        folder.url.standardizedFileURL.path,
+                        folder.bookmarkData,
+                        folder.isEnabled ? 1 : 0,
+                        folder.trackCount,
+                        folder.lastScannedAt,
+                        Date()
+                    ]
+                )
+            }
         }
     }
 
     private func loadPersistedFolders() {
-        guard let manifestURL,
-              let data = try? Data(contentsOf: manifestURL),
-              let decoded = try? JSONDecoder().decode([WatchedFolder].self, from: data) else {
+        migrateLegacyWatchedFoldersIfPresent()
+
+        let loaded = try? db.reader.read { db in
+            let rows = try Row.fetchAll(db, sql: "SELECT * FROM watched_folders ORDER BY added_at ASC")
+            return rows.compactMap { row -> WatchedFolder? in
+                guard let idStr: String = row["id"],
+                      let id = UUID(uuidString: idStr),
+                      let urlStr: String = row["url"] else { return nil }
+                let url = URL(fileURLWithPath: urlStr)
+                let bookmarkBlob: Data? = row["bookmark_blob"]
+                let isActive: Bool = row["is_active"] ?? true
+                let trackCount: Int = row["track_count"] ?? 0
+                let lastScannedAt: Date? = row["last_scanned_at"]
+
+                return WatchedFolder(
+                    id: id,
+                    url: url,
+                    bookmarkData: bookmarkBlob,
+                    isEnabled: isActive,
+                    autoIngest: true,
+                    lastScannedAt: lastScannedAt,
+                    trackCount: trackCount
+                )
+            }
+        }
+        if let loaded, !loaded.isEmpty {
+            self.folders = loaded
+        }
+    }
+
+    private func migrateLegacyWatchedFoldersIfPresent() {
+        guard let legacyURL = defaultLegacyWatchedFoldersURL(),
+              FileManager.default.fileExists(atPath: legacyURL.path),
+              let data = try? Data(contentsOf: legacyURL),
+              let decoded = try? JSONDecoder().decode([WatchedFolder].self, from: data),
+              !decoded.isEmpty else {
             return
         }
+
         self.folders = decoded
+        persistFolders()
+        try? FileManager.default.removeItem(at: legacyURL)
+    }
+
+    private func defaultLegacyWatchedFoldersURL() -> URL? {
+        guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
+        return support.appendingPathComponent("MSRU/watched_folders.json")
     }
 
     // MARK: - Default Folder Seeding

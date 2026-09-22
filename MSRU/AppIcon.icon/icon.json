@@ -1,8 +1,8 @@
 {
   "fill" : {
     "linear-gradient" : [
-      "display-p3:0.35778,0.98904,0.91467,1.00000",
-      "display-p3:0.09374,0.08989,0.37344,1.00000"
+      "display-p3:0.91504,0.21313,0.29639,1.00000",
+      "display-p3:0.12294,0.12294,0.12294,1.00000"
     ]
   },
   "groups" : [
@@ -13,14 +13,14 @@
           "fill" : "none",
           "glass" : false,
           "hidden" : false,
-          "image-name" : "2.png",
-          "name" : "2",
+          "image-name" : "Codex 图像 2026年9月12日 02_03_39.png",
+          "name" : "Codex 图像 2026年9月12日 02_03_39",
           "opacity" : 1,
           "position" : {
-            "scale" : 0.7,
+            "scale" : 0.6,
             "translation-in-points" : [
-              -17.200000000000045,
-              75.00000000000006
+              -6,
+              -42
             ]
           }
         }

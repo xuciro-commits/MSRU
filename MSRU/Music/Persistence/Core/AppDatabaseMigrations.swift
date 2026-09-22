@@ -15,6 +15,7 @@ nonisolated enum AppDatabaseMigrations {
     nonisolated static func register(to migrator: inout DatabaseMigrator) {
         registerV1(to: &migrator)
         registerV2(to: &migrator)
+        registerV3(to: &migrator)
     }
 
     // MARK: - Initial Identity & Asset Schema (v1)
@@ -309,6 +310,146 @@ nonisolated enum AppDatabaseMigrations {
                     tokenize = 'unicode61 remove_diacritics 2'
                 );
             """)
+        }
+    }
+
+    // MARK: - Playlists, Domain Storage & SQLite Cutover (v3)
+
+    nonisolated static func registerV3(to migrator: inout DatabaseMigrator) {
+        migrator.registerMigration("v3_playlists_radio_rules_and_domain_storage") { db in
+            // 1. Add bookmark_blob to file_assets if needed
+            if try !db.columns(in: "file_assets").contains(where: { $0.name == "bookmark_blob" }) {
+                try db.alter(table: "file_assets") { t in
+                    t.add(column: "bookmark_blob", .blob)
+                }
+            }
+
+            // 2. Saved Library Tracks & Sources (User Library persistence)
+            try db.create(table: "saved_library_tracks") { t in
+                t.column("id", .text).primaryKey()
+                t.column("title", .text).notNull()
+                t.column("artist", .text).notNull()
+                t.column("album", .text)
+                t.column("duration", .double).notNull().defaults(to: 0)
+                t.column("artwork_reference", .text)
+                t.column("date_added", .datetime).notNull()
+                t.column("last_played_at", .datetime)
+            }
+
+            try db.create(table: "saved_library_sources") { t in
+                t.column("id", .text).primaryKey()
+                t.column("library_track_id", .text).notNull().references("saved_library_tracks", onDelete: .cascade)
+                t.column("kind", .text).notNull()
+                t.column("local_url", .text)
+                t.column("remote_url", .text)
+                t.column("external_id", .text)
+                t.column("title", .text)
+                t.column("artist", .text)
+                t.column("duration", .double)
+            }
+            try db.create(index: "idx_saved_library_sources_track", on: "saved_library_sources", columns: ["library_track_id"])
+
+            // 3. Playlists & Playlist Tracks
+            try db.create(table: "playlists") { t in
+                t.column("id", .text).primaryKey()
+                t.column("title", .text).notNull()
+                t.column("description", .text)
+                t.column("artwork_reference", .text)
+                t.column("is_pinned", .boolean).notNull().defaults(to: false)
+                t.column("created_at", .datetime).notNull()
+                t.column("updated_at", .datetime).notNull()
+            }
+
+            try db.create(table: "playlist_tracks") { t in
+                t.column("playlist_id", .text).notNull().references("playlists", onDelete: .cascade)
+                t.column("track_id", .text).notNull()
+                t.column("position", .integer).notNull()
+                t.column("added_at", .datetime).notNull()
+                t.primaryKey(["playlist_id", "position"])
+            }
+            try db.create(index: "idx_playlist_tracks_playlist", on: "playlist_tracks", columns: ["playlist_id"])
+            try db.create(index: "idx_playlist_tracks_track", on: "playlist_tracks", columns: ["track_id"])
+
+            // 4. Watched Folders
+            try db.create(table: "watched_folders") { t in
+                t.column("id", .text).primaryKey()
+                t.column("url", .text).notNull().unique()
+                t.column("bookmark_blob", .blob)
+                t.column("is_active", .boolean).notNull().defaults(to: true)
+                t.column("track_count", .integer).notNull().defaults(to: 0)
+                t.column("last_scanned_at", .datetime)
+                t.column("added_at", .datetime).notNull()
+            }
+
+            // 5. Acoustic Fingerprint Records, Asset Cache & Audio File Signatures
+            try db.create(table: "fingerprint_records") { t in
+                t.column("fingerprint", .text).primaryKey()
+                t.column("duration", .double).notNull()
+                t.column("algorithm", .text).notNull()
+                t.column("title", .text).notNull()
+                t.column("artist", .text).notNull()
+                t.column("album", .text)
+                t.column("track_number", .integer)
+                t.column("release_mbid", .text)
+                t.column("recording_mbid", .text)
+                t.column("artwork_reference", .text)
+                t.column("date_learned", .datetime).notNull()
+                t.column("match_count", .integer).notNull().defaults(to: 1)
+            }
+
+            try db.create(table: "asset_fingerprint_cache") { t in
+                t.column("file_path", .text).primaryKey()
+                t.column("fingerprint", .text).notNull()
+                t.column("duration", .double).notNull()
+                t.column("mtime", .double).notNull()
+                t.column("file_size", .integer).notNull()
+            }
+
+            try db.create(table: "audio_file_signatures") { t in
+                t.column("file_path", .text).primaryKey()
+                t.column("file_size", .integer).notNull()
+                t.column("mtime", .double).notNull()
+                t.column("inode", .integer)
+                t.column("sha256", .text).notNull()
+            }
+
+            // 6. Path Heuristic Rules
+            try db.create(table: "path_heuristic_rules") { t in
+                t.column("id", .text).primaryKey()
+                t.column("path_pattern", .text).notNull().unique()
+                t.column("target_artist", .text)
+                t.column("target_album", .text)
+                t.column("confidence", .double).notNull().defaults(to: 1.0)
+                t.column("learned_at", .datetime).notNull()
+                t.column("hit_count", .integer).notNull().defaults(to: 0)
+            }
+
+            // 7. Radio Stations, Favorites & Recents
+            try db.create(table: "radio_stations") { t in
+                t.column("id", .text).primaryKey()
+                t.column("title", .text).notNull()
+                t.column("stream_url", .text).notNull()
+                t.column("homepage_url", .text)
+                t.column("genre", .text)
+                t.column("country", .text)
+                t.column("language", .text)
+                t.column("codec", .text)
+                t.column("bitrate_kbps", .integer)
+                t.column("is_featured", .boolean).notNull().defaults(to: false)
+                t.column("description", .text)
+                t.column("artwork_reference", .text)
+                t.column("is_custom", .boolean).notNull().defaults(to: true)
+                t.column("created_at", .datetime).notNull()
+            }
+
+            try db.create(table: "radio_favorites") { t in
+                t.column("station_id", .text).primaryKey()
+            }
+
+            try db.create(table: "radio_recents") { t in
+                t.column("station_id", .text).primaryKey()
+                t.column("played_at", .datetime).notNull()
+            }
         }
     }
 }

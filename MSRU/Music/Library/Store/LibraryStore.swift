@@ -16,7 +16,7 @@ final class LibraryStore {
     private var pendingOperation: Task<Bool, Never>?
     private var operationID: UUID?
 
-    convenience init() { self.init(repository: JSONLibraryRepository()) }
+    convenience init() { self.init(repository: SQLiteLibraryRepository()) }
     init(repository: any LibraryRepository) {
         self.repository = repository
         rebuildIndex()

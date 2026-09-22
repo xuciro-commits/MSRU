@@ -178,4 +178,49 @@ struct LibraryTests {
         #expect(!result.category.isSameRecording)
         #expect(result.category.isSameWork)
     }
+
+    @Test
+    @MainActor
+    func sqliteLibraryRepositoryRoundTripAndLegacyMigration() async throws {
+        let db = try TestDatabase.makeEphemeral()
+        let tempFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent("library_legacy_\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: tempFile) }
+
+        let legacyTrack = LibraryTrack(
+            title: "七里香",
+            artist: "周杰伦",
+            album: "七里香",
+            duration: 299.0,
+            sources: [
+                LibraryPlaybackSource(
+                    kind: .local,
+                    localFileURL: URL(fileURLWithPath: "/music/qilixiang.flac")
+                )
+            ]
+        )
+        let data = try JSONEncoder().encode([legacyTrack])
+        try data.write(to: tempFile)
+
+        // Init repository with legacy file URL - should migrate and delete JSON
+        let repo = SQLiteLibraryRepository(db: db, legacyFileURL: tempFile)
+        let loaded = try await repo.loadTracks()
+
+        #expect(loaded.count == 1)
+        let track = try #require(loaded.first)
+        #expect(track.title == "七里香")
+        #expect(track.artist == "周杰伦")
+        #expect(track.sources.first?.kind == .local)
+        #expect(!FileManager.default.fileExists(atPath: tempFile.path))
+
+        // Test saving an updated list back to SQLite
+        var updatedTrack = track
+        updatedTrack.title = "七里香 (Remastered)"
+        try await repo.saveTracks([updatedTrack])
+
+        let reloaded = try await repo.loadTracks()
+        #expect(reloaded.count == 1)
+        let reloadedTrack = try #require(reloaded.first)
+        #expect(reloadedTrack.title == "七里香 (Remastered)")
+    }
 }
