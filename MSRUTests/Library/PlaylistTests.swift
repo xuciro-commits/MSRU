@@ -142,5 +142,61 @@ struct PlaylistTests {
         #expect(migrated.title == "Legacy Party")
         #expect(migrated.trackIDs == ["legacy_trk_1"])
         #expect(!FileManager.default.fileExists(atPath: tempFile.path))
+        #expect(FileManager.default.fileExists(atPath: tempFile.appendingPathExtension("legacy.backup").path))
     }
+
+    @Test
+    func sqlitePlaylistChangesPreserveUnrelatedRows() async throws {
+        let db = try TestDatabase.makeEphemeral()
+        let repo = SQLitePlaylistRepository(db: db)
+        let first = Playlist(title: "First", trackIDs: ["a", "b"])
+        let second = Playlist(title: "Second", trackIDs: ["c"])
+        try await repo.savePlaylists([first, second])
+
+        var changed = first
+        changed.title = "Renamed"
+        try await repo.applyChanges(upserting: [changed], deleting: [])
+
+        let loaded = try await repo.loadPlaylists()
+        #expect(loaded.first(where: { $0.id == changed.id })?.title == "Renamed")
+        #expect(loaded.first(where: { $0.id == second.id })?.trackIDs == ["c"])
+    }
+
+    @Test
+    func malformedLegacyPlaylistRemainsRecoverable() async throws {
+        let db = try TestDatabase.makeEphemeral()
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("playlists_corrupt_\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data("{broken".utf8).write(to: url)
+
+        let repo = SQLitePlaylistRepository(db: db, legacyFileURL: url)
+        await #expect(throws: (any Error).self) { _ = try await repo.loadPlaylists() }
+        #expect(FileManager.default.fileExists(atPath: url.path))
+        #expect(!FileManager.default.fileExists(atPath: url.appendingPathExtension("legacy.backup").path))
+    }
+
+    @Test
+    func failedPlaylistWriteDoesNotChangeVisibleState() async {
+        let repo = FailingPlaylistRepository()
+        let store = PlaylistStore(repository: repo)
+        await store.load()
+        #expect(store.playlists.isEmpty)
+        #expect(store.errorMessage != nil)
+
+        _ = await store.createPlaylist(title: "Will Fail")
+        #expect(store.playlists.isEmpty)
+        #expect(store.errorMessage != nil)
+    }
+}
+
+@MainActor
+private final class FailingPlaylistRepository: PlaylistRepository, @unchecked Sendable {
+    func loadPlaylists() async throws -> [Playlist] { [] }
+    func savePlaylists(_ playlists: [Playlist]) async throws { throw Failure.write }
+    func applyChanges(upserting playlists: [Playlist], deleting ids: Set<UUID>) async throws {
+        throw Failure.write
+    }
+
+    private enum Failure: Error { case write }
 }

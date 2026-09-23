@@ -93,6 +93,21 @@ nonisolated public struct Playlist: Identifiable, Codable, Hashable, Sendable {
 protocol PlaylistRepository: Sendable {
     func loadPlaylists() async throws -> [Playlist]
     func savePlaylists(_ playlists: [Playlist]) async throws
+    func applyChanges(upserting playlists: [Playlist], deleting ids: Set<UUID>) async throws
+}
+
+extension PlaylistRepository {
+    func applyChanges(upserting playlists: [Playlist], deleting ids: Set<UUID>) async throws {
+        var current = try await loadPlaylists().filter { !ids.contains($0.id) }
+        for playlist in playlists {
+            if let index = current.firstIndex(where: { $0.id == playlist.id }) {
+                current[index] = playlist
+            } else {
+                current.append(playlist)
+            }
+        }
+        try await savePlaylists(current)
+    }
 }
 
 // MARK: - SQLite Playlist Repository
@@ -111,7 +126,7 @@ final class SQLitePlaylistRepository: PlaylistRepository {
     }
 
     func loadPlaylists() async throws -> [Playlist] {
-        await migrateLegacyPlaylistsIfPresent()
+        try await migrateLegacyPlaylistsIfPresent()
 
         return try await db.reader.read { db in
             let playlistRows = try Row.fetchAll(db, sql: "SELECT * FROM playlists ORDER BY created_at DESC")
@@ -120,7 +135,9 @@ final class SQLitePlaylistRepository: PlaylistRepository {
             let trackRows = try Row.fetchAll(db, sql: "SELECT playlist_id, track_id FROM playlist_tracks ORDER BY playlist_id ASC, position ASC")
             var tracksByPlaylistID: [String: [String]] = [:]
             for row in trackRows {
-                guard let plID: String = row["playlist_id"], let trkID: String = row["track_id"] else { continue }
+                guard let plID: String = row["playlist_id"], let trkID: String = row["track_id"] else {
+                    throw PlaylistReadError.invalidRow
+                }
                 tracksByPlaylistID[plID, default: []].append(trkID)
             }
 
@@ -130,15 +147,17 @@ final class SQLitePlaylistRepository: PlaylistRepository {
                       let id = UUID(uuidString: idStr),
                       let title: String = row["title"],
                       let createdAt: Date = row["created_at"],
-                      let updatedAt: Date = row["updated_at"] else { continue }
+                      let updatedAt: Date = row["updated_at"] else {
+                    throw PlaylistReadError.invalidRow
+                }
                 let desc: String? = row["description"]
                 let artworkRef: String? = row["artwork_reference"]
                 let isPinned: Bool = row["is_pinned"] ?? false
                 let trackIDs = tracksByPlaylistID[idStr] ?? []
 
                 let rulesJSON: String? = row["rules_json"]
-                let rules: SmartPlaylistRuleGroup? = rulesJSON.flatMap {
-                    try? JSONDecoder().decode(SmartPlaylistRuleGroup.self, from: Data($0.utf8))
+                let rules = try rulesJSON.map {
+                    try JSONDecoder().decode(SmartPlaylistRuleGroup.self, from: Data($0.utf8))
                 }
 
                 playlists.append(Playlist(
@@ -158,15 +177,23 @@ final class SQLitePlaylistRepository: PlaylistRepository {
     }
 
     func savePlaylists(_ playlists: [Playlist]) async throws {
-        try await db.dbWriter.write { db in
-            try db.execute(sql: "DELETE FROM playlists")
+        let desiredIDs = Set(playlists.map(\.id))
+        let existingIDs = try await db.reader.read { db in
+            try Set(String.fetchAll(db, sql: "SELECT id FROM playlists").compactMap(UUID.init(uuidString:)))
+        }
+        try await applyChanges(upserting: playlists, deleting: existingIDs.subtracting(desiredIDs))
+    }
 
+    func applyChanges(upserting playlists: [Playlist], deleting ids: Set<UUID>) async throws {
+        guard !playlists.isEmpty || !ids.isEmpty else { return }
+        try await db.dbWriter.write { db in
+            for id in ids {
+                try db.execute(sql: "DELETE FROM playlists WHERE id = ?", arguments: [id.uuidString])
+            }
             for pl in playlists {
                 let rulesJSON: String?
-                if let rules = pl.rules,
-                   let data = try? JSONEncoder().encode(rules),
-                   let jsonString = String(data: data, encoding: .utf8) {
-                    rulesJSON = jsonString
+                if let rules = pl.rules {
+                    rulesJSON = String(decoding: try JSONEncoder().encode(rules), as: UTF8.self)
                 } else {
                     rulesJSON = nil
                 }
@@ -175,6 +202,13 @@ final class SQLitePlaylistRepository: PlaylistRepository {
                     sql: """
                     INSERT INTO playlists (id, title, description, artwork_reference, is_pinned, created_at, updated_at, rules_json)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                        title = excluded.title,
+                        description = excluded.description,
+                        artwork_reference = excluded.artwork_reference,
+                        is_pinned = excluded.is_pinned,
+                        updated_at = excluded.updated_at,
+                        rules_json = excluded.rules_json
                     """,
                     arguments: [
                         pl.id.uuidString,
@@ -188,38 +222,81 @@ final class SQLitePlaylistRepository: PlaylistRepository {
                     ]
                 )
 
-                for (pos, trackID) in pl.trackIDs.enumerated() {
-                    try db.execute(
-                        sql: """
-                        INSERT INTO playlist_tracks (playlist_id, track_id, position, added_at)
-                        VALUES (?, ?, ?, ?)
-                        """,
-                        arguments: [
-                            pl.id.uuidString,
-                            trackID,
-                            pos,
-                            Date()
-                        ]
-                    )
+                let existingTracks = try String.fetchAll(
+                    db, sql: "SELECT track_id FROM playlist_tracks WHERE playlist_id = ? ORDER BY position",
+                    arguments: [pl.id.uuidString]
+                )
+                if existingTracks != pl.trackIDs {
+                    try db.execute(sql: "DELETE FROM playlist_tracks WHERE playlist_id = ?",
+                                   arguments: [pl.id.uuidString])
+                    for (pos, trackID) in pl.trackIDs.enumerated() {
+                        try db.execute(
+                            sql: """
+                            INSERT INTO playlist_tracks (playlist_id, track_id, position, added_at)
+                            VALUES (?, ?, ?, ?)
+                            """,
+                            arguments: [pl.id.uuidString, trackID, pos, Date()]
+                        )
+                    }
                 }
             }
         }
     }
 
-    private func migrateLegacyPlaylistsIfPresent() async {
+    private func migrateLegacyPlaylistsIfPresent() async throws {
         guard let legacyURL = legacyFileURL ?? defaultLegacyPlaylistsURL(),
-              FileManager.default.fileExists(atPath: legacyURL.path),
-              let data = try? Data(contentsOf: legacyURL),
-              !data.isEmpty else { return }
+              FileManager.default.fileExists(atPath: legacyURL.path) else { return }
+        let data = try Data(contentsOf: legacyURL)
 
         let isoDecoder = JSONDecoder()
         isoDecoder.dateDecodingStrategy = .iso8601
         let legacy = (try? isoDecoder.decode([Playlist].self, from: data))
             ?? (try? JSONDecoder().decode([Playlist].self, from: data))
-        if let legacy, !legacy.isEmpty {
-            try? await savePlaylists(legacy)
+        guard let legacy else { throw PlaylistMigrationError.invalidLegacyFile(legacyURL) }
+
+        let existing = try await db.reader.read { db in
+            let ids = try String.fetchAll(db, sql: "SELECT id FROM playlists")
+            var tracksByID: [String: [String]] = [:]
+            for id in ids {
+                tracksByID[id] = try String.fetchAll(
+                    db, sql: "SELECT track_id FROM playlist_tracks WHERE playlist_id = ? ORDER BY position",
+                    arguments: [id]
+                )
+            }
+            return tracksByID
         }
-        try? FileManager.default.removeItem(at: legacyURL)
+        for playlist in legacy {
+            if let persisted = existing[playlist.id.uuidString],
+               persisted != playlist.trackIDs {
+                throw PlaylistMigrationError.conflictingTracks(playlist.id)
+            }
+        }
+        let missing = legacy.filter { existing[$0.id.uuidString] == nil }
+        try await applyChanges(upserting: missing, deleting: [])
+
+        let verified = try await db.reader.read { db in
+            for playlist in legacy {
+                guard try Int.fetchOne(db, sql: "SELECT 1 FROM playlists WHERE id = ?",
+                                       arguments: [playlist.id.uuidString]) != nil else { return false }
+                let trackIDs = try String.fetchAll(
+                    db, sql: "SELECT track_id FROM playlist_tracks WHERE playlist_id = ? ORDER BY position",
+                    arguments: [playlist.id.uuidString]
+                )
+                guard trackIDs == playlist.trackIDs else { return false }
+            }
+            return true
+        }
+        guard verified else { throw PlaylistMigrationError.verificationFailed }
+
+        let backupURL = legacyURL.appendingPathExtension("legacy.backup")
+        if FileManager.default.fileExists(atPath: backupURL.path) {
+            guard try Data(contentsOf: backupURL) == data else {
+                throw PlaylistMigrationError.backupConflict(backupURL)
+            }
+            try FileManager.default.removeItem(at: legacyURL)
+        } else {
+            try FileManager.default.moveItem(at: legacyURL, to: backupURL)
+        }
     }
 
     private func defaultLegacyPlaylistsURL() -> URL? {
@@ -230,6 +307,34 @@ final class SQLitePlaylistRepository: PlaylistRepository {
 }
 
 typealias JSONPlaylistRepository = SQLitePlaylistRepository
+
+private enum PlaylistMigrationError: LocalizedError {
+    case invalidLegacyFile(URL)
+    case conflictingTracks(UUID)
+    case verificationFailed
+    case backupConflict(URL)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidLegacyFile(let url):
+            return "Unable to decode legacy playlists at \(url.path). The file was kept for recovery."
+        case .conflictingTracks(let id):
+            return "Legacy playlist \(id) conflicts with the database. The legacy file was kept for recovery."
+        case .verificationFailed:
+            return "Playlist migration verification failed. The legacy file was kept for recovery."
+        case .backupConflict(let url):
+            return "Playlist migration backup differs at \(url.path). Both files were kept."
+        }
+    }
+}
+
+private enum PlaylistReadError: LocalizedError {
+    case invalidRow
+
+    var errorDescription: String? {
+        "A stored playlist row is invalid. Existing database data was kept."
+    }
+}
 
 final class PreviewPlaylistRepository: PlaylistRepository, @unchecked Sendable {
     private var playlists: [Playlist]
@@ -262,6 +367,8 @@ final class PlaylistStore {
     private(set) var errorMessage: String?
 
     private let repository: any PlaylistRepository
+    private var pendingOperation: Task<Bool, Never>?
+    private var operationID: UUID?
 
     // MARK: - Init
 
@@ -276,25 +383,28 @@ final class PlaylistStore {
     // MARK: - Load
 
     func load() async {
-        isLoading = true
-        defer { isLoading = false }
-        do {
-            playlists = try await repository.loadPlaylists()
-            hasLoaded = true
-            errorMessage = nil
-
-            // If store is empty, seed a default "Favorites" playlist
-            if playlists.isEmpty {
-                let defaultFavorites = Playlist(
-                    title: "Favorites",
-                    description: "Your favorite tracks in one place",
-                    isPinned: true
-                )
-                playlists.append(defaultFavorites)
-                try? await repository.savePlaylists(playlists)
+        _ = await serialized { [self] in
+            isLoading = true
+            defer { isLoading = false }
+            do {
+                var loaded = try await repository.loadPlaylists()
+                if loaded.isEmpty {
+                    let favorites = Playlist(
+                        title: "Favorites",
+                        description: "Your favorite tracks in one place",
+                        isPinned: true
+                    )
+                    try await repository.applyChanges(upserting: [favorites], deleting: [])
+                    loaded = [favorites]
+                }
+                playlists = loaded
+                hasLoaded = true
+                errorMessage = nil
+                return true
+            } catch {
+                errorMessage = error.localizedDescription
+                return false
             }
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 
@@ -317,8 +427,11 @@ final class PlaylistStore {
             isPinned: isPinned,
             rules: rules
         )
-        playlists.insert(newPlaylist, at: 0)
-        await persist()
+        _ = await mutate { current in
+            var next = current
+            next.insert(newPlaylist, at: 0)
+            return next
+        }
         return newPlaylist
     }
 
@@ -348,8 +461,7 @@ final class PlaylistStore {
     }
 
     func deletePlaylist(id: UUID) async {
-        playlists.removeAll { $0.id == id }
-        await persist()
+        _ = await mutate { $0.filter { $0.id != id } }
     }
 
     func updatePlaylist(
@@ -360,85 +472,95 @@ final class PlaylistStore {
         rules: SmartPlaylistRuleGroup? = nil,
         updateRules: Bool = false
     ) async {
-        guard let index = playlists.firstIndex(where: { $0.id == id }) else { return }
-        playlists[index].title = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        playlists[index].description = description
-        if let isPinned {
-            playlists[index].isPinned = isPinned
+        _ = await mutate { current in
+            var next = current
+            guard let index = next.firstIndex(where: { $0.id == id }) else { return current }
+            next[index].title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            next[index].description = description
+            if let isPinned { next[index].isPinned = isPinned }
+            if updateRules { next[index].rules = rules }
+            next[index].updatedAt = Date()
+            return next
         }
-        if updateRules {
-            playlists[index].rules = rules
-        }
-        playlists[index].updatedAt = Date()
-        await persist()
     }
 
     func addTrack(_ trackID: String, to playlistID: UUID) async {
-        guard let index = playlists.firstIndex(where: { $0.id == playlistID }) else { return }
-        if !playlists[index].trackIDs.contains(trackID) {
-            playlists[index].trackIDs.append(trackID)
-            playlists[index].updatedAt = Date()
-            await persist()
+        _ = await mutate { current in
+            var next = current
+            guard let index = next.firstIndex(where: { $0.id == playlistID }),
+                  !next[index].trackIDs.contains(trackID) else { return current }
+            next[index].trackIDs.append(trackID)
+            next[index].updatedAt = Date()
+            return next
         }
     }
 
     func addTracks(_ trackIDs: [String], to playlistID: UUID) async {
-        guard let index = playlists.firstIndex(where: { $0.id == playlistID }) else { return }
-        var updated = playlists[index].trackIDs
-        for id in trackIDs {
-            if !updated.contains(id) {
-                updated.append(id)
-            }
+        _ = await mutate { current in
+            var next = current
+            guard let index = next.firstIndex(where: { $0.id == playlistID }) else { return current }
+            var updated = next[index].trackIDs
+            for id in trackIDs where !updated.contains(id) { updated.append(id) }
+            guard updated != next[index].trackIDs else { return current }
+            next[index].trackIDs = updated
+            next[index].updatedAt = Date()
+            return next
         }
-        playlists[index].trackIDs = updated
-        playlists[index].updatedAt = Date()
-        await persist()
     }
 
     func removeTrack(_ trackID: String, from playlistID: UUID) async {
-        guard let index = playlists.firstIndex(where: { $0.id == playlistID }) else { return }
-        playlists[index].trackIDs.removeAll { $0 == trackID }
-        playlists[index].updatedAt = Date()
-        await persist()
+        _ = await mutate { current in
+            var next = current
+            guard let index = next.firstIndex(where: { $0.id == playlistID }),
+                  next[index].trackIDs.contains(trackID) else { return current }
+            next[index].trackIDs.removeAll { $0 == trackID }
+            next[index].updatedAt = Date()
+            return next
+        }
     }
 
     /// Purges tracks matching the specified IDs from all playlists in a single atomic save.
     func purgeTracks(withIDs ids: Set<String>) async {
         guard !ids.isEmpty else { return }
-        var changed = false
-        for i in playlists.indices {
-            let originalCount = playlists[i].trackIDs.count
-            playlists[i].trackIDs.removeAll { ids.contains($0) }
-            if playlists[i].trackIDs.count != originalCount {
-                playlists[i].updatedAt = Date()
-                changed = true
+        _ = await mutate { current in
+            var next = current
+            for i in next.indices {
+                let originalCount = next[i].trackIDs.count
+                next[i].trackIDs.removeAll { ids.contains($0) }
+                if next[i].trackIDs.count != originalCount { next[i].updatedAt = Date() }
             }
-        }
-        if changed {
-            await persist()
+            return next
         }
     }
 
     func removeTracks(at offsets: IndexSet, from playlistID: UUID) async {
-        guard let index = playlists.firstIndex(where: { $0.id == playlistID }) else { return }
-        playlists[index].trackIDs = playlists[index].trackIDs
-            .enumerated()
-            .filter { !offsets.contains($0.offset) }
-            .map(\.element)
-        playlists[index].updatedAt = Date()
-        await persist()
+        _ = await mutate { current in
+            var next = current
+            guard let index = next.firstIndex(where: { $0.id == playlistID }) else { return current }
+            let filtered = next[index].trackIDs.enumerated()
+                .filter { !offsets.contains($0.offset) }.map(\.element)
+            guard filtered != next[index].trackIDs else { return current }
+            next[index].trackIDs = filtered
+            next[index].updatedAt = Date()
+            return next
+        }
     }
 
     func moveTracks(from source: IndexSet, to destination: Int, in playlistID: UUID) async {
-        guard let index = playlists.firstIndex(where: { $0.id == playlistID }) else { return }
-        var list = playlists[index].trackIDs
-        let itemsToMove = source.sorted().map { list[$0] }
-        list = list.enumerated().filter { !source.contains($0.offset) }.map(\.element)
-        let targetIndex = min(max(0, destination > (source.first ?? 0) ? destination - source.count : destination), list.count)
-        list.insert(contentsOf: itemsToMove, at: targetIndex)
-        playlists[index].trackIDs = list
-        playlists[index].updatedAt = Date()
-        await persist()
+        _ = await mutate { current in
+            var next = current
+            guard let index = next.firstIndex(where: { $0.id == playlistID }) else { return current }
+            var list = next[index].trackIDs
+            guard source.allSatisfy({ list.indices.contains($0) }) else { return current }
+            let itemsToMove = source.sorted().map { list[$0] }
+            list = list.enumerated().filter { !source.contains($0.offset) }.map(\.element)
+            let targetIndex = min(max(0, destination > (source.first ?? 0) ? destination - source.count : destination), list.count)
+            list.insert(contentsOf: itemsToMove, at: targetIndex)
+            guard list != next[index].trackIDs else { return current }
+            next[index].trackIDs = list
+            next[index].updatedAt = Date()
+            return next
+        }
     }
 
     // MARK: - Queries
@@ -453,14 +575,42 @@ final class PlaylistStore {
 
     // MARK: - Persistence
 
-    private func persist() async {
-        isSaving = true
-        defer { isSaving = false }
-        do {
-            try await repository.savePlaylists(playlists)
-            errorMessage = nil
-        } catch {
-            errorMessage = error.localizedDescription
+    private func mutate(_ transform: @escaping @MainActor ([Playlist]) -> [Playlist]) async -> Bool {
+        await serialized { [self] in
+            let next = transform(playlists)
+            let oldByID = Dictionary(uniqueKeysWithValues: playlists.map { ($0.id, $0) })
+            let nextIDs = Set(next.map(\.id))
+            let changed = next.filter { oldByID[$0.id] != $0 }
+            let deleted = Set(oldByID.keys).subtracting(nextIDs)
+            guard !changed.isEmpty || !deleted.isEmpty else { return true }
+            isSaving = true
+            defer { isSaving = false }
+            do {
+                try await repository.applyChanges(upserting: changed, deleting: deleted)
+                playlists = next
+                errorMessage = nil
+                return true
+            } catch {
+                errorMessage = error.localizedDescription
+                return false
+            }
         }
+    }
+
+    private func serialized(_ operation: @escaping @MainActor () async -> Bool) async -> Bool {
+        let previous = pendingOperation
+        let id = UUID()
+        let task = Task { @MainActor in
+            _ = await previous?.value
+            return await operation()
+        }
+        pendingOperation = task
+        operationID = id
+        let result = await task.value
+        if operationID == id {
+            pendingOperation = nil
+            operationID = nil
+        }
+        return result
     }
 }

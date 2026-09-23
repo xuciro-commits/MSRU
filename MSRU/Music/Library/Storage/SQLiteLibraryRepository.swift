@@ -37,7 +37,7 @@ final class SQLiteLibraryRepository: LibraryRepository, Sendable {
                       let id = UUID(uuidString: idStr),
                       let kindStr: String = sRow["kind"],
                       let kind = LibraryPlaybackSourceKind(rawValue: kindStr) else {
-                    continue
+                    throw LibraryReadError.invalidSourceRow
                 }
 
                 let localPath: String? = sRow["local_url"]
@@ -66,7 +66,7 @@ final class SQLiteLibraryRepository: LibraryRepository, Sendable {
                       let title: String = tRow["title"],
                       let artist: String = tRow["artist"],
                       let dateAdded: Date = tRow["date_added"] else {
-                    continue
+                    throw LibraryReadError.invalidTrackRow
                 }
 
                 let album: String? = tRow["album"]
@@ -225,6 +225,18 @@ private enum LibraryMigrationError: LocalizedError {
         case .conflictingSources(let id): return "Library migration found incomplete sources for \(id); the original file was kept."
         case .verificationFailed: return "Library migration verification failed; the original file was kept."
         case .backupConflict(let url): return "Library migration found a different backup at \(url.lastPathComponent); the original file was kept."
+        }
+    }
+}
+
+private enum LibraryReadError: LocalizedError {
+    case invalidTrackRow
+    case invalidSourceRow
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidTrackRow: return "A saved library row is invalid. Existing database data was kept."
+        case .invalidSourceRow: return "A saved library source is invalid. Existing database data was kept."
         }
     }
 }

@@ -9,6 +9,9 @@ protocol LocalLibraryRepository: Sendable {
     func fetchTracks(forReleaseIDs ids: Set<String>) async throws -> [LocalTrack]
     func fetchTracks(forArtistIDs ids: Set<String>) async throws -> [LocalTrack]
     func fetchTracks(inFolder folder: URL) async throws -> [LocalTrack]
+    func fetchTracks(withFilenames names: Set<String>) async throws -> [LocalTrack]
+    func fetchTracks(matchingAlbum title: String, artist: String) async throws -> [LocalTrack]
+    func fetchTracks(matchingArtist name: String) async throws -> [LocalTrack]
     func findUniqueTrack(title: String, artist: String?) async throws -> LocalTrack?
     func searchTracks(_ query: String, limit: Int) async throws -> [LocalTrack]
     func importTrack(from url: URL) async throws -> LocalTrack?
@@ -71,6 +74,18 @@ extension LocalLibraryRepository {
             let path = $0.fileURL.standardizedFileURL.path
             return path == prefix || path.hasPrefix(prefix + "/")
         }
+    }
+    func fetchTracks(withFilenames names: Set<String>) async throws -> [LocalTrack] {
+        try await loadTracks().filter { names.contains($0.fileURL.lastPathComponent) }
+    }
+    func fetchTracks(matchingAlbum title: String, artist: String) async throws -> [LocalTrack] {
+        try await loadTracks().filter {
+            $0.album?.trimmingCharacters(in: .whitespacesAndNewlines).localizedCaseInsensitiveCompare(title) == .orderedSame
+                && (artist.isEmpty || $0.artist.trimmingCharacters(in: .whitespacesAndNewlines).localizedCaseInsensitiveCompare(artist) == .orderedSame)
+        }
+    }
+    func fetchTracks(matchingArtist name: String) async throws -> [LocalTrack] {
+        try await loadTracks().filter { ArtistCreditCleaner.containsArtist(name, in: $0.artist) }
     }
     func findUniqueTrack(title: String, artist: String?) async throws -> LocalTrack? {
         let matches = try await loadTracks().filter {

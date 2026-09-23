@@ -43,12 +43,14 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
                 rel.artwork_asset_id,
                 rt.track_number
             FROM assets a
+            JOIN sources s ON s.id = a.source_id
             LEFT JOIN file_assets fa ON fa.asset_id = a.id
             LEFT JOIN recordings rec ON rec.id = a.recording_id
             LEFT JOIN release_tracks rt ON rt.recording_id = rec.id
             LEFT JOIN releases rel ON rel.id = rt.release_id
             LEFT JOIN artist_credits ac ON ac.entity_id = rec.id AND ac.entity_type = 'recording'
             LEFT JOIN artists art ON art.id = ac.artist_id
+            WHERE s.source_type IN ('local_folder', 'localFolder')
             ORDER BY rec.sort_title ASC, a.relative_path ASC
             """
 
@@ -233,6 +235,50 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
             predicate: "a.relative_path = ? OR substr(a.relative_path, 1, length(?)) = ?",
             arguments: [path, childPrefix, childPrefix]
         )
+    }
+
+    func fetchTracks(withFilenames names: Set<String>) async throws -> [LocalTrack] {
+        guard !names.isEmpty else { return [] }
+        var tracks: [LocalTrack] = []
+        for name in names.sorted() {
+            tracks.append(contentsOf: try await fetchLocalTracks(
+                predicate: "a.relative_path = ? OR (substr(a.relative_path, -length(?)) = ? AND substr(a.relative_path, -length(?) - 1, 1) = '/')",
+                arguments: [name, name, name, name]
+            ))
+        }
+        var seen = Set<String>()
+        return tracks.filter { seen.insert($0.id).inserted }
+    }
+
+    func fetchTracks(matchingAlbum title: String, artist: String) async throws -> [LocalTrack] {
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanArtist = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanTitle.isEmpty else { return [] }
+        let candidates = try await fetchLocalTracks(
+            predicate: """
+                EXISTS (SELECT 1 FROM release_tracks rt JOIN releases rel ON rel.id = rt.release_id
+                        WHERE rt.recording_id = r.id AND lower(trim(rel.title)) = lower(?))
+                """,
+            arguments: [cleanTitle]
+        )
+        return candidates.filter {
+            cleanArtist.isEmpty || $0.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+                .localizedCaseInsensitiveCompare(cleanArtist) == .orderedSame
+        }
+    }
+
+    func fetchTracks(matchingArtist name: String) async throws -> [LocalTrack] {
+        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanName.isEmpty else { return [] }
+        let candidates = try await fetchLocalTracks(
+            predicate: """
+                EXISTS (SELECT 1 FROM artist_credits ac JOIN artists art ON art.id = ac.artist_id
+                        WHERE ac.entity_type = 'recording' AND ac.entity_id = r.id
+                          AND instr(lower(art.name), lower(?)) > 0)
+                """,
+            arguments: [cleanName]
+        )
+        return candidates.filter { ArtistCreditCleaner.containsArtist(cleanName, in: $0.artist) }
     }
 
     func findUniqueTrack(title: String, artist: String?) async throws -> LocalTrack? {
@@ -519,10 +565,7 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
                     guard let destination = destination as URL? else { throw CocoaError(.fileWriteUnknown) }
                     trashed.append((fileURL, destination))
                 } catch {
-                    for item in trashed.reversed() {
-                        try? FileManager.default.moveItem(at: item.destination, to: item.original)
-                    }
-                    throw error
+                    try restoreTrashedFiles(trashed, after: error)
                 }
             }
         }
@@ -531,11 +574,23 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
             let identityRepo = IdentityRepository(db: db)
             _ = try await identityRepo.deleteTracks(assetIDs: matchedIDs)
         } catch {
-            for item in trashed.reversed() {
-                try? FileManager.default.moveItem(at: item.destination, to: item.original)
-            }
-            throw error
+            try restoreTrashedFiles(trashed, after: error)
         }
+    }
+
+    private func restoreTrashedFiles(_ trashed: [(original: URL, destination: URL)], after cause: Error) throws -> Never {
+        var stranded: [String] = []
+        for item in trashed.reversed() {
+            do {
+                try FileManager.default.moveItem(at: item.destination, to: item.original)
+            } catch {
+                stranded.append("\(item.destination.path) → \(item.original.path): \(error.localizedDescription)")
+            }
+        }
+        if !stranded.isEmpty {
+            throw LocalDeletionError.restorationFailed(cause.localizedDescription, stranded)
+        }
+        throw cause
     }
 
     // MARK: - Legacy Migration
@@ -821,5 +876,16 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
         let resolved = support.appendingPathComponent("MSRU/LocalMedia", isDirectory: true)
         try FileManager.default.createDirectory(at: resolved, withIntermediateDirectories: true)
         return resolved
+    }
+}
+
+private enum LocalDeletionError: LocalizedError {
+    case restorationFailed(String, [String])
+
+    var errorDescription: String? {
+        switch self {
+        case .restorationFailed(let cause, let paths):
+            return "File deletion failed (\(cause)). Some files could not be restored: \(paths.joined(separator: "; "))"
+        }
     }
 }

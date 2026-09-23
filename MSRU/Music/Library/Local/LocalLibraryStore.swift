@@ -81,9 +81,13 @@ final class LocalLibraryStore {
     }
 
     private func refreshQuerySnapshot() async {
-        let snapshot = await queryEngine.querySnapshot(includeOrderedIDs: false)
-        self.querySnapshot = snapshot
-        spotlightIndexer?.schedule(repository: repository, albums: albums, artists: artists)
+        do {
+            let snapshot = try await queryEngine.queryDatabaseSnapshot(includeOrderedIDs: false)
+            self.querySnapshot = snapshot
+            spotlightIndexer?.schedule(repository: repository, albums: albums, artists: artists)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     convenience init() {
@@ -173,8 +177,8 @@ final class LocalLibraryStore {
         }
         let legacyNames = playlist.trackIDs.filter { !$0.contains("/") && !$0.contains(":") }
         if !legacyNames.isEmpty {
-            let all = try await repository.loadTracks()
-            for track in all where legacyNames.contains(track.fileURL.lastPathComponent) {
+            let matches = try await repository.fetchTracks(withFilenames: Set(legacyNames))
+            for track in matches {
                 lookup[track.fileURL.lastPathComponent] = track
             }
         }
@@ -332,16 +336,13 @@ final class LocalLibraryStore {
     }
 
     func deleteAlbum(title: String, artist: String, deletePhysical: Bool = false) async {
-        await ensureAllTracksLoaded()
-        guard isFullyLoaded else { return }
-        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let cleanArtist = artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-
-        let trackIDsToDelete = Set(tracks.filter { track in
-            let matchTitle = (track.album?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == cleanTitle)
-            let matchArtist = cleanArtist.isEmpty || (track.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == cleanArtist)
-            return matchTitle && matchArtist
-        }.map(\.id))
+        let trackIDsToDelete: Set<String>
+        do {
+            trackIDsToDelete = Set(try await repository.fetchTracks(matchingAlbum: title, artist: artist).map(\.id))
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
 
         if !trackIDsToDelete.isEmpty {
             guard await deleteTracks(withIDs: trackIDsToDelete, deletePhysical: deletePhysical) else { return }
@@ -364,15 +365,21 @@ final class LocalLibraryStore {
     }
 
     func deleteArtist(name: String, deletePhysical: Bool = false) async {
-        await ensureAllTracksLoaded()
-        guard isFullyLoaded else { return }
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanName.isEmpty else { return }
+
+        let affectedTracks: [LocalTrack]
+        do {
+            affectedTracks = try await repository.fetchTracks(matchingArtist: cleanName)
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
 
         var trackIDsToDelete = Set<String>()
         var tracksToUpdate = [LocalTrack]()
 
-        for track in tracks {
+        for track in affectedTracks {
             if ArtistCreditCleaner.containsArtist(cleanName, in: track.artist) {
                 if ArtistCreditCleaner.isSoleArtist(cleanName, in: track.artist) {
                     // Sole artist: delete track
@@ -440,10 +447,14 @@ final class LocalLibraryStore {
 
     @discardableResult
     func reidentifyTrack(trackID: String) async -> Bool {
-        await ensureAllTracksLoaded()
-        guard isFullyLoaded else { return false }
-        guard let index = tracks.firstIndex(where: { $0.id == trackID }) else { return false }
-        let track = tracks[index]
+        let track: LocalTrack
+        do {
+            guard let found = try await repository.fetchTracks(withIDs: [trackID]).first else { return false }
+            track = found
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
 
         guard let result = await LocalArtworkExtractor.resolveRemoteArtwork(
             artist: track.artist,
@@ -478,7 +489,9 @@ final class LocalLibraryStore {
             errorMessage = error.localizedDescription
             return false
         }
-        tracks[index] = updatedTrack
+        if let index = tracks.firstIndex(where: { $0.id == updatedTrack.id }) {
+            tracks[index] = updatedTrack
+        }
         updateCachedPresentations()
         await refreshQuerySnapshot()
         return true
@@ -486,23 +499,20 @@ final class LocalLibraryStore {
 
     @discardableResult
     func reidentifyAlbum(albumTitle: String, artist: String) async -> Bool {
-        await ensureAllTracksLoaded()
-        guard isFullyLoaded else { return false }
-        let cleanArt = artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let cleanAlb = albumTitle.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-
-        let matchingIndices = tracks.indices.filter { idx in
-            let t = tracks[idx]
-            let tArt = t.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            let tAlb = (t.album ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            return tArt == cleanArt && (tAlb == cleanAlb || cleanAlb.isEmpty)
+        let matchingTracks: [LocalTrack]
+        do {
+            matchingTracks = try await repository.fetchTracks(matchingAlbum: albumTitle, artist: artist)
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
         }
-        guard !matchingIndices.isEmpty else { return false }
+        let cleanArt = artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard let first = matchingTracks.first else { return false }
 
         guard let result = await LocalArtworkExtractor.resolveRemoteArtwork(
             artist: artist,
             album: albumTitle,
-            title: tracks[matchingIndices.first!].title
+            title: first.title
         ) else {
             return false
         }
@@ -510,8 +520,7 @@ final class LocalLibraryStore {
         let artRef = LocalArtworkStorage.shared.storeArtwork(result.data)
         var modifiedTracks: [LocalTrack] = []
 
-        for idx in matchingIndices {
-            let t = tracks[idx]
+        for t in matchingTracks {
             var newAlbum = t.album
             if let canonical = result.canonicalAlbum, !canonical.isEmpty {
                 if newAlbum == nil || newAlbum?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == cleanArt {
