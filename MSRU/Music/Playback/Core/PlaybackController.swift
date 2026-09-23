@@ -1059,7 +1059,9 @@ private struct WeakSessionObserver {
 
         activeResolutionID = resolutionID
 
-        let request = item.playbackRequest
+        let request = playbackQueue.canNext && item.playbackRequest.source == .subsonic
+            ? item.playbackRequest.preparingPCM()
+            : item.playbackRequest
 
         resolutionTask = Task { [weak self] in
 
@@ -1329,8 +1331,8 @@ private struct WeakSessionObserver {
         engine.clearPreparedNext()
         pcmNextTargetID = nextID
         guard let next = playbackQueue.upcoming.first else { return }
-        let request = next.item.playbackRequest
-        guard request.source == .local else { return }
+        let request = next.item.playbackRequest.preparingPCM()
+        guard request.source == .local || request.source == .subsonic else { return }
         pcmNextResolutionTask = Task { [weak self, weak engine] in
             guard let self, let engine else { return }
             do {

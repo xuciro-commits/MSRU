@@ -570,6 +570,7 @@ struct PlaybackItem:
                 preferredQuality: .automatic,
                 localFileURL: nil,
                 remoteURL: streamURL,
+                subsonicServerID: subsonicServerID,
                 providerHint: .subsonic
             )
         }

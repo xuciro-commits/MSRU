@@ -141,6 +141,9 @@ struct MiniPlayerBar: View {
                 if playback.isResolving {
                     ProgressView()
                         .controlSize(.small)
+                } else if playback.playbackErrorMessage != nil {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: size, weight: .semibold))
                 } else {
                     Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
                         .font(.system(size: size, weight: .semibold))
@@ -152,7 +155,8 @@ struct MiniPlayerBar: View {
         .buttonStyle(.plain)
         .foregroundStyle(playback.unifiedHasTrack ? Color.primary : Color.secondary.opacity(0.35))
         .disabled(!playback.unifiedHasTrack || playback.isResolving)
-        .help(playback.isPlaying ? "Pause" : "Play")
+        .help(playback.playbackErrorMessage.map { "\($0) — Retry" }
+            ?? (playback.isPlaying ? "Pause" : "Play"))
         .fixedSize()
     }
 
@@ -889,4 +893,3 @@ struct MiniPlayerAccessoryView: View {
         .padding(.vertical, 8)
     }
 }
-

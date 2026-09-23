@@ -5,6 +5,7 @@
 ## 进行中
 
 - **#61 · 本地专辑连续 PCM 排程**（已实现，待用户验收）。同采样率、同声道曲目在单个播放节点接续；定向代码测试 4 项及 macOS Debug 构建通过。依据 [Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)、[播放交互 15.2](../Docs/Blueprint/InteractionAtlas.md)；当时实现见[实施记录](../Docs/Architecture/ImplementationHistory.md)。完成条件：用户确认真实专辑交接听感、曲目信息切换与队列顺序。
+- **#62 · NAS 专辑连续播放与异格式交接**（已实现，待用户验收）。普通单曲流播；专辑队列经临时下载和 PCM 预备接续，异格式退回正常切歌。定向代码测试 8 项通过；真实 NAS 听感、等待与错误体验由用户验收。依据[播放交互 15.2](../Docs/Blueprint/InteractionAtlas.md)，细节见[实施记录](../Docs/Architecture/ImplementationHistory.md)。
 
 ## Stage 2 待开始（按顺序推进）
 
@@ -12,7 +13,6 @@
 
 | 编号 / 状态 | 大任务与边界 | 完成条件 / 交接依据 |
 | --- | --- | --- |
-| **#62 · 待开始** | **NAS 专辑连续播放与异格式交接**：处理 Subsonic 流的预备、鉴权/缓存生命周期、网络失败，以及采样率和声道变化；承接 #61，依据[播放交互 15.2](../Docs/Blueprint/InteractionAtlas.md)。 | 队列增删/重排、Seek、暂停、断网和授权过期不会播错曲或泄漏资源；可连续排程的来源通过定向代码测试，不能无缝的来源明确回退；用户验收真实交接听感。 |
 | **#63 · 待开始** | **macOS 输出设备与原生采样率链路**：核实 CoreAudio HAL 独占/直通能力，在支持的 DAC 上实现设备选择、采样率切换和设备失联恢复；依据[Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)。 | 记录输入、引擎、设备实际格式及是否发生重采样；有可复现的无重采样/数字处理证据时才标称 Bit-Perfect，DSP 开启时不作此声明；代码测试覆盖切换/失联，DAC 实测由用户完成。若系统能力限制目标，留下证据供阶段收尾决策。 |
 | **#64 · 待开始** | **10 段均衡器**：在播放链路加入可旁路的 EQ、预设与持久化，并处理切歌、音量及削波；依据[Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)与[播放器 15.1](../Docs/Blueprint/InteractionAtlas.md)。 | 10 段参数、旁路/恢复、预设读写及切歌继承有定向测试；音频输出格式和 #63 的直通状态一致；交互先补图册纯文本框图，听感由用户验收。 |
 | **#65 · 待开始** | **EBU R128 / ReplayGain 响度**：扫描并持久化曲目/专辑响度与峰值，播放时提供模式和防削波策略；承接 #64 的 DSP 边界，依据[Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)。 | 固定音频样本的扫描结果、专辑/曲目模式、缺失标签回退和削波边界有代码测试；关闭标准化可恢复原始增益；用户验收音量体验。 |

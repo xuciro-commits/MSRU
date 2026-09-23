@@ -47,6 +47,8 @@ struct PlaybackRequest: Sendable {
     let preferredQuality: PlaybackQuality
     let localFileURL: URL?
     let remoteURL: URL?
+    let subsonicServerID: String?
+    let prefersPreparedPCM: Bool
     let providerHint: PlaybackProviderID?
 
     init(
@@ -55,6 +57,8 @@ struct PlaybackRequest: Sendable {
         preferredQuality: PlaybackQuality = .automatic,
         localFileURL: URL? = nil,
         remoteURL: URL? = nil,
+        subsonicServerID: String? = nil,
+        prefersPreparedPCM: Bool = false,
         providerHint: PlaybackProviderID? = nil
     ) {
         self.itemID = itemID
@@ -62,7 +66,22 @@ struct PlaybackRequest: Sendable {
         self.preferredQuality = preferredQuality
         self.localFileURL = localFileURL
         self.remoteURL = remoteURL
+        self.subsonicServerID = subsonicServerID
+        self.prefersPreparedPCM = prefersPreparedPCM
         self.providerHint = providerHint
+    }
+
+    func preparingPCM() -> PlaybackRequest {
+        PlaybackRequest(
+            itemID: itemID,
+            source: source,
+            preferredQuality: preferredQuality,
+            localFileURL: localFileURL,
+            remoteURL: remoteURL,
+            subsonicServerID: subsonicServerID,
+            prefersPreparedPCM: true,
+            providerHint: providerHint
+        )
     }
 }
 

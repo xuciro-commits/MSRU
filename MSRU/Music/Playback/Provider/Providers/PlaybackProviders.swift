@@ -215,6 +215,11 @@ struct RemoteSubsonicPlaybackProvider: PlaybackProvider {
 
     let id: PlaybackProviderID = .subsonic
     let priority = 950
+    private let downloadStore: any RemoteAudioDownloading
+
+    init(downloadStore: any RemoteAudioDownloading = RemoteAudioDownloadStore()) {
+        self.downloadStore = downloadStore
+    }
 
     func canResolve(_ request: PlaybackRequest) -> Bool {
         request.source == .subsonic && (request.remoteURL != nil || !request.itemID.isEmpty)
@@ -223,31 +228,67 @@ struct RemoteSubsonicPlaybackProvider: PlaybackProvider {
     func resolve(_ request: PlaybackRequest) async throws -> PlaybackResource {
         try Task.checkCancellation()
 
-        if let url = request.remoteURL {
-            return PlaybackResource(
-                providerID: .subsonic,
-                transport: .avPlayerURL(url)
-            )
+        let streamURL: URL
+        if let serverID = request.subsonicServerID {
+            guard let provider = LibraryProviderRegistry.shared.provider(for: LibrarySourceID(serverID)) as? SubsonicLibraryProvider else {
+                throw SubsonicPlaybackError.serverUnavailable
+            }
+            streamURL = try provider.client.streamURL(id: request.itemID)
+        } else if let url = request.remoteURL {
+            streamURL = url
+        } else {
+            throw SubsonicPlaybackError.missingServerIdentity
         }
 
-        // Dynamically resolve authenticated short-lived stream URL from Subsonic client
-        let providers = LibraryProviderRegistry.shared.allProviders().compactMap { $0 as? SubsonicLibraryProvider }
-        if let provider = providers.first {
-            let streamURL = try await provider.client.streamURL(id: request.itemID)
-            return PlaybackResource(
-                providerID: .subsonic,
-                transport: .avPlayerURL(streamURL)
-            )
+        guard request.prefersPreparedPCM else {
+            return PlaybackResource(providerID: .subsonic, transport: .avPlayerURL(streamURL))
         }
 
-        throw SubsonicPlaybackError.missingRemoteURL
+        // Download to a temporary file before decoding. A session owns the file
+        // through playback and removes it on close, including stale prefetches.
+        let fileURL = try await downloadStore.download(streamURL)
+        do {
+            let decoded: AudioCodecOpenResult
+            do {
+                decoded = try await AppleAudioFileDecoder().open(fileURL)
+            } catch {
+                decoded = try await FFmpegCodecBackend().open(fileURL)
+            }
+            if Task.isCancelled {
+                await decoded.session.close()
+                throw CancellationError()
+            }
+            return PlaybackResource(
+                providerID: .subsonic,
+                transport: .decodedPCM(PCMPlaybackResource(
+                    format: decoded.format,
+                    session: DownloadedPCMDecodeSession(
+                        wrapped: decoded.session,
+                        fileURL: fileURL,
+                        downloadStore: downloadStore
+                    )
+                )),
+                duration: decoded.format.duration
+            )
+        } catch is CancellationError {
+            await downloadStore.remove(fileURL)
+            throw CancellationError()
+        } catch {
+            // A stream may use a codec available to AVPlayer only.
+            await downloadStore.remove(fileURL)
+            return PlaybackResource(providerID: .subsonic, transport: .avPlayerURL(streamURL))
+        }
     }
 }
 
 private enum SubsonicPlaybackError: LocalizedError {
-    case missingRemoteURL
+    case missingServerIdentity
+    case serverUnavailable
 
     var errorDescription: String? {
-        "Subsonic stream URL is missing."
+        switch self {
+        case .missingServerIdentity: "Subsonic playback needs a server identity or stream URL."
+        case .serverUnavailable: "The selected Subsonic server is unavailable."
+        }
     }
 }
