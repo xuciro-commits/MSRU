@@ -9,11 +9,12 @@ import Foundation
 import AVFoundation
 import CryptoKit
 import AppFoundation
+import MusicDomain
 
 /// Deterministic exact-content audio signature extractor using AVFoundation PCM inspection.
 ///
 /// Role: **Exactness Evidence** (Local Dedupe & Move Recognition)
-public final class AcoustIDFingerprintExtractor: ExactAudioSignatureExtracting, AudioFingerprinting, Sendable {
+public final class AcoustIDFingerprintExtractor: ExactAudioSignatureExtracting, AcousticFingerprintExtracting, Sendable {
 
     public init() {}
 
@@ -24,7 +25,7 @@ public final class AcoustIDFingerprintExtractor: ExactAudioSignatureExtracting, 
     }
 
     /// Generates a content-based acoustic fingerprint and exact playback duration.
-    public func generateFingerprint(for fileURL: URL) async throws -> AudioFingerprint {
+    public func generateFingerprint(for fileURL: URL) async throws -> AcousticFingerprint {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             throw FingerprintError.fileNotFound
         }
@@ -127,7 +128,7 @@ public final class AcoustIDFingerprintExtractor: ExactAudioSignatureExtracting, 
         let digest = hash.finalize()
         let fingerprintString = digest.compactMap { String(format: "%02x", $0) }.joined()
 
-        return AudioFingerprint(
+        return AcousticFingerprint(
             fingerprint: fingerprintString,
             duration: durationSeconds,
             algorithm: "sha256-pcm-v1"

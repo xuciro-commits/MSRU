@@ -13,6 +13,12 @@ IMPORT = re.compile(
     r"import\s+(?:(?:struct|class|enum|protocol|func|var|let|typealias)\s+)?(\w+)"
 )
 WINDOW_CREATION = re.compile(r"\b(?:NSWindow|NSSplitViewController)\s*\(")
+# AppFoundation is the domain-neutral Apple client layer (see AGENTS.md).
+DOMAIN_MODULES = {"GRDB", "MediaLibrary", "SubsonicKit", "ChromaSwift", "MusicDomain", "MSRUCodecFFmpeg"}
+DOMAIN_VOCABULARY = re.compile(
+    r"\b(?:public|open)\s+(?:final\s+)?(?:struct|class|enum|protocol|actor|typealias)\s+"
+    r"(\w*(?:Track|Album|Artist|Playlist|Lyric|Lrc|Audio|Music|Song|Fingerprint)\w*)"
+)
 
 
 def violations(root: Path) -> list[str]:
@@ -27,8 +33,10 @@ def violations(root: Path) -> list[str]:
                 continue
             module = match.group(1)
             reason = None
-            if module.startswith("MSRU"):
-                reason = "Foundation must not import product modules"
+            if line.lstrip().startswith("@_exported"):
+                reason = "AppFoundation must not re-export modules"
+            elif module.startswith("MSRU") or module in DOMAIN_MODULES:
+                reason = "AppFoundation must not import product/domain modules"
             elif path.is_relative_to(core) and module in {
                 "SwiftUI", "AppKit", "UIKit", "AppFoundationUI"
             }:
@@ -41,6 +49,14 @@ def violations(root: Path) -> list[str]:
                 reason = "Native UI imports belong in AppFoundationUI/Platform"
             if reason:
                 errors.append(f"{path.relative_to(root)}:{number}: {reason}: {module}")
+        for match in DOMAIN_VOCABULARY.finditer(path.read_text()):
+            errors.append(
+                f"{path.relative_to(root)}: domain vocabulary in AppFoundation public API: {match.group(1)}"
+            )
+
+    manifest = (root / "Packages/AppFoundation/Package.swift").read_text()
+    if ".package(" in manifest:
+        errors.append("Packages/AppFoundation/Package.swift: AppFoundation must not declare package dependencies")
 
     for path in sorted((root / "MSRU").rglob("*.swift")):
         if path.is_relative_to(root / "MSRU/Platform"):

@@ -7,6 +7,7 @@
 
 import Foundation
 import AppFoundation
+import MusicDomain
 
 /// A Roon-style multi-version collection aggregating alternative audio assets for a track/recording.
 ///

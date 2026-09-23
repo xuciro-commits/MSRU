@@ -8,6 +8,7 @@
 import Foundation
 import AVFoundation
 import AppFoundation
+import MusicDomain
 
 /// Discovers and extracts cover artwork for music tracks from directory files, embedded tags, or remote archive.
 nonisolated public enum LocalArtworkExtractor {

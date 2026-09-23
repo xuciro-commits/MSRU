@@ -9,6 +9,7 @@
 
 import Foundation
 import AppFoundation
+import MusicDomain
 
 nonisolated public struct AssetMatchCandidate: Sendable {
     public let title: String

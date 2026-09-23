@@ -368,7 +368,7 @@ struct TrackInspectorView: View {
         }
     }
 
-    // MARK: - Versions & Overlay Panels (InteractionAtlas 9.2)
+    // MARK: - Versions & Overlay Panels
 
     private func versionsContent(title: String) -> some View {
         VStack(alignment: .leading, spacing: 16) {

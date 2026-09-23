@@ -7,6 +7,7 @@
 
 import Foundation
 import AppFoundation
+import GRDB
 
 nonisolated public final class AppDatabase: Sendable {
 

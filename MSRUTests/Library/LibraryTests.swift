@@ -9,6 +9,7 @@
 import Testing
 import Foundation
 import AppFoundation
+import MusicDomain
 import GRDB
 import AVFoundation
 @testable import MSRU

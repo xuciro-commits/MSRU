@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import AppFoundation
+import MusicDomain
 
 @MainActor @Observable
 final class LocalAlbumPager {

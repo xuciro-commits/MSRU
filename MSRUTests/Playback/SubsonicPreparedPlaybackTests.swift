@@ -1,6 +1,7 @@
 import Foundation
 import MediaLibrary
 import Testing
+import MusicDomain
 @testable import MSRU
 
 @MainActor

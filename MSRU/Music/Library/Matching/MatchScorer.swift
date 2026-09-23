@@ -7,6 +7,7 @@
 
 import Foundation
 import AppFoundation
+import MusicDomain
 
 /// Query metadata describing a local track candidate for identity matching.
 nonisolated public struct MatchQuery: Sendable, Equatable {

@@ -7,6 +7,7 @@
 
 import Foundation
 import AppFoundation
+import MusicDomain
 
 /// A scored candidate release with comprehensive multi-factor breakdown.
 public struct ScoredReleaseCandidate: Sendable, Equatable, Hashable, Identifiable {

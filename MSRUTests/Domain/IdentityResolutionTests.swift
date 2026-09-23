@@ -10,7 +10,9 @@
 import Testing
 import Foundation
 import AppFoundation
+import MusicDomain
 @testable import MSRU
+import GRDB
 
 @Suite("Identity Resolution & Invariants")
 struct IdentityResolutionTests {

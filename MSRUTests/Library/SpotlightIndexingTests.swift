@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import AppFoundation
 @testable import MSRU
+import MusicDomain
 
 @Suite("Spotlight indexing contracts")
 struct SpotlightIndexingTests {

@@ -12,6 +12,7 @@ import Testing
 import Foundation
 import AppFoundation
 @testable import MSRU
+import MusicDomain
 
 @Suite("Audio Fingerprint & Signature Contracts")
 struct FingerprintTests {

@@ -10,6 +10,7 @@ import Testing
 import Foundation
 import AppFoundation
 @testable import MSRU
+import MusicDomain
 
 @MainActor
 @Suite("Import Pipeline & Clustering Contracts")

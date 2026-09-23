@@ -4,6 +4,7 @@ import AudioToolbox
 import CoreAudio
 import Foundation
 import Testing
+import MusicDomain
 @testable import MSRU
 
 @MainActor

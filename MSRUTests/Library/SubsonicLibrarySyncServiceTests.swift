@@ -12,6 +12,7 @@
 import Testing
 import Foundation
 import AppFoundation
+import MusicDomain
 import MediaLibrary
 import SubsonicKit
 import GRDB

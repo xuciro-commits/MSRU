@@ -7,6 +7,7 @@
 
 import Foundation
 import AppFoundation
+import MusicDomain
 
 /// Match pair between a local cluster item and an external catalog track.
 public struct ClusterTrackMatch: Sendable, Equatable, Identifiable {

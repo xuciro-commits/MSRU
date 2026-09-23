@@ -7,10 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		400B57B93061C80200C76AD8 /* repo-health.py in Resources */ = {isa = PBXBuildFile; fileRef = 400B57B83061C80200C76AD8 /* repo-health.py */; };
 		404EA147305E8362003BA949 /* AppFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 404EA146305E8362003BA949 /* AppFoundation */; };
 		404EA14E305E9751003BA949 /* MSRUCodecFFmpeg in Frameworks */ = {isa = PBXBuildFile; productRef = 404EA14D305E9751003BA949 /* MSRUCodecFFmpeg */; };
 		404EA155305E9777003BA949 /* AppFoundationUI in Frameworks */ = {isa = PBXBuildFile; productRef = 404EA154305E9777003BA949 /* AppFoundationUI */; };
+		40A75D010000000000000001 /* MusicDomain in Frameworks */ = {isa = PBXBuildFile; productRef = 40A75D010000000000000002 /* MusicDomain */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -31,7 +31,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		400B57B83061C80200C76AD8 /* repo-health.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = "repo-health.py"; sourceTree = "<group>"; };
 		40F5DDF83057009E00CA46B2 /* MSRU.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MSRU.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		40F5DE073057009F00CA46B2 /* MSRUTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MSRUTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		40F5DE113057009F00CA46B2 /* MSRUUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MSRUUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -75,6 +74,7 @@
 			files = (
 				404EA147305E8362003BA949 /* AppFoundation in Frameworks */,
 				404EA155305E9777003BA949 /* AppFoundationUI in Frameworks */,
+				40A75D010000000000000001 /* MusicDomain in Frameworks */,
 				404EA14E305E9751003BA949 /* MSRUCodecFFmpeg in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -111,7 +111,6 @@
 				40F5DE143057009F00CA46B2 /* MSRUUITests */,
 				404EA14A305E96CF003BA949 /* Frameworks */,
 				40F5DDF93057009E00CA46B2 /* Products */,
-				400B57B83061C80200C76AD8 /* repo-health.py */,
 			);
 			sourceTree = "<group>";
 		};
@@ -148,6 +147,7 @@
 				404EA146305E8362003BA949 /* AppFoundation */,
 				404EA14D305E9751003BA949 /* MSRUCodecFFmpeg */,
 				404EA154305E9777003BA949 /* AppFoundationUI */,
+				40A75D010000000000000002 /* MusicDomain */,
 			);
 			productName = MSRU;
 			productReference = 40F5DDF83057009E00CA46B2 /* MSRU.app */;
@@ -236,6 +236,7 @@
 			packageReferences = (
 				404E9F93305DA24F003BA949 /* XCLocalSwiftPackageReference "Packages/MSRUCodecFFmpeg" */,
 				404EA151305E9777003BA949 /* XCLocalSwiftPackageReference "Packages/AppFoundation" */,
+				40A75D010000000000000003 /* XCLocalSwiftPackageReference "Packages/MusicDomain" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 40F5DDF93057009E00CA46B2 /* Products */;
@@ -254,7 +255,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				400B57B93061C80200C76AD8 /* repo-health.py in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -708,6 +708,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/AppFoundation;
 		};
+		40A75D010000000000000003 /* XCLocalSwiftPackageReference "Packages/MusicDomain" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/MusicDomain;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -723,6 +727,11 @@
 		404EA154305E9777003BA949 /* AppFoundationUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AppFoundationUI;
+		};
+		40A75D010000000000000002 /* MusicDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 40A75D010000000000000003 /* XCLocalSwiftPackageReference "Packages/MusicDomain" */;
+			productName = MusicDomain;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -7,6 +7,7 @@ import Foundation
 import Observation
 import AppFoundation
 import AppIntents
+import MediaLibrary
 
 
 // MARK: - Application Scope

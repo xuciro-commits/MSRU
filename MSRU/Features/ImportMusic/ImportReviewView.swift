@@ -3,14 +3,14 @@
 //  MSRU
 //
 //  Created for Identity Resolution Engine Phase 5.
-//  Strictly conforms to InteractionAtlas.md Section 11.2.
 //
 
 import SwiftUI
 import Observation
 import AppFoundation
+import MusicDomain
 
-/// Import Review & Resolution Dashboard implementing InteractionAtlas Section 11.2.
+/// Import Review & Resolution Dashboard.
 struct ImportReviewView: View {
 
     @Bindable var store: ImportReviewStore

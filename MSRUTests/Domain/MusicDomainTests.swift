@@ -10,6 +10,7 @@
 import Testing
 import Foundation
 import AppFoundation
+import MusicDomain
 @testable import MSRU
 
 @Suite("Music Domain Core Invariants")

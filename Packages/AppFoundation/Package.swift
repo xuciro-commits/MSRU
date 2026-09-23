@@ -37,25 +37,12 @@ let package = Package(
         )
     ],
 
-    dependencies: [
-        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.0"),
-        .package(path: "../ChromaSwift"),
-        .package(path: "../MediaLibrary"),
-        .package(path: "../SubsonicKit")
-    ],
-
     targets: [
 
         // MARK: - Core
 
         .target(
             name: "AppFoundation",
-            dependencies: [
-                .product(name: "GRDB", package: "GRDB.swift"),
-                .product(name: "ChromaSwift", package: "ChromaSwift"),
-                .product(name: "MediaLibrary", package: "MediaLibrary"),
-                .product(name: "SubsonicKit", package: "SubsonicKit")
-            ],
             resources: [
                 .process("Resources")
             ]

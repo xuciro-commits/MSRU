@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import AppFoundation
+import MusicDomain
 import MediaLibrary
 import SubsonicKit
 @testable import MSRU

@@ -5,6 +5,7 @@
 
 import Foundation
 import AppFoundation
+import MusicDomain
 
 @MainActor
 final class LibraryPresentationAggregator {

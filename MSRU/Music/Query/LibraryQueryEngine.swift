@@ -9,6 +9,7 @@
 import Foundation
 import AppFoundation
 import GRDB
+import MusicDomain
 
 /// Immutable, revisioned query projection snapshot.
 nonisolated public struct LibraryQuerySnapshot: Sendable {

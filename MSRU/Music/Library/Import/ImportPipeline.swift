@@ -8,6 +8,7 @@
 import Foundation
 import AVFoundation
 import AppFoundation
+import MusicDomain
 
 /// Summary result of an 11-step automated import pipeline run.
 public struct ImportPipelineReport: Sendable, Equatable {
@@ -63,7 +64,7 @@ public final class ImportPipeline: Sendable {
     }
 
     public convenience init(
-        fingerprinter: any AudioFingerprinting,
+        fingerprinter: any AcousticFingerprintExtracting,
         catalog: any ExternalCatalogService = MusicBrainzCatalogClient.shared
     ) {
         self.init(

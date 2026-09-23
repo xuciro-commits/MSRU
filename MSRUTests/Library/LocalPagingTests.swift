@@ -1,6 +1,7 @@
 import Foundation
 import GRDB
 import AppFoundation
+import MusicDomain
 import Testing
 @testable import MSRU
 

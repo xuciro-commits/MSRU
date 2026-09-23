@@ -10,6 +10,7 @@
 
 import Foundation
 import AppFoundation
+import GRDB
 
 nonisolated public protocol LibraryQueryResult: Sendable {
     var revision: UInt64 { get }

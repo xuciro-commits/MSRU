@@ -2,6 +2,7 @@ import Foundation
 import CoreSpotlight
 import UniformTypeIdentifiers
 import AppFoundation
+import MusicDomain
 
 /// Stable IDs are shared by the index writer and the system-result router.
 nonisolated enum SpotlightMusicID: Hashable, Sendable {

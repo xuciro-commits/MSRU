@@ -8,6 +8,7 @@
 import Foundation
 import AppFoundation
 @testable import MSRU
+import MusicDomain
 
 enum Fixtures {
 

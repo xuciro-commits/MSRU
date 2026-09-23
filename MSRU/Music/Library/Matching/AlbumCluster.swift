@@ -7,6 +7,7 @@
 
 import Foundation
 import AppFoundation
+import MusicDomain
 
 /// An individual track entry participating in album-level clustering.
 nonisolated public struct AlbumTrackItem: Identifiable, Sendable, Equatable, Codable {

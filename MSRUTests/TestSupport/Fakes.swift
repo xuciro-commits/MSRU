@@ -8,6 +8,7 @@
 import Foundation
 import AppFoundation
 @testable import MSRU
+import MusicDomain
 
 final class FakeCatalogService: ExternalCatalogService, @unchecked Sendable {
     var recordings: [String: [ExternalRecordingMatch]] = [:]
@@ -17,7 +18,7 @@ final class FakeCatalogService: ExternalCatalogService, @unchecked Sendable {
 
     init() {}
 
-    func lookupRecording(fingerprint: AudioFingerprint) async throws -> [ExternalRecordingMatch] {
+    func lookupRecording(fingerprint: AcousticFingerprint) async throws -> [ExternalRecordingMatch] {
         if let matches = recordings[fingerprint.fingerprint] {
             return matches
         }
@@ -51,7 +52,7 @@ final class FakeCatalogService: ExternalCatalogService, @unchecked Sendable {
     }
 }
 
-final class FakeFingerprinter: AudioFingerprinting, Sendable {
+final class FakeFingerprinter: AcousticFingerprintExtracting, Sendable {
     let stubbedFingerprint: AcousticFingerprint
 
     init(

@@ -7,6 +7,7 @@
 
 import Foundation
 import AppFoundation
+import MusicDomain
 
 /// Client for querying MusicBrainz and AcoustID metadata catalog entities.
 public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked Sendable {
@@ -31,7 +32,7 @@ public final class MusicBrainzCatalogClient: ExternalCatalogService, @unchecked 
 
     // MARK: - ExternalCatalogService Protocol
 
-    public func lookupRecording(fingerprint: AudioFingerprint) async throws -> [ExternalRecordingMatch] {
+    public func lookupRecording(fingerprint: AcousticFingerprint) async throws -> [ExternalRecordingMatch] {
         // If fingerprint matches seeded cache, return immediately
         if let cached = mockRecordings[fingerprint.fingerprint] {
             return cached

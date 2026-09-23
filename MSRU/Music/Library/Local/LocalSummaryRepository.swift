@@ -1,6 +1,7 @@
 import Foundation
 import AppFoundation
 import GRDB
+import MusicDomain
 
 nonisolated struct LocalSummaryPage<Item: Sendable>: Sendable {
     let items: [Item]

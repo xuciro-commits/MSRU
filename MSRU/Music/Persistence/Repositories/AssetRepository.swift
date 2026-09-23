@@ -7,6 +7,7 @@
 
 import Foundation
 import AppFoundation
+import GRDB
 
 nonisolated public struct PersistedAssetRecord: Sendable {
     public let id: AssetID

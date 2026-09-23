@@ -2,6 +2,7 @@ import Foundation
 import Darwin
 import GRDB
 import Testing
+import MusicDomain
 @testable import MSRU
 
 /// Opt-in code-path benchmark. Run prepare, paged and legacy as separate test processes.

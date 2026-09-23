@@ -9,6 +9,7 @@ import Foundation
 import Observation
 import AVFoundation
 import AppFoundation
+import MusicDomain
 
 /// Response payload from LRCLIB API.
 nonisolated public struct LrcLibResponse: Codable, Sendable {

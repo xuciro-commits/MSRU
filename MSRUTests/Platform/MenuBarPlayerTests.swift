@@ -10,6 +10,7 @@
 import Foundation
 import Testing
 import AppFoundation
+import MusicDomain
 import SwiftUI
 @testable import MSRU
 

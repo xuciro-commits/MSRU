@@ -8,6 +8,7 @@ import AppFoundation
 import AppFoundationUI
 import MediaLibrary
 import SubsonicKit
+import MusicDomain
 
 struct ArtistDetailView: View {
     let artist: ArtistPresentationModel

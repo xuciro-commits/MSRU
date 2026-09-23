@@ -7,6 +7,7 @@
 
 import Foundation
 import AppFoundation
+import MusicDomain
 
 /// A three-layer cascading metadata container for a music track or audio asset.
 ///

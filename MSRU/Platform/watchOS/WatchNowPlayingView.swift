@@ -8,7 +8,7 @@ import Observation
 
 // MARK: - Watch Now Playing View
 
-/// Native watchOS short-task presentation conforming to InteractionAtlas Section 19.1.
+/// Native watchOS short-task presentation.
 /// Features wrist-optimized touch targets, high-fidelity badges, transport controls, and queue sheet.
 @MainActor
 struct WatchNowPlayingView: View {

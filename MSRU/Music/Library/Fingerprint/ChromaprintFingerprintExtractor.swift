@@ -8,6 +8,7 @@
 import Foundation
 import ChromaSwift
 import AppFoundation
+import MusicDomain
 
 /// Real AcoustID-compatible acoustic fingerprint extractor using native Chromaprint and Apple Accelerate (vDSP).
 public final class ChromaprintFingerprintExtractor: AcousticFingerprintExtracting, Sendable {

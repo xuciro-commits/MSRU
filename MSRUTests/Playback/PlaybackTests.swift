@@ -7,6 +7,7 @@
 
 import Foundation
 import Testing
+import MusicDomain
 @testable import MSRU
 
 @MainActor

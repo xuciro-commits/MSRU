@@ -7,6 +7,7 @@
 
 import Foundation
 import AppFoundation
+import MusicDomain
 
 // MARK: - Audio File Signature
 
@@ -93,16 +94,16 @@ public actor AudioFingerprintService: Sendable {
 
     public static let shared = AudioFingerprintService()
 
-    private let fingerprinter: any AudioFingerprinting
+    private let fingerprinter: any AcousticFingerprintExtracting
     private let registry: LocalFingerprintRegistry
-    private var inFlightTasks: [String: Task<AudioFingerprint, Error>] = [:]
+    private var inFlightTasks: [String: Task<AcousticFingerprint, Error>] = [:]
 
     public private(set) var totalReceivedCount: Int = 0
     public private(set) var computedCount: Int = 0
     public private(set) var skippedCount: Int = 0
 
     public init(
-        fingerprinter: any AudioFingerprinting = AcoustIDFingerprintExtractor(),
+        fingerprinter: any AcousticFingerprintExtracting = AcoustIDFingerprintExtractor(),
         registry: LocalFingerprintRegistry = .shared
     ) {
         self.fingerprinter = fingerprinter
@@ -117,14 +118,14 @@ public actor AudioFingerprintService: Sendable {
 
     /// Single track fingerprint retrieval with signature cache check and in-flight deduplication.
     /// Used by ImportPipeline to eliminate secondary schedulers.
-    public func fingerprint(for fileURL: URL) async throws -> AudioFingerprint {
+    public func fingerprint(for fileURL: URL) async throws -> AcousticFingerprint {
         let canonical = fileURL.resolvingSymlinksInPath().standardizedFileURL.path
 
         // 1. Check cache validity first
         if let cached = await registry.cachedFingerprint(for: fileURL),
            let record = await registry.lookup(fingerprint: cached, duration: 0, tolerance: 10000) {
             skippedCount += 1
-            return AudioFingerprint(
+            return AcousticFingerprint(
                 fingerprint: record.fingerprint,
                 duration: record.duration,
                 algorithm: "chromaprint-pcm-v1"
@@ -136,7 +137,7 @@ public actor AudioFingerprintService: Sendable {
             return try await existing.value
         }
 
-        let task = Task<AudioFingerprint, Error> { [fingerprinter] in
+        let task = Task<AcousticFingerprint, Error> { [fingerprinter] in
             try await fingerprinter.generateFingerprint(for: fileURL)
         }
         inFlightTasks[canonical] = task

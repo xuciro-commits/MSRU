@@ -8,6 +8,7 @@ import Foundation
 @testable import MSRU
 import MediaLibrary
 import SubsonicKit
+import MusicDomain
 
 @Suite("Subsonic Server Integration Contracts")
 struct SubsonicServerStoreTests {

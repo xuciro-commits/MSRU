@@ -8,6 +8,7 @@
 import Foundation
 import Observation
 import AppFoundation
+import MusicDomain
 
 /// Filter criterion for items in the Import Review dashboard.
 public enum ReviewFilterOption: String, CaseIterable, Identifiable, Sendable {
