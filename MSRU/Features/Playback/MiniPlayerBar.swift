@@ -416,6 +416,9 @@ struct MiniPlayerBar: View {
         ) {
             if !compact {
                 volumeControl
+                #if os(macOS)
+                outputDeviceMenu
+                #endif
                 if playback.unifiedHasTrack {
                     providerBadge
                 }
@@ -463,6 +466,36 @@ struct MiniPlayerBar: View {
             .controlSize(.mini)
         }
     }
+
+    #if os(macOS)
+    private var outputDeviceMenu: some View {
+        Menu {
+            Button("System Default") { playback.selectOutputDevice(nil) }
+            if !playback.audioOutput.devices.isEmpty { Divider() }
+            ForEach(playback.audioOutput.devices) { device in
+                Button(device.name) { playback.selectOutputDevice(device.uid) }
+            }
+            Divider()
+            Toggle("Exclusive access", isOn: Binding(
+                get: { playback.audioOutput.exclusiveRequested },
+                set: { playback.setExclusiveOutput($0) }
+            ))
+            .disabled(playback.audioOutput.selectedUID == nil)
+            Divider()
+            Text(playback.audioOutput.formatSummary)
+            if let note = playback.audioOutput.errorMessage { Text(note) }
+            Text("Bit-perfect output is unverified")
+        } label: {
+            Image(systemName: "hifispeaker")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .frame(width: 20, height: 20)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("Audio output: \(playback.audioOutput.displayName)")
+    }
+    #endif
 
     private var volumeIconName: String {
         if playback.isMuted || playback.volume == 0 {

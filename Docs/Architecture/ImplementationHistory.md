@@ -2,6 +2,12 @@
 
 > 本文保存旧工作队列及后续完成事项的历史记录与当时验证证据，不作为当前待办，也不证明现行工作树仍满足当时结果。当前任务以 [工作队列](../../todo/02-WORK-QUEUE.md) 为准。
 
+## #63 macOS 输出设备与原生采样率（2026-09-23，待 DAC 验收）
+
+`MacAudioOutputController` 通过 CoreAudio HAL 枚举有输出通道的设备，按 UID 保存显式选择；PCM 节点以 `kAudioOutputUnitProperty_CurrentDevice` 路由，AVPlayer 以 `audioOutputDeviceUniqueID` 路由。仅对显式选择的设备请求来源采样率和可选 Hog Mode；切回系统默认或控制器销毁时归还本进程取得的独占权并尝试恢复设备原采样率。设备列表、存活标记、默认设备和当前设备采样率变化由 HAL 监听；设备失联后回退系统默认并在保留曲目/进度的前提下重新解析。菜单显示输入、引擎输出及设备当前采样率；不支持目标采样率或独占被占用时提示。AVPlayer 流的格式无法在此链路可靠读出，显示 unknown。
+
+本机只读 HAL 枚举与 `AudioUnitSetProperty`/`AudioUnitGetProperty` 当前设备探针成功；`MacAudioOutputTests` 6 项通过（含本机输出枚举、速率设置及归还、独占所有权、断连与默认变更）。macOS 与 iOS Simulator Debug 构建通过。真实 DAC 切率、独占、热拔插和听感留给用户集中实测。**Bit-Perfect 未获证明**：当前 PCM 以 Float32 进入 `AVAudioEngine` 主混音器，采样率匹配不能证明样本位级不变、没有系统/设备数字处理；后续 #64 EQ 开启时更不能宣称直通。Stage 2 收尾需按 DAC 和数字输出实测决定这一目标的最终表述。
+
 ## #62 NAS 专辑连续播放（2026-09-23，待用户验收）
 
 Subsonic 请求保留源服务器身份并在解析时重新生成鉴权 URL；缺少身份和流地址时拒绝任意选取其他 NAS。普通单曲仍直接流播；有后续曲目的 NAS 队列将音频下载到会话拥有的临时文件，Apple/FFmpeg 解码后交给 PCM 节点预备下一曲。关闭、切歌、取消和过期解析清理临时文件；HTTP 401/403、非音频响应和网络错误不会伪装成可播曲目。不兼容的采样率/声道或不支持的编码回到正常切歌路径。首曲需要完整下载后才能开始，启动时间取决于 NAS 文件大小与网络速度。`SubsonicPreparedPlaybackTests` 8 项定向测试覆盖服务器身份、PCM 准备/清理、单曲流播、HTTP 鉴权失败、过期下载隔离、NAS 双曲目推进与无扩展名内容解码；听感及真实 NAS 设备由用户集中验收。

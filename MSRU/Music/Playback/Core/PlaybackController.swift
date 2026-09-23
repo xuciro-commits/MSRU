@@ -161,6 +161,10 @@ private struct WeakSessionObserver {
 
     private let makePlayer: (URL) -> AVPlayer
 
+    #if os(macOS)
+    let audioOutput: MacAudioOutputController
+    #endif
+
     // MARK: - Init
 
     init(
@@ -173,7 +177,37 @@ private struct WeakSessionObserver {
         self.providerKernel = providerKernel ?? PlaybackProviderKernel.standard()
 
         self.playbackQueue = PlaybackQueueController()
+        #if os(macOS)
+        self.audioOutput = MacAudioOutputController()
+        self.audioOutput.onSelectedDeviceLost = { [weak self] in
+            self?.restartCurrentForOutputChange()
+        }
+        self.audioOutput.onDefaultDeviceChanged = { [weak self] in
+            self?.restartCurrentForOutputChange()
+        }
+        #endif
     }
+
+    #if os(macOS)
+    func selectOutputDevice(_ uid: String?) {
+        player?.pause()
+        pcmEngine?.stopOutput()
+        audioOutput.select(uid)
+        restartCurrentForOutputChange()
+    }
+
+    func setExclusiveOutput(_ enabled: Bool) {
+        player?.pause()
+        pcmEngine?.stopOutput()
+        audioOutput.setExclusive(enabled)
+        restartCurrentForOutputChange()
+    }
+
+    private func restartCurrentForOutputChange() {
+        guard let currentItem, hasActiveTransport else { return }
+        resolveAndStart(currentItem, resumeAt: currentTime, autoPlay: isPlaying)
+    }
+    #endif
 
     // MARK: - Current Item
 
@@ -1030,7 +1064,7 @@ private struct WeakSessionObserver {
 
     // MARK: - Resolve
 
-    private func resolveAndStart(_ item: PlaybackItem) {
+    private func resolveAndStart(_ item: PlaybackItem, resumeAt: TimeInterval = 0, autoPlay: Bool = true) {
 
         currentRecordingMBID = nil
         cancelActiveResolution()
@@ -1082,7 +1116,7 @@ private struct WeakSessionObserver {
                 }
 
                 do {
-                    try self.activate(resource: resource, item: item)
+                    try self.activate(resource: resource, item: item, resumeAt: resumeAt, autoPlay: autoPlay)
                 } catch {
                     if case .decodedPCM(let pcm) = resource.transport {
                         await pcm.session.close()
@@ -1141,7 +1175,7 @@ private struct WeakSessionObserver {
 
     // MARK: - Activate
 
-    private func activate(resource: PlaybackResource, item: PlaybackItem) throws {
+    private func activate(resource: PlaybackResource, item: PlaybackItem, resumeAt: TimeInterval = 0, autoPlay: Bool = true) throws {
 
         /*
          无论上一个 Transport 是 AVPlayer
@@ -1157,6 +1191,11 @@ private struct WeakSessionObserver {
         case .avPlayerURL(let resolvedURL):
 
             let newPlayer = makePlayer(resolvedURL)
+            #if os(macOS)
+            let outputRoute = try audioOutput.prepare(inputRate: nil)
+            newPlayer.audioOutputDeviceUniqueID = outputRoute.deviceUID
+            audioOutput.updateEngineRate(nil)
+            #endif
             newPlayer.volume = isMuted ? 0.0 : volume
             newPlayer.isMuted = isMuted
 
@@ -1166,21 +1205,30 @@ private struct WeakSessionObserver {
 
             currentProviderID = resource.providerID
 
-            currentTime = 0
+            currentTime = resumeAt
 
             duration = resource.duration ?? item.duration ?? 0
 
             installObservers(for: newPlayer)
 
-            newPlayer.play()
-
-            isPlaying = true
+            if resumeAt > 0 {
+                newPlayer.seek(to: CMTime(seconds: resumeAt, preferredTimescale: 600),
+                               toleranceBefore: .zero, toleranceAfter: .zero)
+            }
+            if autoPlay { newPlayer.play() }
+            isPlaying = autoPlay
 
         // MARK: Extended Codec → PCM → AVAudioEngine
 
         case .decodedPCM(let pcmResource):
 
+            #if os(macOS)
+            let outputRoute = try audioOutput.prepare(inputRate: pcmResource.format.sampleRate)
+            let engine = try PCMPlaybackEngine(resource: pcmResource, outputDeviceID: outputRoute.deviceID)
+            audioOutput.updateEngineRate(engine.outputSampleRate)
+            #else
             let engine = try PCMPlaybackEngine(resource: pcmResource)
+            #endif
             engine.volume = isMuted ? 0.0 : volume
 
             engine.onEnded = { [weak self, weak engine] in
@@ -1205,6 +1253,12 @@ private struct WeakSessionObserver {
                 self.currentResource = nextResource
                 self.currentProviderID = nextResource.providerID
                 self.currentTime = engine.currentTime
+                #if os(macOS)
+                let outputRate = engine.outputSampleRate
+                if self.audioOutput.engineRate != outputRate {
+                    self.audioOutput.updateEngineRate(outputRate)
+                }
+                #endif
                 self.duration = engine.duration
                 self.notifyItemChanged()
                 self.refreshPCMNext()
@@ -1217,15 +1271,29 @@ private struct WeakSessionObserver {
 
             currentProviderID = resource.providerID
 
-            currentTime = 0
+            currentTime = resumeAt
 
             duration = resource.duration ?? pcmResource.format.duration ?? item.duration ?? 0
 
             startPCMTimeUpdates(engine)
 
-            engine.play()
-
-            isPlaying = true
+            if resumeAt > 0 {
+                Task { [weak self, weak engine] in
+                    guard let self, let engine, self.pcmEngine === engine else { return }
+                    do {
+                        try await engine.seek(to: resumeAt)
+                        guard self.pcmEngine === engine else { return }
+                        if autoPlay { engine.play() }
+                        self.refreshPCMNext(force: true)
+                    } catch {
+                        guard self.pcmEngine === engine else { return }
+                        self.handleTransportFailure(error.localizedDescription)
+                    }
+                }
+            } else if autoPlay {
+                engine.play()
+            }
+            isPlaying = autoPlay
 
             refreshPCMNext()
 
@@ -1293,6 +1361,7 @@ private struct WeakSessionObserver {
         pcmEngine = nil
 
         if let previousPCMEngine {
+            previousPCMEngine.stopOutput()
             previousPCMEngine.onEnded = nil
             previousPCMEngine.onFailure = nil
             previousPCMEngine.onAdvanced = nil

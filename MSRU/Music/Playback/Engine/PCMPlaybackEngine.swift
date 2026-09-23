@@ -52,7 +52,9 @@ final class PCMPlaybackEngine {
     private let maximumScheduledBuffers = 4
     private let decodeBlockFrames = 8192
 
-    init(resource: PCMPlaybackResource) throws {
+    var outputSampleRate: Double { audioEngine.outputNode.outputFormat(forBus: 0).sampleRate }
+
+    init(resource: PCMPlaybackResource, outputDeviceID: UInt32? = nil) throws {
         session = resource.session
         format = resource.format
         guard let audioFormat = AVAudioFormat(
@@ -70,6 +72,9 @@ final class PCMPlaybackEngine {
         } else {
             audioEngine.connect(playerNode, to: audioEngine.mainMixerNode, format: audioFormat)
         }
+        #if os(macOS)
+        try audioEngine.routeToMacOutput(deviceID: outputDeviceID)
+        #endif
         audioEngine.prepare()
         try audioEngine.start()
     }
@@ -101,6 +106,12 @@ final class PCMPlaybackEngine {
     func pause() {
         wantsToPlay = false
         playerNode.pause()
+    }
+
+    func stopOutput() {
+        wantsToPlay = false
+        playerNode.stop()
+        audioEngine.stop()
     }
 
     func seek(to seconds: TimeInterval) async throws {
