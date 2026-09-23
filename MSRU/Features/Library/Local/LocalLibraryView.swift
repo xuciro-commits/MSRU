@@ -206,7 +206,8 @@ struct LocalLibraryView: View {
                                 if tracks.suffix(20).contains(where: { $0.id == track.id }) {
                                     Task { await pager?.loadMore() }
                                 }
-                            }
+                            },
+                            onPlay: { track, queue in playLocalPageTrack(track, queue: queue) }
                         )
                         .frame(
                             maxWidth: .infinity,
@@ -381,11 +382,16 @@ struct LocalLibraryView: View {
                 selectedTrack = track
             },
             onPlay: {
-                playback.toggle(track: track, queue: store.tracks)
+                playLocalPageTrack(track, queue: pager?.tracks ?? store.tracks)
             },
             artwork: artwork(track),
             actions: trackActions(track)
         )
+    }
+
+    private func playLocalPageTrack(_ track: LocalTrack, queue: [LocalTrack]) {
+        playback.toggle(track: track, queue: queue)
+        playback.continueLocalQueue(using: pager?.makePlaybackPageSource())
     }
 
 

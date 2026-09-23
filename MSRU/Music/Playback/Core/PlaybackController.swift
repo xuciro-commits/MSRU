@@ -117,6 +117,10 @@ private struct WeakSessionObserver {
     private(set) var duration: TimeInterval = 0
 
     private(set) var playbackErrorMessage: String?
+    private var localQueuePageSource: LocalPlaybackPageSource?
+    private var localQueuePageTask: Task<Void, Never>?
+    private var localQueueGeneration = UUID()
+    private var advanceAfterQueuePage = false
 
     // MARK: - Volume & Mute State
 
@@ -512,6 +516,8 @@ private struct WeakSessionObserver {
 
     func play(_ item: PlaybackItem, context: [PlaybackItem]? = nil) {
 
+        clearPagedLocalQueue()
+
         let isAlreadyCurrent = currentItem?.id == item.id && currentResource != nil
 
         playbackQueue.start(item, context: context)
@@ -629,6 +635,8 @@ private struct WeakSessionObserver {
     // MARK: - Toggle Local
 
     func toggle(track: LocalTrack, queue: [LocalTrack]) {
+
+        clearPagedLocalQueue()
 
         let item = PlaybackItem(local: track)
 
@@ -870,6 +878,7 @@ private struct WeakSessionObserver {
 
     func clearUpcoming() {
 
+        clearPagedLocalQueue()
         playbackQueue.clearUpcoming()
         refreshPCMNext()
     }
@@ -907,11 +916,58 @@ private struct WeakSessionObserver {
     func next() {
 
         guard let next = playbackQueue.advanceNext() else {
-
+            if localQueuePageSource?.hasMore == true {
+                advanceAfterQueuePage = true
+                replenishLocalQueueIfNeeded()
+            }
             return
         }
 
+        if localQueuePageSource != nil {
+            playbackQueue.trimHistory(keepingLast: 256)
+        }
         resolveAndStart(next.item)
+        replenishLocalQueueIfNeeded()
+    }
+
+    func continueLocalQueue(using source: LocalPlaybackPageSource?) {
+        localQueuePageSource = source
+        replenishLocalQueueIfNeeded()
+    }
+
+    private func clearPagedLocalQueue() {
+        localQueueGeneration = UUID()
+        localQueuePageTask?.cancel()
+        localQueuePageTask = nil
+        localQueuePageSource = nil
+        advanceAfterQueuePage = false
+    }
+
+    private func replenishLocalQueueIfNeeded() {
+        guard let source = localQueuePageSource, source.hasMore,
+              playbackQueue.upcoming.count < 16, localQueuePageTask == nil else { return }
+        let generation = localQueueGeneration
+        localQueuePageTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let tracks = try await source.nextPage()
+                guard !Task.isCancelled, generation == self.localQueueGeneration else { return }
+                for track in tracks {
+                    self.playbackQueue.addToQueue(PlaybackItem(local: track))
+                }
+                self.localQueuePageTask = nil
+                if self.advanceAfterQueuePage, self.playbackQueue.canNext {
+                    self.advanceAfterQueuePage = false
+                    self.next()
+                } else {
+                    self.replenishLocalQueueIfNeeded()
+                }
+            } catch {
+                guard generation == self.localQueueGeneration else { return }
+                self.localQueuePageTask = nil
+                self.playbackErrorMessage = error.localizedDescription
+            }
+        }
     }
 
     // MARK: - Pause
@@ -1170,6 +1226,7 @@ private struct WeakSessionObserver {
     // MARK: - Stop
 
     func stop() {
+        clearPagedLocalQueue()
 
         cancelActiveResolution()
 

@@ -21,6 +21,14 @@ final class LocalTrackPager {
 
     var hasMore: Bool { tracks.count < totalCount }
 
+    func makePlaybackPageSource() -> LocalPlaybackPageSource? {
+        guard hasMore else { return nil }
+        return LocalPlaybackPageSource(
+            repository: repository, query: query, sort: sort, ascending: ascending,
+            offset: tracks.count, totalCount: totalCount
+        )
+    }
+
     func reset(query: String, sort: LocalTrackPageRequest.Sort, ascending: Bool) async {
         generation &+= 1
         self.query = query
@@ -50,5 +58,39 @@ final class LocalTrackPager {
             errorMessage = error.localizedDescription
         }
         if currentGeneration == generation { isLoading = false }
+    }
+}
+
+@MainActor
+final class LocalPlaybackPageSource {
+    private let repository: any LocalLibraryRepository
+    private let query: String
+    private let sort: LocalTrackPageRequest.Sort
+    private let ascending: Bool
+    private var offset: Int
+    private var totalCount: Int
+
+    init(repository: any LocalLibraryRepository, query: String,
+         sort: LocalTrackPageRequest.Sort, ascending: Bool,
+         offset: Int, totalCount: Int) {
+        self.repository = repository
+        self.query = query
+        self.sort = sort
+        self.ascending = ascending
+        self.offset = offset
+        self.totalCount = totalCount
+    }
+
+    var hasMore: Bool { offset < totalCount }
+
+    func nextPage() async throws -> [LocalTrack] {
+        guard hasMore else { return [] }
+        let page = try await repository.fetchPage(LocalTrackPageRequest(
+            query: query, sort: sort, ascending: ascending, offset: offset, limit: 128
+        ))
+        guard !page.tracks.isEmpty || !page.hasMore else { throw CocoaError(.fileReadCorruptFile) }
+        offset += page.tracks.count
+        totalCount = page.totalCount
+        return page.tracks
     }
 }

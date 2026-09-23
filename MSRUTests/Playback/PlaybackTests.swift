@@ -196,6 +196,20 @@ struct PlaybackTests {
         #expect(controller.movePrevious() == nil)
     }
 
+    @Test("Paged playback history remains bounded")
+    func queueHistoryTrim() {
+        let controller = PlaybackQueueController()
+        let items = (0..<300).map { makeItem("paged-\($0)", title: "Song \($0)") }
+        controller.start(items[0], context: items)
+        for _ in 1..<300 {
+            _ = controller.advanceNext()
+            controller.trimHistory(keepingLast: 256)
+        }
+        #expect(controller.history.count == 256)
+        #expect(controller.current?.item.id == items[299].id)
+        #expect(controller.history.first?.item.id == items[43].id)
+    }
+
     @Test("PlayNext moves existing upcoming item to front or inserts new item")
     func queuePlayNextDeduplication() {
         let controller = PlaybackQueueController()

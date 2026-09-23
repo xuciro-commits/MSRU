@@ -19,6 +19,7 @@ struct LocalTrackTableView: View {
     var onRevealInFinder: ((URL) -> Void)? = nil
     var onDeleteTracks: ((Set<String>) -> Void)? = nil
     var onTrackAppear: ((LocalTrack) -> Void)? = nil
+    var onPlay: ((LocalTrack, [LocalTrack]) -> Void)? = nil
 
     @State private var selectedTrackIDs: Set<String> = []
     @State private var isDeleteConfirmationPresented: Bool = false
@@ -32,7 +33,8 @@ struct LocalTrackTableView: View {
         library: LibraryStore,
         onRevealInFinder: ((URL) -> Void)? = nil,
         onDeleteTracks: ((Set<String>) -> Void)? = nil,
-        onTrackAppear: ((LocalTrack) -> Void)? = nil
+        onTrackAppear: ((LocalTrack) -> Void)? = nil,
+        onPlay: ((LocalTrack, [LocalTrack]) -> Void)? = nil
     ) {
         self.tracks = tracks
         self.isFiltered = isFiltered
@@ -52,6 +54,7 @@ struct LocalTrackTableView: View {
         self.onRevealInFinder = onRevealInFinder
         self.onDeleteTracks = onDeleteTracks
         self.onTrackAppear = onTrackAppear
+        self.onPlay = onPlay
     }
 
     var body: some View {
@@ -181,7 +184,8 @@ struct LocalTrackTableView: View {
             }
         } primaryAction: { selection in
             if let firstID = selection.first, let track = tracks.first(where: { $0.id == firstID }) {
-                playback.toggle(track: track, queue: tracks)
+                if let onPlay { onPlay(track, tracks) }
+                else { playback.toggle(track: track, queue: tracks) }
             }
         }
         .tint(Color.accentColor)
@@ -371,7 +375,8 @@ struct LocalTrackTableView: View {
     @ViewBuilder
     private func trackContextMenu(_ track: LocalTrack) -> some View {
         Button {
-            playback.toggle(track: track, queue: tracks)
+            if let onPlay { onPlay(track, tracks) }
+            else { playback.toggle(track: track, queue: tracks) }
         } label: {
             Label(isCurrentTrack(track) && playback.isPlaying ? "Pause" : "Play",
                   systemImage: isCurrentTrack(track) && playback.isPlaying ? "pause.fill" : "play.fill")

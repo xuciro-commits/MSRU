@@ -264,6 +264,11 @@ final class PlaybackQueueController {
         return previous
     }
 
+    func trimHistory(keepingLast count: Int) {
+        let excess = history.count - max(0, count)
+        if excess > 0 { history.removeFirst(excess) }
+    }
+
 
     // MARK: - Play Next
 

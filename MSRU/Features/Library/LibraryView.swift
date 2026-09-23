@@ -589,6 +589,13 @@ struct LibraryView:
         return localPager?.tracks ?? []
     }
 
+    private func playLocalPageTrack(_ track: LocalTrack, queue: [LocalTrack]) {
+        playback.toggle(track: track, queue: queue)
+        if !isRemoteSourceActive {
+            playback.continueLocalQueue(using: localPager?.makePlaybackPageSource())
+        }
+    }
+
     private var gridColumns: [GridItem] {
         [GridItem(.adaptive(minimum: 180, maximum: 200), spacing: 20)]
     }
@@ -671,7 +678,7 @@ struct LibraryView:
                                     selectedLocalTrack = nil
                                 }
                             },
-                            onPlay: { playback.toggle(track: track, queue: filteredLocalTracks) },
+                            onPlay: { playLocalPageTrack(track, queue: filteredLocalTracks) },
                             onPlayNext: { playback.playNext(track) },
                             onEnqueue: { playback.addToQueue(track) },
                             onToggleLibrary: {
@@ -865,7 +872,8 @@ struct LibraryView:
                     } else if !isRemoteSourceActive && track.id == localPager?.tracks.last?.id && localPager?.hasMore == true {
                         Task { await localPager?.loadMore() }
                     }
-                }
+                },
+                onPlay: { track, queue in playLocalPageTrack(track, queue: queue) }
             )
         }
     }
