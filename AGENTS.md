@@ -69,7 +69,10 @@ Scripts/verify.sh gates      # architecture + preview guardrails (seconds)
 Scripts/verify.sh packages   # gates + swift test for AppFoundation, MusicDomain
 Scripts/verify.sh app        # gates + macOS unit tests (scheme MSRU-UnitTests) + iOS Simulator build (scheme MSRU)
 Scripts/verify.sh            # everything; logs in .build/verify/
+Scripts/repo-health.py [--since REF]   # size, hotspots, unreachable files, placeholder UI, sparse formatting
 ```
+
+Principle: the least code, the beautiful code, the great application. Run `repo-health.py` before and after substantial work and report the delta; unreachable files and placeholder UI are deleted or wired up, not kept.
 
 After any change, the gates, the affected package tests, the macOS unit-test build and the iOS Simulator build must pass. UI tests (`-only-testing:MSRUUITests`, scheme `MSRU`, signed runner) and `MacAudioHardwareSmokeTests` touch the real machine; run them only when the task concerns them. There is no formatter or linter configured: follow surrounding style, keep `git diff --check` clean. Every View/Representable needs a same-file `#Preview` using fixtures; previews and tests never use live network, accounts or user data. Temporary probes are deleted after use; only lasting regressions become tests.
 

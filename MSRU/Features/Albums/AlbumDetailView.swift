@@ -116,23 +116,11 @@ struct AlbumDetailView: View {
                         .foregroundStyle(.tertiary)
 
                         if album.versionCount > 1 {
-                            Menu {
-                                Button("Default / Preferred Version (High Resolution)") {}
-                                Button("Local Lossless Master") {}
-                                Button("Subsonic NAS Stream") {}
-                            } label: {
-                                HStack(spacing: 5) {
-                                    Image(systemName: "square.stack.3d.down.right")
-                                    Text("\(album.versionCount) Versions")
-                                    Image(systemName: "chevron.down")
-                                        .font(.caption2)
-                                }
+                            Label("\(album.versionCount) Versions", systemImage: "square.stack.3d.down.right")
                                 .font(.caption.bold())
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
                                 .background(Capsule().fill(.quaternary))
-                            }
-                            .menuStyle(.borderlessButton)
                         }
 
                         HStack(spacing: 12) {
