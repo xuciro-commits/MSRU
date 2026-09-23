@@ -520,9 +520,10 @@ final class PlaylistStore {
     }
 
     /// Purges tracks matching the specified IDs from all playlists in a single atomic save.
-    func purgeTracks(withIDs ids: Set<String>) async {
-        guard !ids.isEmpty else { return }
-        _ = await mutate { current in
+    @discardableResult
+    func purgeTracks(withIDs ids: Set<String>) async -> Bool {
+        guard !ids.isEmpty else { return true }
+        return await mutate { current in
             var next = current
             for i in next.indices {
                 let originalCount = next[i].trackIDs.count

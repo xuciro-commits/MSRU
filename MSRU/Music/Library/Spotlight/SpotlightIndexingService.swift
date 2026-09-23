@@ -178,7 +178,8 @@ actor SpotlightIndexWorker {
     /// Indexes local tracks page by page so startup never needs a resident full track array.
     func rebuild(repository: any LocalLibraryRepository,
                  albums: [AlbumPresentationModel],
-                 artists: [ArtistPresentationModel]) async throws {
+                 artists: [ArtistPresentationModel],
+                 summaries: LocalSummaryRepository? = nil) async throws {
         try Task.checkCancellation()
         if !hasIndexed { try await writer.removeLocalMusic() }
         var nextSignatures: [String: Int] = [:]
@@ -214,16 +215,45 @@ actor SpotlightIndexWorker {
             if !page.hasMore { break }
             guard !page.tracks.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
         }
-        for album in albums {
-            try Task.checkCancellation()
-            if let ready = accept(SpotlightMusicRecord(album: album)) {
-                try await writer.index(ready)
+        if let summaries {
+            var albumOffset = 0
+            while true {
+                try Task.checkCancellation()
+                let page = try await summaries.albumPage(offset: albumOffset, limit: min(batchSize, 256))
+                for album in page.items {
+                    if let ready = accept(SpotlightMusicRecord(album: album)) {
+                        try await writer.index(ready)
+                    }
+                }
+                albumOffset += page.items.count
+                if !page.hasMore { break }
+                guard !page.items.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
             }
-        }
-        for artist in artists {
-            try Task.checkCancellation()
-            if let ready = accept(SpotlightMusicRecord(artist: artist)) {
-                try await writer.index(ready)
+            var artistOffset = 0
+            while true {
+                try Task.checkCancellation()
+                let page = try await summaries.artistPage(offset: artistOffset, limit: min(batchSize, 256))
+                for artist in page.items {
+                    if let ready = accept(SpotlightMusicRecord(artist: artist)) {
+                        try await writer.index(ready)
+                    }
+                }
+                artistOffset += page.items.count
+                if !page.hasMore { break }
+                guard !page.items.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
+            }
+        } else {
+            for album in albums {
+                try Task.checkCancellation()
+                if let ready = accept(SpotlightMusicRecord(album: album)) {
+                    try await writer.index(ready)
+                }
+            }
+            for artist in artists {
+                try Task.checkCancellation()
+                if let ready = accept(SpotlightMusicRecord(artist: artist)) {
+                    try await writer.index(ready)
+                }
             }
         }
         if !batch.isEmpty { try await writer.index(batch) }
@@ -266,20 +296,26 @@ final class SpotlightIndexingService {
 
     func schedule(repository: any LocalLibraryRepository,
                   albums: [AlbumPresentationModel],
-                  artists: [ArtistPresentationModel]) {
+                  artists: [ArtistPresentationModel],
+                  summaries: LocalSummaryRepository? = nil) {
         pending?.cancel()
         let previous = pending
         pending = Task { [worker] in
             _ = await previous?.value
             do {
                 try await Task.sleep(for: .milliseconds(700))
-                try await worker.rebuild(repository: repository, albums: albums, artists: artists)
+                try await worker.rebuild(repository: repository, albums: albums,
+                                         artists: artists, summaries: summaries)
             } catch is CancellationError {
                 // Superseded by a newer library revision.
             } catch {
                 print("[SpotlightIndex] Paged index update failed: \(error)")
             }
         }
+    }
+
+    func schedule(repository: any LocalLibraryRepository, summaries: LocalSummaryRepository) {
+        schedule(repository: repository, albums: [], artists: [], summaries: summaries)
     }
 
     func cancel() {

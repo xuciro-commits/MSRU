@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import AppFoundation
 import Testing
 @testable import MSRU
 
@@ -88,6 +89,19 @@ struct LocalPagingTests {
             }
         }
         let repository = SQLiteLocalLibraryRepository(db: db)
+        let summaries = LocalSummaryRepository(db: db)
+        let firstAlbums = try await summaries.albumPage(limit: 64)
+        let secondAlbums = try await summaries.albumPage(offset: 64, limit: 64)
+        #expect(firstAlbums.totalCount == 1_000)
+        #expect(firstAlbums.items.count == 64)
+        #expect(secondAlbums.items.first?.title == "Album 0064")
+        #expect(try await summaries.albumPage(query: "Album 0999").items.map(\.title) == ["Album 0999"])
+        #expect(try await summaries.album(id: "rel_0999")?.trackCount == 50)
+        #expect(try await summaries.album(id: "rel_0999")?.duration == 9_000)
+        let firstArtists = try await summaries.artistPage(limit: 32)
+        #expect(firstArtists.totalCount == 100)
+        #expect(firstArtists.items.count == 32)
+        #expect(try await summaries.artist(id: "art_099")?.trackCount == 500)
         let store = LocalLibraryStore(repository: repository, db: db)
         let storeStarted = CFAbsoluteTimeGetCurrent()
         await store.loadIfNeeded()
@@ -96,8 +110,20 @@ struct LocalPagingTests {
         #expect(!store.isFullyLoaded)
         #expect(store.totalTrackCount == 50_000)
         #expect(store.tracks.count == 128)
-        #expect(store.albums.count == 1_000)
-        #expect(store.artists.count == 100)
+        let albumPager = store.makeAlbumPager()
+        await albumPager.reset(query: "", sort: .title)
+        #expect(albumPager.albums.count == 64)
+        #expect(albumPager.totalCount == 1_000)
+        await albumPager.loadMore()
+        #expect(albumPager.albums.count == 128)
+        await albumPager.reset(query: "Album 0999", sort: .title)
+        #expect(albumPager.albums.map(\.title) == ["Album 0999"])
+        let artistPager = store.makeArtistPager()
+        await artistPager.reset(query: "")
+        #expect(artistPager.artists.count == 64)
+        #expect(artistPager.totalCount == 100)
+        await artistPager.reset(query: "Artist 099")
+        #expect(artistPager.artists.map(\.name) == ["Artist 099"])
         let fullLoadStarted = CFAbsoluteTimeGetCurrent()
         let full = try await repository.loadTracks()
         let fullLoadMs = (CFAbsoluteTimeGetCurrent() - fullLoadStarted) * 1000

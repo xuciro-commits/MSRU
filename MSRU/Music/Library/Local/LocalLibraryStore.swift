@@ -9,9 +9,6 @@ final class LocalLibraryStore {
     private(set) var totalTrackCount = 0
     private(set) var isFullyLoaded = false
     private(set) var revision: UInt64 = 0
-    private(set) var querySnapshot: LibraryQuerySnapshot = LibraryQuerySnapshot()
-    private var cachedAlbums: [AlbumPresentationModel] = []
-    private var cachedArtists: [ArtistPresentationModel] = []
     private(set) var isImporting = false
     private(set) var errorMessage: String?
     private var didLoad = false
@@ -20,7 +17,7 @@ final class LocalLibraryStore {
     private var pendingImports = 0
     private let repository: any LocalLibraryRepository
     private let db: AppDatabase
-    private let queryEngine: LibraryQueryEngine
+    private let summaryRepository: LocalSummaryRepository
     private weak var libraryStore: LibraryStore?
     private weak var playlistStore: PlaylistStore?
     private weak var playbackController: PlaybackController?
@@ -29,7 +26,7 @@ final class LocalLibraryStore {
     func attachSpotlightIndexer(_ indexer: SpotlightIndexingService) {
         spotlightIndexer = indexer
         if didLoad {
-            indexer.schedule(repository: repository, albums: albums, artists: artists)
+            indexer.schedule(repository: repository, summaries: summaryRepository)
         }
     }
 
@@ -43,24 +40,6 @@ final class LocalLibraryStore {
         self.playbackController = playbackController
     }
 
-    var albums: [AlbumPresentationModel] {
-        if !cachedAlbums.isEmpty {
-            return cachedAlbums
-        }
-        return querySnapshot.albumSummaries
-    }
-
-    var artists: [ArtistPresentationModel] {
-        if !cachedArtists.isEmpty {
-            return cachedArtists
-        }
-        return querySnapshot.artistSummaries
-    }
-
-    var positionLookup: [String: Int] {
-        querySnapshot.positionLookup
-    }
-
     var isLoading: Bool {
         !didLoad
     }
@@ -70,24 +49,11 @@ final class LocalLibraryStore {
     }
 
     private func updateCachedPresentations() {
-        if isFullyLoaded {
-            self.cachedAlbums = LibraryPresentationAggregator.buildAlbums(from: tracks)
-            self.cachedArtists = LibraryPresentationAggregator.buildArtists(from: tracks)
-        } else {
-            self.cachedAlbums = []
-            self.cachedArtists = []
-        }
         self.revision &+= 1
     }
 
-    private func refreshQuerySnapshot() async {
-        do {
-            let snapshot = try await queryEngine.queryDatabaseSnapshot(includeOrderedIDs: false)
-            self.querySnapshot = snapshot
-            spotlightIndexer?.schedule(repository: repository, albums: albums, artists: artists)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+    private func scheduleSpotlightRefresh() {
+        spotlightIndexer?.schedule(repository: repository, summaries: summaryRepository)
     }
 
     convenience init() {
@@ -97,11 +63,20 @@ final class LocalLibraryStore {
     init(repository: any LocalLibraryRepository, db: AppDatabase = AppDatabase.shared) {
         self.repository = repository
         self.db = db
-        self.queryEngine = LibraryQueryEngine(db: db)
+        self.summaryRepository = LocalSummaryRepository(db: db)
     }
 
     func makePager() -> LocalTrackPager {
         LocalTrackPager(repository: repository)
+    }
+
+    func makeAlbumPager() -> LocalAlbumPager { LocalAlbumPager(repository: summaryRepository) }
+    func makeArtistPager() -> LocalArtistPager { LocalArtistPager(repository: summaryRepository) }
+    func findAlbum(id: String) async throws -> AlbumPresentationModel? {
+        try await summaryRepository.album(id: id)
+    }
+    func findArtist(id: String) async throws -> ArtistPresentationModel? {
+        try await summaryRepository.artist(id: id)
     }
 
     func fetchTracks(forReleaseIDs ids: Set<String>) async throws -> [LocalTrack] {
@@ -226,7 +201,7 @@ final class LocalLibraryStore {
             didLoad = true
             errorMessage = nil
 
-            await refreshQuerySnapshot()
+            scheduleSpotlightRefresh()
             if isFullyLoaded { triggerBackgroundArtworkBackfillIfNeeded() }
         } catch {
             didLoad = false
@@ -243,7 +218,7 @@ final class LocalLibraryStore {
             self.totalTrackCount = page.totalCount
             self.isFullyLoaded = page.totalCount <= page.tracks.count
             self.updateCachedPresentations()
-            await self.refreshQuerySnapshot()
+            self.scheduleSpotlightRefresh()
             await LocalLibraryIndexingService.shared.enqueue(newTracks)
             self.triggerBackgroundArtworkBackfillIfNeeded()
         }
@@ -280,14 +255,21 @@ final class LocalLibraryStore {
                 ? self.tracks.count
                 : max(0, self.totalTrackCount - deletedTracks.count)
 
-            // Cross-store cleanup follows a successful authoritative SQLite delete.
-            await self.libraryStore?.purgeTracks(matchingIDs: deletedTrackIDs, localURLs: deletedURLs)
-            await self.playlistStore?.purgeTracks(withIDs: deletedTrackIDs)
+            // SQLite removes persisted references in the same transaction as assets.
+            // These store calls synchronize any already-loaded in-memory collections.
+            let librarySynchronized = await self.libraryStore?.purgeTracks(
+                matchingIDs: deletedTrackIDs, localURLs: deletedURLs) ?? true
+            let playlistsSynchronized = await self.playlistStore?.purgeTracks(withIDs: deletedTrackIDs) ?? true
+            if !librarySynchronized || !playlistsSynchronized {
+                if !librarySynchronized { await self.libraryStore?.load() }
+                if !playlistsSynchronized { await self.playlistStore?.load() }
+                self.errorMessage = "Local files were removed, but saved collections could not refresh. Reopen the library to retry."
+            }
             self.playbackController?.purgeTracks(withIDs: deletedTrackIDs, localURLs: deletedURLs)
 
             self.updateCachedPresentations()
             self.deregisterTracks(deletedTracks)
-            await self.refreshQuerySnapshot()
+            self.scheduleSpotlightRefresh()
             succeeded = true
         }
         return succeeded
@@ -318,7 +300,7 @@ final class LocalLibraryStore {
 
         await serialized {
             self.updateCachedPresentations()
-            await self.refreshQuerySnapshot()
+            self.scheduleSpotlightRefresh()
         }
     }
 
@@ -393,7 +375,7 @@ final class LocalLibraryStore {
 
         await serialized {
             self.updateCachedPresentations()
-            await self.refreshQuerySnapshot()
+            self.scheduleSpotlightRefresh()
         }
     }
 
@@ -451,7 +433,7 @@ final class LocalLibraryStore {
             tracks[index] = updatedTrack
         }
         updateCachedPresentations()
-        await refreshQuerySnapshot()
+        scheduleSpotlightRefresh()
         return true
     }
 
@@ -510,7 +492,7 @@ final class LocalLibraryStore {
             }
         }
         updateCachedPresentations()
-        await refreshQuerySnapshot()
+        scheduleSpotlightRefresh()
         return true
     }
 
@@ -649,7 +631,7 @@ final class LocalLibraryStore {
         }
         if anyUpdates {
             updateCachedPresentations()
-            await refreshQuerySnapshot()
+            scheduleSpotlightRefresh()
         }
 
         return (repaired, artworkAdded)
@@ -693,15 +675,19 @@ final class LocalLibraryStore {
     private func importNow(_ urls: [URL]) async {
         errorMessage = nil
         do {
-            let newlyImported = try await repository.importTracks(from: urls)
+            let result = try await repository.importTracksDetailed(from: urls)
             let page = try await repository.fetchPage(LocalTrackPageRequest(limit: 128))
             tracks = page.tracks
             totalTrackCount = page.totalCount
             isFullyLoaded = page.totalCount <= page.tracks.count
             updateCachedPresentations()
-            await refreshQuerySnapshot()
-            await LocalLibraryIndexingService.shared.enqueue(newlyImported)
+            scheduleSpotlightRefresh()
+            await LocalLibraryIndexingService.shared.enqueue(result.tracks)
             triggerBackgroundArtworkBackfillIfNeeded()
+            if !result.failures.isEmpty {
+                let names = result.failures.prefix(3).map { $0.fileURL.lastPathComponent }.joined(separator: ", ")
+                errorMessage = "Imported \(result.tracks.count) tracks; \(result.failures.count) failed (\(names)). The failed files remain in place."
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -841,7 +827,7 @@ final class LocalLibraryStore {
                         }
                     }
                     self.updateCachedPresentations()
-                    await self.refreshQuerySnapshot()
+                    self.scheduleSpotlightRefresh()
                     print("[ArtworkBackfill] Backfilled artwork for album: [\(group.album ?? "Unknown")] (\(updatedBatch.count) tracks)")
                 }
             }

@@ -80,6 +80,26 @@ struct SpotlightIndexingTests {
         #expect(second.1 == [SpotlightMusicID.track(tracks[1].id).rawValue])
     }
 
+    @Test("Paged Spotlight rebuild includes database album and artist summaries")
+    @MainActor
+    func pagedSummaries() async throws {
+        let db = try TestDatabase.makeEphemeral()
+        let repository = SQLiteLocalLibraryRepository(db: db)
+        let track = LocalTrack(fileURL: URL(fileURLWithPath: "/music/spotlight-album.wav"),
+                               title: "Song", artist: "Artist", album: "Album", trackNumber: 1)
+        try await repository.saveTracksInPlace([track])
+        let summaries = LocalSummaryRepository(db: db)
+        let writer = RecordingWriter()
+        let worker = SpotlightIndexWorker(writer: writer, batchSize: 1)
+
+        try await worker.rebuild(repository: repository, albums: [], artists: [], summaries: summaries)
+        let indexed = await writer.snapshot().2.flatMap { $0 }
+        #expect(indexed.count == 3)
+        #expect(indexed.map(\.id).contains(.track(track.id)))
+        #expect(indexed.contains { if case .album(_) = $0.id { return true }; return false })
+        #expect(indexed.contains { if case .artist(_) = $0.id { return true }; return false })
+    }
+
     @Test("Shortcuts select exact tracks and bound search results")
     func intentLookup() {
         let first = LocalTrack(fileURL: URL(fileURLWithPath: "/tmp/song-a.flac"), title: "Song", artist: "One")

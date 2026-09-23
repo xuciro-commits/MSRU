@@ -18,11 +18,11 @@ enum SpotlightSelectionRouter {
             scene.select(localTrack: track)
             scene.application.playback.play(track)
         case .album(let id):
-            guard library.albums.contains(where: { $0.id == id }) else { return false }
+            guard (try? await library.findAlbum(id: id)) != nil else { return false }
             scene.requestedAlbumID = id
             scene.send(.navigate(.section(.albums)))
         case .artist(let id):
-            guard library.artists.contains(where: { $0.id == id }) else { return false }
+            guard (try? await library.findArtist(id: id)) != nil else { return false }
             scene.requestedArtistID = id
             scene.send(.navigate(.section(.artists)))
         }

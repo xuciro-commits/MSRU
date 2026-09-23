@@ -19,11 +19,11 @@ struct ArtistsView: View {
     var onAddMusic: (() -> Void)? = nil
 
     @State private var searchQuery: String = ""
+    @State private var localPager: LocalArtistPager?
     @State private var selectedArtist: ArtistPresentationModel?
     @State private var selectedAlbum: AlbumPresentationModel?
     @State private var selectedArtistTracks: [LocalTrack] = []
     @State private var selectedAlbumTracks: [LocalTrack] = []
-    @State private var localArtistIDs: Set<String> = []
     @State private var artistPendingDelete: ArtistPresentationModel?
     @State private var isDeleteConfirmationPresented: Bool = false
     @State private var selectedArtistIDs: Set<String> = []
@@ -64,36 +64,12 @@ struct ArtistsView: View {
         return !SourceID.isLocalSourceID(selectedSourceID)
     }
 
-    private var allArtists: [ArtistPresentationModel] {
-        if isRemoteSourceActive {
-            let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-            return query.isEmpty ? remoteArtists : remoteSearchResults
-        }
-        return localStore.artists
-    }
-
     private var filteredArtists: [ArtistPresentationModel] {
         if isRemoteSourceActive {
             let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
             return query.isEmpty ? remoteArtists : remoteSearchResults
         }
-
-        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        var matching: [ArtistPresentationModel]
-        if query.isEmpty {
-            matching = allArtists
-        } else {
-            matching = allArtists.filter {
-                $0.name.lowercased().contains(query) ||
-                $0.aliases.contains { $0.lowercased().contains(query) }
-            }
-        }
-
-        if let selectedSourceID, SourceID.isLocalSourceID(selectedSourceID) {
-            matching = matching.filter { localArtistIDs.contains($0.id) }
-        }
-
-        return matching
+        return localPager?.artists ?? []
     }
 
     private func loadRemoteArtists(sourceID: String, reset: Bool = true) async {
@@ -268,23 +244,26 @@ struct ArtistsView: View {
         }
         .task(id: requestedArtistID) {
             if let requestedArtistID,
-               let artist = localStore.artists.first(where: { $0.id == requestedArtistID }) {
+               let artist = try? await localStore.findArtist(id: requestedArtistID) {
                 selectedArtist = artist
                 self.requestedArtistID = nil
             }
         }
         .task(id: selectedSourceID) {
-            if let selectedSourceID, SourceID.isLocalSourceID(selectedSourceID) {
-                let snapshot = await LibraryQueryEngine.shared.querySnapshot(
-                    sourceFilter: selectedSourceID, includeOrderedIDs: false
-                )
-                localArtistIDs = Set(snapshot.artistSummaries.map(\.id))
-            } else {
-                localArtistIDs = []
-            }
             if isRemoteSourceActive, let sourceID = selectedSourceID {
                 await loadRemoteArtists(sourceID: sourceID, reset: true)
             }
+        }
+        .task(id: "\(selectedSourceID ?? "")|\(searchQuery)|\(localStore.revision)") {
+            guard !isRemoteSourceActive else { return }
+            let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !query.isEmpty {
+                try? await Task.sleep(for: .milliseconds(150))
+                guard !Task.isCancelled else { return }
+            }
+            let pager = localPager ?? localStore.makeArtistPager()
+            localPager = pager
+            await pager.reset(query: query)
         }
         .task(id: "\(selectedSourceID ?? "")-\(searchQuery)") {
             let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -356,7 +335,7 @@ struct ArtistsView: View {
 
     @ViewBuilder
     private var mainArtistsGrid: some View {
-        if localStore.isLoading || (isLoadingRemote && remoteArtists.isEmpty) || isSearchingRemote {
+        if localStore.isLoading || (!isRemoteSourceActive && (localPager == nil || localPager?.isLoading == true && localPager?.artists.isEmpty == true)) || (isLoadingRemote && remoteArtists.isEmpty) || isSearchingRemote {
             VStack(spacing: 0) {
                 header
                 Divider()
@@ -375,7 +354,15 @@ struct ArtistsView: View {
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    emptyState
+                    if let error = localPager?.errorMessage {
+                        VStack {
+                            ContentUnavailableView("无法加载艺术家", systemImage: "exclamationmark.triangle",
+                                                   description: Text(error))
+                            Button("重试") { Task { await localPager?.retry() } }
+                        }
+                    } else {
+                        emptyState
+                    }
                 }
             }
         } else {
@@ -434,13 +421,17 @@ struct ArtistsView: View {
                                                 await loadRemoteArtists(sourceID: sourceID, reset: false)
                                             }
                                         }
+                                    } else if !isRemoteSourceActive,
+                                              filteredArtists.suffix(12).contains(where: { $0.id == artist.id }),
+                                              localPager?.hasMore == true {
+                                        Task { await localPager?.loadMore() }
                                     }
                                 }
                             }
                         }
                     }
 
-                    if isLoadingMoreRemote {
+                    if isLoadingMoreRemote || (!isRemoteSourceActive && localPager?.isLoading == true) {
                         HStack(spacing: 8) {
                             Spacer()
                             ProgressView()
@@ -451,6 +442,12 @@ struct ArtistsView: View {
                             Spacer()
                         }
                         .padding(.vertical, 12)
+                    }
+                    if !isRemoteSourceActive, let error = localPager?.errorMessage {
+                        HStack {
+                            Text(error).foregroundStyle(.secondary)
+                            Button("重试") { Task { await localPager?.retry() } }
+                        }
                     }
                 }
                 .padding(28)
@@ -547,7 +544,7 @@ struct ArtistsView: View {
             let serverName = availableSources.first(where: { $0.sourceID == selectedSourceID })?.displayName ?? "远程媒体服务"
             return "\(serverName) • 按需在线浏览"
         } else {
-            return "\(filteredArtists.count) 位艺术家"
+            return "\(localPager?.totalCount ?? filteredArtists.count) 位艺术家"
         }
     }
 

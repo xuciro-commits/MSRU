@@ -392,7 +392,8 @@ nonisolated public final class IdentityRepository: Sendable {
     public func deleteTracks(
         assetIDs: Set<AssetID> = [],
         recordingIDs: Set<RecordingID> = [],
-        relativePaths: Set<String> = []
+        relativePaths: Set<String> = [],
+        cascadeLocalCollections: Bool = false
     ) async throws -> (prunedReleases: Int, prunedArtists: Int) {
         guard !assetIDs.isEmpty || !recordingIDs.isEmpty || !relativePaths.isEmpty else { return (0, 0) }
 
@@ -442,6 +443,44 @@ nonisolated public final class IdentityRepository: Sendable {
                         matchedAssetIDs.insert(row["id"])
                         if let recID: String = row["recording_id"] { recIDsToCheck.insert(recID) }
                     }
+                }
+            }
+
+            if cascadeLocalCollections && !matchedAssetIDs.isEmpty {
+                let values = matchedAssetIDs.sorted()
+                var localPaths = Set<String>()
+                for start in stride(from: 0, to: values.count, by: 500) {
+                    let batch = Array(values[start..<min(start + 500, values.count)])
+                    let placeholders = Array(repeating: "?", count: batch.count).joined(separator: ",")
+                    let paths = try String.fetchAll(db, sql: """
+                        SELECT a.relative_path FROM assets a JOIN sources s ON s.id = a.source_id
+                        WHERE a.id IN (\(placeholders)) AND s.source_type IN ('local_folder', 'localFolder')
+                        """, arguments: StatementArguments(batch))
+                    localPaths.formUnion(paths)
+                }
+                let orderedPaths = localPaths.sorted()
+                var affectedSavedTrackIDs = Set<String>()
+                for start in stride(from: 0, to: orderedPaths.count, by: 400) {
+                    let paths = Array(orderedPaths[start..<min(start + 400, orderedPaths.count)])
+                    let placeholders = Array(repeating: "?", count: paths.count).joined(separator: ",")
+                    let saved = try String.fetchAll(db, sql: """
+                        SELECT DISTINCT library_track_id FROM saved_library_sources
+                        WHERE kind = 'local' AND local_url IN (\(placeholders))
+                        """, arguments: StatementArguments(paths))
+                    affectedSavedTrackIDs.formUnion(saved)
+                    try db.execute(sql: """
+                        DELETE FROM saved_library_sources WHERE kind = 'local' AND local_url IN (\(placeholders))
+                        """, arguments: StatementArguments(paths))
+                    let playlistIDs = paths.flatMap { [URL(fileURLWithPath: $0).absoluteString, $0] }
+                    let playlistPlaceholders = Array(repeating: "?", count: playlistIDs.count).joined(separator: ",")
+                    try db.execute(sql: "DELETE FROM playlist_tracks WHERE track_id IN (\(playlistPlaceholders))",
+                                   arguments: StatementArguments(playlistIDs))
+                }
+                for savedID in affectedSavedTrackIDs {
+                    try db.execute(sql: """
+                        DELETE FROM saved_library_tracks WHERE id = ?
+                        AND NOT EXISTS (SELECT 1 FROM saved_library_sources WHERE library_track_id = ?)
+                        """, arguments: [savedID, savedID])
                 }
             }
 

@@ -271,6 +271,10 @@ struct CascadeDeletionTests {
         let fileURL = URL(fileURLWithPath: "/music/test_123.flac")
         let localTrack = LocalTrack(fileURL: fileURL, title: "Test Song", artist: "Artist", duration: 180)
         await libraryStore.add(local: localTrack)
+        let remoteSource = LibraryPlaybackSource(kind: .openverse, externalID: "remote-copy")
+        if let savedID = libraryStore.libraryTrack(for: localTrack)?.id {
+            #expect(await libraryStore.addSource(remoteSource, toTrackID: savedID))
+        }
         #expect(libraryStore.contains(local: localTrack))
 
         // 3. Add to playback queue
@@ -290,9 +294,56 @@ struct CascadeDeletionTests {
 
         // Library no longer contains the track
         #expect(!libraryStore.contains(local: localTrack))
+        #expect(libraryStore.contains(source: remoteSource))
 
         // Playback queue is cleared
         #expect(playbackController.playbackQueue.upcoming.isEmpty)
+    }
+
+    @Test
+    func localDeletionCascadesCollectionsAndRollsBackOnFailure() async throws {
+        let db = try TestDatabase.makeEphemeral()
+        let sourceID = try await TestDatabase.seedSource(in: db)
+        let path = "/tmp/msru-cascade-atomic.flac"
+        let recordingID = RecordingID("rec_atomic_cascade")
+        let assetID = AssetID("asset_atomic_cascade")
+        try await IdentityRepository(db: db).upsertRecording(id: recordingID, title: "Atomic")
+        try await AssetRepository(db: db).batchUpsert([
+            PersistedAssetRecord(id: assetID, sourceID: sourceID, relativePath: path,
+                                 fileSize: 100, mtime: 1, format: "FLAC", recordingID: recordingID)
+        ])
+        let saved = LibraryTrack(title: "Atomic", artist: "Artist", sources: [
+            LibraryPlaybackSource(kind: .local, localFileURL: URL(fileURLWithPath: path)),
+            LibraryPlaybackSource(kind: .openverse, externalID: "remote-copy")
+        ])
+        let savedRepository = SQLiteLibraryRepository(db: db)
+        try await savedRepository.saveTracks([saved])
+        let playlist = Playlist(title: "Atomic", trackIDs: [path, "keep"])
+        let playlistRepository = SQLitePlaylistRepository(db: db)
+        try await playlistRepository.savePlaylists([playlist])
+
+        try await db.dbWriter.write { database in
+            try database.execute(sql: "CREATE TRIGGER reject_atomic_delete BEFORE DELETE ON assets BEGIN SELECT RAISE(ABORT, 'injected failure'); END")
+        }
+        let localRepository = SQLiteLocalLibraryRepository(db: db)
+        await #expect(throws: (any Error).self) {
+            try await localRepository.deleteTracks(withIDs: [path], deletePhysicalFiles: false)
+        }
+        let before = try await savedRepository.loadTracks()
+        #expect(before.first?.sources.count == 2)
+        #expect(try await playlistRepository.loadPlaylists().first?.trackIDs == [path, "keep"])
+
+        try await db.dbWriter.write { database in
+            try database.execute(sql: "DROP TRIGGER reject_atomic_delete")
+        }
+        try await localRepository.deleteTracks(withIDs: [path], deletePhysicalFiles: false)
+        let after = try await savedRepository.loadTracks()
+        #expect(after.first?.sources.map(\.kind) == [.openverse])
+        #expect(try await playlistRepository.loadPlaylists().first?.trackIDs == ["keep"])
+        let assetCount = try await db.reader.read { database in
+            try Int.fetchOne(database, sql: "SELECT COUNT(*) FROM assets WHERE id = ?", arguments: [assetID.rawValue]) ?? 0
+        }
+        #expect(assetCount == 0)
     }
 
     @Test

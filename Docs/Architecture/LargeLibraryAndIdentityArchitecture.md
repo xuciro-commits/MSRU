@@ -4,7 +4,7 @@
 
 This document defines the production architecture for MSRU's music library infrastructure, engineered to scale smoothly from 1,000 to **500,000 items** while delivering deterministic entity identity, provenance-backed metadata resolution, multi-language/Chinese FTS5 instant search, zero-work UI updates, and an uncompromised native macOS AppKit presentation layer.
 
-**实现状态（2026-09-24）**：本页以下的 500K、15MB、冷页毫秒数与零工作等数值是目标或历史合成基准，不是当前 App 冷启动/RSS 的验收结论。当前代码对本地歌曲列表采用 128 首分页，Spotlight 和常用定位操作按页/目标读取；本地歌曲播放队列按需续页并限制历史为 256 首，显式元数据修复与指纹孤儿清理也逐页读取。专辑、艺人摘要仍可能整批物化。50,000 首/1,000 专辑/100 艺人的测试进程内 SQLite 基准约 86.6ms 完成本地库首批 128 首和摘要载入，整表歌曲读取约 454ms；磁盘冷启动及 RSS 下降 70% 尚未验证。现行任务和完成条件见[工作队列](../../todo/02-WORK-QUEUE.md)。
+**实现状态（2026-09-24）**：本页以下的 500K、15MB、冷页毫秒数与零工作等数值是目标或历史合成基准，不是当前 App 冷启动/RSS 的验收结论。本地歌曲以 128 首分页，专辑/艺人摘要以 64 项分页并在 SQLite 中完成筛选、排序与精确定位；Spotlight、播放队列、显式元数据修复与指纹维护也逐页读取。固定磁盘 SQLite 数据集（50,000 首/1,000 专辑/100 艺人）按独立测试进程比较：首批有界存储路径 47–53ms、增量 RSS 9.4–9.6MB；旧整表路径 601–606ms、增量 RSS 66–69MB。该数据仅证明隔离的存储代码路径约 86% 的增量内存下降；全 App 冷启动与总 RSS 尚未测定。可复现探针位于 `MSRUTests/Benchmarks/Stage2StorageBenchmarkTests.swift`，默认跳过，分别以 `/tmp/msru-stage2-50k-benchmark-mode` 中的 `prepare`、`paged`、`legacy` 运行独立进程。现行任务和完成条件见[工作队列](../../todo/02-WORK-QUEUE.md)。
 
 ---
 

@@ -60,7 +60,7 @@
 | **STAGE 3**<br>异类切片压力测试与框架独立 | **脱离音乐场景验证框架**：<br>`Examples/DocStudio`<br>`Examples/HotelDesk`<br>`Packages/AppFoundation/Undo` | · AppFoundationUI 提取通用 Undo 事务机制<br>· 严禁向框架泄漏任何 Music 依赖 | · 独立 Demo App 零修改复用 AppFoundation 架构装配与 Shell<br>· 多窗口文档编辑与 Undo/Redo 回滚测试全绿<br>· 证明框架具备 5 年多种产品支撑力 | 验证框架不是音乐特化封装，奠定未来开发不同领域 Apple 原生产品的基础 |
 | **STAGE 4**<br>跨设备原生互联与生态闭环 | **Apple 多端协同**：<br>`Platform/Network`<br>`Features/RemoteControl` | · 纯 Apple 原生 `Network.framework` (Bonjour)<br>· 局域网轻量状态同步协议 | · iPhone / Apple Watch 自动发现 Mac 播放器并毫秒级遥控<br>· 局域网无损音轨传输与歌单高速下发 | 沙发或床上轻松遥控桌面发烧音响，实现媲美 Apple 官方生态的无缝体验 |
 
-Stage 2 当前进度见[工作队列 #61–#68](../../todo/02-WORK-QUEUE.md)：本地/NAS 专辑 PCM 接续已实现，仍待对应听感验收；macOS 非默认设备切换、10 段 EQ 及当前 R128 响度功能由用户复验通过。SQLite 增量写入与本地歌曲分页已经接入；启动整表读取、数据恢复契约及 50,000 首冷启动和 RSS 目标仍待 #66–#67 收口。Bit-Perfect 未获证明，DAC 切率、独占和热拔插没有单独实测记录；#68 决定阶段最终边界。
+Stage 2 当前进度见[工作队列 #61–#68](../../todo/02-WORK-QUEUE.md)：本地/NAS 专辑 PCM 接续已实现，听感验收仍以用户记录为准；macOS 非默认设备切换、10 段 EQ 及当前 R128 响度功能由用户复验通过。SQLite 增量写入、歌曲及专辑/艺人分页、部分导入失败报告和删除时的收藏/歌单事务级联已接入；固定磁盘 50,000 首存储路径基准已记录，但全 App 冷启动及总 RSS 目标尚未证实。Bit-Perfect 未获证明，DAC 切率、独占和热拔插没有单独实测记录；#68 决定阶段最终边界。
 
 ---
 

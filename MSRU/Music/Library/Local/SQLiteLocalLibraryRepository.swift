@@ -517,11 +517,19 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
     }
 
     func importTracks(from urls: [URL]) async throws -> [LocalTrack] {
-        let supported = urls.filter { LocalAudioFormatSupport.supports($0) }
-        guard !supported.isEmpty else { return [] }
+        try await importTracksDetailed(from: urls).tracks
+    }
+
+    func importTracksDetailed(from urls: [URL]) async throws -> LocalImportResult {
+        guard !urls.isEmpty else { return LocalImportResult(tracks: [], failures: []) }
 
         var readList: [LocalTrack] = []
-        for url in supported {
+        var failures: [LocalImportFailure] = []
+        for url in urls {
+            guard LocalAudioFormatSupport.supports(url) else {
+                failures.append(LocalImportFailure(fileURL: url, reason: "Unsupported audio format"))
+                continue
+            }
             let hasSecurityAccess = url.startAccessingSecurityScopedResource()
             defer {
                 if hasSecurityAccess {
@@ -532,12 +540,12 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
                 let track = try await readTrack(from: url)
                 readList.append(track)
             } catch {
-                print("Batch read failed:", url.lastPathComponent, error.localizedDescription)
+                failures.append(LocalImportFailure(fileURL: url, reason: error.localizedDescription))
             }
         }
 
         try await saveTracksInPlace(readList)
-        return readList
+        return LocalImportResult(tracks: readList, failures: failures)
     }
 
     // MARK: - Delete
@@ -592,7 +600,7 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
 
         do {
             let identityRepo = IdentityRepository(db: db)
-            _ = try await identityRepo.deleteTracks(assetIDs: matchedIDs)
+            _ = try await identityRepo.deleteTracks(assetIDs: matchedIDs, cascadeLocalCollections: true)
         } catch {
             try restoreTrashedFiles(trashed, after: error)
         }
@@ -685,6 +693,8 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
 
     static func readTrack(from url: URL) async throws -> LocalTrack {
         let url = url.resolvingSymlinksInPath().standardizedFileURL
+        let values = try url.resourceValues(forKeys: [.isRegularFileKey])
+        guard values.isRegularFile == true else { throw CocoaError(.fileReadNoSuchFile) }
         let asset = AVURLAsset(url: url)
 
         // Fast path for DSD DSF files: bypass AVFoundation to prevent CoreAudio FFR errors

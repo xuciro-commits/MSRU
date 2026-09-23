@@ -10,6 +10,7 @@ import Testing
 import Foundation
 import AppFoundation
 import GRDB
+import AVFoundation
 @testable import MSRU
 
 @Suite("Library & Deduplication Invariants")
@@ -423,6 +424,33 @@ struct LibraryTests {
         #expect(!store.isFullyLoaded)
         #expect(repository.saved.count == 3)
         #expect(repository.saved.allSatisfy { $0.album == nil })
+    }
+
+    @Test("Batch import reports individual failures and retries without duplicating successful files")
+    @MainActor
+    func partialImportFailureAndRetry() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("msru_import_\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let valid = directory.appendingPathComponent("valid.wav")
+        let missing = directory.appendingPathComponent("missing.wav")
+        let format = try #require(AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1))
+        let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 128))
+        buffer.frameLength = 128
+        let file = try AVAudioFile(forWriting: valid, settings: format.settings)
+        try file.write(from: buffer)
+
+        let repo = SQLiteLocalLibraryRepository(db: try TestDatabase.makeEphemeral())
+        let first = try await repo.importTracksDetailed(from: [valid, missing])
+        #expect(first.tracks.count == 1)
+        #expect(first.failures.map(\.fileURL) == [missing])
+        #expect(try await repo.fetchPage(LocalTrackPageRequest()).totalCount == 1)
+
+        try FileManager.default.copyItem(at: valid, to: missing)
+        let retry = try await repo.importTracksDetailed(from: [valid, missing])
+        #expect(retry.failures.isEmpty)
+        #expect(try await repo.fetchPage(LocalTrackPageRequest()).totalCount == 2)
     }
 }
 

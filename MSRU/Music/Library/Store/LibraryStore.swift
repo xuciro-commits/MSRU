@@ -85,26 +85,26 @@ final class LibraryStore {
     func remove(local track: LocalTrack) async { await removeTrack(containing: LibraryPlaybackSource(local: track)) }
     func remove(openverse track: OpenverseAudio) async { await removeTrack(containing: LibraryPlaybackSource(openverse: track)) }
 
-    /// Purges tracks matching specified IDs or file URLs from the saved library in a single atomic save.
-    func purgeTracks(matchingIDs ids: Set<String>, localURLs: Set<URL>) async {
-        guard !ids.isEmpty || !localURLs.isEmpty else { return }
-        _ = await mutate { current in
-            let filtered = current.filter { track in
-                if ids.contains(track.id.uuidString) { return false }
-                for source in track.sources {
-                    if let url = source.localFileURL {
-                        if localURLs.contains(url) || ids.contains(url.path) || ids.contains(url.standardizedFileURL.path) {
-                            return false
-                        }
-                    }
-                    if let extID = source.externalID, ids.contains(extID) {
-                        return false
-                    }
+    /// Remove only deleted local sources; a saved track with another source stays available.
+    @discardableResult
+    func purgeTracks(matchingIDs ids: Set<String>, localURLs: Set<URL>) async -> Bool {
+        guard !ids.isEmpty || !localURLs.isEmpty else { return true }
+        let paths = Set(localURLs.map { $0.resolvingSymlinksInPath().standardizedFileURL.path })
+        return await mutate({ current in
+            var changed = false
+            var next: [LibraryTrack] = []
+            for track in current {
+                var updated = track
+                updated.sources.removeAll { source in
+                    guard source.kind == .local, let url = source.localFileURL else { return false }
+                    let path = url.resolvingSymlinksInPath().standardizedFileURL.path
+                    return paths.contains(path) || ids.contains(path) || ids.contains(source.externalID ?? "")
                 }
-                return true
+                if updated.sources != track.sources { changed = true }
+                if !updated.sources.isEmpty { next.append(updated) }
             }
-            return filtered.count != current.count ? filtered : nil
-        }
+            return changed ? next : nil
+        }, unchangedIsSuccess: true)
     }
 
     private func removeTrack(containing source: LibraryPlaybackSource) async {
@@ -157,10 +157,10 @@ final class LibraryStore {
         return false
     }
 
-    private func mutate(_ change: @escaping @MainActor ([LibraryTrack]) -> [LibraryTrack]?) async -> Bool {
+    private func mutate(_ change: @escaping @MainActor ([LibraryTrack]) -> [LibraryTrack]?, unchangedIsSuccess: Bool = false) async -> Bool {
         await serialized {
             if !self.hasLoaded, !(await self.loadNow()) { return false }
-            guard let updated = change(self.tracks) else { return false }
+            guard let updated = change(self.tracks) else { return unchangedIsSuccess }
             self.isSaving = true
             self.errorMessage = nil
             defer { self.isSaving = false }

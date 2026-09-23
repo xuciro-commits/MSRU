@@ -34,6 +34,7 @@ struct AlbumsView: View {
 
     @State private var searchQuery: String = ""
     @State private var sortField: AlbumSortField = .title
+    @State private var localPager: LocalAlbumPager?
     @State private var selectedAlbum: AlbumPresentationModel?
     @State private var selectedLocalTracks: [LocalTrack] = []
     @State private var albumPendingDelete: AlbumPresentationModel?
@@ -76,56 +77,12 @@ struct AlbumsView: View {
         return !SourceID.isLocalSourceID(selectedSourceID)
     }
 
-    private var allAlbums: [AlbumPresentationModel] {
-        if isRemoteSourceActive {
-            let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-            return query.isEmpty ? remoteAlbums : remoteSearchResults
-        }
-        return localStore.albums
-    }
-
     private var filteredAlbums: [AlbumPresentationModel] {
         if isRemoteSourceActive {
             let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
             return query.isEmpty ? remoteAlbums : remoteSearchResults
         }
-
-        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        var matching: [AlbumPresentationModel]
-        if query.isEmpty {
-            matching = allAlbums
-        } else {
-            matching = allAlbums.filter { album in
-                album.title.lowercased().contains(query) || album.artist.lowercased().contains(query)
-            }
-        }
-
-        if let selectedSourceID, !isRemoteSourceActive {
-            let activeItem = availableSources.first(where: { $0.id == selectedSourceID })
-            matching = matching.filter { album in
-                if SourceID.isLocalSourceID(selectedSourceID) {
-                    return album.sourceBadge == nil || album.sourceBadge == "Local Files" || album.sourceBadge == "Local Media Library" || album.sourceBadge == "本地文件"
-                } else if let activeItem {
-                    return album.sourceBadge == activeItem.displayName
-                }
-                return true
-            }
-        }
-
-        if sortField == .title {
-            return matching
-        }
-
-        return matching.sorted { a, b in
-            switch sortField {
-            case .title:
-                return a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
-            case .artist:
-                return a.artist.localizedCaseInsensitiveCompare(b.artist) == .orderedAscending
-            case .year:
-                return (a.year ?? 0) > (b.year ?? 0)
-            }
-        }
+        return localPager?.albums ?? []
     }
 
     private func loadRemoteAlbums(sourceID: String, reset: Bool = true) async {
@@ -256,7 +213,7 @@ struct AlbumsView: View {
                     onFetchArtwork: album.id.hasPrefix("subsonic:") ? nil : { () -> Void in
                         Task {
                             await localStore.reidentifyAlbum(albumTitle: album.title, artist: album.artist)
-                            if let updated = localStore.albums.first(where: { $0.id == album.id }) {
+                            if let updated = try? await localStore.findAlbum(id: album.id) {
                                 selectedAlbum = updated
                             }
                         }
@@ -277,10 +234,27 @@ struct AlbumsView: View {
         }
         .task(id: requestedAlbumID) {
             if let requestedAlbumID,
-               let album = localStore.albums.first(where: { $0.id == requestedAlbumID }) {
+               let album = try? await localStore.findAlbum(id: requestedAlbumID) {
                 selectedAlbum = album
                 self.requestedAlbumID = nil
             }
+        }
+        .task(id: "\(selectedSourceID ?? "")|\(searchQuery)|\(sortField.rawValue)|\(localStore.revision)") {
+            guard !isRemoteSourceActive else { return }
+            let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !query.isEmpty {
+                try? await Task.sleep(for: .milliseconds(150))
+                guard !Task.isCancelled else { return }
+            }
+            let pager = localPager ?? localStore.makeAlbumPager()
+            localPager = pager
+            let sort: LocalSummaryRepository.AlbumSort
+            switch sortField {
+            case .title: sort = .title
+            case .artist: sort = .artist
+            case .year: sort = .year
+            }
+            await pager.reset(query: query, sort: sort)
         }
         .task(id: "\(selectedSourceID ?? "")-\(sortField.rawValue)") {
             if isRemoteSourceActive, let sourceID = selectedSourceID {
@@ -357,7 +331,7 @@ struct AlbumsView: View {
 
     @ViewBuilder
     private var mainAlbumsGrid: some View {
-        if localStore.isLoading || (isLoadingRemote && remoteAlbums.isEmpty) || isSearchingRemote {
+        if localStore.isLoading || (!isRemoteSourceActive && (localPager == nil || localPager?.isLoading == true && localPager?.albums.isEmpty == true)) || (isLoadingRemote && remoteAlbums.isEmpty) || isSearchingRemote {
             VStack(spacing: 0) {
                 header
                 Divider()
@@ -376,7 +350,15 @@ struct AlbumsView: View {
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    emptyState
+                    if let error = localPager?.errorMessage {
+                        VStack {
+                            ContentUnavailableView("无法加载专辑", systemImage: "exclamationmark.triangle",
+                                                   description: Text(error))
+                            Button("重试") { Task { await localPager?.retry() } }
+                        }
+                    } else {
+                        emptyState
+                    }
                 }
             }
         } else {
@@ -444,13 +426,17 @@ struct AlbumsView: View {
                                                 await loadRemoteAlbums(sourceID: sourceID, reset: false)
                                             }
                                         }
+                                    } else if !isRemoteSourceActive,
+                                              filteredAlbums.suffix(12).contains(where: { $0.id == album.id }),
+                                              localPager?.hasMore == true {
+                                        Task { await localPager?.loadMore() }
                                     }
                                 }
                             }
                         }
                     }
 
-                    if isLoadingMoreRemote {
+                    if isLoadingMoreRemote || (!isRemoteSourceActive && localPager?.isLoading == true) {
                         HStack(spacing: 8) {
                             Spacer()
                             ProgressView()
@@ -461,6 +447,12 @@ struct AlbumsView: View {
                             Spacer()
                         }
                         .padding(.vertical, 12)
+                    }
+                    if !isRemoteSourceActive, let error = localPager?.errorMessage {
+                        HStack {
+                            Text(error).foregroundStyle(.secondary)
+                            Button("重试") { Task { await localPager?.retry() } }
+                        }
                     }
                 }
                 .padding(24)
@@ -563,7 +555,7 @@ struct AlbumsView: View {
             let serverName = availableSources.first(where: { $0.sourceID == selectedSourceID })?.displayName ?? "远程媒体服务"
             return "\(serverName) • 按需在线浏览"
         } else {
-            return "\(filteredAlbums.count) 张专辑"
+            return "\(localPager?.totalCount ?? filteredAlbums.count) 张专辑"
         }
     }
 

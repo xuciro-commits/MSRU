@@ -17,11 +17,22 @@ protocol LocalLibraryRepository: Sendable {
     func searchTracks(_ query: String, limit: Int) async throws -> [LocalTrack]
     func importTrack(from url: URL) async throws -> LocalTrack?
     func importTracks(from urls: [URL]) async throws -> [LocalTrack]
+    func importTracksDetailed(from urls: [URL]) async throws -> LocalImportResult
     func saveTrackInPlace(_ track: LocalTrack) async throws
     func saveTracksInPlace(_ tracks: [LocalTrack]) async throws
     func batchUpsertTracks(_ tracks: [LocalTrack]) async throws
     func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws
     func readTrack(from url: URL) async throws -> LocalTrack
+}
+
+nonisolated struct LocalImportFailure: Sendable {
+    let fileURL: URL
+    let reason: String
+}
+
+nonisolated struct LocalImportResult: Sendable {
+    let tracks: [LocalTrack]
+    let failures: [LocalImportFailure]
 }
 
 nonisolated struct LocalTrackPageRequest: Sendable {
@@ -144,13 +155,23 @@ extension LocalLibraryRepository {
         try await saveTracksInPlace(tracks)
     }
     func importTracks(from urls: [URL]) async throws -> [LocalTrack] {
+        try await importTracksDetailed(from: urls).tracks
+    }
+    func importTracksDetailed(from urls: [URL]) async throws -> LocalImportResult {
         var imported: [LocalTrack] = []
+        var failures: [LocalImportFailure] = []
         for url in urls {
-            if let track = try await importTrack(from: url) {
-                imported.append(track)
+            do {
+                if let track = try await importTrack(from: url) {
+                    imported.append(track)
+                } else {
+                    failures.append(LocalImportFailure(fileURL: url, reason: "No track was imported"))
+                }
+            } catch {
+                failures.append(LocalImportFailure(fileURL: url, reason: error.localizedDescription))
             }
         }
-        return imported
+        return LocalImportResult(tracks: imported, failures: failures)
     }
     func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws {}
     func readTrack(from url: URL) async throws -> LocalTrack {
