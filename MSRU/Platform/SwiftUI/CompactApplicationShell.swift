@@ -292,7 +292,7 @@ struct CompactApplicationShell: View {
             if selectedTab != .discovery { selectedTab = .discovery }
         case .radio:
             if selectedTab != .radio { selectedTab = .radio }
-        case .library, .albums, .artists, .playlists:
+        case .library, .albums, .artists, .playlists, .sources:
             if selectedTab != .library { selectedTab = .library }
         case .addMusic, .importReview, .settings:
             if selectedTab != .tools { selectedTab = .tools }
@@ -310,7 +310,7 @@ struct CompactApplicationShell: View {
                 scene.send(.navigate(.section(.radio)))
             }
         case .library:
-            if scene.navigation.section != .library && scene.navigation.section != .albums && scene.navigation.section != .artists && scene.navigation.section != .playlists {
+            if scene.navigation.section != .library && scene.navigation.section != .albums && scene.navigation.section != .artists && scene.navigation.section != .playlists && scene.navigation.section != .sources {
                 scene.send(.navigate(.section(.library)))
             }
         case .tools:

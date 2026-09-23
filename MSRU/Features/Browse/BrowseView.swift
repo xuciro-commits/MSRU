@@ -75,6 +75,9 @@ struct BrowseView: View {
                     Label(error, systemImage: "exclamationmark.triangle")
                         .font(.callout)
                 }
+
+                genreShelves
+
                 content
             }
             .padding(28)
@@ -224,6 +227,40 @@ struct BrowseView: View {
         )
     }
 
+
+    // MARK: - Genre Shelves
+
+    private var genreShelves: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Explore by Genre")
+                .font(.title3.bold())
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(["Pop", "Rock", "Jazz", "Classical", "Electronic", "Ambient", "Folk"], id: \.self) { genre in
+                        Button {
+                            feature.send(.queryChanged(genre))
+                            feature.send(.searchRequested(genre))
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "music.note")
+                                    .foregroundStyle(Color.accentColor)
+                                Text(genre)
+                                    .font(.callout.weight(.medium))
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(.quaternary)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
 
     // MARK: - Content
 
@@ -515,16 +552,22 @@ struct BrowseView: View {
 
                 Spacer()
 
-
                 if isSaved {
-
-                    Image(
-                        systemName:
-                            "checkmark.circle.fill"
-                    )
-                    .foregroundStyle(
-                        Color.accentColor
-                    )
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color.accentColor)
+                        .help("In Library")
+                } else {
+                    Button {
+                        Task {
+                            try? await OnDemandCherryPicker.shared.ingest(audio: item)
+                            feature.send(.libraryToggleRequested(item))
+                        }
+                    } label: {
+                        Image(systemName: "plus.circle")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Add to Library")
                 }
 
 

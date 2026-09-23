@@ -27,6 +27,9 @@ struct SettingsView:
     @Bindable var watchedFolders:
         WatchedFolderStore
 
+    @Bindable var subsonicServers:
+        SubsonicServerStore
+
     @Environment(\.openURL)
     private var openURL
 
@@ -296,7 +299,11 @@ struct SettingsView:
 
 
         case .library:
-            watchedFoldersSection
+            VStack(alignment: .leading, spacing: 32) {
+                watchedFoldersSection
+                Divider()
+                RemoteServerListView(store: subsonicServers)
+            }
 
 
         case .playback:
@@ -1059,7 +1066,8 @@ enum SettingsFeature: ApplicationFeaturePresentation {
                     playback: scene.application.playback,
                     providerManager: scene.application.providerManager,
                     languageSettings: scene.application.languageSettings,
-                    watchedFolders: scene.application.watchedFolders
+                    watchedFolders: scene.application.watchedFolders,
+                    subsonicServers: scene.application.subsonicServers
                 )
             }
         ]
@@ -1074,7 +1082,8 @@ enum SettingsFeature: ApplicationFeaturePresentation {
         playback: app.playback,
         providerManager: app.providerManager,
         languageSettings: app.languageSettings,
-        watchedFolders: app.watchedFolders
+        watchedFolders: app.watchedFolders,
+        subsonicServers: app.subsonicServers
     )
     .frame(width: 1000, height: 700)
 }

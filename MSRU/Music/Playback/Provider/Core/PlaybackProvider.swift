@@ -12,6 +12,7 @@ enum PlaybackProviderID: String, CaseIterable, Hashable, Sendable {
     case local
     case openverse
     case radio
+    case subsonic
 }
 
 protocol PlaybackProvider: Sendable {
@@ -38,6 +39,7 @@ struct PlaybackRequest: Sendable {
         case local
         case openverse
         case radio
+        case subsonic
     }
 
     let itemID: String

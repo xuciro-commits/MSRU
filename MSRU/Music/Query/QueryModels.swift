@@ -22,19 +22,41 @@ nonisolated public struct QuerySpec: Sendable, Hashable {
     public var ascending: Bool
     public var offset: Int
     public var limit: Int?
+    public var sourceFilter: String?
 
     nonisolated public init(
         query: String = "",
         sortField: QuerySortField = .title,
         ascending: Bool = true,
         offset: Int = 0,
-        limit: Int? = nil
+        limit: Int? = nil,
+        sourceFilter: String? = nil
     ) {
         self.query = query
         self.sortField = sortField
         self.ascending = ascending
         self.offset = offset
         self.limit = limit
+        self.sourceFilter = sourceFilter
+    }
+}
+
+nonisolated public struct SourceFilterItem: Identifiable, Hashable, Sendable {
+    public var id: String { sourceID ?? "__all__" }
+    public let sourceID: String? // nil represents 'All Sources'
+    public let displayName: String
+    public let count: Int?
+
+    nonisolated public init(id: String?, displayName: String, count: Int?) {
+        self.sourceID = id
+        self.displayName = displayName
+        self.count = count
+    }
+
+    nonisolated public init(id: String?, displayName: String, count: Int) {
+        self.sourceID = id
+        self.displayName = displayName
+        self.count = count
     }
 }
 
@@ -49,6 +71,9 @@ nonisolated public struct TrackRowSummary: Identifiable, Sendable, Hashable {
     public let year: Int?
     public let artworkReference: String?
     public var isFavorite: Bool
+    public let sourceID: String?
+    public let sourceDisplayName: String?
+    public let format: String?
 
     nonisolated public init(
         id: String,
@@ -60,7 +85,10 @@ nonisolated public struct TrackRowSummary: Identifiable, Sendable, Hashable {
         trackNumber: Int? = nil,
         year: Int? = nil,
         artworkReference: String? = nil,
-        isFavorite: Bool = false
+        isFavorite: Bool = false,
+        sourceID: String? = nil,
+        sourceDisplayName: String? = nil,
+        format: String? = nil
     ) {
         self.id = id
         self.recordingID = recordingID
@@ -72,6 +100,9 @@ nonisolated public struct TrackRowSummary: Identifiable, Sendable, Hashable {
         self.year = year
         self.artworkReference = artworkReference
         self.isFavorite = isFavorite
+        self.sourceID = sourceID
+        self.sourceDisplayName = sourceDisplayName
+        self.format = format
     }
 }
 
@@ -82,6 +113,8 @@ nonisolated public struct AlbumCardSummary: Identifiable, Sendable, Hashable {
     public let year: Int?
     public let trackCount: Int
     public let artworkReference: String?
+    public let sourceBadge: String?
+    public let versionCount: Int
 
     nonisolated public init(
         id: String,
@@ -89,7 +122,9 @@ nonisolated public struct AlbumCardSummary: Identifiable, Sendable, Hashable {
         artist: String,
         year: Int? = nil,
         trackCount: Int = 0,
-        artworkReference: String? = nil
+        artworkReference: String? = nil,
+        sourceBadge: String? = nil,
+        versionCount: Int = 1
     ) {
         self.id = id
         self.title = title
@@ -97,6 +132,8 @@ nonisolated public struct AlbumCardSummary: Identifiable, Sendable, Hashable {
         self.year = year
         self.trackCount = trackCount
         self.artworkReference = artworkReference
+        self.sourceBadge = sourceBadge
+        self.versionCount = versionCount
     }
 }
 

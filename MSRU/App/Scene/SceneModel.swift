@@ -76,6 +76,13 @@ final class SceneModel: Identifiable, ApplicationSceneRuntime {
     var selectedLocalTrack: LocalTrack?
     var selectedLibraryTrack: LibraryTrack?
     var selectedRadioStation: RadioStation?
+    var selectedSourceFilter: String?
+
+    func navigateToSource(sourceID: String?, target: SceneSection) {
+        guard !isClosed else { return }
+        self.selectedSourceFilter = sourceID
+        send(.navigate(.section(target)))
+    }
 
     enum ContextPane: String, CaseIterable, Identifiable, Codable, Sendable {
         case inspector

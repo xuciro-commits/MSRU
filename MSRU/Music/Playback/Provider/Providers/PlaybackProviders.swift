@@ -4,6 +4,8 @@
 //
 
 import Foundation
+import MediaLibrary
+import SubsonicKit
 
 // MARK: - Local Playback Provider
 
@@ -196,3 +198,47 @@ private enum RadioPlaybackProviderError: LocalizedError {
         }
     }
 }
+
+// MARK: - Remote Subsonic Playback Provider
+
+struct RemoteSubsonicPlaybackProvider: PlaybackProvider {
+
+    let id: PlaybackProviderID = .subsonic
+    let priority = 950
+
+    func canResolve(_ request: PlaybackRequest) -> Bool {
+        request.source == .subsonic && (request.remoteURL != nil || !request.itemID.isEmpty)
+    }
+
+    func resolve(_ request: PlaybackRequest) async throws -> PlaybackResource {
+        try Task.checkCancellation()
+
+        if let url = request.remoteURL {
+            return PlaybackResource(
+                providerID: .subsonic,
+                transport: .avPlayerURL(url)
+            )
+        }
+
+        // Dynamically resolve authenticated short-lived stream URL from Subsonic client
+        let providers = LibraryProviderRegistry.shared.allProviders().compactMap { $0 as? SubsonicLibraryProvider }
+        if let provider = providers.first {
+            let streamURL = try await provider.client.streamURL(id: request.itemID)
+            return PlaybackResource(
+                providerID: .subsonic,
+                transport: .avPlayerURL(streamURL)
+            )
+        }
+
+        throw SubsonicPlaybackError.missingRemoteURL
+    }
+}
+
+private enum SubsonicPlaybackError: LocalizedError {
+    case missingRemoteURL
+
+    var errorDescription: String? {
+        "Subsonic stream URL is missing."
+    }
+}
+

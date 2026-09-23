@@ -6,12 +6,15 @@
 import SwiftUI
 import AppFoundation
 import AppFoundationUI
+import MediaLibrary
+import SubsonicKit
 
 @MainActor
 struct PlaylistDetailView: View {
     @Bindable var playlistStore: PlaylistStore
     let playlist: Playlist
     let tracks: [LocalTrack]
+    var subsonicServers: SubsonicServerStore? = nil
     let playback: PlaybackController
     var onBack: () -> Void
     var onSelectTrack: ((LocalTrack) -> Void)?
@@ -19,10 +22,15 @@ struct PlaylistDetailView: View {
     @State private var isEditSheetPresented = false
     @State private var isDeleteConfirmationPresented = false
     @State private var selectedTrackIDs: Set<String> = []
+    @State private var remoteTracks: [LocalTrack] = []
+    @State private var isLoadingRemoteTracks: Bool = false
 
     private var resolvedTracks: [LocalTrack] {
-        playlist.trackIDs.compactMap { id in
-            tracks.first { $0.id == id }
+        if !remoteTracks.isEmpty {
+            return remoteTracks
+        }
+        return playlist.trackIDs.compactMap { id in
+            tracks.first { $0.id == id || $0.fileURL.lastPathComponent == id || $0.fileURL.absoluteString.contains(id) }
         }
     }
 
@@ -75,10 +83,14 @@ struct PlaylistDetailView: View {
                         }
 
                         HStack(spacing: 6) {
-                            Text("\(resolvedTracks.count) songs")
-                            if !resolvedTracks.isEmpty {
-                                Text("•")
-                                Text(totalDurationString)
+                            if isLoadingRemoteTracks && resolvedTracks.isEmpty {
+                                Text("正在从远程媒体服务加载…")
+                            } else {
+                                Text("\(resolvedTracks.count) songs")
+                                if !resolvedTracks.isEmpty {
+                                    Text("•")
+                                    Text(totalDurationString)
+                                }
                             }
                         }
                         .font(.callout)
@@ -128,8 +140,20 @@ struct PlaylistDetailView: View {
                     .padding(.horizontal, 24)
                     .padding(.vertical, 4)
 
+                if isLoadingRemoteTracks {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("正在从远程服务加载歌单曲目...")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 8)
+                }
+
                 // Track List
-                if resolvedTracks.isEmpty {
+                if resolvedTracks.isEmpty && !isLoadingRemoteTracks {
                     VStack(spacing: 12) {
                         Image(systemName: "music.note.list")
                             .font(.system(size: 40))
@@ -142,7 +166,7 @@ struct PlaylistDetailView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 48)
-                } else {
+                } else if !resolvedTracks.isEmpty {
                     LazyVStack(spacing: 2) {
                         ForEach(Array(resolvedTracks.enumerated()), id: \.element.id) { index, track in
                             trackRow(index: index + 1, track: track)
@@ -154,6 +178,9 @@ struct PlaylistDetailView: View {
             .padding(.bottom, 48)
         }
         .hideScrollIndicatorsCompletely()
+        .task {
+            await loadRemoteTracksIfNeeded()
+        }
         .overlay(alignment: .bottom) {
             if selectedTrackIDs.count > 1 {
                 floatingBatchBar
@@ -349,6 +376,50 @@ struct PlaylistDetailView: View {
         let m = total / 60
         let s = total % 60
         return String(format: "%d:%02d", m, s)
+    }
+
+    // MARK: - Remote Loading
+
+    private func loadRemoteTracksIfNeeded() async {
+        guard let desc = playlist.description,
+              let idRangeStart = desc.range(of: "[id:"),
+              let idRangeEnd = desc.range(of: "]", range: idRangeStart.upperBound..<desc.endIndex),
+              let subsonicServers else {
+            return
+        }
+        let remotePlaylistID = String(desc[idRangeStart.upperBound..<idRangeEnd.lowerBound])
+
+        guard let server = subsonicServers.servers.first(where: { desc.contains($0.name) }) ?? subsonicServers.servers.first,
+              let client = subsonicServers.client(for: server.id) else {
+            return
+        }
+
+        isLoadingRemoteTracks = true
+        defer { isLoadingRemoteTracks = false }
+
+        do {
+            let detail = try await client.playlist(id: remotePlaylistID)
+            let songs = detail.entry ?? []
+            let mapped: [LocalTrack] = songs.compactMap { song in
+                guard let streamURL = try? client.streamURL(id: song.id) else { return nil }
+                let coverURL = try? client.coverArtURL(id: song.coverArt ?? song.id)
+                return LocalTrack(
+                    fileURL: streamURL,
+                    title: song.title,
+                    artist: song.artist ?? "Unknown Artist",
+                    album: song.album ?? "Unknown Album",
+                    duration: TimeInterval(song.duration ?? 0),
+                    artworkReference: coverURL?.absoluteString,
+                    trackNumber: song.track,
+                    year: song.year
+                )
+            }
+            self.remoteTracks = mapped
+        } catch is CancellationError {
+            // Cancelled
+        } catch {
+            print("[PlaylistDetailView] Failed to load remote playlist tracks: \(error)")
+        }
     }
 
     private var floatingBatchBar: some View {

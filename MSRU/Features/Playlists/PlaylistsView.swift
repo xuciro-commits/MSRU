@@ -6,6 +6,9 @@
 import SwiftUI
 import AppFoundation
 import AppFoundationUI
+import CryptoKit
+import MediaLibrary
+import SubsonicKit
 
 enum PlaylistSortField: String, CaseIterable, Identifiable {
     case title = "Title"
@@ -19,9 +22,12 @@ enum PlaylistSortField: String, CaseIterable, Identifiable {
 struct PlaylistsView: View {
     @Bindable var playlistStore: PlaylistStore
     let localStore: LocalLibraryStore
+    var subsonicServers: SubsonicServerStore? = nil
     let playback: PlaybackController
+    @Binding var selectedSourceID: String?
     var onSelectTrack: ((LocalTrack) -> Void)?
 
+    @State private var availableSources: [SourceFilterItem] = []
     @State private var searchQuery: String = ""
     @State private var sortField: PlaylistSortField = .title
     @State private var selectedPlaylist: Playlist?
@@ -30,14 +36,54 @@ struct PlaylistsView: View {
     @State private var isDeleteConfirmationPresented: Bool = false
     @State private var selectedPlaylistIDs: Set<UUID> = []
     @State private var isBatchDeleteConfirmationPresented: Bool = false
+    @State private var remotePlaylists: [Playlist] = []
+    @State private var isLoadingRemotePlaylists: Bool = false
+
+    init(
+        playlistStore: PlaylistStore,
+        localStore: LocalLibraryStore,
+        playback: PlaybackController,
+        subsonicServers: SubsonicServerStore? = nil,
+        selectedSourceID: Binding<String?> = .constant(nil),
+        onSelectTrack: ((LocalTrack) -> Void)? = nil
+    ) {
+        self.playlistStore = playlistStore
+        self.localStore = localStore
+        self.playback = playback
+        self.subsonicServers = subsonicServers
+        self._selectedSourceID = selectedSourceID
+        self.onSelectTrack = onSelectTrack
+    }
+
+    private var isRemoteSourceActive: Bool {
+        guard let selectedSourceID else { return false }
+        return !SourceID.isLocalSourceID(selectedSourceID)
+    }
+
+    private var allPlaylists: [Playlist] {
+        if isRemoteSourceActive {
+            return remotePlaylists
+        }
+        return playlistStore.playlists
+    }
 
     private var filteredPlaylists: [Playlist] {
         let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let matching = playlistStore.playlists.filter { playlist in
+        var matching = allPlaylists.filter { playlist in
             guard !query.isEmpty else { return true }
             let titleMatch = playlist.title.lowercased().contains(query)
             let descMatch = playlist.description?.lowercased().contains(query) ?? false
             return titleMatch || descMatch
+        }
+
+        if let selectedSourceID, !isRemoteSourceActive {
+            matching = matching.filter { playlist in
+                if SourceID.isLocalSourceID(selectedSourceID) {
+                    return playlist.description?.contains("Subsonic") != true && playlist.description?.contains("极空间") != true
+                } else {
+                    return playlist.description?.contains("Subsonic") == true || playlist.description?.contains("极空间") == true
+                }
+            }
         }
 
         return matching.sorted { a, b in
@@ -52,6 +98,52 @@ struct PlaylistsView: View {
         }
     }
 
+    private func loadRemotePlaylists(sourceID: String) async {
+        guard !SourceID.isLocalSourceID(sourceID), let serversStore = subsonicServers else {
+            remotePlaylists = []
+            return
+        }
+        let cleanID = LibrarySourceID(sourceID.replacingOccurrences(of: "src_", with: ""))
+        guard let client = serversStore.client(for: cleanID),
+              let server = serversStore.server(for: cleanID) else {
+            return
+        }
+
+        isLoadingRemotePlaylists = true
+        defer { isLoadingRemotePlaylists = false }
+
+        do {
+            let dtos = try await client.playlists()
+            let mapped = dtos.map { pl -> Playlist in
+                let key = "\(cleanID.rawValue):playlist:\(pl.id)"
+                let digest = CryptoKit.SHA256.hash(data: Data(key.utf8))
+                var bytes = Array(digest.prefix(16))
+                bytes[6] = (bytes[6] & 0x0F) | 0x40
+                bytes[8] = (bytes[8] & 0x3F) | 0x80
+                let uuid = UUID(uuid: (
+                    bytes[0], bytes[1], bytes[2], bytes[3],
+                    bytes[4], bytes[5], bytes[6], bytes[7],
+                    bytes[8], bytes[9], bytes[10], bytes[11],
+                    bytes[12], bytes[13], bytes[14], bytes[15]
+                ))
+                let coverArtURL = (try? client.coverArtURL(id: pl.id))?.absoluteString
+                return Playlist(
+                    id: uuid,
+                    title: pl.name,
+                    description: "Subsonic · \(server.name) · [id:\(pl.id)]",
+                    trackIDs: [],
+                    artworkReference: coverArtURL,
+                    isPinned: false
+                )
+            }
+            self.remotePlaylists = mapped
+        } catch is CancellationError {
+            // Cancelled
+        } catch {
+            print("[PlaylistsView] Failed to load remote playlists: \(error)")
+        }
+    }
+
     var body: some View {
         Group {
             if let playlist = selectedPlaylist {
@@ -59,12 +151,18 @@ struct PlaylistsView: View {
                     playlistStore: playlistStore,
                     playlist: playlist,
                     tracks: localStore.tracks,
+                    subsonicServers: subsonicServers,
                     playback: playback,
                     onBack: { selectedPlaylist = nil },
                     onSelectTrack: onSelectTrack
                 )
             } else {
                 overviewContent
+            }
+        }
+        .task(id: selectedSourceID) {
+            if isRemoteSourceActive, let sourceID = selectedSourceID {
+                await loadRemotePlaylists(sourceID: sourceID)
             }
         }
     }
@@ -121,19 +219,30 @@ struct PlaylistsView: View {
 
     @ViewBuilder
     private var overviewContent: some View {
-        Group {
-            if filteredPlaylists.isEmpty {
-                VStack(spacing: 0) {
-                    headerBar
-                    Divider()
-                    emptyView
+        VStack(spacing: 0) {
+            headerBar
+            Divider()
+
+            if !availableSources.isEmpty {
+                SourceFilterBarView(sources: availableSources, selectedSourceID: $selectedSourceID)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 8)
+                Divider()
+            }
+
+            if isLoadingRemotePlaylists && remotePlaylists.isEmpty {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text("正在从远程媒体服务加载歌单...")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if filteredPlaylists.isEmpty {
+                emptyView
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 20) {
-                        headerBar
-                        Divider()
-
                         MarqueeSelectionContainer(selectedIDs: $selectedPlaylistIDs) {
                             LazyVGrid(
                                 columns: [
@@ -158,6 +267,35 @@ struct PlaylistsView: View {
                 }
                 .animation(.easeInOut(duration: 0.2), value: selectedPlaylistIDs.count)
             }
+        }
+        .task {
+            let localCount = playlistStore.playlists.filter { $0.description?.contains("Subsonic") != true && $0.description?.contains("极空间") != true }.count
+            let remoteServers = subsonicServers?.servers ?? []
+
+            var items = [
+                SourceFilterItem(
+                    id: nil,
+                    displayName: "全部",
+                    count: remoteServers.isEmpty ? localCount : nil
+                )
+            ]
+            items.append(
+                SourceFilterItem(
+                    id: SourceID.defaultLocal.rawValue,
+                    displayName: "本地歌单",
+                    count: localCount
+                )
+            )
+            for server in remoteServers {
+                items.append(
+                    SourceFilterItem(
+                        id: "src_\(server.id.rawValue)",
+                        displayName: server.name,
+                        count: nil
+                    )
+                )
+            }
+            availableSources = items
         }
         .sheet(isPresented: $isNewPlaylistSheetPresented) {
             NewPlaylistSheetView { title, desc in
@@ -226,10 +364,13 @@ struct PlaylistsView: View {
             if playlist.isPinned {
                 FoundationCardBadge("Pinned", systemImage: "pin.fill", foregroundStyle: Color.accentColor)
             }
+            if playlist.description?.contains("极空间") == true || playlist.description?.contains("Subsonic") == true {
+                FoundationCardBadge("NAS", systemImage: "server.rack", foregroundStyle: Color.blue)
+            }
         } actionOverlay: {
             FoundationCardActionButton(systemImage: "play.fill") {
                 let resolved = playlist.trackIDs.compactMap { id in
-                    localStore.tracks.first { $0.id == id }
+                    localStore.tracks.first { $0.id == id || $0.fileURL.lastPathComponent == id || $0.fileURL.absoluteString.contains(id) }
                 }
                 if let first = resolved.first {
                     playback.play(first, queue: resolved)
@@ -240,9 +381,17 @@ struct PlaylistsView: View {
                 .font(.headline)
                 .lineLimit(1)
         } subtitle: {
-            Text("\(playlist.trackCount) songs")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(playlist.trackCount) songs")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if let desc = playlist.description, desc.contains("来自") {
+                    Text(desc)
+                        .font(.caption2)
+                        .foregroundStyle(.blue)
+                        .lineLimit(1)
+                }
+            }
         }
         .marqueeItem(id: playlist.id)
         .simultaneousGesture(
@@ -257,7 +406,7 @@ struct PlaylistsView: View {
 
             Button {
                 let resolved = playlist.trackIDs.compactMap { id in
-                    localStore.tracks.first { $0.id == id }
+                    localStore.tracks.first { $0.id == id || $0.fileURL.lastPathComponent == id || $0.fileURL.absoluteString.contains(id) }
                 }
                 if let first = resolved.first {
                     playback.play(first, queue: resolved)
@@ -497,6 +646,11 @@ enum PlaylistsFeature: ApplicationFeaturePresentation {
                         playlistStore: scene.application.playlistStore,
                         localStore: scene.application.localLibrary,
                         playback: scene.application.playback,
+                        subsonicServers: scene.application.subsonicServers,
+                        selectedSourceID: Binding(
+                            get: { scene.selectedSourceFilter },
+                            set: { scene.selectedSourceFilter = $0 }
+                        ),
                         onSelectTrack: { track in
                             scene.select(localTrack: track)
                         }

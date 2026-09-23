@@ -174,4 +174,57 @@ nonisolated public final class AssetRepository: Sendable {
             try db.execute(sql: "DELETE FROM assets WHERE id IN (\(placeholders))", arguments: statementArgs)
         }
     }
+
+    // MARK: - Stream Assets
+
+    public struct PersistedStreamAssetRecord: Sendable {
+        public let assetID: AssetID
+        public let providerID: String
+        public let remoteItemID: String
+        public let streamURL: String?
+        public let isHLS: Bool
+        public let expiresAt: Date?
+
+        public init(
+            assetID: AssetID,
+            providerID: String,
+            remoteItemID: String,
+            streamURL: String? = nil,
+            isHLS: Bool = false,
+            expiresAt: Date? = nil
+        ) {
+            self.assetID = assetID
+            self.providerID = providerID
+            self.remoteItemID = remoteItemID
+            self.streamURL = streamURL
+            self.isHLS = isHLS
+            self.expiresAt = expiresAt
+        }
+    }
+
+    public func batchUpsertStreamAssets(_ streamAssets: [PersistedStreamAssetRecord]) async throws {
+        guard !streamAssets.isEmpty else { return }
+        try await db.dbWriter.write { db in
+            let stmt = try db.makeStatement(sql: """
+                INSERT INTO stream_assets (asset_id, provider_id, remote_item_id, stream_url, is_hls, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(asset_id) DO UPDATE SET
+                    provider_id = excluded.provider_id,
+                    remote_item_id = excluded.remote_item_id,
+                    stream_url = excluded.stream_url,
+                    is_hls = excluded.is_hls,
+                    expires_at = excluded.expires_at
+            """)
+            for sa in streamAssets {
+                try stmt.execute(arguments: [
+                    sa.assetID.rawValue,
+                    sa.providerID,
+                    sa.remoteItemID,
+                    sa.streamURL,
+                    sa.isHLS,
+                    sa.expiresAt
+                ])
+            }
+        }
+    }
 }

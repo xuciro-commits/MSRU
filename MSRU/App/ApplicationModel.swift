@@ -88,6 +88,15 @@ final class ApplicationModel {
         WatchedFolderStore
 
 
+    // MARK: - Subsonic Servers & Coordinator
+
+    let subsonicServers:
+        SubsonicServerStore
+
+    let libraryCoordinator:
+        LibraryCoordinator
+
+
     // MARK: - Language
 
     let languageSettings:
@@ -197,7 +206,11 @@ final class ApplicationModel {
         languageSettings:
             LanguageSettings? = nil,
         watchedFolders:
-            WatchedFolderStore? = nil
+            WatchedFolderStore? = nil,
+        subsonicServers:
+            SubsonicServerStore? = nil,
+        libraryCoordinator:
+            LibraryCoordinator? = nil
     ) {
 
         self.musicCatalog =
@@ -243,6 +256,14 @@ final class ApplicationModel {
 
         self.watchedFolders =
             watchedFolders ?? WatchedFolderStore(localStore: localLibrary)
+
+        let resolvedSubsonicServers =
+            subsonicServers ?? SubsonicServerStore()
+        self.subsonicServers =
+            resolvedSubsonicServers
+
+        self.libraryCoordinator =
+            libraryCoordinator ?? LibraryCoordinator()
 
         self.localLibrary.attachCascadeCollaborators(
             libraryStore: library,

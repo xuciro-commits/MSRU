@@ -133,6 +133,9 @@ final class PlaybackProviderKernel: Sendable {
         // Radio live streaming
         registry.register(RadioPlaybackProvider())
 
+        // Subsonic / OpenSubsonic remote streaming
+        registry.register(RemoteSubsonicPlaybackProvider())
+
         return PlaybackProviderKernel(registry: registry)
     }
 }

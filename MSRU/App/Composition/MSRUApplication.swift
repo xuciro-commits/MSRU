@@ -21,6 +21,7 @@ enum MSRUApplication {
         builder.add(AlbumsFeature.self)
         builder.add(ArtistsFeature.self)
         builder.add(PlaylistsFeature.self)
+        builder.add(SourcesFeature.self)
         builder.add(RadioFeature.self)
         builder.add(AddMusicFeature.self)
         builder.add(SettingsFeature.self)

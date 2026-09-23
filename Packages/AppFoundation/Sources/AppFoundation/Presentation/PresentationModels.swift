@@ -74,6 +74,8 @@ public struct AlbumPresentationModel: Identifiable, Hashable, Sendable {
     public let trackCount: Int
     public let duration: TimeInterval
     public let audioQualityBadge: String?
+    public let sourceBadge: String?
+    public let versionCount: Int
     public let discs: [DiscTrackGroup]
 
     public init(
@@ -87,6 +89,8 @@ public struct AlbumPresentationModel: Identifiable, Hashable, Sendable {
         trackCount: Int,
         duration: TimeInterval,
         audioQualityBadge: String? = nil,
+        sourceBadge: String? = nil,
+        versionCount: Int = 1,
         discs: [DiscTrackGroup] = []
     ) {
         self.id = id
@@ -99,6 +103,8 @@ public struct AlbumPresentationModel: Identifiable, Hashable, Sendable {
         self.trackCount = trackCount
         self.duration = duration
         self.audioQualityBadge = audioQualityBadge
+        self.sourceBadge = sourceBadge
+        self.versionCount = versionCount
         self.discs = discs
     }
 

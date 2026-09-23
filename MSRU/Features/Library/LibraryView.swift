@@ -7,6 +7,8 @@ import SwiftUI
 import Observation
 import AppFoundation
 import AppFoundationUI
+import MediaLibrary
+import SubsonicKit
 
 
 struct LibraryView:
@@ -43,7 +45,7 @@ struct LibraryView:
             case .local:
 
                 return
-                    "Local Files"
+                    "Files"
             }
         }
     }
@@ -61,6 +63,8 @@ struct LibraryView:
     var localStore:
         LocalLibraryStore
 
+    var subsonicServers:
+        SubsonicServerStore? = nil
 
     @Bindable
     var playback:
@@ -117,6 +121,15 @@ struct LibraryView:
     @State
     private var isDeleteConfirmationPresented: Bool = false
 
+    @Binding var selectedSourceID: String?
+    @State private var availableSources: [SourceFilterItem] = []
+    @State private var remoteTracks: [LocalTrack] = []
+    @State private var isLoadingRemoteTracks: Bool = false
+    @State private var remoteAlbumOffset: Int = 0
+    @State private var hasMoreRemoteTracks: Bool = true
+    @State private var isLoadingMoreRemoteTracks: Bool = false
+    @State private var isSearchingRemoteTracks: Bool = false
+    private let albumBatchSize: Int = 10
 
     // MARK: - Init
 
@@ -125,77 +138,39 @@ struct LibraryView:
             FeatureHost<LibraryFeature>,
         localStore:
             LocalLibraryStore,
+        subsonicServers:
+            SubsonicServerStore? = nil,
         playback:
             PlaybackController,
         selectedLocalTrack:
             Binding<LocalTrack?>,
         selectedLibraryTrack:
             Binding<LibraryTrack?> = .constant(nil),
+        selectedSourceID:
+            Binding<String?> = .constant(nil),
         onAddMusic:
             @escaping () -> Void
     ) {
         self.feature = feature
         self.localStore = localStore
+        self.subsonicServers = subsonicServers
         self.playback = playback
         self._selectedLocalTrack = selectedLocalTrack
         self._selectedLibraryTrack = selectedLibraryTrack
+        self._selectedSourceID = selectedSourceID
         self.onAddMusic = onAddMusic
     }
 
 
     // MARK: - Body
 
-    var body:
-        some View {
-
+    var body: some View {
         Group {
             switch viewMode {
             case .grid:
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        header
-                        Divider()
-                        filterBar
-                        Divider()
-                        errorBanners
-
-                        switch scope {
-                        case .saved:
-                            savedGridContent
-                        case .local:
-                            localGridContent
-                        }
-                    }
-                    .padding(24)
-                }
-                .hideScrollIndicatorsCompletely()
-                .overlay(alignment: .bottom) {
-                    if scope == .saved && selectedSavedTrackIDs.count > 1 {
-                        savedGridBatchBar
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                    } else if scope == .local && selectedLocalTrackIDs.count > 1 {
-                        localGridBatchBar
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
-                }
-                .animation(.easeInOut(duration: 0.2), value: selectedSavedTrackIDs.count)
-                .animation(.easeInOut(duration: 0.2), value: selectedLocalTrackIDs.count)
-
+                gridModeView
             case .table:
-                VStack(spacing: 0) {
-                    header
-                    Divider()
-                    filterBar
-                    Divider()
-                    errorBanners
-
-                    switch scope {
-                    case .saved:
-                        savedTableContent
-                    case .local:
-                        localTableContent
-                    }
-                }
+                tableModeView
             }
         }
         .frame(
@@ -241,8 +216,130 @@ struct LibraryView:
                 selectedLocalTrack = nil
             }
         }
+        .task {
+            availableSources = (try? await LibraryQueryEngine.shared.fetchAvailableSources(for: "recording")) ?? []
+            if let servers = subsonicServers?.servers {
+                for server in servers {
+                    let sourceID = "src_\(server.id.rawValue)"
+                    if !availableSources.contains(where: { $0.sourceID == sourceID || $0.sourceID == server.id.rawValue }) {
+                        availableSources.append(
+                            SourceFilterItem(
+                                id: sourceID,
+                                displayName: server.name,
+                                count: nil
+                            )
+                        )
+                    }
+                }
+            }
+        }
+        .task(id: selectedSourceID) {
+            if isRemoteSourceActive, let sourceID = selectedSourceID {
+                await loadRemoteTracks(sourceID: sourceID, query: searchQuery, reset: true)
+            }
+        }
+        .task(id: "\(selectedSourceID ?? "")-\(searchQuery)") {
+            if isRemoteSourceActive, let sourceID = selectedSourceID {
+                let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                guard !Task.isCancelled else { return }
+                await loadRemoteTracks(sourceID: sourceID, query: trimmed, reset: true)
+            }
+        }
     }
 
+    // MARK: - View Mode Layouts
+
+    @ViewBuilder
+    private var gridOverlayBar: some View {
+        if scope == .saved && selectedSavedTrackIDs.count > 1 {
+            savedGridBatchBar
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if scope == .local && selectedLocalTrackIDs.count > 1 {
+            localGridBatchBar
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+
+    @ViewBuilder
+    private var gridModeView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                header
+                Divider()
+                filterBar
+                Divider()
+                errorBanners
+
+                if isRemoteSourceActive {
+                    localGridContent
+
+                    if isLoadingMoreRemoteTracks {
+                        HStack(spacing: 8) {
+                            Spacer()
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("正在加载更多曲目...")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                        }
+                        .padding(.vertical, 12)
+                    }
+                } else {
+                    switch scope {
+                    case .saved:
+                        savedGridContent
+                    case .local:
+                        localGridContent
+                    }
+                }
+            }
+            .padding(24)
+        }
+        .hideScrollIndicatorsCompletely()
+        .overlay(alignment: .bottom) {
+            gridOverlayBar
+        }
+        .animation(.easeInOut(duration: 0.2), value: selectedSavedTrackIDs.count)
+        .animation(.easeInOut(duration: 0.2), value: selectedLocalTrackIDs.count)
+    }
+
+    @ViewBuilder
+    private var tableModeView: some View {
+        VStack(spacing: 0) {
+            header
+            Divider()
+            filterBar
+            Divider()
+            errorBanners
+
+            if isRemoteSourceActive {
+                localTableContent
+
+                if isLoadingMoreRemoteTracks {
+                    HStack(spacing: 8) {
+                        Spacer()
+                        ProgressView()
+                            .scaleEffect(0.7)
+                        Text("正在加载更多曲目...")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                    .padding(.vertical, 8)
+                    .background(.ultraThinMaterial)
+                }
+            } else {
+                switch scope {
+                case .saved:
+                    savedTableContent
+                case .local:
+                    localTableContent
+                }
+            }
+        }
+    }
 
     // MARK: - Header
 
@@ -251,7 +348,9 @@ struct LibraryView:
             HStack(spacing: 20) {
                 libraryTitle
                 Spacer()
-                scopePicker.frame(width: 220)
+                if !isRemoteSourceActive {
+                    scopePicker.frame(width: 220)
+                }
                 importButton
             }
             .fixedSize(horizontal: true, vertical: false)
@@ -261,7 +360,9 @@ struct LibraryView:
                     Spacer()
                     importButton
                 }
-                scopePicker
+                if !isRemoteSourceActive {
+                    scopePicker
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -288,34 +389,47 @@ struct LibraryView:
         Button(action: onAddMusic) { Label("Add Music", systemImage: "plus") }
     }
 
-    private var librarySubtitle:
-        String {
-
+    private var librarySubtitle: String {
+        if isRemoteSourceActive {
+            if isLoadingRemoteTracks && remoteTracks.isEmpty {
+                return String(localized: "正在从远程媒体服务加载…")
+            }
+            if isSearchingRemoteTracks {
+                return String(localized: "正在检索远程歌曲…")
+            }
+            let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !query.isEmpty {
+                return "搜索结果：\(filteredLocalTracks.count) 首歌曲"
+            }
+            let serverName = availableSources.first(where: { $0.sourceID == selectedSourceID })?.displayName ?? "远程媒体服务"
+            return "\(serverName) • 按需在线浏览"
+        }
         switch scope {
-
         case .saved:
-
-            return
-                "\(feature.tracks.count) saved songs"
-
-
+            return "\(feature.tracks.count) 首收藏歌曲"
         case .local:
-
-            return
-                "\(localStore.tracks.count) local songs"
+            return "\(localStore.tracks.count) 首本地歌曲"
         }
     }
-
 
     // MARK: - Filter Bar
 
     private var filterBar: some View {
-        LibraryFilterBar(
-            viewMode: $viewMode,
-            sortField: $sortField,
-            sortAscending: $sortAscending,
-            searchQuery: $searchQuery
-        )
+        VStack(alignment: .leading, spacing: 10) {
+            LibraryFilterBar(
+                viewMode: $viewMode,
+                sortField: $sortField,
+                sortAscending: $sortAscending,
+                searchQuery: $searchQuery,
+                isSearching: isSearchingRemoteTracks,
+                prompt: isRemoteSourceActive ? "搜索远程歌曲…" : "Filter songs…"
+            )
+
+            if !availableSources.isEmpty {
+                SourceFilterBarView(sources: availableSources, selectedSourceID: $selectedSourceID)
+                    .padding(.horizontal, 20)
+            }
+        }
     }
 
     // MARK: - Error Banners
@@ -340,17 +454,120 @@ struct LibraryView:
     // MARK: - Filtered Queries
 
     private var filteredSavedTracks: [LibraryTrack] {
-        LibraryCollectionSortFilter.filterAndSort(
-            tracks: feature.tracks,
+        var baseTracks = feature.tracks
+        if let selectedSourceID {
+            baseTracks = baseTracks.filter { track in
+                if SourceID.isLocalSourceID(selectedSourceID) {
+                    return track.sources.contains(where: { $0.kind == .local })
+                } else {
+                    return track.sources.contains(where: { $0.kind == .openSubsonic })
+                }
+            }
+        }
+        return LibraryCollectionSortFilter.filterAndSort(
+            tracks: baseTracks,
             query: searchQuery,
             field: sortField,
             ascending: sortAscending
         )
     }
 
+    private var isRemoteSourceActive: Bool {
+        guard let id = selectedSourceID else { return false }
+        return !SourceID.isLocalSourceID(id)
+    }
+
+    private func loadRemoteTracks(sourceID: String, query: String = "", reset: Bool = true) async {
+        guard !SourceID.isLocalSourceID(sourceID), let subsonicServers else { return }
+        let cleanID = sourceID.replacingOccurrences(of: "src_", with: "")
+        guard let server = subsonicServers.servers.first(where: {
+            $0.id.rawValue == sourceID || $0.id.rawValue == cleanID
+        }),
+        let client = subsonicServers.client(for: server.id) else {
+            return
+        }
+
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if reset {
+            if !trimmed.isEmpty {
+                isSearchingRemoteTracks = true
+            } else {
+                isLoadingRemoteTracks = true
+            }
+            remoteAlbumOffset = 0
+            hasMoreRemoteTracks = true
+            remoteTracks = []
+        } else {
+            guard hasMoreRemoteTracks, !isLoadingMoreRemoteTracks, !isLoadingRemoteTracks, !isSearchingRemoteTracks else { return }
+            isLoadingMoreRemoteTracks = true
+        }
+
+        defer {
+            isLoadingRemoteTracks = false
+            isLoadingMoreRemoteTracks = false
+            isSearchingRemoteTracks = false
+        }
+
+        do {
+            var songs: [SubsonicSongDTO] = []
+            if !trimmed.isEmpty {
+                let searchResult = try await client.search3(query: trimmed, artistCount: 0, albumCount: 0, songCount: 100)
+                songs = searchResult.song ?? []
+                self.hasMoreRemoteTracks = false
+            } else {
+                let albumList = try await client.albumList2(type: "alphabeticalByName", size: albumBatchSize, offset: remoteAlbumOffset)
+                for album in albumList {
+                    if let albumDetail = try? await client.album(id: album.id),
+                       let albumSongs = albumDetail.song {
+                        songs.append(contentsOf: albumSongs)
+                    }
+                }
+                self.remoteAlbumOffset += albumList.count
+                if albumList.count < albumBatchSize {
+                    self.hasMoreRemoteTracks = false
+                }
+            }
+
+            let mapped: [LocalTrack] = songs.compactMap { song in
+                guard let streamURL = try? client.streamURL(id: song.id) else { return nil }
+                let coverURL = try? client.coverArtURL(id: song.coverArt ?? song.id)
+                return LocalTrack(
+                    fileURL: streamURL,
+                    title: song.title,
+                    artist: song.artist ?? "Unknown Artist",
+                    album: song.album ?? "Unknown Album",
+                    duration: TimeInterval(song.duration ?? 0),
+                    artworkReference: coverURL?.absoluteString,
+                    trackNumber: song.track,
+                    year: song.year
+                )
+            }
+
+            if reset {
+                self.remoteTracks = mapped
+            } else {
+                self.remoteTracks.append(contentsOf: mapped)
+            }
+        } catch is CancellationError {
+            // Cancelled
+        } catch {
+            print("[LibraryView] Failed to load remote tracks: \(error)")
+        }
+    }
+
     private var filteredLocalTracks: [LocalTrack] {
-        LibraryCollectionSortFilter.filterAndSort(
-            tracks: localStore.tracks,
+        if isRemoteSourceActive {
+            return remoteTracks
+        }
+        var baseTracks = localStore.tracks
+        if selectedSourceID == "local" {
+            baseTracks = baseTracks.filter { track in
+                track.artworkReference?.contains("subsonic") != true && track.fileURL.isFileURL
+            }
+        }
+        return LibraryCollectionSortFilter.filterAndSort(
+            tracks: baseTracks,
             query: searchQuery,
             field: sortField,
             ascending: sortAscending
@@ -406,9 +623,13 @@ struct LibraryView:
 
     @ViewBuilder
     private var localGridContent: some View {
-        if localStore.isLoading {
+        if (isRemoteSourceActive && isLoadingRemoteTracks && remoteTracks.isEmpty) || isSearchingRemoteTracks {
             loadingView
-        } else if localStore.tracks.isEmpty {
+        } else if !isRemoteSourceActive && localStore.isLoading {
+            loadingView
+        } else if isRemoteSourceActive && remoteTracks.isEmpty {
+            remoteEmptyView
+        } else if !isRemoteSourceActive && localStore.tracks.isEmpty {
             emptyLocalView
         } else if filteredLocalTracks.isEmpty {
             emptySearchView
@@ -433,7 +654,7 @@ struct LibraryView:
                                     selectedLocalTrack = nil
                                 }
                             },
-                            onPlay: { playback.toggle(track: track, queue: localStore.tracks) },
+                            onPlay: { playback.toggle(track: track, queue: filteredLocalTracks) },
                             onPlayNext: { playback.playNext(track) },
                             onEnqueue: { playback.addToQueue(track) },
                             onToggleLibrary: {
@@ -445,14 +666,29 @@ struct LibraryView:
                                     }
                                 }
                             },
-                            onReveal: { PlatformFileViewer.revealInFinder(url: track.fileURL) },
+                            onReveal: {
+                                if track.fileURL.isFileURL {
+                                    PlatformFileViewer.revealInFinder(url: track.fileURL)
+                                }
+                            },
                             onDelete: {
-                                Task {
-                                    await localStore.deleteTracks(withIDs: [track.id])
+                                if !isRemoteSourceActive {
+                                    Task {
+                                        await localStore.deleteTracks(withIDs: [track.id])
+                                    }
                                 }
                             }
                         )
                         .marqueeItem(id: track.id)
+                        .onAppear {
+                            if isRemoteSourceActive && track.id == remoteTracks.last?.id && hasMoreRemoteTracks && !isLoadingMoreRemoteTracks && !isLoadingRemoteTracks && searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                if let sourceID = selectedSourceID {
+                                    Task {
+                                        await loadRemoteTracks(sourceID: sourceID, query: "", reset: false)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -568,26 +804,43 @@ struct LibraryView:
 
     @ViewBuilder
     private var localTableContent: some View {
-        if localStore.isLoading {
+        if (isRemoteSourceActive && isLoadingRemoteTracks && remoteTracks.isEmpty) || isSearchingRemoteTracks {
             loadingView
-        } else if localStore.tracks.isEmpty {
+        } else if !isRemoteSourceActive && localStore.isLoading {
+            loadingView
+        } else if isRemoteSourceActive && remoteTracks.isEmpty {
+            remoteEmptyView
+        } else if !isRemoteSourceActive && localStore.tracks.isEmpty {
             emptyLocalView
         } else if filteredLocalTracks.isEmpty {
             emptySearchView
         } else {
             LocalTrackTableView(
                 tracks: filteredLocalTracks,
-                positionLookup: localStore.positionLookup,
-                isFiltered: !searchQuery.isEmpty,
+                positionLookup: isRemoteSourceActive ? Dictionary(uniqueKeysWithValues: filteredLocalTracks.enumerated().map { ($1.id, $0 + 1) }) : localStore.positionLookup,
+                isFiltered: !searchQuery.isEmpty || isRemoteSourceActive,
                 selectedTrack: $selectedLocalTrack,
                 playback: playback,
                 library: feature.libraryStore,
                 onRevealInFinder: { url in
-                    PlatformFileViewer.revealInFinder(url: url)
+                    if url.isFileURL {
+                        PlatformFileViewer.revealInFinder(url: url)
+                    }
                 },
                 onDeleteTracks: { ids in
-                    Task {
-                        await localStore.deleteTracks(withIDs: ids)
+                    if !isRemoteSourceActive {
+                        Task {
+                            await localStore.deleteTracks(withIDs: ids)
+                        }
+                    }
+                },
+                onTrackAppear: { track in
+                    if isRemoteSourceActive && track.id == remoteTracks.last?.id && hasMoreRemoteTracks && !isLoadingMoreRemoteTracks && !isLoadingRemoteTracks && searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        if let sourceID = selectedSourceID {
+                            Task {
+                                await loadRemoteTracks(sourceID: sourceID, query: "", reset: false)
+                            }
+                        }
                     }
                 }
             )
@@ -595,6 +848,18 @@ struct LibraryView:
     }
 
     // MARK: - Empty & Loading Views
+
+    private var remoteEmptyView: some View {
+        ContentUnavailableView {
+            Label(
+                searchQuery.isEmpty ? "未发现远程歌曲" : "未找到匹配曲目",
+                systemImage: searchQuery.isEmpty ? "externaldrive.connected.to.line.below" : "magnifyingglass"
+            )
+        } description: {
+            Text(searchQuery.isEmpty ? "远程媒体服务已连接，当前暂未发现歌曲，或可尝试在上方的搜索框中搜索曲目。" : "未在远程服务器中找到与 \"\(searchQuery)\" 匹配的歌曲。")
+        }
+        .frame(maxWidth: .infinity, minHeight: 280)
+    }
 
     private var emptySavedView: some View {
         ContentUnavailableView {
@@ -619,14 +884,19 @@ struct LibraryView:
     }
 
     private var emptySearchView: some View {
-        ContentUnavailableView.search(text: searchQuery)
-            .frame(maxWidth: .infinity, minHeight: 280)
+        ContentUnavailableView {
+            Label("No Results", systemImage: "magnifyingglass")
+        } description: {
+            Text("Try searching for a different song, artist, or album.")
+        }
+        .frame(maxWidth: .infinity, minHeight: 280)
     }
 
     private var loadingView: some View {
         VStack(spacing: 12) {
             ProgressView()
-            Text("Loading library…").foregroundStyle(.secondary)
+            Text(isSearchingRemoteTracks ? "正在远程检索歌曲..." : (isRemoteSourceActive ? "正在从远程媒体服务加载歌曲..." : "Loading library…"))
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, minHeight: 280)
     }

@@ -11,6 +11,8 @@ struct LibraryFilterBar: View {
     @Binding var sortField: LibrarySortField
     @Binding var sortAscending: Bool
     @Binding var searchQuery: String
+    var isSearching: Bool = false
+    var prompt: LocalizedStringKey = "Filter songs…"
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
@@ -51,11 +53,17 @@ struct LibraryFilterBar: View {
 
     private var searchInput: some View {
         HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-                .font(.caption)
+            if isSearching {
+                ProgressView()
+                    .scaleEffect(0.6)
+                    .frame(width: 14, height: 14)
+            } else {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+            }
 
-            TextField("Filter songs…", text: $searchQuery)
+            TextField(prompt, text: $searchQuery)
                 .textFieldStyle(.plain)
                 .font(.callout)
 

@@ -33,6 +33,7 @@ nonisolated enum SceneSection:
     case albums
     case artists
     case playlists
+    case sources
 
     case addMusic
     case importReview

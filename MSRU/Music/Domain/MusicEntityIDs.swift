@@ -28,6 +28,16 @@ nonisolated public struct SourceID: MusicEntityID {
     public let rawValue: String
     nonisolated public init(_ value: String) { self.rawValue = value }
     nonisolated public static func generate() -> SourceID { SourceID("src_\(UUID().uuidString.lowercased())") }
+    nonisolated public static let defaultLocal = SourceID("src_local_default")
+
+    nonisolated public static func isLocalSourceID(_ id: String?) -> Bool {
+        guard let id else { return false }
+        return id == "local" || id == "src_local_default" || id.hasPrefix("src_local")
+    }
+
+    nonisolated public var isLocal: Bool {
+        Self.isLocalSourceID(rawValue)
+    }
 }
 
 /// Identifies a physical audio file asset located within a Source.
@@ -139,6 +149,26 @@ nonisolated public enum DeterministicID {
     nonisolated public static func asset(sourceID: SourceID, relativePath: String) -> AssetID {
         let key = "\(sourceID.rawValue)|\(relativePath)"
         return AssetID(hexHash(key, prefix: "ast"))
+    }
+
+    nonisolated public static func sourceRecording(sourceID: SourceID, itemID: String) -> RecordingID {
+        let key = "\(sourceID.rawValue)|\(itemID)"
+        return RecordingID(hexHash(key, prefix: "rec"))
+    }
+
+    nonisolated public static func sourceRelease(sourceID: SourceID, itemID: String) -> ReleaseID {
+        let key = "\(sourceID.rawValue)|\(itemID)"
+        return ReleaseID(hexHash(key, prefix: "rel"))
+    }
+
+    nonisolated public static func sourceReleaseGroup(sourceID: SourceID, itemID: String) -> ReleaseGroupID {
+        let key = "\(sourceID.rawValue)|\(itemID)"
+        return ReleaseGroupID(hexHash(key, prefix: "rg"))
+    }
+
+    nonisolated public static func sourceArtist(sourceID: SourceID, itemID: String) -> ArtistID {
+        let key = "\(sourceID.rawValue)|\(itemID)"
+        return ArtistID(hexHash(key, prefix: "art"))
     }
 
     nonisolated public static func releaseTrack(releaseID: ReleaseID, medium: Int, track: Int) -> ReleaseTrackID {

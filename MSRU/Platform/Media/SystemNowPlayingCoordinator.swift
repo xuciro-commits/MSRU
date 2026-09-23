@@ -246,8 +246,8 @@ final class SystemNowPlayingCoordinator: NSObject, PlaybackSessionObserving, Sys
             Task { @MainActor [weak self] in
                 guard let self, let image = await MediaImagePipeline.shared.loadThumbnail(for: ref, bucket: .px512) else { return }
                 guard var currentInfo = self.nowPlayingCenter.nowPlayingInfo ?? self.currentNowPlayingInfo else { return }
-                let size = image.size
-                currentInfo[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: size) { _ in image }
+                guard let artwork = makeMediaItemArtwork(from: image) else { return }
+                currentInfo[MPMediaItemPropertyArtwork] = artwork
                 self.nowPlayingCenter.nowPlayingInfo = currentInfo
                 self.currentNowPlayingInfo = currentInfo
             }
@@ -313,7 +313,14 @@ final class SystemNowPlayingCoordinator: NSObject, PlaybackSessionObserving, Sys
 
 #if canImport(AppKit) && !targetEnvironment(macCatalyst)
 private nonisolated func makeMediaItemArtwork(from data: Data) -> MPMediaItemArtwork? {
-    guard let image = NSImage(data: data), image.size.width > 0, image.size.height > 0 else {
+    guard let image = NSImage(data: data) else {
+        return nil
+    }
+    return makeMediaItemArtwork(from: image)
+}
+
+private nonisolated func makeMediaItemArtwork(from image: NSImage) -> MPMediaItemArtwork? {
+    guard image.size.width > 0, image.size.height > 0 else {
         return nil
     }
     let size = image.size
@@ -323,7 +330,14 @@ private nonisolated func makeMediaItemArtwork(from data: Data) -> MPMediaItemArt
 }
 #elseif canImport(UIKit)
 private nonisolated func makeMediaItemArtwork(from data: Data) -> MPMediaItemArtwork? {
-    guard let image = UIImage(data: data), image.size.width > 0, image.size.height > 0 else {
+    guard let image = UIImage(data: data) else {
+        return nil
+    }
+    return makeMediaItemArtwork(from: image)
+}
+
+private nonisolated func makeMediaItemArtwork(from image: UIImage) -> MPMediaItemArtwork? {
+    guard image.size.width > 0, image.size.height > 0 else {
         return nil
     }
     let size = image.size

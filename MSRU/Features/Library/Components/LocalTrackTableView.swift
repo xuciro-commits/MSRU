@@ -18,6 +18,7 @@ struct LocalTrackTableView: View {
 
     var onRevealInFinder: ((URL) -> Void)? = nil
     var onDeleteTracks: ((Set<String>) -> Void)? = nil
+    var onTrackAppear: ((LocalTrack) -> Void)? = nil
 
     @State private var selectedTrackIDs: Set<String> = []
     @State private var isDeleteConfirmationPresented: Bool = false
@@ -30,7 +31,8 @@ struct LocalTrackTableView: View {
         playback: PlaybackController,
         library: LibraryStore,
         onRevealInFinder: ((URL) -> Void)? = nil,
-        onDeleteTracks: ((Set<String>) -> Void)? = nil
+        onDeleteTracks: ((Set<String>) -> Void)? = nil,
+        onTrackAppear: ((LocalTrack) -> Void)? = nil
     ) {
         self.tracks = tracks
         self.isFiltered = isFiltered
@@ -49,6 +51,7 @@ struct LocalTrackTableView: View {
         self.library = library
         self.onRevealInFinder = onRevealInFinder
         self.onDeleteTracks = onDeleteTracks
+        self.onTrackAppear = onTrackAppear
     }
 
     var body: some View {
@@ -114,6 +117,9 @@ struct LocalTrackTableView: View {
                     position: positionLookup[track.id],
                     playback: playback
                 )
+                .onAppear {
+                    onTrackAppear?(track)
+                }
             }
             .width(min: 32, ideal: 36, max: 44)
 
@@ -264,6 +270,9 @@ struct LocalTrackTableView: View {
         )
         .contextMenu {
             trackContextMenu(track)
+        }
+        .onAppear {
+            onTrackAppear?(track)
         }
     }
 

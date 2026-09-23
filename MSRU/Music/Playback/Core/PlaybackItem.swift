@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import MediaLibrary
 
 
 enum PlaybackItemSource:
@@ -13,6 +14,7 @@ enum PlaybackItemSource:
     case local
     case openverse
     case radio
+    case subsonic
 }
 
 
@@ -31,6 +33,16 @@ struct PlaybackItem:
 
         case radio(
             RadioStation
+        )
+
+        case subsonic(
+            id: String,
+            title: String,
+            artist: String,
+            album: String?,
+            duration: TimeInterval,
+            artworkReference: String?,
+            streamURL: URL? = nil
         )
     }
 
@@ -93,6 +105,85 @@ struct PlaybackItem:
     }
 
 
+    // MARK: - Subsonic
+
+    init(
+        subsonic id: String,
+        title: String,
+        artist: String,
+        album: String? = nil,
+        duration: TimeInterval = 0,
+        artworkReference: String? = nil,
+        streamURL: URL? = nil
+    ) {
+        self.id = "subsonic:\(id)"
+        self.payload = .subsonic(
+            id: id,
+            title: title,
+            artist: artist,
+            album: album,
+            duration: duration,
+            artworkReference: artworkReference,
+            streamURL: streamURL
+        )
+    }
+
+    static func subsonic(
+        serverID: LibrarySourceID? = nil,
+        itemID: String,
+        title: String,
+        artist: String,
+        album: String? = nil,
+        duration: TimeInterval = 0,
+        streamURL: URL? = nil,
+        coverArtURL: URL? = nil
+    ) -> PlaybackItem {
+        PlaybackItem(
+            subsonic: itemID,
+            title: title,
+            artist: artist,
+            album: album,
+            duration: duration,
+            artworkReference: coverArtURL?.absoluteString,
+            streamURL: streamURL
+        )
+    }
+
+    var subsonicPayload: (itemID: String, title: String, artist: String, album: String?)? {
+        guard case .subsonic(let id, let title, let artist, let album, _, _, _) = payload else {
+            return nil
+        }
+        return (itemID: id, title: title, artist: artist, album: album)
+    }
+
+
+    // MARK: - TrackRowSummary
+
+    init(summary: TrackRowSummary) {
+        if summary.sourceID == "local" || summary.sourceID == nil {
+            self.init(
+                local: LocalTrack(
+                    fileURL: URL(fileURLWithPath: summary.id),
+                    title: summary.title,
+                    artist: summary.artist,
+                    album: summary.album,
+                    duration: summary.duration,
+                    artworkReference: summary.artworkReference
+                )
+            )
+        } else {
+            self.init(
+                subsonic: summary.id,
+                title: summary.title,
+                artist: summary.artist,
+                album: summary.album,
+                duration: summary.duration,
+                artworkReference: summary.artworkReference
+            )
+        }
+    }
+
+
     // MARK: - Source
 
     var source:
@@ -108,6 +199,9 @@ struct PlaybackItem:
 
         case .radio:
             return .radio
+
+        case .subsonic:
+            return .subsonic
         }
     }
 
@@ -138,6 +232,9 @@ struct PlaybackItem:
         ):
 
             return station.name
+
+        case .subsonic(_, let title, _, _, _, _, _):
+            return title
         }
     }
 
@@ -166,6 +263,9 @@ struct PlaybackItem:
         ):
 
             return "\(station.genre.rawValue) • \(station.country)"
+
+        case .subsonic(_, _, let artist, _, _, _, _):
+            return artist
         }
     }
 
@@ -183,6 +283,9 @@ struct PlaybackItem:
 
         case .radio:
             return "LIVE RADIO"
+
+        case .subsonic:
+            return "SUBSONIC"
         }
     }
 
@@ -201,7 +304,7 @@ struct PlaybackItem:
             return track.artworkData
 
 
-        case .openverse, .radio:
+        case .openverse, .radio, .subsonic:
             return nil
         }
     }
@@ -215,6 +318,11 @@ struct PlaybackItem:
         case .local:
             return nil
 
+        case .subsonic(_, _, _, _, _, let artworkReference, _):
+            if let artworkReference, let url = URL(string: artworkReference), url.scheme?.hasPrefix("http") == true {
+                return url
+            }
+            return nil
 
         case .openverse(
             let track
@@ -239,6 +347,8 @@ struct PlaybackItem:
             return track.thumbnailURL.map { MediaImageReference(url: $0) }
         case .radio(let station):
             return station.artworkURL.map { MediaImageReference(url: $0) }
+        case .subsonic(_, _, _, _, _, let artworkReference, _):
+            return artworkReference.flatMap { MediaImageReference(string: $0) }
         }
     }
 
@@ -288,6 +398,9 @@ struct PlaybackItem:
 
         case .radio:
             return nil
+
+        case .subsonic(_, _, _, _, let duration, _, _):
+            return duration > 0 ? duration : nil
         }
     }
 
@@ -355,6 +468,18 @@ struct PlaybackItem:
         case .local(
             let track
         ):
+            if !track.fileURL.isFileURL,
+               let scheme = track.fileURL.scheme?.lowercased(),
+               scheme == "http" || scheme == "https" {
+                return PlaybackRequest(
+                    itemID: track.id,
+                    source: .subsonic,
+                    preferredQuality: .automatic,
+                    localFileURL: nil,
+                    remoteURL: track.fileURL,
+                    providerHint: .subsonic
+                )
+            }
 
             return PlaybackRequest(
                 itemID:
@@ -407,6 +532,16 @@ struct PlaybackItem:
                     nil,
                 remoteURL: station.streamURL,
                 providerHint: .radio
+            )
+
+        case .subsonic(let subsonicID, _, _, _, _, _, let streamURL):
+            return PlaybackRequest(
+                itemID: subsonicID,
+                source: .subsonic,
+                preferredQuality: .automatic,
+                localFileURL: nil,
+                remoteURL: streamURL,
+                providerHint: .subsonic
             )
         }
     }

@@ -343,6 +343,16 @@ private struct WeakSessionObserver {
                 isLossless: false,
                 isHiRes: false
             )
+
+        case .subsonic:
+            return AudioFormatInfo(
+                codec: "STREAM",
+                sampleRate: "44.1 kHz",
+                bitDepth: "16-bit",
+                bitrate: "Dynamic",
+                isLossless: true,
+                isHiRes: false
+            )
         }
     }
 

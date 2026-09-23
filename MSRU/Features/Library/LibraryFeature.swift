@@ -383,6 +383,7 @@ private struct LibraryFeatureDestination: View {
         LibraryView(
             feature: scene.libraryFeature,
             localStore: scene.application.localLibrary,
+            subsonicServers: scene.application.subsonicServers,
             playback: scene.application.playback,
             selectedLocalTrack: Binding(
                 get: { scene.selectedLocalTrack },
@@ -391,6 +392,10 @@ private struct LibraryFeatureDestination: View {
             selectedLibraryTrack: Binding(
                 get: { scene.selectedLibraryTrack },
                 set: { scene.select(libraryTrack: $0) }
+            ),
+            selectedSourceID: Binding(
+                get: { scene.selectedSourceFilter },
+                set: { scene.selectedSourceFilter = $0 }
             ),
             onAddMusic: {
                 scene.send(.navigate(.section(.addMusic)))

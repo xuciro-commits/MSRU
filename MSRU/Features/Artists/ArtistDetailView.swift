@@ -6,10 +6,13 @@
 import SwiftUI
 import AppFoundation
 import AppFoundationUI
+import MediaLibrary
+import SubsonicKit
 
 struct ArtistDetailView: View {
     let artist: ArtistPresentationModel
     let tracks: [LocalTrack]
+    var subsonicServers: SubsonicServerStore? = nil
     @Bindable var playback: PlaybackController
     let onBack: () -> Void
     let onSelectTrack: (LocalTrack) -> Void
@@ -20,15 +23,28 @@ struct ArtistDetailView: View {
     @State private var biographyRecord: ArtistBiographyRecord? = nil
     @State private var isBioExpanded: Bool = false
     @State private var selectedTrackIDs: Set<String> = []
+    @State private var remoteAlbums: [AlbumPresentationModel] = []
+    @State private var remoteTopTracks: [LocalTrack] = []
+    @State private var isLoadingRemote: Bool = false
 
     private var albums: [AlbumPresentationModel] {
-        LibraryPresentationAggregator.buildAlbums(from: tracks).filter {
+        if artist.id.hasPrefix("subsonic:") {
+            return remoteAlbums
+        }
+        return LibraryPresentationAggregator.buildAlbums(from: tracks).filter {
             $0.artist.trimmingCharacters(in: .whitespacesAndNewlines) == artist.name
         }
     }
 
     private var topTracks: [LocalTrack] {
-        Array(tracks.prefix(5))
+        if artist.id.hasPrefix("subsonic:") {
+            return remoteTopTracks
+        }
+        return Array(tracks.prefix(5))
+    }
+
+    private var effectiveTracks: [LocalTrack] {
+        artist.id.hasPrefix("subsonic:") ? remoteTopTracks : tracks
     }
 
     var body: some View {
@@ -101,7 +117,7 @@ struct ArtistDetailView: View {
                             }
                             .buttonStyle(.bordered)
 
-                            if onDeleteArtist != nil {
+                            if onDeleteArtist != nil && !artist.id.hasPrefix("subsonic:") {
                                 Button(role: .destructive, action: { isDeleteConfirmationPresented = true }) {
                                     Label("Delete Artist", systemImage: "trash")
                                         .font(.headline)
@@ -159,7 +175,36 @@ struct ArtistDetailView: View {
                                         onSelectAlbum(album)
                                     },
                                     onPlay: {
-                                        if let first = tracks.first(where: { $0.album == album.title }) {
+                                        if album.id.hasPrefix("subsonic:"), let subsonicServers {
+                                            let parts = album.id.split(separator: ":")
+                                            if parts.count >= 3 {
+                                                let serverID = LibrarySourceID(String(parts[1]))
+                                                let remoteAlbumID = String(parts[2])
+                                                if let client = subsonicServers.client(for: serverID) {
+                                                    Task {
+                                                        if let detailed = try? await client.album(id: remoteAlbumID),
+                                                           let songs = detailed.song, !songs.isEmpty {
+                                                            let items = songs.compactMap { song -> PlaybackItem? in
+                                                                let streamURL = try? client.streamURL(id: song.id)
+                                                                let coverArtURL = try? client.coverArtURL(id: song.coverArt ?? remoteAlbumID)
+                                                                return PlaybackItem.subsonic(
+                                                                    serverID: serverID,
+                                                                    itemID: song.id,
+                                                                    title: song.title,
+                                                                    artist: song.artist ?? album.artist,
+                                                                    album: album.title,
+                                                                    streamURL: streamURL,
+                                                                    coverArtURL: coverArtURL
+                                                                )
+                                                            }
+                                                            if let first = items.first {
+                                                                playback.play(first, context: items)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } else if let first = tracks.first(where: { $0.album == album.title }) {
                                             playback.play(first)
                                         }
                                     }
@@ -183,6 +228,76 @@ struct ArtistDetailView: View {
         .task {
             if biographyRecord == nil {
                 biographyRecord = await ArtistBiographyService.shared.fetchBiography(artistName: artist.name)
+            }
+        }
+        .task(id: artist.id) {
+            if artist.id.hasPrefix("subsonic:"), let subsonicServers {
+                let parts = artist.id.split(separator: ":")
+                if parts.count >= 3 {
+                    let serverID = LibrarySourceID(String(parts[1]))
+                    let remoteArtistID = String(parts[2])
+                    if let client = subsonicServers.client(for: serverID),
+                       let server = subsonicServers.server(for: serverID) {
+                        isLoadingRemote = true
+                        defer { isLoadingRemote = false }
+                        do {
+                            let artistDTO = try await client.artist(id: remoteArtistID)
+                            let albumDTOs = artistDTO.album ?? []
+                            let mappedAlbums = albumDTOs.map { albumDTO -> AlbumPresentationModel in
+                                let coverArtURL = try? client.coverArtURL(id: albumDTO.coverArt ?? albumDTO.id)
+                                return AlbumPresentationModel(
+                                    id: "subsonic:\(serverID.rawValue):\(albumDTO.id)",
+                                    title: albumDTO.effectiveTitle,
+                                    artist: albumDTO.artist ?? artist.name,
+                                    year: albumDTO.year,
+                                    artworkURL: coverArtURL,
+                                    artworkReference: coverArtURL?.absoluteString,
+                                    trackCount: albumDTO.songCount ?? 0,
+                                    duration: TimeInterval(albumDTO.duration ?? 0),
+                                    audioQualityBadge: nil,
+                                    sourceBadge: server.name,
+                                    versionCount: 1,
+                                    discs: []
+                                )
+                            }
+                            self.remoteAlbums = mappedAlbums
+
+                            var sampledSongs: [LocalTrack] = []
+                            for albumDTO in mappedAlbums.prefix(2) {
+                                let albumParts = albumDTO.id.split(separator: ":")
+                                if albumParts.count >= 3 {
+                                    let albumID = String(albumParts[2])
+                                    if let detailed = try? await client.album(id: albumID),
+                                       let songs = detailed.song {
+                                        for s in songs.prefix(3) {
+                                            if let streamURL = try? client.streamURL(id: s.id) {
+                                                let coverURL = try? client.coverArtURL(id: s.coverArt ?? albumID)
+                                                sampledSongs.append(
+                                                    LocalTrack(
+                                                        fileURL: streamURL,
+                                                        title: s.title,
+                                                        artist: s.artist ?? artist.name,
+                                                        album: s.album ?? albumDTO.title,
+                                                        duration: TimeInterval(s.duration ?? 0),
+                                                        artworkReference: coverURL?.absoluteString,
+                                                        trackNumber: s.track,
+                                                        year: s.year
+                                                    )
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                if sampledSongs.count >= 5 { break }
+                            }
+                            self.remoteTopTracks = sampledSongs
+                        } catch is CancellationError {
+                            // Cancelled
+                        } catch {
+                            print("[ArtistDetailView] Failed to load remote artist: \(error)")
+                        }
+                    }
+                }
             }
         }
         .confirmationDialog(
@@ -347,13 +462,13 @@ struct ArtistDetailView: View {
     }
 
     private func playAll() {
-        guard let first = tracks.first else { return }
-        playback.play(first)
+        guard let first = effectiveTracks.first else { return }
+        playback.toggle(track: first, queue: effectiveTracks)
     }
 
     private func shuffleAll() {
-        guard let first = tracks.shuffled().first else { return }
-        playback.play(first)
+        guard let first = effectiveTracks.shuffled().first else { return }
+        playback.toggle(track: first, queue: effectiveTracks.shuffled())
     }
 
     @ViewBuilder

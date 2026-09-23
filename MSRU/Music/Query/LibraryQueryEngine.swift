@@ -58,16 +58,106 @@ public actor LibraryQueryEngine {
         self.db = db
     }
 
+    // MARK: - Source Availability & Counts
+
+    /// Fetches all active sources with their entity counts for UI FilterBars.
+    public func fetchAvailableSources(for entityType: String = "release") async throws -> [SourceFilterItem] {
+        try await db.reader.read { db in
+            let normalizedType: String
+            if entityType == "recording" || entityType == "track" || entityType == "song" {
+                normalizedType = "recording"
+            } else if entityType == "artist" {
+                normalizedType = "artist"
+            } else {
+                normalizedType = "release"
+            }
+
+            let sourceRows = try Row.fetchAll(db, sql: """
+                SELECT s.id, s.display_name, s.source_type,
+                       (CASE
+                        WHEN ? = 'recording' THEN (
+                            SELECT COUNT(DISTINCT a.recording_id) FROM assets a WHERE a.source_id = s.id
+                        )
+                        WHEN ? = 'artist' THEN (
+                            SELECT COUNT(DISTINCT ac.artist_id) FROM artist_credits ac
+                            JOIN assets a ON a.recording_id = ac.entity_id
+                            WHERE a.source_id = s.id
+                        )
+                        ELSE (
+                            SELECT COUNT(DISTINCT rt.release_id) FROM release_tracks rt
+                            JOIN assets a ON a.recording_id = rt.recording_id
+                            WHERE a.source_id = s.id
+                        )
+                        END) as item_count
+                FROM sources s
+                WHERE s.is_enabled = 1
+                ORDER BY s.source_type ASC, s.display_name ASC
+            """, arguments: [normalizedType, normalizedType])
+
+            var localCount: Int = 0
+            var foundLocalSource: Bool = false
+            var remoteItems: [SourceFilterItem] = []
+
+            for row in sourceRows {
+                guard let sID: String = row["id"], let name: String = row["display_name"] else { continue }
+                let isLocal = SourceID.isLocalSourceID(sID) || (row["source_type"] as String?) == "localFolder"
+                if isLocal {
+                    foundLocalSource = true
+                    let c: Int = row["item_count"] ?? 0
+                    localCount += c
+                } else {
+                    // For remote sources (Subsonic, NAS, etc.), DO NOT display count! (Live on-demand iceberg)
+                    remoteItems.append(SourceFilterItem(id: sID, displayName: name, count: nil))
+                }
+            }
+
+            // Fallback for local count if sources table had no matching local row
+            if !foundLocalSource {
+                let fallbackCount: Int
+                if normalizedType == "recording" {
+                    fallbackCount = try Int.fetchOne(db, sql: "SELECT COUNT(DISTINCT a.recording_id) FROM assets a") ?? 0
+                } else if normalizedType == "artist" {
+                    fallbackCount = try Int.fetchOne(db, sql: "SELECT COUNT(DISTINCT ac.artist_id) FROM artist_credits ac JOIN assets a ON a.recording_id = ac.entity_id") ?? 0
+                } else {
+                    fallbackCount = try Int.fetchOne(db, sql: "SELECT COUNT(DISTINCT rt.release_id) FROM release_tracks rt JOIN assets a ON a.recording_id = rt.recording_id") ?? 0
+                }
+                localCount = fallbackCount
+            }
+
+            // Unified local item
+            let localItem = SourceFilterItem(
+                id: SourceID.defaultLocal.rawValue,
+                displayName: String(localized: "Local Files"),
+                count: localCount
+            )
+
+            // When remote sources are connected, "All" does not have a finite fixed count; omit badge
+            let allCount: Int? = remoteItems.isEmpty ? localCount : nil
+            var items: [SourceFilterItem] = [
+                SourceFilterItem(id: nil, displayName: "All", count: allCount),
+                localItem
+            ]
+            items.append(contentsOf: remoteItems)
+
+            return items
+        }
+    }
+
     // MARK: - DB-Backed Fast-Path Snapshots (<15ms at 100K)
 
     /// Direct SQLite index-backed snapshot generator eliminating in-memory dictionary grouping overhead.
-    public func queryDatabaseSnapshot() async throws -> LibraryQuerySnapshot {
+    public func queryDatabaseSnapshot(sourceFilter: String? = nil) async throws -> LibraryQuerySnapshot {
         let revision = currentRevision &+ 1
         currentRevision = revision
 
         return try await db.reader.read { db in
-            // 1. Ordered IDs from SQLite index
-            let rows = try Row.fetchAll(db, sql: "SELECT id FROM recordings ORDER BY sort_title ASC")
+            // 1. Ordered IDs from SQLite index with optional source filter
+            let recSQL = """
+                SELECT r.id FROM recordings r
+                WHERE (? IS NULL OR EXISTS (SELECT 1 FROM assets a WHERE a.recording_id = r.id AND a.source_id = ?))
+                ORDER BY r.sort_title ASC
+            """
+            let rows = try Row.fetchAll(db, sql: recSQL, arguments: [sourceFilter, sourceFilter])
             var orderedIDs: [String] = []
             orderedIDs.reserveCapacity(rows.count)
             var positionLookup: [String: Int] = [:]
@@ -80,8 +170,8 @@ public actor LibraryQueryEngine {
                 }
             }
 
-            // 2. Album summaries directly aggregated in SQLite
-            let albumRows = try Row.fetchAll(db, sql: """
+            // 2. Album summaries directly aggregated in SQLite with optional source filter
+            let albumSQL = """
                 SELECT rel.id, rel.title,
                        COALESCE((
                            SELECT a.name FROM artist_credits ac
@@ -91,10 +181,23 @@ public actor LibraryQueryEngine {
                        ), 'Unknown Artist') as artist,
                        rel.release_year,
                        (SELECT COUNT(*) FROM release_tracks rt WHERE rt.release_id = rel.id) as track_count,
-                       rel.artwork_asset_id
+                       rel.artwork_asset_id,
+                       (SELECT s.display_name FROM release_tracks rt
+                        JOIN assets a ON a.recording_id = rt.recording_id
+                        JOIN sources s ON s.id = a.source_id
+                        WHERE rt.release_id = rel.id LIMIT 1) as source_badge,
+                       (SELECT COUNT(DISTINCT a.source_id) FROM release_tracks rt
+                        JOIN assets a ON a.recording_id = rt.recording_id
+                        WHERE rt.release_id = rel.id) as version_count
                 FROM releases rel
+                WHERE (? IS NULL OR EXISTS (
+                    SELECT 1 FROM release_tracks rt
+                    JOIN assets a ON a.recording_id = rt.recording_id
+                    WHERE rt.release_id = rel.id AND a.source_id = ?
+                ))
                 ORDER BY rel.sort_title ASC
-            """)
+            """
+            let albumRows = try Row.fetchAll(db, sql: albumSQL, arguments: [sourceFilter, sourceFilter])
 
             var albums: [AlbumPresentationModel] = []
             albums.reserveCapacity(albumRows.count)
@@ -105,6 +208,8 @@ public actor LibraryQueryEngine {
                 let year: Int? = row["release_year"]
                 let count: Int = row["track_count"] ?? 0
                 let artRef: String? = row["artwork_asset_id"]
+                let badge: String? = row["source_badge"]
+                let vCount: Int = row["version_count"] ?? 1
 
                 albums.append(AlbumPresentationModel(
                     id: id,
@@ -115,22 +220,37 @@ public actor LibraryQueryEngine {
                     artworkURL: nil,
                     artworkReference: artRef,
                     trackCount: count,
-                    duration: 0
+                    duration: 0,
+                    sourceBadge: badge,
+                    versionCount: max(1, vCount)
                 ))
             }
 
-            // 3. Artist summaries directly aggregated in SQLite
-            let artistRows = try Row.fetchAll(db, sql: """
+            // 3. Artist summaries directly aggregated in SQLite with optional source filter
+            let artistSQL = """
                 SELECT a.id, a.name,
-                       (SELECT COUNT(*) FROM artist_credits ac WHERE ac.artist_id = a.id AND ac.entity_type = 'recording') as track_count,
-                       (SELECT COUNT(DISTINCT ac.entity_id) FROM artist_credits ac WHERE ac.artist_id = a.id AND ac.entity_type = 'release') as album_count,
+                       (SELECT COUNT(*) FROM artist_credits ac
+                        JOIN assets ast ON ast.recording_id = ac.entity_id
+                        WHERE ac.artist_id = a.id AND ac.entity_type = 'recording'
+                          AND (? IS NULL OR ast.source_id = ?)) as track_count,
+                       (SELECT COUNT(DISTINCT ac.entity_id) FROM artist_credits ac
+                        JOIN release_tracks rt ON rt.release_id = ac.entity_id
+                        JOIN assets ast ON ast.recording_id = rt.recording_id
+                        WHERE ac.artist_id = a.id AND ac.entity_type = 'release'
+                          AND (? IS NULL OR ast.source_id = ?)) as album_count,
                        (SELECT rel.artwork_asset_id FROM releases rel
                         JOIN artist_credits ac ON ac.entity_id = rel.id AND ac.entity_type = 'release'
                         WHERE ac.artist_id = a.id AND rel.artwork_asset_id IS NOT NULL
                         LIMIT 1) as artwork_ref
                 FROM artists a
+                WHERE (? IS NULL OR EXISTS (
+                    SELECT 1 FROM artist_credits ac
+                    JOIN assets ast ON ast.recording_id = ac.entity_id
+                    WHERE ac.artist_id = a.id AND ast.source_id = ?
+                ))
                 ORDER BY a.sort_name ASC
-            """)
+            """
+            let artistRows = try Row.fetchAll(db, sql: artistSQL, arguments: [sourceFilter, sourceFilter, sourceFilter, sourceFilter, sourceFilter, sourceFilter])
 
             var artists: [ArtistPresentationModel] = []
             artists.reserveCapacity(artistRows.count)
@@ -161,9 +281,9 @@ public actor LibraryQueryEngine {
     }
 
     /// Snapshot query delegating to the fast database engine.
-    public func querySnapshot() async -> LibraryQuerySnapshot {
+    public func querySnapshot(sourceFilter: String? = nil) async -> LibraryQuerySnapshot {
         do {
-            return try await queryDatabaseSnapshot()
+            return try await queryDatabaseSnapshot(sourceFilter: sourceFilter)
         } catch {
             return LibraryQuerySnapshot(revision: currentRevision)
         }
@@ -239,35 +359,47 @@ public actor LibraryQueryEngine {
                 let direction = spec.ascending ? "ASC" : "DESC"
 
                 sql = """
-                    SELECT r.id as rec_id, r.title, COALESCE(a.name, 'Unknown Artist') as artist,
+                    SELECT r.id as rec_id, r.title, COALESCE(art.name, 'Unknown Artist') as artist,
                            rel.title as album, r.duration, rt.track_position, rel.release_year,
-                           rel.artwork_asset_id, COALESCE(le.is_favorite, 0) as is_fav
+                           rel.artwork_asset_id, COALESCE(le.is_favorite, 0) as is_fav,
+                           a.source_id, s.display_name as source_name, a.format
                     FROM recordings r
                     LEFT JOIN artist_credits ac ON ac.entity_id = r.id AND ac.entity_type = 'recording'
-                    LEFT JOIN artists a ON a.id = ac.artist_id
+                    LEFT JOIN artists art ON art.id = ac.artist_id
                     LEFT JOIN release_tracks rt ON rt.recording_id = r.id
                     LEFT JOIN releases rel ON rel.id = rt.release_id
                     LEFT JOIN library_entries le ON le.recording_id = r.id
+                    LEFT JOIN assets a ON a.recording_id = r.id
+                    LEFT JOIN sources s ON s.id = a.source_id
+                    WHERE (? IS NULL OR a.source_id = ?)
                     ORDER BY \(sortCol) \(direction)
                 """
+                args.append(spec.sourceFilter as Any)
+                args.append(spec.sourceFilter as Any)
             } else {
                 // FTS5 accelerated multi-lingual search
                 let queryPattern = SearchTokenNormalizer.prepareFTSQuery(spec.query)
                 sql = """
-                    SELECT r.id as rec_id, r.title, COALESCE(a.name, 'Unknown Artist') as artist,
+                    SELECT r.id as rec_id, r.title, COALESCE(art.name, 'Unknown Artist') as artist,
                            rel.title as album, r.duration, rt.track_position, rel.release_year,
-                           rel.artwork_asset_id, COALESCE(le.is_favorite, 0) as is_fav
+                           rel.artwork_asset_id, COALESCE(le.is_favorite, 0) as is_fav,
+                           a.source_id, s.display_name as source_name, a.format
                     FROM library_fts fts
                     JOIN recordings r ON r.id = fts.recording_id
                     LEFT JOIN artist_credits ac ON ac.entity_id = r.id AND ac.entity_type = 'recording'
-                    LEFT JOIN artists a ON a.id = ac.artist_id
+                    LEFT JOIN artists art ON art.id = ac.artist_id
                     LEFT JOIN release_tracks rt ON rt.recording_id = r.id
                     LEFT JOIN releases rel ON rel.id = rt.release_id
                     LEFT JOIN library_entries le ON le.recording_id = r.id
+                    LEFT JOIN assets a ON a.recording_id = r.id
+                    LEFT JOIN sources s ON s.id = a.source_id
                     WHERE library_fts MATCH ?
+                      AND (? IS NULL OR a.source_id = ?)
                     ORDER BY rank
                 """
                 args.append(queryPattern)
+                args.append(spec.sourceFilter as Any)
+                args.append(spec.sourceFilter as Any)
             }
 
             if let limit = spec.limit {
@@ -290,6 +422,9 @@ public actor LibraryQueryEngine {
                 let year: Int? = row["release_year"]
                 let artRef: String? = row["artwork_asset_id"]
                 let isFav: Bool = (row["is_fav"] as? Int ?? 0) == 1
+                let sID: String? = row["source_id"]
+                let sName: String? = row["source_name"]
+                let fmt: String? = row["format"]
 
                 return TrackRowSummary(
                     id: recIdStr,
@@ -301,9 +436,104 @@ public actor LibraryQueryEngine {
                     trackNumber: trackPos,
                     year: year,
                     artworkReference: artRef,
-                    isFavorite: isFav
+                    isFavorite: isFav,
+                    sourceID: sID,
+                    sourceDisplayName: sName,
+                    format: fmt
                 )
             }
         }
+    }
+
+    // MARK: - Listen Now Real Behavior Projections
+
+    public func fetchBehaviorSnapshot() async throws -> ListenNowBehaviorSnapshot {
+        try await db.reader.read { db in
+            let baseSelect = """
+                SELECT r.id as rec_id, r.title, COALESCE(art.name, 'Unknown Artist') as artist,
+                       rel.title as album, r.duration, rt.track_position, rel.release_year,
+                       rel.artwork_asset_id, COALESCE(le.is_favorite, 0) as is_fav,
+                       a.source_id, s.display_name as source_name, a.format
+                FROM recordings r
+                JOIN library_entries le ON le.recording_id = r.id
+                LEFT JOIN artist_credits ac ON ac.entity_id = r.id AND ac.entity_type = 'recording'
+                LEFT JOIN artists art ON art.id = ac.artist_id
+                LEFT JOIN release_tracks rt ON rt.recording_id = r.id
+                LEFT JOIN releases rel ON rel.id = rt.release_id
+                LEFT JOIN assets a ON a.recording_id = r.id
+                LEFT JOIN sources s ON s.id = a.source_id
+            """
+
+            func mapRows(_ rows: [Row]) -> [TrackRowSummary] {
+                var seen = Set<String>()
+                var summaries: [TrackRowSummary] = []
+                for row in rows {
+                    guard let recIdStr: String = row["rec_id"], !seen.contains(recIdStr),
+                          let title: String = row["title"],
+                          let artist: String = row["artist"] else { continue }
+                    seen.insert(recIdStr)
+                    summaries.append(TrackRowSummary(
+                        id: recIdStr,
+                        recordingID: RecordingID(recIdStr),
+                        title: title,
+                        artist: artist,
+                        album: row["album"],
+                        duration: row["duration"] ?? 0,
+                        trackNumber: row["track_position"],
+                        year: row["release_year"],
+                        artworkReference: row["artwork_asset_id"],
+                        isFavorite: (row["is_fav"] as? Int ?? 0) == 1,
+                        sourceID: row["source_id"],
+                        sourceDisplayName: row["source_name"],
+                        format: row["format"]
+                    ))
+                }
+                return summaries
+            }
+
+            let recentsRows = try Row.fetchAll(db, sql: "\(baseSelect) WHERE le.last_played_at IS NOT NULL ORDER BY le.last_played_at DESC LIMIT 12")
+            let recentlyPlayed = mapRows(recentsRows)
+
+            let addedRows = try Row.fetchAll(db, sql: "\(baseSelect) ORDER BY le.date_added DESC LIMIT 12")
+            let recentlyAdded = mapRows(addedRows)
+
+            let freqRows = try Row.fetchAll(db, sql: "\(baseSelect) WHERE le.play_count > 0 ORDER BY le.play_count DESC LIMIT 12")
+            let frequentlyPlayed = mapRows(freqRows)
+
+            let favRows = try Row.fetchAll(db, sql: "\(baseSelect) WHERE le.is_favorite = 1 ORDER BY le.date_added DESC LIMIT 12")
+            let favorites = mapRows(favRows)
+
+            let hero = recentlyPlayed.first ?? favorites.first ?? recentlyAdded.first
+
+            return ListenNowBehaviorSnapshot(
+                heroItem: hero,
+                recentlyPlayed: recentlyPlayed,
+                recentlyAdded: recentlyAdded,
+                frequentlyPlayed: frequentlyPlayed,
+                favorites: favorites
+            )
+        }
+    }
+}
+
+nonisolated public struct ListenNowBehaviorSnapshot: Sendable {
+    public let heroItem: TrackRowSummary?
+    public let recentlyPlayed: [TrackRowSummary]
+    public let recentlyAdded: [TrackRowSummary]
+    public let frequentlyPlayed: [TrackRowSummary]
+    public let favorites: [TrackRowSummary]
+
+    nonisolated public init(
+        heroItem: TrackRowSummary? = nil,
+        recentlyPlayed: [TrackRowSummary] = [],
+        recentlyAdded: [TrackRowSummary] = [],
+        frequentlyPlayed: [TrackRowSummary] = [],
+        favorites: [TrackRowSummary] = []
+    ) {
+        self.heroItem = heroItem
+        self.recentlyPlayed = recentlyPlayed
+        self.recentlyAdded = recentlyAdded
+        self.frequentlyPlayed = frequentlyPlayed
+        self.favorites = favorites
     }
 }

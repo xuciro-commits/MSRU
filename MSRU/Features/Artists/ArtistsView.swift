@@ -6,10 +6,14 @@
 import SwiftUI
 import AppFoundation
 import AppFoundationUI
+import MediaLibrary
+import SubsonicKit
 
 struct ArtistsView: View {
     @Bindable var localStore: LocalLibraryStore
     @Bindable var playback: PlaybackController
+    var subsonicServers: SubsonicServerStore? = nil
+    @Binding var selectedSourceID: String?
     let onSelectTrack: (LocalTrack) -> Void
     var onAddMusic: (() -> Void)? = nil
 
@@ -21,16 +25,187 @@ struct ArtistsView: View {
     @State private var selectedArtistIDs: Set<String> = []
     @State private var isBatchDeleteConfirmationPresented: Bool = false
 
+    @State private var availableSources: [SourceFilterItem] = []
+    @State private var remoteArtists: [ArtistPresentationModel] = []
+    @State private var seenArtistKeys: Set<String> = []
+    @State private var remoteOffset: Int = 0
+    @State private var hasMoreRemote: Bool = true
+    @State private var isLoadingRemote: Bool = false
+    @State private var isLoadingMoreRemote: Bool = false
+    @State private var remoteSearchResults: [ArtistPresentationModel] = []
+    @State private var isSearchingRemote: Bool = false
+    @State private var remoteLoadError: String? = nil
+    private let pageSize: Int = 50
+
+    init(
+        localStore: LocalLibraryStore,
+        playback: PlaybackController,
+        subsonicServers: SubsonicServerStore? = nil,
+        selectedSourceID: Binding<String?> = .constant(nil),
+        onSelectTrack: @escaping (LocalTrack) -> Void,
+        onAddMusic: (() -> Void)? = nil
+    ) {
+        self.localStore = localStore
+        self.playback = playback
+        self.subsonicServers = subsonicServers
+        self._selectedSourceID = selectedSourceID
+        self.onSelectTrack = onSelectTrack
+        self.onAddMusic = onAddMusic
+    }
+
+    private var isRemoteSourceActive: Bool {
+        guard let selectedSourceID else { return false }
+        return !SourceID.isLocalSourceID(selectedSourceID)
+    }
+
     private var allArtists: [ArtistPresentationModel] {
-        localStore.artists
+        if isRemoteSourceActive {
+            let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+            return query.isEmpty ? remoteArtists : remoteSearchResults
+        }
+        return localStore.artists
     }
 
     private var filteredArtists: [ArtistPresentationModel] {
+        if isRemoteSourceActive {
+            let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+            return query.isEmpty ? remoteArtists : remoteSearchResults
+        }
+
         let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !query.isEmpty else { return allArtists }
-        return allArtists.filter {
-            $0.name.lowercased().contains(query) ||
-            $0.aliases.contains { $0.lowercased().contains(query) }
+        var matching: [ArtistPresentationModel]
+        if query.isEmpty {
+            matching = allArtists
+        } else {
+            matching = allArtists.filter {
+                $0.name.lowercased().contains(query) ||
+                $0.aliases.contains { $0.lowercased().contains(query) }
+            }
+        }
+
+        if let selectedSourceID, SourceID.isLocalSourceID(selectedSourceID) {
+            let localArtistNames = Set(localStore.tracks.filter { $0.fileURL.isFileURL && $0.artworkReference?.contains("subsonic") != true }.map { $0.artist.trimmingCharacters(in: .whitespacesAndNewlines) })
+            matching = matching.filter { localArtistNames.contains($0.name) }
+        }
+
+        return matching
+    }
+
+    private func loadRemoteArtists(sourceID: String, reset: Bool = true) async {
+        guard !SourceID.isLocalSourceID(sourceID), let serversStore = subsonicServers else {
+            remoteArtists = []
+            seenArtistKeys = []
+            return
+        }
+        let cleanID = LibrarySourceID(sourceID.replacingOccurrences(of: "src_", with: ""))
+        guard let client = serversStore.client(for: cleanID) else {
+            return
+        }
+
+        if reset {
+            isLoadingRemote = true
+            remoteOffset = 0
+            hasMoreRemote = true
+            remoteArtists = []
+            seenArtistKeys = []
+        } else {
+            guard hasMoreRemote, !isLoadingMoreRemote, !isLoadingRemote else { return }
+            isLoadingMoreRemote = true
+        }
+        remoteLoadError = nil
+        defer {
+            isLoadingRemote = false
+            isLoadingMoreRemote = false
+        }
+
+        do {
+            var newArtists: [ArtistPresentationModel] = []
+            var currentOffset = remoteOffset
+            let batchAlbumSize = 60
+
+            // Pull albums in small 60-album chunks and extract unique artists without full index download freeze
+            while newArtists.count < (reset ? 30 : 20) && hasMoreRemote {
+                let albumDTOs = try await client.albumList2(type: "alphabeticalByArtist", size: batchAlbumSize, offset: currentOffset)
+                if albumDTOs.isEmpty {
+                    hasMoreRemote = false
+                    break
+                }
+                currentOffset += albumDTOs.count
+
+                for album in albumDTOs {
+                    guard let artistName = album.artist?.trimmingCharacters(in: .whitespacesAndNewlines), !artistName.isEmpty else {
+                        continue
+                    }
+                    let artistID = album.artistId ?? artistName
+                    let dedupeKey = "\(cleanID.rawValue):\(artistID)"
+                    if !seenArtistKeys.contains(dedupeKey) {
+                        seenArtistKeys.insert(dedupeKey)
+                        let coverArtURL = try? client.coverArtURL(id: album.coverArt ?? album.id)
+                        newArtists.append(ArtistPresentationModel(
+                            id: "subsonic:\(cleanID.rawValue):\(artistID)",
+                            name: artistName,
+                            aliases: [],
+                            albumCount: 1,
+                            trackCount: 0,
+                            artworkURL: coverArtURL,
+                            artworkReference: coverArtURL?.absoluteString
+                        ))
+                    }
+                }
+
+                if albumDTOs.count < batchAlbumSize {
+                    hasMoreRemote = false
+                    break
+                }
+            }
+
+            self.remoteOffset = currentOffset
+            if reset {
+                self.remoteArtists = newArtists
+            } else {
+                self.remoteArtists.append(contentsOf: newArtists)
+            }
+        } catch is CancellationError {
+            // Cancelled
+        } catch {
+            self.remoteLoadError = error.localizedDescription
+            print("[ArtistsView] Failed to load remote artists: \(error)")
+        }
+    }
+
+    private func searchRemoteArtists(query: String, sourceID: String) async {
+        guard !SourceID.isLocalSourceID(sourceID), let serversStore = subsonicServers else {
+            remoteSearchResults = []
+            return
+        }
+        let cleanID = LibrarySourceID(sourceID.replacingOccurrences(of: "src_", with: ""))
+        guard let client = serversStore.client(for: cleanID) else {
+            return
+        }
+
+        isSearchingRemote = true
+        defer { isSearchingRemote = false }
+
+        do {
+            let searchResult = try await client.search3(query: query, artistCount: 50, albumCount: 0, songCount: 0)
+            let dtos = searchResult.artist ?? []
+            let mapped = dtos.map { dto -> ArtistPresentationModel in
+                let coverArtURL = try? client.coverArtURL(id: dto.coverArt ?? dto.id)
+                return ArtistPresentationModel(
+                    id: "subsonic:\(cleanID.rawValue):\(dto.id)",
+                    name: dto.name,
+                    aliases: [],
+                    albumCount: dto.albumCount ?? 0,
+                    trackCount: 0,
+                    artworkURL: coverArtURL,
+                    artworkReference: coverArtURL?.absoluteString
+                )
+            }
+            self.remoteSearchResults = mapped
+        } catch is CancellationError {
+            // Cancelled
+        } catch {
+            print("[ArtistsView] Failed to search remote artists: \(error)")
         }
     }
 
@@ -45,9 +220,13 @@ struct ArtistsView: View {
                 AlbumDetailView(
                     album: album,
                     localTracks: albumTracks,
+                    subsonicServers: subsonicServers,
                     playback: playback,
                     onBack: { selectedAlbum = nil },
-                    onSelectTrack: onSelectTrack
+                    onSelectTrack: onSelectTrack,
+                    onDeleteAlbum: album.id.hasPrefix("subsonic:") ? nil : {
+                        selectedAlbum = nil
+                    }
                 )
             } else if let artist = selectedArtist {
                 let artistTracks = localStore.tracks.filter {
@@ -57,19 +236,54 @@ struct ArtistsView: View {
                 ArtistDetailView(
                     artist: artist,
                     tracks: artistTracks,
+                    subsonicServers: subsonicServers,
                     playback: playback,
                     onBack: { selectedArtist = nil },
                     onSelectTrack: onSelectTrack,
                     onSelectAlbum: { album in
                         selectedAlbum = album
                     },
-                    onDeleteArtist: {
+                    onDeleteArtist: artist.id.hasPrefix("subsonic:") ? nil : {
                         artistPendingDelete = artist
                         isDeleteConfirmationPresented = true
                     }
                 )
             } else {
                 mainArtistsGrid
+            }
+        }
+        .task(id: selectedSourceID) {
+            if isRemoteSourceActive, let sourceID = selectedSourceID {
+                await loadRemoteArtists(sourceID: sourceID, reset: true)
+            }
+        }
+        .task(id: "\(selectedSourceID ?? "")-\(searchQuery)") {
+            let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+            if isRemoteSourceActive, let sourceID = selectedSourceID {
+                if trimmed.isEmpty {
+                    remoteSearchResults = []
+                } else {
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    guard !Task.isCancelled else { return }
+                    await searchRemoteArtists(query: trimmed, sourceID: sourceID)
+                }
+            }
+        }
+        .task {
+            availableSources = (try? await LibraryQueryEngine.shared.fetchAvailableSources(for: "artist")) ?? []
+            if let servers = subsonicServers?.servers {
+                for server in servers {
+                    let sourceID = "src_\(server.id.rawValue)"
+                    if !availableSources.contains(where: { $0.sourceID == sourceID || $0.sourceID == server.id.rawValue }) {
+                        availableSources.append(
+                            SourceFilterItem(
+                                id: sourceID,
+                                displayName: server.name,
+                                count: nil
+                            )
+                        )
+                    }
+                }
             }
         }
         .confirmationDialog(
@@ -113,18 +327,27 @@ struct ArtistsView: View {
 
     @ViewBuilder
     private var mainArtistsGrid: some View {
-        if localStore.isLoading {
+        if localStore.isLoading || (isLoadingRemote && remoteArtists.isEmpty) || isSearchingRemote {
             VStack(spacing: 0) {
                 header
                 Divider()
-                ProgressView()
+                ProgressView(isSearchingRemote ? "正在远程检索艺术家..." : (isLoadingRemote ? "正在从远程媒体服务加载艺术家..." : ""))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         } else if filteredArtists.isEmpty {
             VStack(spacing: 0) {
                 header
                 Divider()
-                emptyState
+                if isRemoteSourceActive {
+                    ContentUnavailableView(
+                        searchQuery.isEmpty ? "未发现远程艺术家" : "未找到匹配的远程艺术家",
+                        systemImage: "music.mic",
+                        description: Text(searchQuery.isEmpty ? (remoteLoadError ?? "远程媒体库中暂未发现艺术家，或请检查服务器连接状态。") : "在远程媒体库中未找到与 \"\(searchQuery)\" 相关的艺术家。")
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    emptyState
+                }
             }
         } else {
             ScrollView {
@@ -165,16 +388,40 @@ struct ArtistsView: View {
                                 .contextMenu {
                                     Button("Open Artist") { selectedArtist = artist }
                                     Button("Play Artist") { playArtist(artist) }
-                                    Divider()
-                                    Button(role: .destructive) {
-                                        artistPendingDelete = artist
-                                        isDeleteConfirmationPresented = true
-                                    } label: {
-                                        Label("Delete Artist (Cascade)", systemImage: "trash")
+                                    if !artist.id.hasPrefix("subsonic:") {
+                                        Divider()
+                                        Button(role: .destructive) {
+                                            artistPendingDelete = artist
+                                            isDeleteConfirmationPresented = true
+                                        } label: {
+                                            Label("Delete Artist (Cascade)", systemImage: "trash")
+                                        }
+                                    }
+                                }
+                                .onAppear {
+                                    if isRemoteSourceActive && artist.id == remoteArtists.last?.id && hasMoreRemote && !isLoadingMoreRemote && searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                        if let sourceID = selectedSourceID {
+                                            Task {
+                                                await loadRemoteArtists(sourceID: sourceID, reset: false)
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
+                    }
+
+                    if isLoadingMoreRemote {
+                        HStack(spacing: 8) {
+                            Spacer()
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("正在加载更多艺术家...")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                        }
+                        .padding(.vertical, 12)
                     }
                 }
                 .padding(28)
@@ -191,57 +438,88 @@ struct ArtistsView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Artists")
-                    .font(.largeTitle.bold())
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Artists")
+                        .font(.largeTitle.bold())
 
-                Text("\(allArtists.count) Artists")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            if let onAddMusic {
-                Button {
-                    onAddMusic()
-                } label: {
-                    Label("Add Music", systemImage: "plus")
-                        .font(.callout.bold())
+                    Text(artistsSubtitle)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-            }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-
-                TextField("Filter artists…", text: $searchQuery)
-                    .textFieldStyle(.plain)
-
-                if !searchQuery.isEmpty {
+                if let onAddMusic {
                     Button {
-                        searchQuery = ""
+                        onAddMusic()
                     } label: {
-                        Image(systemName: "xmark.circle.fill")
+                        Label("Add Music", systemImage: "plus")
+                            .font(.callout.bold())
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+
+                HStack(spacing: 10) {
+                    if isSearchingRemote {
+                        ProgressView()
+                            .scaleEffect(0.6)
+                            .frame(width: 14, height: 14)
+                    } else {
+                        Image(systemName: "magnifyingglass")
                             .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-            .frame(width: 260)
 
-            HStack {
-                Spacer()
+                    TextField(isRemoteSourceActive ? "搜索远程艺术家…" : "Filter artists…", text: $searchQuery)
+                        .textFieldStyle(.plain)
+
+                    if !searchQuery.isEmpty {
+                        Button {
+                            searchQuery = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+                .frame(width: 260)
+
+                HStack {
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .frame(maxWidth: .infinity, alignment: .trailing)
+
+            if !availableSources.isEmpty {
+                SourceFilterBarView(sources: availableSources, selectedSourceID: $selectedSourceID)
+            }
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
+    }
+
+    private var artistsSubtitle: String {
+        if isRemoteSourceActive {
+            if isLoadingRemote && remoteArtists.isEmpty {
+                return String(localized: "正在从远程媒体服务加载…")
+            }
+            if isSearchingRemote {
+                return String(localized: "正在检索远程艺术家…")
+            }
+            let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !query.isEmpty {
+                return "搜索结果：\(filteredArtists.count) 位艺术家"
+            }
+            let serverName = availableSources.first(where: { $0.sourceID == selectedSourceID })?.displayName ?? "远程媒体服务"
+            return "\(serverName) • 按需在线浏览"
+        } else {
+            return "\(filteredArtists.count) 位艺术家"
+        }
     }
 
     private var emptyState: some View {
@@ -262,6 +540,44 @@ struct ArtistsView: View {
     }
 
     private func playArtist(_ artist: ArtistPresentationModel) {
+        if artist.id.hasPrefix("subsonic:"), let subsonicServers {
+            let parts = artist.id.split(separator: ":")
+            if parts.count >= 3 {
+                let serverID = LibrarySourceID(String(parts[1]))
+                let remoteArtistID = String(parts[2])
+                if let client = subsonicServers.client(for: serverID) {
+                    Task {
+                        if let artistDTO = try? await client.artist(id: remoteArtistID),
+                           let albums = artistDTO.album, !albums.isEmpty {
+                            for album in albums {
+                                if let detailed = try? await client.album(id: album.id),
+                                   let songs = detailed.song, !songs.isEmpty {
+                                    let items = songs.compactMap { song -> PlaybackItem? in
+                                        let streamURL = try? client.streamURL(id: song.id)
+                                        let coverArtURL = try? client.coverArtURL(id: song.coverArt ?? album.id)
+                                        return PlaybackItem.subsonic(
+                                            serverID: serverID,
+                                            itemID: song.id,
+                                            title: song.title,
+                                            artist: song.artist ?? artist.name,
+                                            album: album.title,
+                                            streamURL: streamURL,
+                                            coverArtURL: coverArtURL
+                                        )
+                                    }
+                                    if let first = items.first {
+                                        playback.play(first, context: items)
+                                        break
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return
+        }
+
         let matching = localStore.tracks.filter {
             $0.artist.trimmingCharacters(in: .whitespacesAndNewlines) == artist.name
         }
@@ -358,6 +674,11 @@ enum ArtistsFeature: ApplicationFeaturePresentation {
                     ArtistsView(
                         localStore: scene.application.localLibrary,
                         playback: scene.application.playback,
+                        subsonicServers: scene.application.subsonicServers,
+                        selectedSourceID: Binding(
+                            get: { scene.selectedSourceFilter },
+                            set: { scene.selectedSourceFilter = $0 }
+                        ),
                         onSelectTrack: { track in
                             scene.select(localTrack: track)
                         },
@@ -370,8 +691,6 @@ enum ArtistsFeature: ApplicationFeaturePresentation {
         ]
     }
 }
-
-
 
 // MARK: - Preview
 
