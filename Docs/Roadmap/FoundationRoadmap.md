@@ -60,7 +60,7 @@
 | **STAGE 3**<br>异类切片压力测试与框架独立 | **脱离音乐场景验证框架**：<br>`Examples/DocStudio`<br>`Examples/HotelDesk`<br>`Packages/AppFoundation/Undo` | · AppFoundationUI 提取通用 Undo 事务机制<br>· 严禁向框架泄漏任何 Music 依赖 | · 独立 Demo App 零修改复用 AppFoundation 架构装配与 Shell<br>· 多窗口文档编辑与 Undo/Redo 回滚测试全绿<br>· 证明框架具备 5 年多种产品支撑力 | 验证框架不是音乐特化封装，奠定未来开发不同领域 Apple 原生产品的基础 |
 | **STAGE 4**<br>跨设备原生互联与生态闭环 | **Apple 多端协同**：<br>`Platform/Network`<br>`Features/RemoteControl` | · 纯 Apple 原生 `Network.framework` (Bonjour)<br>· 局域网轻量状态同步协议 | · iPhone / Apple Watch 自动发现 Mac 播放器并毫秒级遥控<br>· 局域网无损音轨传输与歌单高速下发 | 沙发或床上轻松遥控桌面发烧音响，实现媲美 Apple 官方生态的无缝体验 |
 
-Stage 2 当前进度见[工作队列 #61–#68](../../todo/02-WORK-QUEUE.md)：本地/NAS 专辑 PCM 接续已实现，用户于 2026-09-24 确认本轮使用验收通过；macOS 非默认设备切换、10 段 EQ 及当前 R128 响度功能由用户复验通过。SQLite 增量写入、歌曲及专辑/艺人分页、部分导入失败报告和删除时的收藏/歌单事务级联已接入。50,000 首固定库的隔离存储路径达到 <100ms，曲库额外 RSS 降约 76%；受控 App 进程约 0.7 秒就绪、整进程 RSS 降约 26%，**未达到本表的全进程数字**，测量边界见[大曲库架构](../Architecture/LargeLibraryAndIdentityArchitecture.md)。#67 等待用户决定性能验收口径。Bit-Perfect 未获证明，DAC 切率、独占和热拔插没有单独实测记录；#68 决定阶段最终边界。下一波先由[工作队列 #69](../../todo/02-WORK-QUEUE.md)定界 Stage 3 的真实异类产品场景，再拆实现任务。
+Stage 2 已由用户于 2026-09-24 确认 #67/#68 通过并收尾，当前结果与历史验证见[工作队列](../../todo/02-WORK-QUEUE.md)及[实施历史](../Architecture/ImplementationHistory.md)。本地/NAS 专辑 PCM 接续、macOS 非默认设备切换、10 段 EQ、当前 R128 响度功能和 SQLite 增量/分页/删除级联已落地。50,000 首固定库的隔离存储路径 47–53ms，曲库额外 RSS 降约 76%；受控 App 进程约 0.7 秒就绪、整进程 RSS 降约 26%，**原表中的全进程 <100ms 和总 RSS 降 70% 未达**，测量边界见[大曲库架构](../Architecture/LargeLibraryAndIdentityArchitecture.md)。用户接受当前实测结果作为本阶段交付，不再追本轮原数字。Bit-Perfect、DAC 物理切率/独占/热拔插无单独证明，不能写成已达到的能力。Stage 3 从[工作队列 #69](../../todo/02-WORK-QUEUE.md)接手。
 
 ---
 

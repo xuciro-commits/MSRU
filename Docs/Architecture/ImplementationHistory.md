@@ -2,6 +2,10 @@
 
 > 本文保存旧工作队列及后续完成事项的历史记录与当时验证证据，不作为当前待办，也不证明现行工作树仍满足当时结果。当前任务以 [工作队列](../../todo/02-WORK-QUEUE.md) 为准。
 
+## Stage 2 #67–#68 收尾（2026-09-24，用户确认通过）
+
+用户确认本轮性能与集成任务通过，停止继续处理 #67/#68 并转向 Stage 3。50,000 首数据集的隔离存储路径 47–53ms、曲库增量 RSS 降约 76%；全 App 进程约 0.7 秒就绪、总 RSS 降约 26%，与路线图原数字仍有差距，完整口径见[大曲库架构](LargeLibraryAndIdentityArchitecture.md)。阶段相关定向测试 58 项、来源夹具修正后 3 项、DAC 模拟硬件 5 项通过；macOS/iOS Simulator Debug 构建及架构门禁通过，Preview 源码门禁覆盖 91 个 View/Representable 声明。用户确认本轮使用验收通过；Bit-Perfect、DAC 物理切率/独占/热拔插未单独证明，不列为已达成事实。Stage 3 下一任务见[工作队列 #69](../../todo/02-WORK-QUEUE.md)。
+
 ## #66 SQLite 曲库收口（2026-09-24，用户验收本轮功能）
 
 本地歌曲首批只取 128 首，专辑/艺人摘要各按 64 项分页，SQLite 完成搜索、排序与精确定位；Spotlight、播放队列和显式维护任务逐页读取。歌单增量写入、写失败不发布内存状态、旧数据迁移可重试及媒体/收藏/歌单/来源对账已由上一轮提交。导入现在逐文件报告失败并保留成功项，可修复文件后重试。删除本地资产时，同一 SQLite 事务清理对应收藏来源与歌单引用；多来源收藏保留其它来源，事务失败时资产及引用全部回滚。`CascadeDeletionTests`、`LibraryTests`、`LocalPagingTests`、`SpotlightIndexingTests` 定向测试 **29 项通过**，包含注入失败回滚；macOS 测试构建及 iOS Simulator Debug 构建通过。本轮界面功能由用户验收。#67 的隔离存储性能数字及全 App 指标边界见[大曲库架构](LargeLibraryAndIdentityArchitecture.md)。
