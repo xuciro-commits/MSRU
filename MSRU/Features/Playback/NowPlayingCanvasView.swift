@@ -208,6 +208,10 @@ struct NowPlayingCanvasView: View {
                             ProgressView()
                                 .controlSize(.regular)
                                 .tint(.black)
+                        } else if playback.playbackErrorMessage != nil {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 26, weight: .bold))
+                                .foregroundStyle(.black)
                         } else {
                             Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
                                 .font(.system(size: 26, weight: .bold))
@@ -218,7 +222,8 @@ struct NowPlayingCanvasView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!playback.unifiedHasTrack || playback.isResolving)
-                .help(playback.isPlaying ? "Pause (Space)" : "Play (Space)")
+                .help(playback.playbackErrorMessage.map { "\($0) — Retry (Space)" }
+                    ?? (playback.isPlaying ? "Pause (Space)" : "Play (Space)"))
                 .keyboardShortcut(.space, modifiers: [])
 
                 // Next button
