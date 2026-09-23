@@ -2,6 +2,12 @@
 
 > 本文保存旧工作队列及后续完成事项的历史记录与当时验证证据，不作为当前待办，也不证明现行工作树仍满足当时结果。当前任务以 [工作队列](../../todo/02-WORK-QUEUE.md) 为准。
 
+## #64 10 段均衡器（2026-09-23，待听感验收）
+
+`EqualizerState` 与 `EqualizerStore` 保存 31 Hz–16 kHz 十段参数、旁路开关、内置/自定义预设及选择；面板同时从常驻播放器与完整播放器进入。`PCMPlaybackEngine` 在 `AVAudioPlayerNode` 与主混音器之间插入 `AVAudioUnitEQ`，两侧保持来源 PCM 格式；旁路保留增益参数并恢复原音量，切歌时同一节点保持设置。正增益的总和用于在 EQ 前保守降低电平，减少削波风险；不把该策略宣称为所有瞬态的严格无削波证明。启用 EQ 时，Subsonic 单曲走临时下载解码 PCM；其他无法转换的 AVPlayer 流明确显示 EQ 不可用。macOS 输出状态继续显示引擎与设备速率，并在 EQ 生效时标出 DSP 活跃，绝不宣称 Bit-Perfect。
+
+`EqualizerTests` 3 项定向测试覆盖预设持久化、旁路/增益限幅/电平补偿、连续切歌继承；受影响的 `GaplessPlaybackTests`、`SubsonicPreparedPlaybackTests` 与 `MacAudioOutputTests` 定向测试通过，macOS 与 iOS Simulator Debug 构建通过。界面操作和 EQ 听感由用户集中验收。
+
 ## #63 macOS 输出设备与原生采样率（2026-09-23，待 DAC 验收）
 
 `MacAudioOutputController` 通过 CoreAudio HAL 枚举有输出通道的设备，按 UID 保存显式选择；PCM 节点以 `kAudioOutputUnitProperty_CurrentDevice` 路由，AVPlayer 以 `audioOutputDeviceUniqueID` 路由。仅对显式选择的设备请求来源采样率和可选 Hog Mode；切回系统默认或控制器销毁时归还本进程取得的独占权并尝试恢复设备原采样率。设备列表、存活标记、默认设备和当前设备采样率变化由 HAL 监听；设备失联后回退系统默认并在保留曲目/进度的前提下重新解析。菜单显示输入、引擎输出及设备当前采样率；不支持目标采样率或独占被占用时提示。AVPlayer 流的格式无法在此链路可靠读出，显示 unknown。

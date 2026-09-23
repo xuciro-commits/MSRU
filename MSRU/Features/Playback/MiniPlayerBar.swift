@@ -18,6 +18,7 @@ struct MiniPlayerBar: View {
     var onExpandNowPlaying: (() -> Void)? = nil
 
     @State private var scrubbingProgress: Double? = nil
+    @State private var isEqualizerPresented = false
 
 
     var body: some View {
@@ -416,6 +417,7 @@ struct MiniPlayerBar: View {
         ) {
             if !compact {
                 volumeControl
+                equalizerButton
                 #if os(macOS)
                 outputDeviceMenu
                 #endif
@@ -467,6 +469,22 @@ struct MiniPlayerBar: View {
         }
     }
 
+    private var equalizerButton: some View {
+        Button {
+            isEqualizerPresented.toggle()
+        } label: {
+            Image(systemName: "slider.vertical.3")
+                .font(.system(size: 13))
+                .foregroundStyle(playback.equalizer.state.isEnabled ? Color.accentColor : Color.secondary)
+                .frame(width: 20, height: 20)
+        }
+        .buttonStyle(.plain)
+        .help("Equalizer")
+        .popover(isPresented: $isEqualizerPresented) {
+            EqualizerPanel(playback: playback)
+        }
+    }
+
     #if os(macOS)
     private var outputDeviceMenu: some View {
         Menu {
@@ -482,7 +500,7 @@ struct MiniPlayerBar: View {
             ))
             .disabled(playback.audioOutput.selectedUID == nil)
             Divider()
-            Text(playback.audioOutput.formatSummary)
+            Text(playback.outputFormatSummary)
             if let note = playback.audioOutput.errorMessage { Text(note) }
             Text("Bit-perfect output is unverified")
         } label: {

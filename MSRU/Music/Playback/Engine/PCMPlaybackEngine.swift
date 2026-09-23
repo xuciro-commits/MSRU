@@ -16,6 +16,7 @@ final class PCMPlaybackEngine {
 
     private let audioEngine = AVAudioEngine()
     private let playerNode = AVAudioPlayerNode()
+    private let equalizerNode = AVAudioUnitEQ(numberOfBands: EqualizerState.frequencies.count)
     private let audioFormat: AVAudioFormat
     private var session: any PCMDecodeSession
     private(set) var format: PCMStreamFormat
@@ -51,10 +52,15 @@ final class PCMPlaybackEngine {
     private var baseTime: TimeInterval = 0
     private let maximumScheduledBuffers = 4
     private let decodeBlockFrames = 8192
+    private var requestedVolume: Float = 1
+    private(set) var equalizerState = EqualizerState()
 
     var outputSampleRate: Double { audioEngine.outputNode.outputFormat(forBus: 0).sampleRate }
+    var renderedVolume: Float { playerNode.volume }
+    var equalizerBandGains: [Float] { equalizerNode.bands.map(\.gain) }
+    var equalizerIsBypassed: Bool { equalizerNode.bypass }
 
-    init(resource: PCMPlaybackResource, outputDeviceID: UInt32? = nil) throws {
+    init(resource: PCMPlaybackResource, outputDeviceID: UInt32? = nil, equalizer: EqualizerState = EqualizerState()) throws {
         session = resource.session
         format = resource.format
         guard let audioFormat = AVAudioFormat(
@@ -67,11 +73,22 @@ final class PCMPlaybackEngine {
         }
         self.audioFormat = audioFormat
         audioEngine.attach(playerNode)
-        if #available(macOS 27.0, iOS 27.0, tvOS 27.0, watchOS 27.0, *) {
-            try audioEngine.connectNode(playerNode, to: audioEngine.mainMixerNode, format: audioFormat)
-        } else {
-            audioEngine.connect(playerNode, to: audioEngine.mainMixerNode, format: audioFormat)
+        audioEngine.attach(equalizerNode)
+        for (index, frequency) in EqualizerState.frequencies.enumerated() {
+            let band = equalizerNode.bands[index]
+            band.filterType = .parametric
+            band.frequency = min(frequency, Float(resource.format.sampleRate * 0.45))
+            band.bandwidth = 1
+            band.bypass = false
         }
+        if #available(macOS 27.0, iOS 27.0, tvOS 27.0, watchOS 27.0, *) {
+            try audioEngine.connectNode(playerNode, to: equalizerNode, format: audioFormat)
+            try audioEngine.connectNode(equalizerNode, to: audioEngine.mainMixerNode, format: audioFormat)
+        } else {
+            audioEngine.connect(playerNode, to: equalizerNode, format: audioFormat)
+            audioEngine.connect(equalizerNode, to: audioEngine.mainMixerNode, format: audioFormat)
+        }
+        applyEqualizer(equalizer)
         #if os(macOS)
         try audioEngine.routeToMacOutput(deviceID: outputDeviceID)
         #endif
@@ -83,8 +100,22 @@ final class PCMPlaybackEngine {
     var hasPendingTransition: Bool { pendingTransition != nil }
     var duration: TimeInterval { format.duration ?? 0 }
     var volume: Float {
-        get { playerNode.volume }
-        set { playerNode.volume = newValue }
+        get { requestedVolume }
+        set {
+            requestedVolume = min(max(newValue, 0), 1)
+            playerNode.volume = requestedVolume * equalizerState.headroomMultiplier
+        }
+    }
+
+    func applyEqualizer(_ state: EqualizerState) {
+        var normalized = state
+        normalized.sanitize()
+        equalizerState = normalized
+        equalizerNode.bypass = !normalized.isEnabled
+        for (band, gain) in zip(equalizerNode.bands, normalized.gains) {
+            band.gain = gain
+        }
+        playerNode.volume = requestedVolume * normalized.headroomMultiplier
     }
 
     var currentTime: TimeInterval {

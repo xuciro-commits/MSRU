@@ -19,6 +19,7 @@ struct NowPlayingCanvasView: View {
     @State private var scrubbingProgress: Double? = nil
     @State private var isQueueDrawerPresented: Bool = false
     @State private var isLyricsPresented: Bool = false
+    @State private var isEqualizerPresented: Bool = false
     @State private var lyricsStore = LyricsStore.shared
 
     var body: some View {
@@ -268,6 +269,19 @@ struct NowPlayingCanvasView: View {
                     .font(.system(size: 13))
                     .foregroundStyle(.white.opacity(0.75))
                     .frame(width: 20)
+
+                Button {
+                    isEqualizerPresented.toggle()
+                } label: {
+                    Image(systemName: "slider.vertical.3")
+                        .font(.system(size: 14))
+                        .foregroundStyle(playback.equalizer.state.isEnabled ? Color.accentColor : .white.opacity(0.75))
+                }
+                .buttonStyle(.plain)
+                .help("Equalizer")
+                .popover(isPresented: $isEqualizerPresented) {
+                    EqualizerPanel(playback: playback)
+                }
 
                 Spacer()
 
