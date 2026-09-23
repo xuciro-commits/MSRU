@@ -6,8 +6,6 @@
 
 - **#61 · 本地专辑连续 PCM 排程**（已实现，待用户验收）。同采样率、同声道曲目在单个播放节点接续；定向代码测试 4 项及 macOS Debug 构建通过。依据 [Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)、[播放交互 15.2](../Docs/Blueprint/InteractionAtlas.md)；当时实现见[实施记录](../Docs/Architecture/ImplementationHistory.md)。完成条件：用户确认真实专辑交接听感、曲目信息切换与队列顺序。
 - **#62 · NAS 专辑连续播放与异格式交接**（已实现，待用户验收）。普通单曲流播；专辑队列经临时下载和 PCM 预备接续，异格式退回正常切歌。定向代码测试 8 项通过；真实 NAS 听感、等待与错误体验由用户验收。依据[播放交互 15.2](../Docs/Blueprint/InteractionAtlas.md)，细节见[实施记录](../Docs/Architecture/ImplementationHistory.md)。
-- **#63 · macOS 输出设备与原生采样率链路**（代码已修复，待设备复验）。可选输出设备、原生采样率请求、HAL 独占尝试与失联恢复；非默认设备切换已改为旧引擎关闭后再路由，新引擎等待 HAL 稳定。macOS 定向测试与 iOS 模拟器构建通过；用户复验 DSF 切设备、DAC 切率、独占及热拔插。Bit-Perfect 未证实；依据[播放交互 15.1](../Docs/Blueprint/InteractionAtlas.md)，细节见[实施记录](../Docs/Architecture/ImplementationHistory.md)。
-- **#64 · 10 段均衡器**（代码已按试听反馈修复，待用户复验）。PCM 链路支持 10 段、旁路、预设和持久化；启用 EQ 保持原音量，正增益可能削波并在面板提示。NAS 单曲在开启 EQ 后进入 PCM 准备，AVPlayer 直播和不可解码流提示不可用。定向测试 3 项及受影响播放测试通过；依据[播放交互 15.1](../Docs/Blueprint/InteractionAtlas.md)，细节见[实施记录](../Docs/Architecture/ImplementationHistory.md)。
 
 ## Stage 2 待开始（按顺序推进）
 
@@ -18,7 +16,7 @@
 | **#65 · 待开始** | **EBU R128 / ReplayGain 响度**：扫描并持久化曲目/专辑响度与峰值，播放时提供模式和防削波策略；承接 #64 的 DSP 边界，依据[Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)。 | 固定音频样本的扫描结果、专辑/曲目模式、缺失标签回退和削波边界有代码测试；关闭标准化可恢复原始增益；用户验收音量体验。 |
 | **#66 · 待开始** | **SQLite 曲库存储收口与零数据丢失**：基于现有 GRDB/WAL 和迁移，不再让大库依赖整表加载、删除后全量重写；依据[数据边界](../Docs/Architecture/DataBoundaries.md)与[大曲库架构](../Docs/Architecture/LargeLibraryAndIdentityArchitecture.md)。 | 增量写入、分页查询、迁移重入/中断恢复、备份或回滚路径有契约测试；迁移验证成功前不删除旧数据；旧数据与收藏/歌单/来源逐项对账，无静默丢失。 |
 | **#67 · 待开始** | **50,000 首曲库性能与流式展示**：在 #66 的查询契约上收口首屏分页、滚动追加、搜索和缓存；依据[大曲库架构](../Docs/Architecture/LargeLibraryAndIdentityArchitecture.md)。 | 先固定设备、数据集、冷启动起止点和当前内存基线，再验证路线图的 <100ms、内存下降 70% 目标；保留可复现基准结果，达不到则记录瓶颈并继续优化，不凭空宣称达标。用户验收滚动体验。 |
-| **#68 · 待开始** | **Stage 2 集成与收尾**：核对 #61–#67 的音频、存储和失败恢复证据，处理未决限制；依据[Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)与[架构验证](../Docs/Architecture/ArchitectureVerification.md)。 | 所有子任务已完成或有明确的用户范围决策；受影响平台构建与定向测试通过，用户完成听感/DAC/大库体验验收；路线图和完成索引只记录实际达成的目标，随后标记 Stage 2 结束。 |
+| **#68 · 待开始** | **Stage 2 集成与收尾**：核对 #61–#67 的音频、存储和失败恢复证据，处理未决限制；依据[Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)与[架构验证](../Docs/Architecture/ArchitectureVerification.md)。 | 所有子任务已完成或有明确的用户范围决策；受影响平台构建与定向测试通过，用户完成听感/DAC/大库体验验收；明确 #63 尚未证明的 Bit-Perfect、DAC 切率/独占/热拔插边界，路线图和完成索引只记录实际达成的目标，随后标记 Stage 2 结束。 |
 
 ## 按真实需求启动
 
@@ -29,6 +27,7 @@
 ## 已完成索引
 
 - 编号 **1–60** 已完成；范围、当时证据及必要背景见[实施历史归档](../Docs/Architecture/ImplementationHistory.md)。#59 的 Spotlight 与快捷指令已由用户验收通过；歌词功能由用户手动试用，端到端基本通过。
+- **#63–#64** 已由用户于 2026-09-23 验收通过：非默认设备切换与均衡器音量问题修复；代码与测试证据见[实施历史归档](../Docs/Architecture/ImplementationHistory.md)。Bit-Perfect 等未证实的 DAC 边界留 #68 决定。
 - 历史验证不作为当前构建或测试结果。新任务只做影响范围内的定向代码、接口测试；长期有效的回归用例留正式 Tests，任务探针用完移除。具体分工见[架构验证](../Docs/Architecture/ArchitectureVerification.md)。
 
 ## 维护规则
