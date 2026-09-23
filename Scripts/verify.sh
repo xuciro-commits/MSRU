@@ -4,6 +4,8 @@
 #   Scripts/verify.sh gates      source guardrails only (seconds, no Xcode needed)
 #   Scripts/verify.sh packages   gates + `swift test` for every local package
 #   Scripts/verify.sh app        gates + app build/test via xcodebuild
+#   Scripts/verify.sh contract   gates + kernel contract: schema lint, generated code in sync,
+#                                Go and Swift implementations against the shared vectors
 # Full logs: .build/verify/<step>.log (gitignored). Exit code is non-zero if any step fails.
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -31,6 +33,12 @@ if [[ "$MODE" == all || "$MODE" == packages ]]; then
   for pkg in AppFoundation MusicDomain; do
     step "test-$pkg" swift test --package-path "Packages/$pkg"
   done
+fi
+
+if [[ "$MODE" == all || "$MODE" == contract ]]; then
+  step contract-schema bash -c 'cd Contract/proto && buf lint && PATH="$(go env GOPATH)/bin:$PATH" buf generate && git diff --exit-code -- ../go/gen'
+  step contract-go bash -c 'cd Contract/go && go vet ./... && go test -count=1 ./...'
+  step contract-swift swift test --package-path Contract/swift
 fi
 
 if [[ "$MODE" == all || "$MODE" == app ]]; then

@@ -27,6 +27,7 @@ Start here (Claude Code reaches this file through `CLAUDE.md`). This file is eno
 | `Packages/MusicDomain` | Music domain package, layered `MusicPlayback` → `MusicLibrary` → `MusicDomain`, plus leaf `SubsonicKit`: types/toolkits, library + persistence (GRDB/SQLite + migrations), sources, identity, import, providers, radio, queries, playback, Subsonic client ([ADR-0004](Docs/ADR/0004-music-domain-packages.md)) |
 | `Packages/ChromaSwift`, `Packages/MSRUCodecFFmpeg` | Chromaprint wrapper (vendored `chromaprint/` source), FFmpeg micro XCFramework (vendored, built by script) |
 | `MSRUTests`, `MSRUUITests` | App unit/contract tests (Swift Testing), process-level UI tests |
+| `Contract/` | Kernel contract: Protobuf data contract, semantic specs, conformance vectors; Go reference and Swift implementations run the same vectors. Domain-neutral, depends on no product code; moves to the platform repository at the split (ADR-0003) |
 | `Scripts/` | `verify.sh`, `verify-architecture.py`, `verify-previews.py`, `repo-health.py` |
 | `Docs/` | Canonical documentation (below) |
 
@@ -57,7 +58,7 @@ Conflicts: the owner's latest instruction decides requirements; code and fresh v
 
 - Music-specific types, rules, storage and integrations → the `Packages/MusicDomain` targets, never AppFoundation or the app target.
 - Reusable, domain-neutral Apple client mechanisms → AppFoundation, only when at least two real uses share the same lifetime and failure semantics.
-- Platform/kernel/server code → the platform repository (until it exists: design only, in `Docs/Platform.md`).
+- Kernel contract → `Contract/` (schema, specs, vectors first; implementations follow). Other platform/server code → the platform repository (until it exists: design only, in `Docs/Platform.md`).
 - Product UI → `MSRU/Features`; platform adapters → `MSRU/Platform`.
 
 ## Build, test, lint
@@ -68,6 +69,7 @@ Requirements: macOS 27 with Xcode 27 (deployment target 27.0, Swift 6 language m
 Scripts/verify.sh gates      # architecture + preview guardrails (seconds)
 Scripts/verify.sh packages   # gates + swift test for AppFoundation, MusicDomain
 Scripts/verify.sh app        # gates + macOS unit tests (scheme MSRU-UnitTests) + iOS Simulator build (scheme MSRU)
+Scripts/verify.sh contract   # gates + kernel contract (needs go, buf, protoc-gen-go: brew install go bufbuild/buf/buf)
 Scripts/verify.sh            # everything; logs in .build/verify/
 Scripts/repo-health.py [--since REF]   # size, hotspots, unreachable files, placeholder UI, sparse formatting
 ```

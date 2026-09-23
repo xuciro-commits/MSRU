@@ -58,6 +58,28 @@ Each item is a falsifiable statement. Status: **H** hypothesis · **2D** used in
 
 Explicitly **not** kernel today: capacity allocation over time (candidate capability — Hotel, manufacturing scheduling), a workflow engine (compare Music import review, Hotel reservation lifecycle and a manufacturing work order first, all as code state machines), money/ledger, organizational hierarchy, UI shells and routes, matching toolkits, media playback.
 
+### Kernel Contract
+
+The kernel is defined by six parts, all in `Contract/` (the seed of the platform repository, ADR-0003). A part never substitutes for another: the schema says what data looks like, never what it means.
+
+| Part | Answers | Form |
+|---|---|---|
+| Data contract | What does the data look like? | Protobuf in `Contract/proto`, checked by `buf lint` |
+| Semantics | What does it mean; what is valid? | Numbered rules (MUST/MUST NOT) with the error each violation returns, `Contract/spec/K*.md` |
+| Errors | Do all runtimes reject the same way? | One error-code set, `Contract/spec/errors.md`; only the code is contract |
+| Compatibility | How may it change without harming old clients or data? | Rules below |
+| Conformance | How is an implementation proven correct? | Language-neutral vectors in `Contract/vectors`; Go (reference) and Swift run the same files |
+| Scope | What is not kernel; who changes it? | This section, §4 promotion rules, ADRs |
+
+**Version.** One identifier for schema package, specs and vectors: `v1alpha1` while concepts are hypotheses (breaking changes allowed, each listed in the change), `v1` once they are stable (breaking changes need a new major version and an ADR).
+
+**Compatibility.** Field numbers and enum values are never reused; removed ones are reserved. A change is breaking if it makes any existing vector fail, changes when an existing error code is returned, or changes the meaning of a field even with an unchanged schema. Adding optional fields, error codes or vectors for previously unspecified behaviour is minor. Readers preserve unknown fields.
+
+**Conformance.** An implementation conforms to a version for the concepts whose vectors it passes in full. Vector format: `{contract, concept, vectors: [{id, rules, given, steps: [{<operation>, expect}], expectLog?}]}`. Schema objects use Protobuf JSON names and are parsed strictly. Values assigned by the implementation are referenced indirectly (`"$step:N"` for the change ID produced by step N; `sameAs: N` for a replay of step N). The authority clock is given per step (`at`), so results are deterministic.
+
+**Current coverage.** K1 Identity and K4 Change record (`v1alpha1`).
+
+
 ### Fact kinds across domains
 
 | Kind | Music | Hotel | Manufacturing |

@@ -19,6 +19,10 @@ DOMAIN_MODULES = {
     "MusicDomain", "MusicLibrary", "MusicPlayback",
 }
 UI_MODULES = {"SwiftUI", "AppKit", "UIKit", "AppFoundationUI"}
+CONTRACT_DOMAIN_WORDS = re.compile(
+    r"\b(?:music|track|album|artist|playlist|song|lyric|subsonic|openverse|hotel|room|reservation|guest)s?\b",
+    re.IGNORECASE,
+)
 # Music packages layer downward: MusicPlayback -> MusicLibrary -> MusicDomain;
 # SubsonicKit sits beside MusicDomain as a leaf.
 # Each target may not import the modules listed for it.
@@ -85,6 +89,19 @@ def violations(root: Path) -> list[str]:
                     errors.append(
                         f"{path.relative_to(root)}:{number}: {target} must not import {match.group(1)}"
                     )
+
+    # The kernel contract is domain-neutral (Docs/Platform.md §4) and depends on no product code.
+    contract = root / "Contract"
+    for path in sorted(p for p in contract.rglob("*") if p.suffix in {".proto", ".md", ".json", ".go", ".swift"}
+                       and not {".build", "gen"} & set(p.relative_to(contract).parts)):
+        text = path.read_text()
+        for match in CONTRACT_DOMAIN_WORDS.finditer(text):
+            number = text.count("\n", 0, match.start()) + 1
+            errors.append(f"{path.relative_to(root)}:{number}: domain vocabulary in kernel contract: {match.group(0)}")
+        for number, line in enumerate(text.splitlines(), 1):
+            match = IMPORT.match(line) if path.suffix == ".swift" else None
+            if match and (match.group(1) in DOMAIN_MODULES | UI_MODULES | {"AppFoundation"} or match.group(1).startswith("MSRU")):
+                errors.append(f"{path.relative_to(root)}:{number}: kernel contract must not import {match.group(1)}")
 
     for path in sorted((root / "MSRU").rglob("*.swift")):
         if path.is_relative_to(root / "MSRU/Platform"):
