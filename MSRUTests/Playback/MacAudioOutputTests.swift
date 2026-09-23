@@ -7,8 +7,8 @@ import Testing
 @testable import MSRU
 
 @MainActor
-@Suite("macOS audio output routing", .serialized)
-struct MacAudioOutputTests {
+@Suite("macOS audio hardware smoke", .serialized)
+struct MacAudioHardwareSmokeTests {
     @Test("CoreAudio enumerates the current default output without changing it")
     func realHardwareEnumeration() throws {
         let hardware = CoreAudioHardware()
@@ -32,7 +32,11 @@ struct MacAudioOutputTests {
         #expect(status == noErr)
         #expect(routedID == defaultID)
     }
+}
 
+@MainActor
+@Suite("macOS audio output routing simulation", .serialized)
+struct MacAudioOutputTests {
     private func device(
         _ id: AudioDeviceID, _ uid: String, rate: Double = 48_000,
         supported: [Double] = [44_100, 48_000]

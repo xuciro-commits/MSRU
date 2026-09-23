@@ -13,7 +13,7 @@
 | 编号 / 状态 | 大任务与边界 | 完成条件 / 交接依据 |
 | --- | --- | --- |
 | **#67 · 待决定** | **50,000 首曲库性能验收口径**：固定设备、数据集、进程起止点和 RSS 基线已有[实测记录](../Docs/Architecture/LargeLibraryAndIdentityArchitecture.md)。隔离数据路径与曲库额外 RSS 达目标；全 App 进程指标未达路线图原文。 | 用户明确选定 Stage 2 的指标口径；若坚持全进程数字，则继续优化并复测，不能以曲库代码路径代替。用户已完成本轮界面体验验收。 |
-| **#68 · 进行中** | **Stage 2 集成与收尾**：相关代码定向测试 58 项通过，来源测试夹具修正后 3 项通过；macOS/iOS Simulator Debug 构建与架构导入门禁通过。2026-09-24 用户确认本轮使用验收通过；同日补齐仓库 Preview 源码门禁，91 个直接 View/Representable 声明均有同文件预览，macOS/iOS Simulator 构建通过。依据[Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)与[架构验证](../Docs/Architecture/ArchitectureVerification.md)。 | 等 #67 指标口径；DAC Bit-Perfect、硬件切率、独占和热拔插缺少单独证据，关闭阶段前明确是补测还是留待后续。路线图只记录实际达成。 |
+| **#68 · 进行中** | **Stage 2 集成与收尾**：相关代码定向测试 58 项通过，来源测试夹具修正后 3 项通过；macOS/iOS Simulator Debug 构建与架构导入门禁通过。2026-09-24 用户确认本轮使用验收通过；同日补齐仓库 Preview 源码门禁，91 个直接 View/Representable 声明均有同文件预览，macOS/iOS Simulator 构建通过。DAC 模拟测试与真实硬件冒烟测试已分组，模拟测试 5 项通过；PCM 数字路径边界见[架构验证](../Docs/Architecture/ArchitectureVerification.md)。 | 等 #67 指标口径；DAC Bit-Perfect、硬件切率、独占和热拔插缺少单独证据，关闭阶段前明确是补测还是留待后续。路线图只记录实际达成。 |
 
 ## 下一波：Stage 3 准备
 
