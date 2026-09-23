@@ -283,6 +283,10 @@ struct NowPlayingCanvasView: View {
                     EqualizerPanel(playback: playback)
                 }
 
+                #if os(macOS)
+                AudioOutputMenu(playback: playback, iconColor: .white.opacity(0.75))
+                #endif
+
                 Spacer()
 
                 // Lyrics toggle
