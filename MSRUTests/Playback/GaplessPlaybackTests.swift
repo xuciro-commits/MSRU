@@ -5,6 +5,30 @@ import Testing
 @MainActor
 @Suite("Local PCM album playback", .serialized)
 struct GaplessPlaybackTests {
+    @Test("Preseeked PCM playback resumes at its saved position and can seek again")
+    func resumesFromPosition() async throws {
+        let url = try Fixtures.createDeterministicWAV(durationSeconds: 0.6)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let decoded = try await AppleAudioFileDecoder().open(url)
+        try await decoded.session.seek(to: 0.15)
+        let engine = try await PCMPlaybackEngine(
+            resource: PCMPlaybackResource(format: decoded.format, session: decoded.session),
+            initialTime: 0.15
+        )
+        engine.volume = 0
+        engine.play()
+        for _ in 0..<20 where engine.currentTime <= 0.15 {
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        #expect(engine.currentTime > 0.15)
+        try await engine.seek(to: 0.3)
+        for _ in 0..<20 where engine.currentTime <= 0.3 {
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        #expect(engine.currentTime > 0.3)
+        await engine.close()
+    }
+
     @Test("Apple local provider decodes the file to PCM blocks")
     func localFileUsesPCM() async throws {
         let url = try Fixtures.createDeterministicWAV(durationSeconds: 0.2, channels: 2)
@@ -41,7 +65,7 @@ struct GaplessPlaybackTests {
         let codec = AppleAudioFileDecoder()
         let first = try await codec.open(firstURL)
         let second = try await codec.open(secondURL)
-        let engine = try PCMPlaybackEngine(resource: PCMPlaybackResource(format: first.format, session: first.session))
+        let engine = try await PCMPlaybackEngine(resource: PCMPlaybackResource(format: first.format, session: first.session))
 
         let nextResource = PlaybackResource(
             providerID: .local,
@@ -84,7 +108,7 @@ struct GaplessPlaybackTests {
         let codec = AppleAudioFileDecoder()
         let first = try await codec.open(firstURL)
         let second = try await codec.open(secondURL)
-        let engine = try PCMPlaybackEngine(resource: PCMPlaybackResource(format: first.format, session: first.session))
+        let engine = try await PCMPlaybackEngine(resource: PCMPlaybackResource(format: first.format, session: first.session))
         let next = PlaybackResource(
             providerID: .local,
             transport: .decodedPCM(PCMPlaybackResource(format: second.format, session: second.session))

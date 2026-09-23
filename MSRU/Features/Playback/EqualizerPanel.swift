@@ -73,8 +73,9 @@ struct EqualizerPanel: View {
             Text(playback.equalizerStatus)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            if playback.equalizer.state.isEnabled {
-                Text(String(format: "Headroom: −%.1f dB to reduce clipping", playback.equalizer.state.headroomDecibels))
+            if playback.equalizer.state.isEnabled,
+               playback.equalizer.state.gains.contains(where: { $0 > 0 }) {
+                Text("Boost may clip loud recordings; playback volume stays unchanged.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

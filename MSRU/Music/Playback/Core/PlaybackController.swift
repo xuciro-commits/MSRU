@@ -139,6 +139,8 @@ private struct WeakSessionObserver {
     private var resolutionTask: Task<Void, Never>?
 
     private var activeResolutionID: UUID?
+    private var resolvingResumeTime: TimeInterval = 0
+    private var resolvingAutoPlay = true
 
     // MARK: - AVPlayer
 
@@ -160,6 +162,10 @@ private struct WeakSessionObserver {
     private var pcmNextResolutionTask: Task<Void, Never>?
 
     private var pcmNextTargetID: UUID?
+
+    private var pcmShutdownTask: Task<Void, Never>?
+    private var pcmShutdownSerial = 0
+    private var pcmRecoveryAttempts: [Date] = []
 
     private let makePlayer: (URL) -> AVPlayer
 
@@ -193,17 +199,29 @@ private struct WeakSessionObserver {
 
     #if os(macOS)
     func selectOutputDevice(_ uid: String?) {
-        player?.pause()
-        pcmEngine?.stopOutput()
-        audioOutput.select(uid)
-        restartCurrentForOutputChange()
+        pcmRecoveryAttempts.removeAll()
+        guard let currentItem, hasActiveTransport || isResolving else {
+            audioOutput.select(uid)
+            return
+        }
+        let resumeAt = pcmEngine?.currentTime ?? (isResolving ? resolvingResumeTime : currentTime)
+        let autoPlay = isResolving ? resolvingAutoPlay : isPlaying
+        resolveAndStart(currentItem, resumeAt: resumeAt, autoPlay: autoPlay) { [weak self] in
+            self?.audioOutput.select(uid)
+        }
     }
 
     func setExclusiveOutput(_ enabled: Bool) {
-        player?.pause()
-        pcmEngine?.stopOutput()
-        audioOutput.setExclusive(enabled)
-        restartCurrentForOutputChange()
+        pcmRecoveryAttempts.removeAll()
+        guard let currentItem, hasActiveTransport || isResolving else {
+            audioOutput.setExclusive(enabled)
+            return
+        }
+        let resumeAt = pcmEngine?.currentTime ?? (isResolving ? resolvingResumeTime : currentTime)
+        let autoPlay = isResolving ? resolvingAutoPlay : isPlaying
+        resolveAndStart(currentItem, resumeAt: resumeAt, autoPlay: autoPlay) { [weak self] in
+            self?.audioOutput.setExclusive(enabled)
+        }
     }
 
     private func restartCurrentForOutputChange() {
@@ -1101,17 +1119,26 @@ private struct WeakSessionObserver {
             return
         }
 
+        pcmRecoveryAttempts.removeAll()
         resolveAndStart(failedItem)
     }
 
     // MARK: - Resolve
 
-    private func resolveAndStart(_ item: PlaybackItem, resumeAt: TimeInterval = 0, autoPlay: Bool = true) {
+    private func resolveAndStart(
+        _ item: PlaybackItem,
+        resumeAt: TimeInterval = 0,
+        autoPlay: Bool = true,
+        afterShutdown: (@MainActor () -> Void)? = nil
+    ) {
 
         currentRecordingMBID = nil
+        resolvingResumeTime = resumeAt
+        resolvingAutoPlay = autoPlay
         cancelActiveResolution()
 
         tearDownActiveTransport()
+        let shutdown = pcmShutdownTask
 
         currentResource = nil
 
@@ -1148,6 +1175,10 @@ private struct WeakSessionObserver {
 
             do {
 
+                await shutdown?.value
+                guard !Task.isCancelled, self.activeResolutionID == resolutionID else { return }
+                afterShutdown?()
+
                 let resource = try await self.providerKernel.resolver.resolve(request)
 
                 guard !Task.isCancelled, self.activeResolutionID == resolutionID else {
@@ -1158,7 +1189,7 @@ private struct WeakSessionObserver {
                 }
 
                 do {
-                    try self.activate(resource: resource, item: item, resumeAt: resumeAt, autoPlay: autoPlay)
+                    try await self.activate(resource: resource, item: item, resumeAt: resumeAt, autoPlay: autoPlay)
                 } catch {
                     if case .decodedPCM(let pcm) = resource.transport {
                         await pcm.session.close()
@@ -1217,7 +1248,7 @@ private struct WeakSessionObserver {
 
     // MARK: - Activate
 
-    private func activate(resource: PlaybackResource, item: PlaybackItem, resumeAt: TimeInterval = 0, autoPlay: Bool = true) throws {
+    private func activate(resource: PlaybackResource, item: PlaybackItem, resumeAt: TimeInterval = 0, autoPlay: Bool = true) async throws {
 
         /*
          无论上一个 Transport 是 AVPlayer
@@ -1254,8 +1285,9 @@ private struct WeakSessionObserver {
             installObservers(for: newPlayer)
 
             if resumeAt > 0 {
-                newPlayer.seek(to: CMTime(seconds: resumeAt, preferredTimescale: 600),
-                               toleranceBefore: .zero, toleranceAfter: .zero)
+                await newPlayer.seek(to: CMTime(seconds: resumeAt, preferredTimescale: 600),
+                                     toleranceBefore: .zero, toleranceAfter: .zero)
+                guard !Task.isCancelled, player === newPlayer else { throw CancellationError() }
             }
             if autoPlay { newPlayer.play() }
             isPlaying = autoPlay
@@ -1264,12 +1296,18 @@ private struct WeakSessionObserver {
 
         case .decodedPCM(let pcmResource):
 
+            let targetTime = max(0, resumeAt)
+            if targetTime > 0 { try await pcmResource.session.seek(to: targetTime) }
+            try Task.checkCancellation()
+
             #if os(macOS)
             let outputRoute = try audioOutput.prepare(inputRate: pcmResource.format.sampleRate)
-            let engine = try PCMPlaybackEngine(resource: pcmResource, outputDeviceID: outputRoute.deviceID, equalizer: equalizer.state)
+            let engine = try await PCMPlaybackEngine(resource: pcmResource, outputDeviceID: outputRoute.deviceID,
+                                                     equalizer: equalizer.state, initialTime: targetTime)
             audioOutput.updateEngineRate(engine.outputSampleRate)
             #else
-            let engine = try PCMPlaybackEngine(resource: pcmResource, equalizer: equalizer.state)
+            let engine = try await PCMPlaybackEngine(resource: pcmResource, equalizer: equalizer.state,
+                                                     initialTime: targetTime)
             #endif
             engine.volume = isMuted ? 0.0 : volume
 
@@ -1281,6 +1319,23 @@ private struct WeakSessionObserver {
             engine.onFailure = { [weak self, weak engine] error in
                 guard let self, let engine, self.pcmEngine === engine else { return }
                 self.handleTransportFailure(error.localizedDescription)
+            }
+
+            engine.onConfigurationChanged = { [weak self, weak engine] in
+                guard let self, let engine, self.pcmEngine === engine,
+                      let currentItem = self.currentItem, !self.isResolving else { return }
+                let now = Date()
+                self.pcmRecoveryAttempts.removeAll { now.timeIntervalSince($0) > 10 }
+                guard self.pcmRecoveryAttempts.count < 3 else {
+                    self.handleTransportFailure("Audio output changed repeatedly. Select another output or retry.")
+                    return
+                }
+                self.pcmRecoveryAttempts.append(now)
+                self.resolveAndStart(currentItem, resumeAt: self.currentTime, autoPlay: self.isPlaying)
+            }
+            guard !Task.isCancelled, engine.isOutputRunning else {
+                await engine.close()
+                throw CancellationError()
             }
 
             engine.onAdvanced = { [weak self, weak engine] queueID, nextResource in
@@ -1319,20 +1374,7 @@ private struct WeakSessionObserver {
 
             startPCMTimeUpdates(engine)
 
-            if resumeAt > 0 {
-                Task { [weak self, weak engine] in
-                    guard let self, let engine, self.pcmEngine === engine else { return }
-                    do {
-                        try await engine.seek(to: resumeAt)
-                        guard self.pcmEngine === engine else { return }
-                        if autoPlay { engine.play() }
-                        self.refreshPCMNext(force: true)
-                    } catch {
-                        guard self.pcmEngine === engine else { return }
-                        self.handleTransportFailure(error.localizedDescription)
-                    }
-                }
-            } else if autoPlay {
+            if autoPlay {
                 engine.play()
             }
             isPlaying = autoPlay
@@ -1403,14 +1445,23 @@ private struct WeakSessionObserver {
         pcmEngine = nil
 
         if let previousPCMEngine {
-            previousPCMEngine.stopOutput()
+            previousPCMEngine.pause()
             previousPCMEngine.onEnded = nil
             previousPCMEngine.onFailure = nil
             previousPCMEngine.onAdvanced = nil
-
-            Task {
-
+            previousPCMEngine.onConfigurationChanged = nil
+            let earlier = pcmShutdownTask
+            pcmShutdownSerial += 1
+            let serial = pcmShutdownSerial
+            let task = Task(priority: .userInitiated) {
+                await earlier?.value
                 await previousPCMEngine.close()
+            }
+            pcmShutdownTask = task
+            Task { [weak self] in
+                await task.value
+                guard let self, self.pcmShutdownSerial == serial else { return }
+                self.pcmShutdownTask = nil
             }
         }
     }
