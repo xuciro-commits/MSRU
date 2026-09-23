@@ -276,6 +276,23 @@ final class MacSceneCoordinator {
         }
     }
 
+    func openSpotlightItem(_ identifier: String) {
+        guard let item = SpotlightMusicID(rawValue: identifier) else { return }
+        let section: SceneSection
+        switch item {
+        case .track: section = .library
+        case .album: section = .albums
+        case .artist: section = .artists
+        }
+        guard let sceneID = route(SceneRoutingRequest(route: .section(section))),
+              let scene = runtimes[sceneID]?.scene else { return }
+        Task {
+            if await SpotlightSelectionRouter.open(identifier: identifier, in: scene) {
+                NSApp.activate(ignoringOtherApps: true)
+            }
+        }
+    }
+
 
     // MARK: - Route Existing Scene
 

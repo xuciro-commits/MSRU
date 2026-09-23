@@ -4,6 +4,7 @@ import Foundation
 import SwiftUI
 import AppFoundation
 import AppFoundationUI
+import CoreSpotlight
 
 
 @MainActor
@@ -56,6 +57,7 @@ struct SwiftUISceneRootView:
 
 
     @State private var shellSession: MSRUApplicationShellSession?
+    @State private var pendingSpotlightIdentifier: String?
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -125,6 +127,15 @@ struct SwiftUISceneRootView:
             handleExternalURL(
                 url
             )
+        }
+        .onContinueUserActivity(CSSearchableItemActionType) { activity in
+            guard let identifier = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+                  SpotlightMusicID(rawValue: identifier) != nil else { return }
+            if let scene {
+                Task { await SpotlightSelectionRouter.open(identifier: identifier, in: scene) }
+            } else {
+                pendingSpotlightIdentifier = identifier
+            }
         }
     }
 
@@ -260,6 +271,11 @@ struct SwiftUISceneRootView:
 
         scene =
             resolvedScene
+
+        if let pendingSpotlightIdentifier {
+            self.pendingSpotlightIdentifier = nil
+            Task { await SpotlightSelectionRouter.open(identifier: pendingSpotlightIdentifier, in: resolvedScene) }
+        }
 
         let session = MSRUApplicationShellSession(scene: resolvedScene)
         session.installShellActions { [weak resolvedScene] in

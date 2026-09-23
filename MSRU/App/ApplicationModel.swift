@@ -6,6 +6,7 @@
 import Foundation
 import Observation
 import AppFoundation
+import AppIntents
 
 
 // MARK: - Application Scope
@@ -44,6 +45,8 @@ final class ApplicationModel {
 
     let localLibrary:
         LocalLibraryStore
+
+    private let spotlightIndexer = SpotlightIndexingService()
 
 
     // MARK: - Library
@@ -301,6 +304,8 @@ final class ApplicationModel {
 
         self.dependencies =
             dependencies
+
+        AppDependencyManager.shared.add(dependency: self)
     }
 
 
@@ -327,6 +332,9 @@ final class ApplicationModel {
 
         hasStarted =
             true
+
+        MusicAppShortcuts.updateAppShortcutParameters()
+        localLibrary.attachSpotlightIndexer(spotlightIndexer)
 
 
         let library =
@@ -375,6 +383,7 @@ final class ApplicationModel {
         systemNowPlayingCoordinator?.deactivate()
         systemNowPlayingCoordinator = nil
         watchedFolders.stopMonitoring()
+        spotlightIndexer.cancel()
 
         startupTask?
             .cancel()

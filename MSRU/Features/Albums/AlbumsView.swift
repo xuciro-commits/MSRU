@@ -40,6 +40,7 @@ struct AlbumsView: View {
     @State private var selectedAlbumIDs: Set<String> = []
     @State private var isBatchDeleteConfirmationPresented: Bool = false
     @Binding var selectedSourceID: String?
+    @Binding var requestedAlbumID: String?
     @State private var availableSources: [SourceFilterItem] = []
     @State private var remoteAlbums: [AlbumPresentationModel] = []
     @State private var isLoadingRemote: Bool = false
@@ -56,6 +57,7 @@ struct AlbumsView: View {
         playback: PlaybackController,
         subsonicServers: SubsonicServerStore? = nil,
         selectedSourceID: Binding<String?> = .constant(nil),
+        requestedAlbumID: Binding<String?> = .constant(nil),
         onSelectTrack: @escaping (LocalTrack) -> Void,
         onAddMusic: (() -> Void)? = nil
     ) {
@@ -63,6 +65,7 @@ struct AlbumsView: View {
         self.playback = playback
         self.subsonicServers = subsonicServers
         self._selectedSourceID = selectedSourceID
+        self._requestedAlbumID = requestedAlbumID
         self.onSelectTrack = onSelectTrack
         self.onAddMusic = onAddMusic
     }
@@ -265,6 +268,13 @@ struct AlbumsView: View {
                 )
             } else {
                 mainAlbumsGrid
+            }
+        }
+        .task(id: requestedAlbumID) {
+            if let requestedAlbumID,
+               let album = localStore.albums.first(where: { $0.id == requestedAlbumID }) {
+                selectedAlbum = album
+                self.requestedAlbumID = nil
             }
         }
         .task(id: "\(selectedSourceID ?? "")-\(sortField.rawValue)") {
@@ -723,6 +733,10 @@ enum AlbumsFeature: ApplicationFeaturePresentation {
                             get: { scene.selectedSourceFilter },
                             set: { scene.selectedSourceFilter = $0 }
                         ),
+                        requestedAlbumID: Binding(
+                            get: { scene.requestedAlbumID },
+                            set: { scene.requestedAlbumID = $0 }
+                        ),
                         onSelectTrack: { track in
                             scene.select(localTrack: track)
                         },
@@ -747,4 +761,3 @@ enum AlbumsFeature: ApplicationFeaturePresentation {
     )
     .frame(width: 800, height: 600)
 }
-

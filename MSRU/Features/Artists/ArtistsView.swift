@@ -14,6 +14,7 @@ struct ArtistsView: View {
     @Bindable var playback: PlaybackController
     var subsonicServers: SubsonicServerStore? = nil
     @Binding var selectedSourceID: String?
+    @Binding var requestedArtistID: String?
     let onSelectTrack: (LocalTrack) -> Void
     var onAddMusic: (() -> Void)? = nil
 
@@ -42,6 +43,7 @@ struct ArtistsView: View {
         playback: PlaybackController,
         subsonicServers: SubsonicServerStore? = nil,
         selectedSourceID: Binding<String?> = .constant(nil),
+        requestedArtistID: Binding<String?> = .constant(nil),
         onSelectTrack: @escaping (LocalTrack) -> Void,
         onAddMusic: (() -> Void)? = nil
     ) {
@@ -49,6 +51,7 @@ struct ArtistsView: View {
         self.playback = playback
         self.subsonicServers = subsonicServers
         self._selectedSourceID = selectedSourceID
+        self._requestedArtistID = requestedArtistID
         self.onSelectTrack = onSelectTrack
         self.onAddMusic = onAddMusic
     }
@@ -250,6 +253,13 @@ struct ArtistsView: View {
                 )
             } else {
                 mainArtistsGrid
+            }
+        }
+        .task(id: requestedArtistID) {
+            if let requestedArtistID,
+               let artist = localStore.artists.first(where: { $0.id == requestedArtistID }) {
+                selectedArtist = artist
+                self.requestedArtistID = nil
             }
         }
         .task(id: selectedSourceID) {
@@ -679,6 +689,10 @@ enum ArtistsFeature: ApplicationFeaturePresentation {
                             get: { scene.selectedSourceFilter },
                             set: { scene.selectedSourceFilter = $0 }
                         ),
+                        requestedArtistID: Binding(
+                            get: { scene.requestedArtistID },
+                            set: { scene.requestedArtistID = $0 }
+                        ),
                         onSelectTrack: { track in
                             scene.select(localTrack: track)
                         },
@@ -703,4 +717,3 @@ enum ArtistsFeature: ApplicationFeaturePresentation {
     )
     .frame(width: 800, height: 600)
 }
-

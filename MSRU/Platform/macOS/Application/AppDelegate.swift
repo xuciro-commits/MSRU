@@ -7,6 +7,7 @@
 
 import AppKit
 import AppFoundation
+import CoreSpotlight
 
 
 @MainActor
@@ -196,6 +197,18 @@ final class AppDelegate:
             .send(
                 commands
             )
+    }
+
+    func application(
+        _ application: NSApplication,
+        continue userActivity: NSUserActivity,
+        restorationHandler: @escaping ([any NSUserActivityRestoring]) -> Void
+    ) -> Bool {
+        guard userActivity.activityType == CSSearchableItemActionType,
+              let identifier = userActivity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+              SpotlightMusicID(rawValue: identifier) != nil else { return false }
+        sceneCoordinator.openSpotlightItem(identifier)
+        return true
     }
 
 

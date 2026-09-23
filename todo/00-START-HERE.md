@@ -22,6 +22,7 @@
 | --- | --- | --- |
 | 用户终极目标、技术与合作偏好 | [用户意图](01-USER-INTENT.md) | 每项任务先对齐这里；以用户最新指令为准 |
 | 下一步做什么、还有什么差距 | [工作队列](02-WORK-QUEUE.md) | 确定本次范围；旧条目与最新授权冲突时更新条目 |
+| 追溯已完成任务与当时证据 | [实施历史归档](../Docs/Architecture/ImplementationHistory.md) | 仅在需要历史背景时读取，不作为当前待办或现状证明 |
 | 产品平台整体蓝图 | [产品平台蓝图](../Docs/Blueprint/ProductPlatformBlueprint.md) | 理解产品与框架之间的关系 |
 | 应用、场景、Feature 的总体方向 | [目标架构](../Docs/Architecture/NorthStarArchitecture.md) | 找职责、所有权与依赖边界 |
 | 前后端与本地能力如何分工 | [客户端与服务端架构](../Docs/Blueprint/ClientServerArchitecture.md) | 定契约与数据边界，不默认必须建后端 |

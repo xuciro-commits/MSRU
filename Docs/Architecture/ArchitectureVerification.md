@@ -29,6 +29,8 @@ xcodebuild test -project MSRU.xcodeproj -scheme MSRU-UnitTests -destination 'pla
 
 CI runner 须有当前项目要求的 Xcode/SDK。仓库目前没有现成 CI workflow，本次不假定某个托管服务可提供它。可先在每次提交前运行这些命令。
 
+验证分工：AI 负责构建、接口调用和内部代码契约的定向测试，用户负责界面显示、使用体感及端到端验收；只有长期有效的回归用例进入正式 Tests，任务专用探针放在临时目录并在任务结束时移除，不加入日常全量测试。
+
 共享的 `MSRU-UnitTests` scheme 只构建应用与单元测试，不构建 UI Runner。主 `MSRU` scheme 保留完整 UI 测试入口；分开运行可以避免机器上的 GUI 调试权限影响普通回归测试。
 
 macOS 进程级退出/重启测试位于 `MSRUUITests`。Debug 组合根识别测试提供的 `MSRU_UI_TEST_SUITE`（限定 `MSRU.UITests.` 前缀），使用独立恢复域、内存业务依赖和禁用 autosave 的窗口工厂；Release 不包含此入口。窗口公开稳定的 scene accessibility identifier，以便核对恢复后的窗口身份。UI Runner 必须正确签名，不能沿用单元测试的禁用签名参数：

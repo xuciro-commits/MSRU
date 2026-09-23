@@ -22,6 +22,14 @@ final class LocalLibraryStore {
     private weak var libraryStore: LibraryStore?
     private weak var playlistStore: PlaylistStore?
     private weak var playbackController: PlaybackController?
+    private var spotlightIndexer: SpotlightIndexingService?
+
+    func attachSpotlightIndexer(_ indexer: SpotlightIndexingService) {
+        spotlightIndexer = indexer
+        if didLoad {
+            indexer.schedule(SpotlightMusicSnapshot(tracks: tracks, albums: cachedAlbums, artists: cachedArtists))
+        }
+    }
 
     func attachCascadeCollaborators(
         libraryStore: LibraryStore?,
@@ -63,6 +71,11 @@ final class LocalLibraryStore {
         self.cachedAlbums = LibraryPresentationAggregator.buildAlbums(from: tracks)
         self.cachedArtists = LibraryPresentationAggregator.buildArtists(from: tracks)
         self.revision &+= 1
+        spotlightIndexer?.schedule(SpotlightMusicSnapshot(
+            tracks: tracks,
+            albums: cachedAlbums,
+            artists: cachedArtists
+        ))
     }
 
     private func refreshQuerySnapshot() async {
@@ -787,4 +800,3 @@ final class LocalLibraryStore {
         }
     }
 }
-

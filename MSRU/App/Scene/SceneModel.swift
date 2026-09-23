@@ -77,6 +77,8 @@ final class SceneModel: Identifiable, ApplicationSceneRuntime {
     var selectedLibraryTrack: LibraryTrack?
     var selectedRadioStation: RadioStation?
     var selectedSourceFilter: String?
+    var requestedAlbumID: String?
+    var requestedArtistID: String?
 
     func navigateToSource(sourceID: String?, target: SceneSection) {
         guard !isClosed else { return }
