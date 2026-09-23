@@ -6,9 +6,7 @@ The only list of active work. Each item: goal, boundary, done-when, status. When
 
 | # · Status | Task | Done when |
 |---|---|---|
-| **75 · verified 2026-09-24, awaiting owner spot-check** | Remove music leakage from AppFoundation: drop GRDB/ChromaSwift/MediaLibrary/SubsonicKit deps and `@_exported`; move music types to `Packages/MusicDomain`, music cards to `MSRU/Shared/UI/Music/MusicCards.swift`; delete dead types (`IdentityEvidence`, `EntityCluster`, fingerprint typealiases); add explicit imports; guard with `verify-architecture.py`. Package name `AppFoundation` kept ([AppleClient.md](AppleClient.md)) | `Scripts/verify.sh` passes on macOS (gates, package tests, macOS unit tests, iOS Simulator build); owner spot-checks the app |
-| **76 · done in code, awaiting owner spot-check** | Music domain packages: `MSRU/Music` → `MusicLibrary`/`MusicPlayback`; MediaLibrary deleted and SubsonicKit folded in as a leaf target; SQLite `sources` is the single source registry (migration v6, legacy UserDefaults list imported once) ([ADR-0004](ADR/0004-music-domain-packages.md)). Follow-up: narrow the mechanically widened `public` surface; delete the legacy UserDefaults server list once no pre-v6 installs remain | Owner spot-checks: add/remove/ping a Subsonic server, browse and play remote albums, remote lyrics, local library unchanged |
-| **77 · ready** | Kernel contract v0 for K1–K5 and K7 ([Platform.md §4](Platform.md)): schemas, semantics, conformance vectors, executable from Go and Swift. Choose the format (JSON Schema, Protobuf, …) and record it in ADR-0002. Only what the Hotel and Music slices need | Vectors run in Go and Swift; no domain vocabulary |
+| **77 · next** | Kernel contract v0 for K1–K5 and K7 ([Platform.md §4](Platform.md)): schemas, semantics, conformance vectors, executable from Go and Swift. Choose the format (JSON Schema, Protobuf, …) and record it in ADR-0002. Only what the Hotel and Music slices need | Vectors run in Go and Swift; no domain vocabulary |
 | **78 · ready (parallel, no code)** | Manufacturing discovery with real scenarios: work-order lifecycle, quality nonconformance, equipment state/downtime. Map each step to K1–K9 and list predicted friction | Findings folded into Platform.md (validation section) and the friction list below; raw notes not kept |
 | **79 · after 77** | Hotel vertical slice in the platform repository: Go server (tenancy, principals, policy hook, change records; reservations and capacity conflicts in the domain), one client (Tauri suggested), one simulated channel connector; draft → confirm → modify/cancel; two staff roles. **May not change the kernel**; records friction | Rejection, conflict and offline-pending flows reproducible; friction recorded |
 | **80 · after 76, 77** | Music retrofit slice: import → identity → claims → user decisions expressed through contract v0; user corrections gain principal and history; decide on content-derived IDs (see [Music.md](Music.md#known-gaps-against-the-platform-kernel)). No user-visible regression; reversible migration | Vectors pass; migration reversible; tests pass |
@@ -16,7 +14,7 @@ The only list of active work. Each item: goal, boundary, done-when, status. When
 | **82 · after 81** | Evolution drills E1 (Hotel → coworking/serviced apartments) and E2 (Music → shared library) | For each drill, which layer changed; kernel changes carry ADRs |
 | **83 · after 81** | First manufacturing slice from #78, including edge observations | Same rules as #79 |
 
-Repository split ([ADR-0003](ADR/0003-repository-split.md)) happens once #75–#77 are done.
+Repository split ([ADR-0003](ADR/0003-repository-split.md)) happens once #77 is done (#75, #76 are complete). Follow-ups from #76: narrow the mechanically widened `public` surface of the music targets; delete the legacy UserDefaults server list once no pre-v6 installs remain.
 
 ## Open friction (temporary; delete entries once resolved)
 
@@ -29,5 +27,3 @@ Repository split ([ADR-0003](ADR/0003-repository-split.md)) happens once #75–#
 ## Music product track
 
 Music keeps shipping. Re-emphasize professional library management (identity, claims, review, corrections, sources, de-duplication) — it is also the prerequisite for drills E2/E3. Listening features (e.g. LAN remote control) are scheduled on owner request. Unproven audio claims (bit-perfect, DAC exclusivity/rate switching/hot-plug) need dedicated hardware verification before being stated.
-
-- **Risk (found in #76, pre-existing):** `SourceRuntimeCoordinator.bootstrapAll()` runs on every Sources view appearance and hard-deletes recordings, releases, credits and artists that have no asset. That can drop identity data and user corrections, e.g. after a server is temporarily removed. Move the purge behind an explicit, previewed maintenance action with a recovery path.

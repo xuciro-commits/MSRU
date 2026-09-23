@@ -11,9 +11,9 @@
 		404EA14E305E9751003BA949 /* MSRUCodecFFmpeg in Frameworks */ = {isa = PBXBuildFile; productRef = 404EA14D305E9751003BA949 /* MSRUCodecFFmpeg */; };
 		404EA155305E9777003BA949 /* AppFoundationUI in Frameworks */ = {isa = PBXBuildFile; productRef = 404EA154305E9777003BA949 /* AppFoundationUI */; };
 		40A75D010000000000000001 /* MusicDomain in Frameworks */ = {isa = PBXBuildFile; productRef = 40A75D010000000000000002 /* MusicDomain */; };
-		40A75D010000000000000031 /* SubsonicKit in Frameworks */ = {isa = PBXBuildFile; productRef = 40A75D010000000000000032 /* SubsonicKit */; };
 		40A75D010000000000000011 /* MusicLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = 40A75D010000000000000012 /* MusicLibrary */; };
 		40A75D010000000000000021 /* MusicPlayback in Frameworks */ = {isa = PBXBuildFile; productRef = 40A75D010000000000000022 /* MusicPlayback */; };
+		40A75D010000000000000031 /* SubsonicKit in Frameworks */ = {isa = PBXBuildFile; productRef = 40A75D010000000000000032 /* SubsonicKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */

@@ -172,17 +172,13 @@ public final class SourceRuntimeCoordinator {
     public func bootstrapAll() async {
         await loadRemoteSources()
         do {
-            // Clean up legacy 'local' duplicates and migrate assets to canonical defaultLocal
+            // Consolidate legacy 'local' duplicates onto the canonical defaultLocal source.
+            // Identity rows are never purged here: an asset-less recording may only be
+            // temporarily unavailable, and deleting it would cascade into favorites,
+            // ratings and play counts. Removal happens only in `removeSource`.
             try? await db.dbWriter.write { db in
                 try db.execute(sql: "UPDATE assets SET source_id = ? WHERE source_id = 'local'", arguments: [SourceID.defaultLocal.rawValue])
                 try db.execute(sql: "DELETE FROM sources WHERE id = 'local'")
-
-                // Purge disconnected orphan records to maintain strict library integrity
-                try db.execute(sql: "DELETE FROM release_tracks WHERE recording_id NOT IN (SELECT id FROM recordings)")
-                try db.execute(sql: "DELETE FROM recordings WHERE id NOT IN (SELECT recording_id FROM assets)")
-                try db.execute(sql: "DELETE FROM releases WHERE id NOT IN (SELECT release_id FROM release_tracks)")
-                try db.execute(sql: "DELETE FROM artist_credits WHERE entity_id NOT IN (SELECT id FROM recordings) AND entity_id NOT IN (SELECT id FROM releases)")
-                try db.execute(sql: "DELETE FROM artists WHERE id NOT IN (SELECT artist_id FROM artist_credits)")
             }
 
             var sources = try await sourceRepo.loadAll()
@@ -315,19 +311,73 @@ public final class SourceRuntimeCoordinator {
 
     public func removeSource(id: SourceID) async {
         do {
-            try await sourceRepo.delete(id: id)
-            try? credentialStore.deletePassword(for: LibrarySourceID(id.serverKey))
-
             try await db.dbWriter.write { db in
-                try db.execute(sql: "DELETE FROM stream_assets WHERE asset_id IN (SELECT id FROM assets WHERE source_id = ?)", arguments: [id.rawValue])
-                try db.execute(sql: "DELETE FROM assets WHERE source_id = ?", arguments: [id.rawValue])
+                try Self.deleteSourceRows(id, in: db)
             }
+            try? credentialStore.deletePassword(for: LibrarySourceID(id.serverKey))
 
             activeSources.removeAll(where: { $0.id == id })
             clients[id] = nil
             status[id] = nil
         } catch {
             print("[SourceRuntimeCoordinator] Failed to delete source \(id.rawValue): \(error)")
+        }
+    }
+
+    /// Deletes a source, its assets, and only the identity rows that this
+    /// removal leaves without any asset. Orphans that existed before are kept.
+    nonisolated static func deleteSourceRows(_ id: SourceID, in db: Database) throws {
+        let recordingIDs = try String.fetchAll(db, sql: """
+            SELECT DISTINCT recording_id FROM assets
+            WHERE source_id = ? AND recording_id IS NOT NULL
+            """, arguments: [id.rawValue])
+
+        try db.execute(sql: "DELETE FROM stream_assets WHERE asset_id IN (SELECT id FROM assets WHERE source_id = ?)", arguments: [id.rawValue])
+        try db.execute(sql: "DELETE FROM assets WHERE source_id = ?", arguments: [id.rawValue])
+        try db.execute(sql: "DELETE FROM sources WHERE id = ?", arguments: [id.rawValue])
+        guard !recordingIDs.isEmpty else { return }
+
+        try db.execute(sql: "CREATE TEMP TABLE IF NOT EXISTS removed_source_recordings (id TEXT PRIMARY KEY)")
+        try db.execute(sql: "DELETE FROM removed_source_recordings")
+        for recordingID in recordingIDs {
+            try db.execute(sql: "INSERT OR IGNORE INTO removed_source_recordings (id) VALUES (?)", arguments: [recordingID])
+        }
+        defer { try? db.execute(sql: "DROP TABLE IF EXISTS removed_source_recordings") }
+
+        // Recordings that lost their last asset in this removal.
+        try db.execute(sql: "DROP TABLE IF EXISTS orphaned_recordings")
+        try db.execute(sql: """
+            CREATE TEMP TABLE orphaned_recordings AS
+            SELECT id FROM removed_source_recordings r
+            WHERE NOT EXISTS (SELECT 1 FROM assets a WHERE a.recording_id = r.id)
+            """)
+        defer { try? db.execute(sql: "DROP TABLE IF EXISTS orphaned_recordings") }
+        // Releases and artists reached only through those recordings.
+        let releaseIDs = try String.fetchAll(db, sql: """
+            SELECT DISTINCT release_id FROM release_tracks
+            WHERE recording_id IN (SELECT id FROM orphaned_recordings)
+            """)
+        let artistIDs = try String.fetchAll(db, sql: """
+            SELECT DISTINCT artist_id FROM artist_credits
+            WHERE (entity_type = 'recording' AND entity_id IN (SELECT id FROM orphaned_recordings))
+               OR (entity_type = 'release' AND entity_id IN (
+                    SELECT release_id FROM release_tracks WHERE recording_id IN (SELECT id FROM orphaned_recordings)))
+            """)
+
+        try db.execute(sql: "DELETE FROM artist_credits WHERE entity_type = 'recording' AND entity_id IN (SELECT id FROM orphaned_recordings)")
+        try db.execute(sql: "DELETE FROM recordings WHERE id IN (SELECT id FROM orphaned_recordings)")
+        for releaseID in releaseIDs {
+            let remaining = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM release_tracks WHERE release_id = ?", arguments: [releaseID]) ?? 0
+            if remaining == 0 {
+                try db.execute(sql: "DELETE FROM artist_credits WHERE entity_type = 'release' AND entity_id = ?", arguments: [releaseID])
+                try db.execute(sql: "DELETE FROM releases WHERE id = ?", arguments: [releaseID])
+            }
+        }
+        for artistID in artistIDs {
+            let remaining = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM artist_credits WHERE artist_id = ?", arguments: [artistID]) ?? 0
+            if remaining == 0 {
+                try db.execute(sql: "DELETE FROM artists WHERE id = ?", arguments: [artistID])
+            }
         }
     }
 
