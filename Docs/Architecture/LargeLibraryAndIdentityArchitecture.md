@@ -4,7 +4,20 @@
 
 This document defines the production architecture for MSRU's music library infrastructure, engineered to scale smoothly from 1,000 to **500,000 items** while delivering deterministic entity identity, provenance-backed metadata resolution, multi-language/Chinese FTS5 instant search, zero-work UI updates, and an uncompromised native macOS AppKit presentation layer.
 
-**实现状态（2026-09-24）**：本页以下的 500K、15MB、冷页毫秒数与零工作等数值是目标或历史合成基准，不是当前 App 冷启动/RSS 的验收结论。本地歌曲以 128 首分页，专辑/艺人摘要以 64 项分页并在 SQLite 中完成筛选、排序与精确定位；Spotlight、播放队列、显式元数据修复与指纹维护也逐页读取。固定磁盘 SQLite 数据集（50,000 首/1,000 专辑/100 艺人）按独立测试进程比较：首批有界存储路径 47–53ms、增量 RSS 9.4–9.6MB；旧整表路径 601–606ms、增量 RSS 66–69MB。该数据仅证明隔离的存储代码路径约 86% 的增量内存下降；全 App 冷启动与总 RSS 尚未测定。可复现探针位于 `MSRUTests/Benchmarks/Stage2StorageBenchmarkTests.swift`，默认跳过，分别以 `/tmp/msru-stage2-50k-benchmark-mode` 中的 `prepare`、`paged`、`legacy` 运行独立进程。现行任务和完成条件见[工作队列](../../todo/02-WORK-QUEUE.md)。
+**实现状态（2026-09-24）**：本页以下的 500K、15MB、冷页毫秒数与零工作等数值是目标或历史合成基准。本地歌曲以 128 首分页，专辑/艺人摘要以 64 项分页并在 SQLite 中完成筛选、排序与精确定位；Spotlight、播放队列、显式元数据修复与指纹维护也逐页读取。固定磁盘 SQLite 数据集（50,000 首/1,000 专辑/100 艺人）的隔离存储路径为 47–53ms、增量 RSS 9.4–9.6MB；旧整表路径为 601–606ms、增量 RSS 66–69MB。完整进程的受控测量及未达到的路线图数字见下节。现行任务和完成条件见[工作队列](../../todo/02-WORK-QUEUE.md)。
+
+### Stage 2：50,000 首进程测量
+
+2026-09-24 在 Mac15,7（36GB RAM）、macOS 27.0、Xcode 27.0 Debug 构建上，分别运行当前提交 `b58da28` 与分页前提交 `42cd7aa`。每次把同一份 33MB 磁盘 SQLite 测试库复制到独立临时用户目录；数据包含 50,000 首、1,000 张专辑、100 位艺人，无封面、用户收藏、歌单或监控文件夹。临时诊断标记的终点是 App 进程完成本地库首批加载、收藏/歌单加载及监控启动；起点是进程启动。为避免测试曲目进入系统索引，探针禁用了后台 Spotlight 写入；测试后移除了临时代码与合成索引项，并重新生成真实曲库索引。此测量包含 App 进程和应用装配，但不包含已有窗口恢复、Spotlight 全量建索引或真正清空系统文件缓存的磁盘冷启动。
+
+| 测量 | 50,000 首当前版 | 50,000 首分页前 | 空库当前版 | 空库分页前 |
+| --- | ---: | ---: | ---: | ---: |
+| 独立进程启动至数据就绪（ms） | 658 / 698 / 685（首次 1,089） | 1,488 / 1,460（首次 2,532） | 677 / 679 / 664 | 833 / 771 / 783 |
+| 就绪时 RSS（KiB） | 181,264 / 181,136 / 181,104 | 246,112 / 246,192 / 246,304 | 161,824 / 161,824 / 161,680 | 166,640 / 166,128 / 166,240 |
+
+以中位数计，整进程 RSS 由约 240MiB 降至 177MiB，下降约 **26%**；各自扣除同版本空库进程基线后，曲库带来的额外 RSS 由约 78MiB 降至约 19MiB，下降约 **76%**。这是两种不同的分母，不能把后者表述成“总内存下降 70%”。当前版与空库版启动时间接近，但进程从执行到数据就绪仍约 0.7 秒，**不符合**路线图原文的全 App `<100ms`。启动基线主要在 App/系统装配范围，不能由曲库分页独自消除；若保留该全进程数字，#67 仍未达到退出条件。
+
+长期可复现的隔离存储探针位于 `MSRUTests/Benchmarks/Stage2StorageBenchmarkTests.swift`，默认跳过；分别把 `prepare`、`paged`、`legacy` 写入 `/tmp/msru-stage2-50k-benchmark-mode`，在独立测试进程运行定向 suite，结束后删除标记。进程级测量使用一次性临时代码，未留在日常测试或产品实现中。
 
 ---
 

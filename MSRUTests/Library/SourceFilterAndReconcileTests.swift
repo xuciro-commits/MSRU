@@ -61,7 +61,14 @@ struct SourceFilterAndReconcileTests {
         try await TestDatabase.seedSource(in: db, id: localSourceID, name: "Local Files", uri: "/Users/music")
 
         let remoteSourceID = SourceID("src_nas_zspace")
-        try await TestDatabase.seedSource(in: db, id: remoteSourceID, name: "极空间 NAS", uri: "http://nas.local:4533")
+        try await SourceRepository(db: db).insertOrUpdate(Source(
+            id: remoteSourceID,
+            sourceType: .networkFolder,
+            uri: "http://nas.local:4533",
+            displayName: "极空间 NAS",
+            capabilities: .networkFolderDefault,
+            isEnabled: true
+        ))
 
         // 2. Seed Local Track
         let localRecID = DeterministicID.recording(title: "Track One", artist: "Artist A")

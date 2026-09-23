@@ -4,7 +4,7 @@
 
 ## 进行中
 
-- **#67 · Stage 2 大库性能最终验证**（进行中）。歌曲、专辑、艺人、Spotlight、播放队列和维护路径已分页；用户已验收本轮功能。固定磁盘 50,000 首数据集的隔离存储路径达到 47–53ms、增量 RSS 9.4–9.6MB，旧整表路径为 601–606ms、66–69MB；这不等于全 App 冷启动或总 RSS。下一步只补全 App 指标与固定设备基线，再交 #68 集成收尾。
+- **#67 · Stage 2 大库性能口径决定**（待决定）。歌曲、专辑、艺人及后台维护已分页，本轮功能由用户验收。固定磁盘库的隔离存储路径 47–53ms；受控 App 进程就绪约 0.7 秒、总 RSS 比分页前降约 26%，各自扣除空库基线后的曲库额外 RSS 降约 76%。完整测量条件见[大曲库架构](../Docs/Architecture/LargeLibraryAndIdentityArchitecture.md)。路线图原文的全进程 `<100ms` 与总 RSS 降 70% 未达；等待用户决定保留原指标继续优化，或把 Stage 2 验收口径明确为曲库增量性能。
 - **#61 · 本地专辑连续 PCM 排程**（已实现，待用户验收）。同采样率、同声道曲目在单个播放节点接续；定向代码测试 4 项及 macOS Debug 构建通过。依据 [Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)、[播放交互 15.2](../Docs/Blueprint/InteractionAtlas.md)；当时实现见[实施记录](../Docs/Architecture/ImplementationHistory.md)。完成条件：用户确认真实专辑交接听感、曲目信息切换与队列顺序。
 - **#62 · NAS 专辑连续播放与异格式交接**（已实现，待用户验收）。普通单曲流播；专辑队列经临时下载和 PCM 预备接续，异格式退回正常切歌。定向代码测试 8 项通过；真实 NAS 听感、等待与错误体验由用户验收。依据[播放交互 15.2](../Docs/Blueprint/InteractionAtlas.md)，细节见[实施记录](../Docs/Architecture/ImplementationHistory.md)。
 
@@ -14,7 +14,7 @@
 
 | 编号 / 状态 | 大任务与边界 | 完成条件 / 交接依据 |
 | --- | --- | --- |
-| **#67 · 进行中** | **50,000 首曲库性能最终验证**：存储路径和流式展示代码已落地，固定磁盘基准见[大曲库架构](../Docs/Architecture/LargeLibraryAndIdentityArchitecture.md)。下一步确定固定设备、全 App 冷启动起止点和总 RSS 基线，测量并按瓶颈优化。 | 验证路线图的 <100ms、总内存下降 70% 目标；保留可复现数据和未达标原因。用户已完成本轮界面体验验收。 |
+| **#67 · 待决定** | **50,000 首曲库性能验收口径**：固定设备、数据集、进程起止点和 RSS 基线已有[实测记录](../Docs/Architecture/LargeLibraryAndIdentityArchitecture.md)。隔离数据路径与曲库额外 RSS 达目标；全 App 进程指标未达路线图原文。 | 用户明确选定 Stage 2 的指标口径；若坚持全进程数字，则继续优化并复测，不能以曲库代码路径代替。用户已完成本轮界面体验验收。 |
 | **#68 · 待开始** | **Stage 2 集成与收尾**：核对 #61–#67 的音频、存储和失败恢复证据，处理未决限制；依据[Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)与[架构验证](../Docs/Architecture/ArchitectureVerification.md)。 | 所有子任务已完成或有明确的用户范围决策；受影响平台构建与定向测试通过，用户完成听感/DAC/大库体验验收；明确 #63 尚未证明的 Bit-Perfect、DAC 切率/独占/热拔插边界，路线图和完成索引只记录实际达成的目标，随后标记 Stage 2 结束。 |
 
 ## 按真实需求启动
