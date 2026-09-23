@@ -914,3 +914,11 @@ struct MiniPlayerAccessoryView: View {
         .padding(.vertical, 8)
     }
 }
+
+#Preview("Mini Player Accessory") {
+    MiniPlayerAccessoryView(
+        playback: MSRUPreviewData.makePlaybackController(),
+        onToggleQueue: {}
+    )
+    .frame(width: 480)
+}

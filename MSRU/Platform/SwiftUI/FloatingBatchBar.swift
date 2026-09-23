@@ -56,3 +56,10 @@ public struct FloatingBatchBar<Actions: View>: View {
         .padding(.bottom, 90)
     }
 }
+
+#Preview("Batch Actions") {
+    FloatingBatchBar(count: 3, title: "3 selected", onDeselect: {}) {
+        Button("Add to Queue") {}
+    }
+    .frame(width: 520, height: 180)
+}

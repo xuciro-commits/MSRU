@@ -707,4 +707,10 @@ extension MacApplicationShellRenderer {
     }
 }
 
+#Preview("Workspace Safe Area") {
+    WorkspaceSafeAreaContainer(
+        content: AnyView(Text("Workspace")),
+        safeAreaInsets: EdgeInsets(top: 0, leading: 0, bottom: 32, trailing: 200)
+    )
+}
 #endif

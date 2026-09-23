@@ -508,6 +508,17 @@ private struct TrackFavoriteButton: View {
 
 // MARK: - Previews
 
+#Preview("Local Track Cells") {
+    let application = MSRUPreviewData.makeApplication()
+    let track = MSRUPreviewData.localTracks[0]
+    HStack(spacing: 12) {
+        TrackIndexIndicatorView(trackID: track.id, position: 1, playback: application.playback)
+        TrackTitleView(trackID: track.id, title: track.title, playback: application.playback)
+        TrackFavoriteButton(track: track, library: application.library)
+    }
+    .padding()
+}
+
 #Preview("Local Track Table · Populated") {
     @Previewable @State var selectedTrack: LocalTrack?
     let tracks = MSRUPreviewData.localTracks

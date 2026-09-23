@@ -204,3 +204,13 @@ struct MusicSectionView: View {
         .padding(.trailing, workspaceSafeArea.trailing + 28)
     }
 }
+
+#Preview("Music Components") {
+    VStack(alignment: .leading, spacing: 20) {
+        MusicArtworkView(url: nil)
+            .frame(width: 80, height: 80)
+        MusicCardView(item: MSRUPreviewData.featuredAlbum, style: .compact)
+        MusicSectionView(section: MSRUPreviewData.featuredSection, onSelect: { _ in })
+    }
+    .frame(width: 540, height: 640)
+}

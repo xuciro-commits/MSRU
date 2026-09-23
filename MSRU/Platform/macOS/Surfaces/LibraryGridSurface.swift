@@ -780,3 +780,13 @@ public final class LibraryCardItemCell: NSCollectionViewItem {
 }
 #endif
 
+#if os(macOS)
+#Preview("Library Grid Surface") {
+    LibraryGridSurface(
+        revision: 1,
+        items: MSRUPreviewData.localTracks.prefix(6).map { $0.toCardSummary() },
+        header: { EmptyView() }
+    )
+    .frame(width: 720, height: 550)
+}
+#endif

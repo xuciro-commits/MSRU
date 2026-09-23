@@ -300,3 +300,17 @@ public struct LibraryTableSurface: NSViewRepresentable {
     }
 }
 #endif
+
+#if os(macOS)
+#Preview("Library Table Surface") {
+    LibraryTableSurface(revision: 1, items: [
+        TrackRowSummary(id: "preview-1", recordingID: RecordingID("rec_preview_1"),
+                        title: "Example Song", artist: "Example Artist", album: "Example Album",
+                        duration: 213, trackNumber: 1, format: "FLAC"),
+        TrackRowSummary(id: "preview-2", recordingID: RecordingID("rec_preview_2"),
+                        title: "Second Song", artist: "Example Artist", album: "Example Album",
+                        duration: 185, trackNumber: 2, format: "WAV")
+    ])
+    .frame(width: 900, height: 460)
+}
+#endif

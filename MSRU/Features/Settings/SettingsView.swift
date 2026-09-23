@@ -1087,3 +1087,8 @@ enum SettingsFeature: ApplicationFeaturePresentation {
     )
     .frame(width: 1000, height: 700)
 }
+
+#Preview("Provider Settings") {
+    ProviderSettingsView(store: ProviderManagerStore(defaults: nil))
+        .frame(width: 800, height: 600)
+}

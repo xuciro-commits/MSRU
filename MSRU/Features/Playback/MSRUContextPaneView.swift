@@ -180,3 +180,10 @@ struct ContextPaneHeaderView: View {
     return MSRUContextPaneView(scene: scene)
         .frame(width: 320, height: 600)
 }
+
+#Preview("Context Header") {
+    let scene = MSRUPreviewData.makeScene()
+    scene.activeContextPane = .queue
+    return ContextPaneHeaderView(scene: scene, onClearQueue: {})
+        .frame(width: 320)
+}

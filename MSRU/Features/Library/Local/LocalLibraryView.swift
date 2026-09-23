@@ -627,3 +627,18 @@ extension LocalTrack {
                      playback: application.playback, selectedTrack: .constant(nil), onAddMusic: {})
         .frame(width: 900, height: 650)
 }
+
+#Preview("Local Track Card") {
+    LocalLibraryTrackCardView(
+        track: MSRUPreviewData.localTracks[0],
+        isPlaying: false,
+        isSaved: true,
+        isSelected: false,
+        onSelect: {},
+        onPlay: {},
+        artwork: Image(systemName: "music.note"),
+        actions: Text("Preview Action")
+    )
+    .frame(width: 180)
+    .padding()
+}

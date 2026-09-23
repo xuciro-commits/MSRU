@@ -8,6 +8,38 @@
 import SwiftUI
 import AppFoundation
 
+#Preview("Foundation Cards") {
+    HStack(alignment: .top, spacing: 20) {
+        VStack(spacing: 12) {
+            FoundationCardBadge("LOSSLESS", systemImage: "waveform")
+            FoundationCardActionButton(title: "Play", action: {})
+            FoundationCard(titleText: "Preview Album", subtitleText: "Preview Artist", onSelect: {}) {
+                Image(systemName: "music.note")
+                    .frame(width: 140, height: 140)
+            }
+        }
+        AlbumCardView(
+            album: AlbumPresentationModel(id: "preview-album", title: "Preview Album", artist: "Preview Artist", trackCount: 10, duration: 1800),
+            onSelect: {}
+        ) {
+            Image(systemName: "music.note.list")
+                .frame(width: 140, height: 140)
+        }
+        ArtistAvatarView(
+            artist: ArtistPresentationModel(id: "preview-artist", name: "Preview Artist", albumCount: 1, trackCount: 10),
+            onSelect: {}
+        ) {
+            Image(systemName: "person.crop.circle")
+                .frame(width: 140, height: 140)
+        }
+        UnifiedTrackCardView(title: "Preview Track", subtitle: "Preview Artist", onSelect: {}, onPlay: {}) {
+            Image(systemName: "music.note")
+                .frame(width: 140, height: 140)
+        }
+    }
+    .padding()
+}
+
 // MARK: - Foundation Card Badge
 
 public struct FoundationCardBadge: View {

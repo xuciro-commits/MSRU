@@ -79,3 +79,13 @@ struct SidebarPaneView: View {
 #Preview("Scene Navigation") {
     SidebarPaneView(scene: MSRUPreviewData.makeScene()).frame(width: 240, height: 600)
 }
+
+#Preview("Sidebar Parts") {
+    @Previewable @State var selection: SceneRoute? = .section(.listenNow)
+    let application = MSRUPreviewData.makeApplication()
+    VStack {
+        SidebarView(selection: $selection, contributions: MSRUApplication.definition.sidebar)
+        SidebarBottomAccessoryView(languageSettings: application.languageSettings, onOpenSettings: {})
+    }
+    .frame(width: 240, height: 600)
+}

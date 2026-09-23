@@ -188,3 +188,14 @@ public struct MarqueeSelectionContainer<Content: View, ID: Hashable & Sendable>:
         )
     }
 }
+
+#Preview("Marquee Selection") {
+    @Previewable @State var selection: Set<String> = ["one"]
+    MarqueeSelectionContainer(selection: $selection, allIDs: ["one", "two"]) {
+        HStack(spacing: 12) {
+            Text("One").padding().background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+            Text("Two").padding().background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+        }
+    }
+    .frame(width: 320, height: 120)
+}

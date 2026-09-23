@@ -97,6 +97,11 @@ struct QueueHeaderView: View {
     }
 }
 
+#Preview("Queue Header") {
+    QueueHeaderView(onClear: {})
+        .frame(width: 340)
+}
+
 
 #Preview("Queue · Empty") {
     QueuePaneView(playback: MSRUPreviewData.makePlaybackController())

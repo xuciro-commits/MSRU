@@ -312,4 +312,19 @@ public struct SwiftUIApplicationShell<Navigation: View>: View {
         }
     }
 }
+
+#Preview("Application Shell") {
+    @Previewable @State var isContextPresented = false
+    SwiftUIApplicationShell(
+        shell: ResolvedApplicationShell(
+            workspace: nil,
+            applicationContexts: [],
+            applicationAccessories: [],
+            toolbar: ResolvedToolbarPresentation()
+        ),
+        isContextPresented: $isContextPresented
+    ) {
+        Text("Navigation")
+    }
+}
 #endif

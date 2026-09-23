@@ -171,3 +171,9 @@ where Route: Hashable & Sendable, Fallback: View {
         destinations.first { $0.matches(route) }
     }
 }
+
+#Preview("Application Route Fallback") {
+    ApplicationRouteView(route: "preview", context: "Preview", destinations: []) { route in
+        Text("No destination: \(route)")
+    }
+}

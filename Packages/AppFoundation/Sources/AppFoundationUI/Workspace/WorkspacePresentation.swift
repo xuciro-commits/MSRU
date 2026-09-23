@@ -160,3 +160,10 @@ public struct WorkspaceContentView<Context>: View {
         presentation.content(for: context)
     }
 }
+
+#Preview("Workspace Content") {
+    WorkspaceContentView(
+        presentation: WorkspacePresentation<String>(identity: WorkspaceIdentity(title: "Preview workspace")) { Text($0) },
+        context: "Preview content"
+    )
+}

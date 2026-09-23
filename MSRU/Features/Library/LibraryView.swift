@@ -935,7 +935,7 @@ struct LibraryView:
 
     // MARK: - Card Views
 
-    private struct LibrarySavedTrackCardItemView: View {
+    fileprivate struct LibrarySavedTrackCardItemView: View {
         let track: LibraryTrack
         let isRemoving: Bool
         let isSelected: Bool
@@ -1017,7 +1017,7 @@ struct LibraryView:
         }
     }
 
-    private struct LibraryLocalTrackCardItemView: View {
+    fileprivate struct LibraryLocalTrackCardItemView: View {
         let track: LocalTrack
         let isSelected: Bool
         let isPlaying: Bool
@@ -1255,4 +1255,22 @@ struct LibraryView:
     LibraryView(feature: scene.libraryFeature, localStore: scene.application.localLibrary,
         playback: scene.application.playback, selectedLocalTrack: .constant(nil), onAddMusic: {})
         .frame(width: 360, height: 640)
+}
+
+#Preview("Library Cards") {
+    let local = MSRUPreviewData.localTracks[0]
+    HStack(spacing: 16) {
+        LibraryView.LibrarySavedTrackCardItemView(
+            track: LibraryTrack(local: local), isRemoving: false,
+            isSelected: false, isPlaying: false,
+            onSelect: {}, onPlay: {}, onPlayNext: {}, onEnqueue: {}, onRemove: {}
+        )
+        LibraryView.LibraryLocalTrackCardItemView(
+            track: local, isSelected: false, isPlaying: false, isSaved: true,
+            onSelect: {}, onPlay: {}, onPlayNext: {}, onEnqueue: {},
+            onToggleLibrary: {}, onReveal: {}, onDelete: {}
+        )
+    }
+    .frame(width: 400)
+    .padding()
 }

@@ -5,6 +5,25 @@
 
 import SwiftUI
 
+#Preview("Presentation Hosts") {
+    VStack(spacing: 12) {
+        AccessoryPreviewHost(
+            presentation: AccessoryPresentation<String>(id: "accessory", scope: .application) { Text($0) },
+            context: "Preview accessory"
+        )
+        ContextPreviewHost(
+            presentation: ContextPresentation<String>(id: "context", role: .inspector) { Text($0) },
+            context: "Preview context"
+        )
+        WorkspacePreviewHost(
+            presentation: WorkspacePresentation<String>(identity: WorkspaceIdentity(title: "Preview workspace")) { Text($0) },
+            context: "Preview workspace"
+        )
+        .frame(height: 220)
+    }
+    .padding()
+}
+
 // MARK: - Accessory Preview Host
 
 /// Lightweight diagnostic renderer for accessory presentations.

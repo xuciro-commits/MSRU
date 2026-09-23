@@ -222,6 +222,11 @@ struct WatchNowPlayingView: View {
         .frame(width: 210, height: 260)
 }
 
+#Preview("Watch Queue") {
+    WatchQueueSheetView(playback: MSRUPreviewData.makePlaybackController(), onClose: {})
+        .frame(width: 210, height: 260)
+}
+
 // MARK: - Watch Queue Sheet View
 
 @MainActor
@@ -315,4 +320,3 @@ struct WatchQueueSheetView: View {
         .buttonStyle(.plain)
     }
 }
-

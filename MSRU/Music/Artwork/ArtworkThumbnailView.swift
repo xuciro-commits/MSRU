@@ -211,3 +211,11 @@ private struct LayoutFrameModifier: ViewModifier {
         }
     }
 }
+
+#Preview("Artwork Placeholder") {
+    HStack {
+        ArtworkThumbnailView(reference: nil as String?, fixedSize: CGSize(width: 64, height: 64))
+        ArtworkThumbnailView(reference: nil as String?, fixedSize: CGSize(width: 128, height: 128), isCircular: true)
+    }
+    .padding()
+}

@@ -410,3 +410,22 @@ enum SourcesFeature: ApplicationFeaturePresentation {
     SourcesView(scene: scene)
         .frame(width: 800, height: 600)
 }
+
+#Preview("Local Source Card") {
+    let source = Source(
+        id: .defaultLocal,
+        sourceType: .localFolder,
+        uri: "/Preview/Music",
+        displayName: "Local Files",
+        capabilities: .localFolderDefault,
+        isEnabled: true
+    )
+    SourceCardView(
+        source: source,
+        scene: MSRUPreviewData.makeScene(section: .sources),
+        coordinator: SourceRuntimeCoordinator(db: try! AppDatabase.makeEphemeral()),
+        onRemove: { _ in }
+    )
+    .frame(width: 700)
+    .padding()
+}
