@@ -21,7 +21,7 @@ nonisolated enum MacSceneRestorationDisposition: Equatable, Sendable {
 nonisolated struct MacSceneLifecyclePolicy: Equatable, Sendable {
     let terminatesAfterLastWindowClosed: Bool
 
-    init(terminatesAfterLastWindowClosed: Bool = true) {
+    init(terminatesAfterLastWindowClosed: Bool = false) {
         self.terminatesAfterLastWindowClosed = terminatesAfterLastWindowClosed
     }
 
@@ -50,7 +50,7 @@ final class MacSceneCoordinator {
 
     // MARK: - Application
 
-    private let application:
+    let application:
         ApplicationModel
 
 

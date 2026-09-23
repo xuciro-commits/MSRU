@@ -62,6 +62,22 @@ struct MSRUApp:
             }
         }
 
+        MenuBarExtra {
+            MenuBarPlayerView(
+                playback: appDelegate.playback,
+                onOpenMainWindow: {
+                    appDelegate.activateApp()
+                },
+                onQuitApp: {
+                    NSApplication.shared.terminate(nil)
+                }
+            )
+        } label: {
+            MenuBarStatusItemLabel(
+                playback: appDelegate.playback
+            )
+        }
+        .menuBarExtraStyle(.window)
 
         #else
 

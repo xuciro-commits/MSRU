@@ -95,6 +95,25 @@ final class AppDelegate:
     }
 
 
+    // MARK: - Playback & Application Access
+
+    var application: ApplicationModel {
+        sceneCoordinator.application
+    }
+
+    var playback: PlaybackController {
+        sceneCoordinator.application.playback
+    }
+
+
+    // MARK: - Window Activation
+
+    func activateApp() {
+        NSApp.activate(ignoringOtherApps: true)
+        sceneCoordinator.reopen()
+    }
+
+
     // MARK: - Command Entry
 
     @discardableResult
