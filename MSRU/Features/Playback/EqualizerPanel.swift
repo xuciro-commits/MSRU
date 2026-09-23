@@ -119,3 +119,7 @@ struct EqualizerPanel: View {
         frequency >= 1_000 ? String(format: "%.0fk", frequency / 1_000) : String(format: "%.0f", frequency)
     }
 }
+
+#Preview("Equalizer and Loudness") {
+    EqualizerPanel(playback: MSRUPreviewData.makePlaybackController())
+}

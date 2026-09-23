@@ -48,4 +48,9 @@ struct AudioOutputMenu: View {
         }
     }
 }
+
+#Preview("Audio Output") {
+    AudioOutputMenu(playback: MSRUPreviewData.makePlaybackController())
+        .padding()
+}
 #endif

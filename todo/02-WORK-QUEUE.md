@@ -15,7 +15,7 @@
 | 编号 / 状态 | 大任务与边界 | 完成条件 / 交接依据 |
 | --- | --- | --- |
 | **#67 · 待决定** | **50,000 首曲库性能验收口径**：固定设备、数据集、进程起止点和 RSS 基线已有[实测记录](../Docs/Architecture/LargeLibraryAndIdentityArchitecture.md)。隔离数据路径与曲库额外 RSS 达目标；全 App 进程指标未达路线图原文。 | 用户明确选定 Stage 2 的指标口径；若坚持全进程数字，则继续优化并复测，不能以曲库代码路径代替。用户已完成本轮界面体验验收。 |
-| **#68 · 待开始** | **Stage 2 集成与收尾**：核对 #61–#67 的音频、存储和失败恢复证据，处理未决限制；依据[Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)与[架构验证](../Docs/Architecture/ArchitectureVerification.md)。 | 所有子任务已完成或有明确的用户范围决策；受影响平台构建与定向测试通过，用户完成听感/DAC/大库体验验收；明确 #63 尚未证明的 Bit-Perfect、DAC 切率/独占/热拔插边界，路线图和完成索引只记录实际达成的目标，随后标记 Stage 2 结束。 |
+| **#68 · 进行中** | **Stage 2 集成与收尾**：相关代码定向测试本轮 58 项通过，来源测试夹具修正后 3 项通过；macOS/iOS Simulator Debug 构建与架构导入门禁通过。阶段相关音频面板 Preview 已补；仓库另有 35 项既有 Preview 门禁欠账，独立处理。依据[Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)与[架构验证](../Docs/Architecture/ArchitectureVerification.md)。 | 等 #67 指标口径、#61/#62 用户听感及 DAC 硬件边界结论；明确 Bit-Perfect、切率、独占、热拔插哪些获证实，哪些留后续；路线图只记录实际达成，再标记 Stage 2 结束。 |
 
 ## 按真实需求启动
 
