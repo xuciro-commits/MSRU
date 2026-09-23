@@ -2,6 +2,10 @@
 
 > 本文保存旧工作队列及后续完成事项的历史记录与当时验证证据，不作为当前待办，也不证明现行工作树仍满足当时结果。当前任务以 [工作队列](../../todo/02-WORK-QUEUE.md) 为准。
 
+## #61 本地专辑连续 PCM 排程（2026-09-23，待听感验收）
+
+本地 Apple 可解码音频文件改用 `AppleAudioFileDecoder` 输出 PCM；不支持的文件仍由 AVPlayer 播放。`PCMPlaybackEngine` 在同采样率、同声道数的下一曲到来前预解码首块，并将其接在当前曲目尾块之后排入同一 `AVAudioPlayerNode`，到播放边界才推进队列和元数据。队列改动、Seek、停止和过期解析会使预备资源失效；异格式曲目由原有切歌路径处理。`GaplessPlaybackTests` 四项定向代码测试通过，覆盖解码帧数、同节点自动推进、异格式拒绝连续排程及专辑队列；用户保留实际听感验收。NAS 在线流仍使用 AVPlayer，后续见工作队列 #62。
+
 ## #59 Spotlight 与 App Intents（2026-09-23）
 
 本地歌曲、专辑和艺人写入 Core Spotlight，曲库刷新后按差异批量更新并清理失效条目；系统搜索结果可路由到歌曲播放或专辑、艺人详情。新增播放歌曲与搜索音乐两项 App Intents 动作，并补齐简体、繁体、日文动作标题与说明。macOS 的「快捷指令」支持用户自行添加这些动作，但不提供预置 App Shortcuts 卡片；iOS 保留预置快捷指令。`SpotlightIndexingTests` 定向测试 3 项通过；macOS/iOS 编译与 Core Spotlight 写入、清理接口探针通过。macOS 构建产物含两项标为可发现的 App Intent 元数据，中文动作标题已打包。2026-09-23 用户机的动作库最初未显示 MSRU：`NSWorkspace` 将同一 Bundle ID 解析到无元数据的旧 `.build/DerivedData` 应用；仅注销旧构建的 LaunchServices 记录、保留当前 Xcode Debug 包并重开「快捷指令」后，动作库实查「播放歌曲」「搜索音乐」均可见，未删除构建文件。系统搜索显示、点击效果与快捷指令运行体验均由用户验收通过。设计见 [InteractionAtlas 19.4](../Blueprint/InteractionAtlas.md)；代码测试分工见[架构验证](ArchitectureVerification.md)。

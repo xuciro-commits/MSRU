@@ -155,6 +155,10 @@ private struct WeakSessionObserver {
 
     private var pcmTimeTask: Task<Void, Never>?
 
+    private var pcmNextResolutionTask: Task<Void, Never>?
+
+    private var pcmNextTargetID: UUID?
+
     private let makePlayer: (URL) -> AVPlayer
 
     // MARK: - Init
@@ -452,6 +456,8 @@ private struct WeakSessionObserver {
 
         if isAlreadyCurrent {
 
+            refreshPCMNext()
+
             if duration > 0, currentTime >= duration - 0.25 {
 
                 seek(toProgress: 0)
@@ -573,6 +579,8 @@ private struct WeakSessionObserver {
                     PlaybackItem(local: $0)
                 })
 
+            refreshPCMNext()
+
             toggle()
 
             return
@@ -603,6 +611,8 @@ private struct WeakSessionObserver {
                     PlaybackItem(openverse: $0)
                 })
 
+            refreshPCMNext()
+
             toggle()
 
             return
@@ -632,6 +642,8 @@ private struct WeakSessionObserver {
 
                     PlaybackItem(radio: $0)
                 })
+
+            refreshPCMNext()
 
             toggle()
 
@@ -666,6 +678,7 @@ private struct WeakSessionObserver {
                         PlaybackItem(library: $0)
                     }
                 )
+                refreshPCMNext()
             }
 
             toggle()
@@ -685,11 +698,13 @@ private struct WeakSessionObserver {
     func playNext(_ item: PlaybackItem) {
 
         playbackQueue.playNext(item)
+        refreshPCMNext()
     }
 
     func addToQueue(_ item: PlaybackItem) {
 
         playbackQueue.addToQueue(item)
+        refreshPCMNext()
     }
 
     // MARK: - Local Queue Actions
@@ -753,16 +768,19 @@ private struct WeakSessionObserver {
     func removeUpcoming(id: UUID) {
 
         playbackQueue.removeUpcoming(id: id)
+        refreshPCMNext()
     }
 
     func removeUpcoming(at offsets: IndexSet) {
 
         playbackQueue.removeUpcoming(at: offsets)
+        refreshPCMNext()
     }
 
     func moveUpcoming(fromOffsets: IndexSet, toOffset: Int) {
 
         playbackQueue.moveUpcoming(fromOffsets: fromOffsets, toOffset: toOffset)
+        refreshPCMNext()
     }
 
     /// Purges deleted tracks from current playback and queue. If current track was purged, advances or stops.
@@ -783,12 +801,15 @@ private struct WeakSessionObserver {
             } else {
                 stop()
             }
+        } else {
+            refreshPCMNext()
         }
     }
 
     func clearUpcoming() {
 
         playbackQueue.clearUpcoming()
+        refreshPCMNext()
     }
 
     // MARK: - Previous
@@ -894,6 +915,8 @@ private struct WeakSessionObserver {
 
                     try await pcmEngine.seek(to: clamped)
 
+                    self.refreshPCMNext(force: true)
+
                 } catch {
 
                     guard self.pcmEngine === pcmEngine else {
@@ -979,6 +1002,8 @@ private struct WeakSessionObserver {
 
                     try await pcmEngine.seek(to: 0)
 
+                    self.refreshPCMNext(force: true)
+
                 } catch {
 
                     print("PCM Stop Seek △", error.localizedDescription)
@@ -1047,19 +1072,21 @@ private struct WeakSessionObserver {
 
                 let resource = try await self.providerKernel.resolver.resolve(request)
 
-                try Task.checkCancellation()
-
-                guard self.activeResolutionID == resolutionID else {
-
-                    /*
-                     如果这个 Resource 已经建立了
-                     PCM Decode Session，而请求已经过期，
-                     生命周期最终会随 Resource 释放。
-                     */
+                guard !Task.isCancelled, self.activeResolutionID == resolutionID else {
+                    if case .decodedPCM(let pcm) = resource.transport {
+                        await pcm.session.close()
+                    }
                     return
                 }
 
-                try self.activate(resource: resource, item: item)
+                do {
+                    try self.activate(resource: resource, item: item)
+                } catch {
+                    if case .decodedPCM(let pcm) = resource.transport {
+                        await pcm.session.close()
+                    }
+                    throw error
+                }
 
                 self.isResolving = false
 
@@ -1164,6 +1191,24 @@ private struct WeakSessionObserver {
                 self.handleTransportFailure(error.localizedDescription)
             }
 
+            engine.onAdvanced = { [weak self, weak engine] queueID, nextResource in
+                guard let self, let engine, self.pcmEngine === engine else { return }
+                guard self.playbackQueue.upcoming.first?.id == queueID,
+                      let next = self.playbackQueue.advanceNext() else {
+                    if self.playbackQueue.canNext { self.next() }
+                    else { self.stop() }
+                    return
+                }
+                self.currentRecordingMBID = nil
+                self.currentResource = nextResource
+                self.currentProviderID = nextResource.providerID
+                self.currentTime = engine.currentTime
+                self.duration = engine.duration
+                self.notifyItemChanged()
+                self.refreshPCMNext()
+                print("Playback ▶︎", "[\(nextResource.providerID.rawValue)]", next.item.title)
+            }
+
             pcmEngine = engine
 
             currentResource = resource
@@ -1179,6 +1224,8 @@ private struct WeakSessionObserver {
             engine.play()
 
             isPlaying = true
+
+            refreshPCMNext()
 
         // MARK: Future Provider-native Transport
 
@@ -1206,6 +1253,11 @@ private struct WeakSessionObserver {
     }
 
     private func tearDownActiveTransport() {
+
+        pcmNextResolutionTask?.cancel()
+        pcmNextResolutionTask = nil
+        pcmNextTargetID = nil
+        pcmEngine?.clearPreparedNext()
 
         /*
          先移除 AVPlayer Observer，
@@ -1241,10 +1293,61 @@ private struct WeakSessionObserver {
         if let previousPCMEngine {
             previousPCMEngine.onEnded = nil
             previousPCMEngine.onFailure = nil
+            previousPCMEngine.onAdvanced = nil
 
             Task {
 
                 await previousPCMEngine.close()
+            }
+        }
+    }
+
+    private func refreshPCMNext(force: Bool = false) {
+        let nextID = playbackQueue.upcoming.first?.id
+        if !force, nextID == pcmNextTargetID { return }
+        pcmNextResolutionTask?.cancel()
+        pcmNextResolutionTask = nil
+        guard let engine = pcmEngine else { return }
+        if engine.hasPendingTransition {
+            let time = engine.currentTime
+            let shouldResume = isPlaying
+            engine.pause()
+            Task { [weak self, weak engine] in
+                guard let self, let engine, self.pcmEngine === engine else { return }
+                do {
+                    try await engine.seek(to: time)
+                    guard self.pcmEngine === engine else { return }
+                    if shouldResume { engine.play() }
+                    self.refreshPCMNext(force: true)
+                } catch {
+                    guard self.pcmEngine === engine else { return }
+                    self.handleTransportFailure(error.localizedDescription)
+                }
+            }
+            return
+        }
+        engine.clearPreparedNext()
+        pcmNextTargetID = nextID
+        guard let next = playbackQueue.upcoming.first else { return }
+        let request = next.item.playbackRequest
+        guard request.source == .local else { return }
+        pcmNextResolutionTask = Task { [weak self, weak engine] in
+            guard let self, let engine else { return }
+            do {
+                let resource = try await self.providerKernel.resolver.resolve(request)
+                guard !Task.isCancelled,
+                      self.pcmEngine === engine,
+                      self.playbackQueue.upcoming.first?.id == next.id else {
+                    if case .decodedPCM(let pcm) = resource.transport { await pcm.session.close() }
+                    return
+                }
+                if engine.canPrepare(resource) {
+                    engine.prepareNext(queueID: next.id, resource: resource)
+                } else if case .decodedPCM(let pcm) = resource.transport {
+                    await pcm.session.close()
+                }
+            } catch {
+                // The current track keeps playing; the normal end path resolves the next item.
             }
         }
     }

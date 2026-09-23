@@ -60,6 +60,8 @@
 | **STAGE 3**<br>异类切片压力测试与框架独立 | **脱离音乐场景验证框架**：<br>`Examples/DocStudio`<br>`Examples/HotelDesk`<br>`Packages/AppFoundation/Undo` | · AppFoundationUI 提取通用 Undo 事务机制<br>· 严禁向框架泄漏任何 Music 依赖 | · 独立 Demo App 零修改复用 AppFoundation 架构装配与 Shell<br>· 多窗口文档编辑与 Undo/Redo 回滚测试全绿<br>· 证明框架具备 5 年多种产品支撑力 | 验证框架不是音乐特化封装，奠定未来开发不同领域 Apple 原生产品的基础 |
 | **STAGE 4**<br>跨设备原生互联与生态闭环 | **Apple 多端协同**：<br>`Platform/Network`<br>`Features/RemoteControl` | · 纯 Apple 原生 `Network.framework` (Bonjour)<br>· 局域网轻量状态同步协议 | · iPhone / Apple Watch 自动发现 Mac 播放器并毫秒级遥控<br>· 局域网无损音轨传输与歌单高速下发 | 沙发或床上轻松遥控桌面发烧音响，实现媲美 Apple 官方生态的无缝体验 |
 
+Stage 2 当前实施起点：本地同采样率、同声道 PCM 曲目已接入连续排程（[工作队列 #61–#68](../../todo/02-WORK-QUEUE.md)）；#61 待用户听感验收。这不等于已完成 DAC 直通、均衡器、ReplayGain、NAS 在线无缝或 50,000 首性能目标。其余大任务及阶段收尾门槛以工作队列为准。
+
 ---
 
 ## 框架抽象准则与停止条件

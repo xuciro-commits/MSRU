@@ -13,6 +13,7 @@ struct LocalPlaybackProvider: PlaybackProvider {
 
     let id: PlaybackProviderID = .local
     let priority = 1_000
+    private let codec = AppleAudioFileDecoder()
 
     func canResolve(_ request: PlaybackRequest) -> Bool {
         guard request.source == .local, let url = request.localFileURL else {
@@ -37,10 +38,19 @@ struct LocalPlaybackProvider: PlaybackProvider {
             throw LocalPlaybackProviderError.fileNotFound(url)
         }
 
-        return PlaybackResource(
-            providerID: .local,
-            transport: .avPlayerURL(url)
-        )
+        do {
+            let decoded = try await codec.open(url)
+            return PlaybackResource(
+                providerID: .local,
+                transport: .decodedPCM(PCMPlaybackResource(format: decoded.format, session: decoded.session)),
+                duration: decoded.format.duration
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            // Keep AVPlayer support for local formats AVAudioFile cannot decode.
+            return PlaybackResource(providerID: .local, transport: .avPlayerURL(url))
+        }
     }
 }
 
@@ -241,4 +251,3 @@ private enum SubsonicPlaybackError: LocalizedError {
         "Subsonic stream URL is missing."
     }
 }
-
