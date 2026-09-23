@@ -489,5 +489,32 @@ public nonisolated enum AppDatabaseMigrations {
             }
             try db.create(index: "idx_asset_album_loudness_album", on: "asset_album_loudness", columns: ["album_key"])
         }
+
+        // Makes `sources` the single registry of remote servers: the username
+        // gets its own column instead of living inside display_name, and
+        // Subsonic rows get their own type. Rows are only rewritten when the
+        // legacy "Name (username)" shape is recognised; anything else is kept.
+        migrator.registerMigration("v6_subsonic_sources") { db in
+            let columns = try db.columns(in: "sources")
+            if !columns.contains(where: { $0.name == "username" }) {
+                try db.alter(table: "sources") { t in
+                    t.add(column: "username", .text)
+                }
+            }
+            let rows = try Row.fetchAll(
+                db,
+                sql: "SELECT id, display_name FROM sources WHERE source_type = ? AND id LIKE ?",
+                arguments: [SourceType.futureProvider.rawValue, SourceID.subsonicPrefix + "%"]
+            )
+            for row in rows {
+                let id: String = row["id"]
+                let legacyName: String = row["display_name"]
+                let parsed = Source.splitLegacySubsonicDisplayName(legacyName)
+                try db.execute(
+                    sql: "UPDATE sources SET source_type = ?, display_name = ?, username = COALESCE(username, ?) WHERE id = ?",
+                    arguments: [SourceType.subsonic.rawValue, parsed.name, parsed.username, id]
+                )
+            }
+        }
     }
 }

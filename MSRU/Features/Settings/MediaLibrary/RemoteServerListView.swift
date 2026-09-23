@@ -6,9 +6,9 @@
 //
 
 import SwiftUI
-import MediaLibrary
 import SubsonicKit
 import AppFoundationUI
+import MusicLibrary
 
 struct RemoteServerListView: View {
     @Bindable var store: SubsonicServerStore
@@ -75,7 +75,7 @@ struct RemoteServerListView: View {
         VStack(spacing: 10) {
             ForEach(store.servers) { server in
                 HStack(spacing: 14) {
-                    Image(systemName: server.kind == .subsonic ? "externaldrive.connected.to.line.below.fill" : "server.rack")
+                    Image(systemName: "externaldrive.connected.to.line.below.fill")
                         .font(.title2)
                         .foregroundStyle(.blue)
                         .frame(width: 32)
@@ -86,7 +86,7 @@ struct RemoteServerListView: View {
                                 .font(.body)
                                 .fontWeight(.semibold)
 
-                            statusPill(server.state)
+                            statusPill(server.status)
                         }
 
                         HStack(spacing: 6) {
@@ -145,8 +145,8 @@ struct RemoteServerListView: View {
     }
 
     @ViewBuilder
-    private func statusPill(_ state: LibrarySourceState) -> some View {
-        switch state {
+    private func statusPill(_ status: RemoteSourceStatus) -> some View {
+        switch status {
         case .online:
             HStack(spacing: 4) {
                 Circle().fill(.green).frame(width: 6, height: 6)
@@ -165,42 +165,21 @@ struct RemoteServerListView: View {
             .padding(.vertical, 2)
             .background(.secondary.opacity(0.12), in: Capsule())
 
-        case .syncing:
+        case .unknown:
             HStack(spacing: 4) {
-                ProgressView().controlSize(.mini)
-                Text("同步中").font(.caption2).foregroundStyle(.blue)
+                Circle().strokeBorder(.secondary).frame(width: 6, height: 6)
+                Text("未检测").font(.caption2).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(.blue.opacity(0.12), in: Capsule())
-
-        case .authenticationRequired:
-            HStack(spacing: 4) {
-                Circle().fill(.orange).frame(width: 6, height: 6)
-                Text("需要认证").font(.caption2).foregroundStyle(.orange)
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(.orange.opacity(0.12), in: Capsule())
-
-        case .error:
-            HStack(spacing: 4) {
-                Circle().fill(.red).frame(width: 6, height: 6)
-                Text("异常").font(.caption2).foregroundStyle(.red)
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(.red.opacity(0.12), in: Capsule())
+            .background(.secondary.opacity(0.08), in: Capsule())
         }
     }
 }
 
 #Preview {
     RemoteServerListView(
-        store: SubsonicServerStore(
-            credentialStore: InMemorySubsonicCredentialStore(),
-            registry: LibraryProviderRegistry()
-        )
+        store: SubsonicServerStore(coordinator: .preview())
     )
     .padding()
     .frame(width: 650)

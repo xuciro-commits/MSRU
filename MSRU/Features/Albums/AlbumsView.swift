@@ -6,7 +6,6 @@
 import SwiftUI
 import AppFoundation
 import AppFoundationUI
-import MediaLibrary
 import SubsonicKit
 import MusicDomain
 import MusicLibrary
@@ -93,7 +92,7 @@ struct AlbumsView: View {
             remoteAlbums = []
             return
         }
-        let cleanID = LibrarySourceID(sourceID.replacingOccurrences(of: "src_", with: ""))
+        let cleanID = SourceID(serverKeyOrSourceID: sourceID)
         guard let client = serversStore.client(for: cleanID),
               let server = serversStore.server(for: cleanID) else {
             return
@@ -126,7 +125,7 @@ struct AlbumsView: View {
             let mapped = dtos.map { dto -> AlbumPresentationModel in
                 let coverArtURL = try? client.coverArtURL(id: dto.coverArt ?? dto.id)
                 return AlbumPresentationModel(
-                    id: "subsonic:\(cleanID.rawValue):\(dto.id)",
+                    id: "subsonic:\(cleanID.serverKey):\(dto.id)",
                     title: dto.effectiveTitle,
                     artist: dto.artist ?? "Unknown Artist",
                     year: dto.year,
@@ -162,7 +161,7 @@ struct AlbumsView: View {
             remoteSearchResults = []
             return
         }
-        let cleanID = LibrarySourceID(sourceID.replacingOccurrences(of: "src_", with: ""))
+        let cleanID = SourceID(serverKeyOrSourceID: sourceID)
         guard let client = serversStore.client(for: cleanID),
               let server = serversStore.server(for: cleanID) else {
             return
@@ -177,7 +176,7 @@ struct AlbumsView: View {
             let mapped = dtos.map { dto -> AlbumPresentationModel in
                 let coverArtURL = try? client.coverArtURL(id: dto.coverArt ?? dto.id)
                 return AlbumPresentationModel(
-                    id: "subsonic:\(cleanID.rawValue):\(dto.id)",
+                    id: "subsonic:\(cleanID.serverKey):\(dto.id)",
                     title: dto.effectiveTitle,
                     artist: dto.artist ?? "Unknown Artist",
                     year: dto.year,
@@ -317,8 +316,8 @@ struct AlbumsView: View {
             availableSources = (try? await LibraryQueryEngine.shared.fetchAvailableSources(for: "release")) ?? []
             if let servers = subsonicServers?.servers {
                 for server in servers {
-                    let sourceID = "src_\(server.id.rawValue)"
-                    if !availableSources.contains(where: { $0.sourceID == sourceID || $0.sourceID == server.id.rawValue }) {
+                    let sourceID = server.id.rawValue
+                    if !availableSources.contains(where: { $0.sourceID == sourceID }) {
                         availableSources.append(
                             SourceFilterItem(
                                 id: sourceID,

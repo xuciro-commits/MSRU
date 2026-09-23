@@ -10,8 +10,14 @@ MSRU is a real, shipping product and the platform's long-term validation domain 
 | `Packages/MusicDomain` — target `MusicLibrary` | Library, persistence (GRDB/SQLite + migrations), identity, import pipeline, catalogue providers, provider management, queries, radio, lyrics fetching |
 | `Packages/MusicDomain` — target `MusicPlayback` | Playback controller and queue, PCM engine, CoreAudio output, DSP, codecs, synchronized lyrics state |
 | `MSRU/Features`, `MSRU/Shared/UI/Music` | Product UI; the app target composes, hosts features and adapts platforms ([ADR-0004](ADR/0004-music-domain-packages.md)) |
-| `Packages/MediaLibrary`, `Packages/SubsonicKit` | Source abstraction and Subsonic/OpenSubsonic client (to be folded into the Music domain; two source representations currently coexist) |
+| `Packages/MusicDomain` — target `SubsonicKit` | Subsonic/OpenSubsonic client, Keychain credentials, capability probe; depends on nothing in the product |
 | `Packages/ChromaSwift`, `Packages/MSRUCodecFFmpeg` | Chromaprint wrapper; FFmpeg micro build (`Scripts/build-ffmpeg-micro-apple.sh`, vendored XCFramework) |
+
+## Sources
+
+- The SQLite `sources` table is the only persisted registry of sources (local folders and Subsonic servers; `username` since migration v6). `SourceRuntimeCoordinator` owns them at runtime: it keeps one authenticated client per server, probes capabilities and holds each server's connection status (not persisted). Feature code reaches servers through `SubsonicServerStore`, which adds no state.
+- A Subsonic server has a source ID `src_subsonic_<8 hex>` and a server key `subsonic_<8 hex>` (`SourceID.serverKey`). The key names the Keychain account and appears inside persisted artwork and remote-item references, so it must not change; convert only through `SourceID.serverKey` / `SourceID(serverKeyOrSourceID:)`.
+- The pre-v6 UserDefaults list `com.msru.subsonic.servers` is imported once and kept untouched as a recovery path; delete it in a later contract step.
 
 ## Model
 

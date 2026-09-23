@@ -13,7 +13,6 @@ import Testing
 import Foundation
 import AppFoundation
 import MusicDomain
-import MediaLibrary
 import SubsonicKit
 import GRDB
 import MusicLibrary
@@ -22,44 +21,6 @@ import MusicPlayback
 
 @Suite("Subsonic Architectural 4-Chain Verification")
 struct SubsonicArchitecturalVerificationTests {
-
-    // MARK: - Chain 1: DTO -> Domain
-
-    @Test("Chain 1: DTO directly maps to Domain without creating parallel models")
-    func testChain1DTOMapping() async throws {
-        let sourceID = LibrarySourceID("subsonic_zspace")
-        let mapper = SubsonicMapper(sourceID: sourceID)
-
-        let songDTO = SubsonicSongDTO(
-            id: "song_1001",
-            parent: "album_2001",
-            title: "七里香",
-            album: "七里香",
-            artist: "周杰伦",
-            track: 1,
-            year: 2004,
-            genre: "Pop",
-            coverArt: "al_2001",
-            size: 10485760,
-            contentType: "audio/flac",
-            suffix: "flac",
-            duration: 299,
-            bitRate: 980,
-            albumId: "album_2001",
-            artistId: "artist_3001",
-            discNumber: 1
-        )
-
-        let track = mapper.mapSong(songDTO)
-        #expect(track.id.sourceID == sourceID)
-        #expect(track.id.rawValue == "song_1001")
-        #expect(track.title == "七里香")
-        #expect(track.artist == "周杰伦")
-        #expect(track.album == "七里香")
-        #expect(track.duration == 299)
-        #expect(track.codec == "FLAC")
-        #expect(track.bitrateKbps == 980)
-    }
 
     // MARK: - Chain 2: Source ID -> Canonical Identity
 
@@ -213,8 +174,7 @@ struct SubsonicArchitecturalVerificationTests {
             credentialStore: credStore
         )
 
-        let playbackProvider = SubsonicPlaybackProvider(sourceID: serverID, client: client)
-        let ephemeralStreamURL = try await playbackProvider.resolveStreamURL(for: "z_track_02")
+        let ephemeralStreamURL = try client.streamURL(id: "z_track_02")
         #expect(ephemeralStreamURL.absoluteString.contains("stream.view"))
         #expect(ephemeralStreamURL.absoluteString.contains("u=msru"))
         #expect(ephemeralStreamURL.absoluteString.contains("t="))

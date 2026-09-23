@@ -2,7 +2,6 @@ import Foundation
 import Testing
 import AppFoundation
 import MusicDomain
-import MediaLibrary
 import SubsonicKit
 import MusicLibrary
 @testable import MSRU
@@ -84,7 +83,7 @@ struct LyricsProviderTests {
 
     @Test("Subsonic provider requires both song and server identities")
     func subsonicIdentityGuard() async throws {
-        let provider = SubsonicLyricsProvider(registry: LibraryProviderRegistry())
+        let provider = SubsonicLyricsProvider(resolveClient: { _ in nil })
         #expect(try await provider.fetchLyrics(context: LyricsQueryContext(title: "Song", artist: "Artist")) == nil)
         #expect(try await provider.fetchLyrics(context: LyricsQueryContext(title: "Song", artist: "Artist", subsonicSongID: "42")) == nil)
         #expect(try await provider.fetchLyrics(context: LyricsQueryContext(title: "Song", artist: "Artist", subsonicSongID: "42", sourceID: "unknown")) == nil)
@@ -104,16 +103,10 @@ struct LyricsProviderTests {
             credentialStore: credentials,
             session: URLSession(configuration: configuration)
         )
-        let registry = LibraryProviderRegistry()
-        registry.register(SubsonicLibraryProvider(
-            sourceID: sourceID,
-            sourceName: "Test server",
-            serverURL: URL(string: "https://lyrics.example")!,
-            username: "tester",
-            client: client
-        ))
         let context = LyricsQueryContext(title: "Song", artist: "Artist", subsonicSongID: "song-42", sourceID: sourceID.rawValue)
-        let text = try await SubsonicLyricsProvider(registry: registry).fetchLyrics(context: context)
+        let text = try await SubsonicLyricsProvider(resolveClient: { key in
+            key == sourceID.rawValue ? client : nil
+        }).fetchLyrics(context: context)
         #expect(text == "[00:01.25]Remote line")
         #expect(LyricsURLProtocol.requestedSongID == "song-42")
     }

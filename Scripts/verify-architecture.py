@@ -15,16 +15,19 @@ IMPORT = re.compile(
 WINDOW_CREATION = re.compile(r"\b(?:NSWindow|NSSplitViewController)\s*\(")
 # AppFoundation is the domain-neutral Apple client layer (see AGENTS.md).
 DOMAIN_MODULES = {
-    "GRDB", "MediaLibrary", "SubsonicKit", "ChromaSwift", "MSRUCodecFFmpeg",
+    "GRDB", "SubsonicKit", "ChromaSwift", "MSRUCodecFFmpeg",
     "MusicDomain", "MusicLibrary", "MusicPlayback",
 }
 UI_MODULES = {"SwiftUI", "AppKit", "UIKit", "AppFoundationUI"}
-# Music packages layer downward: MusicPlayback -> MusicLibrary -> MusicDomain.
+# Music packages layer downward: MusicPlayback -> MusicLibrary -> MusicDomain;
+# SubsonicKit sits beside MusicDomain as a leaf.
 # Each target may not import the modules listed for it.
 MUSIC_TARGET_FORBIDDEN = {
     "MusicDomain": UI_MODULES | DOMAIN_MODULES - {"MusicDomain"},
     "MusicLibrary": UI_MODULES | {"MusicPlayback", "MSRUCodecFFmpeg"},
     "MusicPlayback": UI_MODULES,
+    # Protocol client: depends on nothing in the product.
+    "SubsonicKit": UI_MODULES | DOMAIN_MODULES - {"SubsonicKit"},
 }
 DOMAIN_VOCABULARY = re.compile(
     r"\b(?:public|open)\s+(?:final\s+)?(?:struct|class|enum|protocol|actor|typealias)\s+"

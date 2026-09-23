@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import MediaLibrary
 import SubsonicKit
 
 struct AddSubsonicServerSheet: View {
@@ -286,10 +285,7 @@ struct AddSubsonicServerSheet: View {
 
 #Preview {
     AddSubsonicServerSheet(
-        store: SubsonicServerStore(
-            credentialStore: InMemorySubsonicCredentialStore(),
-            registry: LibraryProviderRegistry()
-        ),
+        store: SubsonicServerStore(coordinator: .preview()),
         onDismiss: {}
     )
 }

@@ -11,8 +11,9 @@
 		404EA14E305E9751003BA949 /* MSRUCodecFFmpeg in Frameworks */ = {isa = PBXBuildFile; productRef = 404EA14D305E9751003BA949 /* MSRUCodecFFmpeg */; };
 		404EA155305E9777003BA949 /* AppFoundationUI in Frameworks */ = {isa = PBXBuildFile; productRef = 404EA154305E9777003BA949 /* AppFoundationUI */; };
 		40A75D010000000000000001 /* MusicDomain in Frameworks */ = {isa = PBXBuildFile; productRef = 40A75D010000000000000002 /* MusicDomain */; };
-		40A75D010000000000000021 /* MusicPlayback in Frameworks */ = {isa = PBXBuildFile; productRef = 40A75D010000000000000022 /* MusicPlayback */; };
+		40A75D010000000000000031 /* SubsonicKit in Frameworks */ = {isa = PBXBuildFile; productRef = 40A75D010000000000000032 /* SubsonicKit */; };
 		40A75D010000000000000011 /* MusicLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = 40A75D010000000000000012 /* MusicLibrary */; };
+		40A75D010000000000000021 /* MusicPlayback in Frameworks */ = {isa = PBXBuildFile; productRef = 40A75D010000000000000022 /* MusicPlayback */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -77,6 +78,7 @@
 				404EA147305E8362003BA949 /* AppFoundation in Frameworks */,
 				404EA155305E9777003BA949 /* AppFoundationUI in Frameworks */,
 				40A75D010000000000000001 /* MusicDomain in Frameworks */,
+				40A75D010000000000000031 /* SubsonicKit in Frameworks */,
 				40A75D010000000000000021 /* MusicPlayback in Frameworks */,
 				40A75D010000000000000011 /* MusicLibrary in Frameworks */,
 				404EA14E305E9751003BA949 /* MSRUCodecFFmpeg in Frameworks */,
@@ -100,20 +102,12 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		404EA14A305E96CF003BA949 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
 		40F5DDEF3057009E00CA46B2 = {
 			isa = PBXGroup;
 			children = (
 				40F5DDFA3057009E00CA46B2 /* MSRU */,
 				40F5DE0A3057009F00CA46B2 /* MSRUTests */,
 				40F5DE143057009F00CA46B2 /* MSRUUITests */,
-				404EA14A305E96CF003BA949 /* Frameworks */,
 				40F5DDF93057009E00CA46B2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -152,6 +146,7 @@
 				404EA14D305E9751003BA949 /* MSRUCodecFFmpeg */,
 				404EA154305E9777003BA949 /* AppFoundationUI */,
 				40A75D010000000000000002 /* MusicDomain */,
+				40A75D010000000000000032 /* SubsonicKit */,
 				40A75D010000000000000022 /* MusicPlayback */,
 				40A75D010000000000000012 /* MusicLibrary */,
 			);
@@ -748,6 +743,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 40A75D010000000000000003 /* XCLocalSwiftPackageReference "Packages/MusicDomain" */;
 			productName = MusicPlayback;
+		};
+		40A75D010000000000000032 /* SubsonicKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 40A75D010000000000000003 /* XCLocalSwiftPackageReference "Packages/MusicDomain" */;
+			productName = SubsonicKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

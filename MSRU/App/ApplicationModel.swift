@@ -7,7 +7,6 @@ import Foundation
 import Observation
 import AppFoundation
 import AppIntents
-import MediaLibrary
 import MusicLibrary
 import MusicPlayback
 
@@ -98,9 +97,6 @@ final class ApplicationModel {
 
     let subsonicServers:
         SubsonicServerStore
-
-    let libraryCoordinator:
-        LibraryCoordinator
 
 
     // MARK: - Language
@@ -214,9 +210,7 @@ final class ApplicationModel {
         watchedFolders:
             WatchedFolderStore? = nil,
         subsonicServers:
-            SubsonicServerStore? = nil,
-        libraryCoordinator:
-            LibraryCoordinator? = nil
+            SubsonicServerStore? = nil
     ) {
 
         self.musicCatalog =
@@ -267,9 +261,6 @@ final class ApplicationModel {
             subsonicServers ?? SubsonicServerStore()
         self.subsonicServers =
             resolvedSubsonicServers
-
-        self.libraryCoordinator =
-            libraryCoordinator ?? LibraryCoordinator()
 
         self.localLibrary.attachCascadeCollaborators(
             libraryStore: library,

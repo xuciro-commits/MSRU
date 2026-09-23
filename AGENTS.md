@@ -24,8 +24,7 @@ Start here (Claude Code reaches this file through `CLAUDE.md`). This file is eno
 | `MSRU/Shared/UI/Music` | Shared music views (cards, components) |
 | `MSRU/PreviewSupport` | Deterministic preview fixtures (`MSRUPreviewData`) |
 | `Packages/AppFoundation` | Apple client layer: `AppFoundation` (no UI) + `AppFoundationUI` (native code only under `AppFoundationUI/Platform`) |
-| `Packages/MusicDomain` | Music domain package, layered `MusicPlayback` → `MusicLibrary` → `MusicDomain`: types/toolkits, library + persistence (GRDB/SQLite + migrations), identity, import, providers, radio, queries, playback ([ADR-0004](Docs/ADR/0004-music-domain-packages.md)) |
-| `Packages/MediaLibrary`, `Packages/SubsonicKit` | Music source abstraction, Subsonic client |
+| `Packages/MusicDomain` | Music domain package, layered `MusicPlayback` → `MusicLibrary` → `MusicDomain`, plus leaf `SubsonicKit`: types/toolkits, library + persistence (GRDB/SQLite + migrations), sources, identity, import, providers, radio, queries, playback, Subsonic client ([ADR-0004](Docs/ADR/0004-music-domain-packages.md)) |
 | `Packages/ChromaSwift`, `Packages/MSRUCodecFFmpeg` | Chromaprint wrapper (vendored `chromaprint/` source), FFmpeg micro XCFramework (vendored, built by script) |
 | `MSRUTests`, `MSRUUITests` | App unit/contract tests (Swift Testing), process-level UI tests |
 | `Scripts/` | `verify.sh`, `verify-architecture.py`, `verify-previews.py`, `repo-health.py` |
@@ -67,7 +66,7 @@ Requirements: macOS 27 with Xcode 27 (deployment target 27.0, Swift 6 language m
 
 ```sh
 Scripts/verify.sh gates      # architecture + preview guardrails (seconds)
-Scripts/verify.sh packages   # gates + swift test for AppFoundation, MusicDomain, MediaLibrary, SubsonicKit
+Scripts/verify.sh packages   # gates + swift test for AppFoundation, MusicDomain
 Scripts/verify.sh app        # gates + macOS unit tests (scheme MSRU-UnitTests) + iOS Simulator build (scheme MSRU)
 Scripts/verify.sh            # everything; logs in .build/verify/
 ```

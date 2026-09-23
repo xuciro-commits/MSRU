@@ -7,7 +7,6 @@ import SwiftUI
 import AppFoundation
 import AppFoundationUI
 import CryptoKit
-import MediaLibrary
 import SubsonicKit
 import MusicLibrary
 import MusicPlayback
@@ -108,7 +107,7 @@ struct PlaylistsView: View {
             remotePlaylists = []
             return
         }
-        let cleanID = LibrarySourceID(sourceID.replacingOccurrences(of: "src_", with: ""))
+        let cleanID = SourceID(serverKeyOrSourceID: sourceID)
         guard let client = serversStore.client(for: cleanID),
               let server = serversStore.server(for: cleanID) else {
             return
@@ -120,7 +119,7 @@ struct PlaylistsView: View {
         do {
             let dtos = try await client.playlists()
             let mapped = dtos.map { pl -> Playlist in
-                let key = "\(cleanID.rawValue):playlist:\(pl.id)"
+                let key = "\(cleanID.serverKey):playlist:\(pl.id)"
                 let digest = CryptoKit.SHA256.hash(data: Data(key.utf8))
                 var bytes = Array(digest.prefix(16))
                 bytes[6] = (bytes[6] & 0x0F) | 0x40
@@ -318,7 +317,7 @@ struct PlaylistsView: View {
             for server in remoteServers {
                 items.append(
                     SourceFilterItem(
-                        id: "src_\(server.id.rawValue)",
+                        id: server.id.rawValue,
                         displayName: server.name,
                         count: nil
                     )

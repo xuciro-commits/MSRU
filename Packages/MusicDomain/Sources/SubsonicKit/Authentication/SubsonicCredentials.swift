@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import MediaLibrary
 
 public struct SubsonicCredentials: Sendable, Codable, Equatable {
     public let serverID: LibrarySourceID

@@ -6,7 +6,6 @@
 import Testing
 import Foundation
 import CryptoKit
-@testable import MediaLibrary
 @testable import SubsonicKit
 
 @Suite("Subsonic Authentication Contracts")
@@ -59,63 +58,23 @@ struct SubsonicAuthenticationTests {
     }
 }
 
-@Suite("Subsonic Mapper & DTO Contracts")
-struct SubsonicMapperTests {
+@Suite("Subsonic Capability Contracts")
+struct SubsonicCapabilityTests {
 
-    @Test("SubsonicMapper converts SongDTO to UnifiedTrack with correct types")
-    func songMapping() {
-        let sourceID = LibrarySourceID("subsonic.test")
-        let mapper = SubsonicMapper(sourceID: sourceID)
+    @Test("LibraryCapabilities OptionSet behaves correctly with Codable and combinations")
+    func libraryCapabilitiesBehavior() throws {
+        var caps: LibraryCapabilities = [.browse, .streaming, .artwork]
+        #expect(caps.contains(.browse))
+        #expect(caps.contains(.streaming))
+        #expect(caps.contains(.artwork))
+        #expect(!caps.contains(.scrobbling))
 
-        let songDTO = SubsonicSongDTO(
-            id: "12345",
-            title: "七里香",
-            album: "七里香",
-            artist: "周杰伦",
-            track: 1,
-            year: 2004,
-            genre: "Pop",
-            coverArt: "al-123",
-            size: 45000000,
-            contentType: "audio/flac",
-            suffix: "flac",
-            duration: 299,
-            bitRate: 1411,
-            albumId: "al-123",
-            artistId: "ar-99"
-        )
+        caps.insert(.openSubsonicExtensions)
+        #expect(caps.contains(.openSubsonicExtensions))
 
-        let track = mapper.mapSong(songDTO)
-
-        #expect(track.id == MediaID(sourceID: sourceID, rawValue: "12345"))
-        #expect(track.title == "七里香")
-        #expect(track.artist == "周杰伦")
-        #expect(track.artistID == MediaID(sourceID: sourceID, rawValue: "ar-99"))
-        #expect(track.albumID == MediaID(sourceID: sourceID, rawValue: "al-123"))
-        #expect(track.year == 2004)
-        #expect(track.codec == "FLAC")
-        #expect(track.duration == 299)
-        #expect(track.artworkReference == "al-123")
-    }
-
-    @Test("SubsonicMapper handles missing album/artist gracefully")
-    func albumMappingWithMissingFields() {
-        let sourceID = LibrarySourceID("subsonic.test")
-        let mapper = SubsonicMapper(sourceID: sourceID)
-
-        let albumDTO = SubsonicAlbumDTO(
-            id: "al-999",
-            name: "Fallback Title",
-            title: nil,
-            artist: nil,
-            artistId: nil
-        )
-
-        let album = mapper.mapAlbum(albumDTO)
-        #expect(album.id.rawValue == "al-999")
-        #expect(album.title == "Fallback Title")
-        #expect(album.artist == "Unknown Artist")
-        #expect(album.artistID == nil)
+        let data = try JSONEncoder().encode(caps)
+        let decoded = try JSONDecoder().decode(LibraryCapabilities.self, from: data)
+        #expect(decoded == caps)
     }
 }
 

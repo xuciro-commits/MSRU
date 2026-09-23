@@ -28,7 +28,7 @@ step gate-architecture python3 Scripts/verify-architecture.py
 step gate-previews     python3 Scripts/verify-previews.py
 
 if [[ "$MODE" == all || "$MODE" == packages ]]; then
-  for pkg in AppFoundation MusicDomain MediaLibrary SubsonicKit; do
+  for pkg in AppFoundation MusicDomain; do
     step "test-$pkg" swift test --package-path "Packages/$pkg"
   done
 fi

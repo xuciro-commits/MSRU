@@ -7,7 +7,6 @@
 
 import Foundation
 import os
-import MediaLibrary
 
 public actor SubsonicClient {
     public nonisolated let serverID: LibrarySourceID

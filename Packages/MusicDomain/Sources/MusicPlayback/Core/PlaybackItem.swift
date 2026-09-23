@@ -4,9 +4,9 @@
 //
 
 import Foundation
-import MediaLibrary
 import MusicDomain
 import MusicLibrary
+import SubsonicKit
 
 
 public enum PlaybackItemSource:

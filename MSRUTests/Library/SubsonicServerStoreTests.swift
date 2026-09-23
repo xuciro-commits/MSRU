@@ -6,9 +6,9 @@
 import Testing
 import Foundation
 @testable import MSRU
-import MediaLibrary
 import SubsonicKit
 import MusicDomain
+import MusicLibrary
 import MusicPlayback
 
 @Suite("Subsonic Server Integration Contracts")
@@ -66,29 +66,85 @@ struct SubsonicServerStoreTests {
         #expect(!provider.canResolve(request))
     }
 
-    @Test("SubsonicServerStore manages server addition and deletion in memory")
+    @Test("Legacy UserDefaults servers import once into sources with their username")
     @MainActor
-    func serverStoreManagement() async throws {
-        let credStore = InMemorySubsonicCredentialStore()
-        let registry = LibraryProviderRegistry()
-        let ephemeralDefaults = UserDefaults(suiteName: "test_\(UUID().uuidString)")!
-        let store = SubsonicServerStore(
-            credentialStore: credStore,
-            registry: registry,
-            userDefaults: ephemeralDefaults
+    func legacyServersImportIntoSources() async throws {
+        let defaults = UserDefaults(suiteName: "test_\(UUID().uuidString)")!
+        let legacy = #"[{"id":{"rawValue":"subsonic_ab12cd34"},"name":"Home NAS","kind":"subsonic","capabilities":0,"state":"online","serverURL":"http://192.168.31.200:8025","username":"msru"}]"#
+        defaults.set(Data(legacy.utf8), forKey: SourceRuntimeCoordinator.legacySubsonicServersKey)
+        let db = try AppDatabase.makeEphemeral()
+        let coordinator = SourceRuntimeCoordinator(
+            db: db,
+            credentialStore: InMemorySubsonicCredentialStore(),
+            legacyDefaults: defaults
         )
+        let store = SubsonicServerStore(coordinator: coordinator)
+        await coordinator.loadRemoteSources()
 
-        // Verify initial state
-        #expect(store.servers.isEmpty)
+        let server = try #require(store.servers.first)
+        #expect(store.servers.count == 1)
+        #expect(server.id == SourceID("src_subsonic_ab12cd34"))
+        #expect(server.name == "Home NAS")
+        #expect(server.username == "msru")
+        #expect(server.status == .unknown)
+        #expect(store.client(for: LibrarySourceID("subsonic_ab12cd34"))?.serverID == LibrarySourceID("subsonic_ab12cd34"))
+        #expect(store.client(for: server.id) != nil)
+        // The legacy value stays as a recovery path.
+        #expect(defaults.data(forKey: SourceRuntimeCoordinator.legacySubsonicServersKey) != nil)
 
-        // Adding server saves password to credential store and registers provider
-        let sourceID = LibrarySourceID("zspace_test")
-        try credStore.savePassword("msruz4pro", for: sourceID)
-        #expect(try credStore.password(for: sourceID) == "msruz4pro")
+        // Removing the server must not resurrect it from the legacy list.
+        await coordinator.removeSource(id: server.id)
+        let reloaded = SourceRuntimeCoordinator(
+            db: db,
+            credentialStore: InMemorySubsonicCredentialStore(),
+            legacyDefaults: defaults
+        )
+        await reloaded.loadRemoteSources()
+        #expect(reloaded.subsonicSources.isEmpty)
+    }
 
-        // Removing server cleans up credentials and registry
-        store.removeServer(id: sourceID)
-        #expect(try credStore.password(for: sourceID) == nil)
-        #expect(registry.provider(for: sourceID) == nil)
+    @Test("Removing a server deletes its credential and client")
+    @MainActor
+    func removeServerCleansUp() async throws {
+        let credentials = InMemorySubsonicCredentialStore()
+        let db = try AppDatabase.makeEphemeral()
+        let source = Source(
+            id: SourceID("src_subsonic_zz99"),
+            sourceType: .subsonic,
+            uri: "http://192.168.31.200:8025",
+            displayName: "Test",
+            capabilities: [.supportsStreaming],
+            username: "msru"
+        )
+        try await SourceRepository(db: db).insertOrUpdate(source)
+        try credentials.savePassword("secret", for: LibrarySourceID("subsonic_zz99"))
+        let coordinator = SourceRuntimeCoordinator(
+            db: db,
+            credentialStore: credentials,
+            legacyDefaults: UserDefaults(suiteName: "test_\(UUID().uuidString)")!
+        )
+        await coordinator.loadRemoteSources()
+        #expect(coordinator.subsonicClient(for: source.id) != nil)
+
+        await coordinator.removeSource(id: source.id)
+        #expect(coordinator.subsonicClient(for: source.id) == nil)
+        #expect(try credentials.password(for: LibrarySourceID("subsonic_zz99")) == nil)
+        #expect(coordinator.subsonicSources.isEmpty)
+    }
+
+    @Test("Server keys and source IDs map to each other")
+    func serverKeyMapping() {
+        #expect(SourceID("src_subsonic_ab12").serverKey == "subsonic_ab12")
+        #expect(SourceID(serverKeyOrSourceID: "subsonic_ab12") == SourceID("src_subsonic_ab12"))
+        #expect(SourceID(serverKeyOrSourceID: "src_subsonic_ab12") == SourceID("src_subsonic_ab12"))
+        #expect(SourceID.newSubsonic().rawValue.hasPrefix(SourceID.subsonicPrefix))
+    }
+
+    @Test("Legacy display names split into name and username")
+    func legacyDisplayNameSplit() {
+        #expect(Source.splitLegacySubsonicDisplayName("Home NAS (msru)") == ("Home NAS", "msru"))
+        #expect(Source.splitLegacySubsonicDisplayName("极空间 (user) (admin)") == ("极空间 (user)", "admin"))
+        #expect(Source.splitLegacySubsonicDisplayName("Plain") == ("Plain", nil))
+        #expect(Source.splitLegacySubsonicDisplayName("() ") == ("() ", nil))
     }
 }

@@ -8,7 +8,9 @@ import PackageDescription
 //   MusicLibrary  — library, persistence (GRDB), identity, import, catalog,
 //                   providers, queries, radio
 //   MusicPlayback — playback engine, CoreAudio output, DSP, codecs, queue
-// Dependencies point downward: MusicPlayback → MusicLibrary → MusicDomain.
+//   SubsonicKit   — Subsonic/OpenSubsonic client, credentials, capability probe
+// Dependencies point downward: MusicPlayback → MusicLibrary → MusicDomain;
+// MusicLibrary and MusicPlayback also use SubsonicKit, which depends on nothing.
 // Moved app-target code keeps the app's concurrency semantics
 // (default MainActor isolation, approachable concurrency).
 let appTargetSettings: [SwiftSetting] = [
@@ -32,20 +34,20 @@ let package = Package(
     products: [
         .library(name: "MusicDomain", targets: ["MusicDomain"]),
         .library(name: "MusicLibrary", targets: ["MusicLibrary"]),
-        .library(name: "MusicPlayback", targets: ["MusicPlayback"])
+        .library(name: "MusicPlayback", targets: ["MusicPlayback"]),
+        .library(name: "SubsonicKit", targets: ["SubsonicKit"])
     ],
 
     dependencies: [
         .package(path: "../AppFoundation"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.0"),
         .package(path: "../ChromaSwift"),
-        .package(path: "../MediaLibrary"),
-        .package(path: "../SubsonicKit"),
         .package(path: "../MSRUCodecFFmpeg")
     ],
 
     targets: [
         .target(name: "MusicDomain"),
+        .target(name: "SubsonicKit"),
         .target(
             name: "MusicLibrary",
             dependencies: [
@@ -53,8 +55,7 @@ let package = Package(
                 .product(name: "AppFoundation", package: "AppFoundation"),
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "ChromaSwift", package: "ChromaSwift"),
-                .product(name: "MediaLibrary", package: "MediaLibrary"),
-                .product(name: "SubsonicKit", package: "SubsonicKit")
+                "SubsonicKit"
             ],
             swiftSettings: appTargetSettings
         ),
@@ -65,8 +66,7 @@ let package = Package(
                 "MusicLibrary",
                 .product(name: "AppFoundation", package: "AppFoundation"),
                 .product(name: "GRDB", package: "GRDB.swift"),
-                .product(name: "MediaLibrary", package: "MediaLibrary"),
-                .product(name: "SubsonicKit", package: "SubsonicKit"),
+                "SubsonicKit",
                 .product(name: "MSRUCodecFFmpeg", package: "MSRUCodecFFmpeg")
             ],
             swiftSettings: appTargetSettings
@@ -74,6 +74,10 @@ let package = Package(
         .testTarget(
             name: "MusicDomainTests",
             dependencies: ["MusicDomain"]
+        ),
+        .testTarget(
+            name: "SubsonicKitTests",
+            dependencies: ["SubsonicKit"]
         ),
         .testTarget(
             name: "MusicLibraryTests",

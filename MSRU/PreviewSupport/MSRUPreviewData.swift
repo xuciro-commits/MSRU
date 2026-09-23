@@ -8,6 +8,7 @@ import MusicKit
 import AppFoundation
 import MusicLibrary
 import MusicPlayback
+import SubsonicKit
 
 
 // MARK: - Preview Data
@@ -709,4 +710,15 @@ private struct PreviewAppleMusicService: AppleMusicLibraryServing {
     func fetchAlbums() async throws -> [Album] { [] }
     func fetchArtists() async throws -> [Artist] { [] }
     func fetchSongs() async throws -> [Song] { [] }
+}
+
+extension SourceRuntimeCoordinator {
+    /// Isolated coordinator for previews: in-memory database, credentials and defaults.
+    static func preview() -> SourceRuntimeCoordinator {
+        SourceRuntimeCoordinator(
+            db: try! AppDatabase.makeEphemeral(),
+            credentialStore: InMemorySubsonicCredentialStore(),
+            legacyDefaults: UserDefaults(suiteName: "msru.preview.\(UUID().uuidString)")!
+        )
+    }
 }

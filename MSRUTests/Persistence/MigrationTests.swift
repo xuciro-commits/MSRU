@@ -153,4 +153,32 @@ struct MigrationTests {
         }
         #expect(counts == [1, 1, 1, 1])
     }
+
+    @Test
+    func migrationV6MovesSubsonicUsernameOutOfDisplayName() throws {
+        let queue = try DatabaseQueue()
+        let appDb = AppDatabase(dbWriter: queue)
+        try appDb.migrator.migrate(queue, upTo: "v5_r128_analysis")
+        try queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO sources (id, source_type, uri, display_name, capabilities, is_enabled, created_at, updated_at) VALUES
+                ('src_subsonic_ab12', 'future_provider', 'http://nas:8025', 'Home NAS (msru)', 8, 1, '2026-01-01', '2026-01-01'),
+                ('src_subsonic_cd34', 'future_provider', 'http://nas2:4533', 'No user shape', 8, 1, '2026-01-01', '2026-01-01'),
+                ('src_local_default', 'local_folder', 'file://local', 'Local Files', 1, 1, '2026-01-01', '2026-01-01')
+            """)
+        }
+
+        try appDb.migrator.migrate(queue)
+        try appDb.migrator.migrate(queue)
+
+        let rows = try queue.read { db in
+            try Row.fetchAll(db, sql: "SELECT id, source_type, display_name, username FROM sources ORDER BY id")
+                .map { [$0["id"] as String, $0["source_type"] as String, $0["display_name"] as String, $0["username"] as String? ?? "-"] }
+        }
+        #expect(rows == [
+            ["src_local_default", "local_folder", "Local Files", "-"],
+            ["src_subsonic_ab12", "subsonic", "Home NAS", "msru"],
+            ["src_subsonic_cd34", "subsonic", "No user shape", "-"]
+        ])
+    }
 }

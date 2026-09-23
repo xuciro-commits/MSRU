@@ -11,7 +11,6 @@ import Foundation
 import CryptoKit
 import AppFoundation
 import MusicDomain
-import MediaLibrary
 import SubsonicKit
 import GRDB
 import MusicLibrary

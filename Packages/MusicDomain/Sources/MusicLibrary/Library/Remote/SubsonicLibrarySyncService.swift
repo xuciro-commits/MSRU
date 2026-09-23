@@ -8,7 +8,6 @@
 
 import Foundation
 import AppFoundation
-import MediaLibrary
 import SubsonicKit
 import GRDB
 
@@ -38,7 +37,7 @@ nonisolated public final class SubsonicLibrarySyncService: Sendable {
         let sourceRepo = SourceRepository(db: db)
         let identityRepo = IdentityRepository(db: db)
         let assetRepo = AssetRepository(db: db)
-        let sourceID = SourceID("src_\(serverID.rawValue)")
+        let sourceID = SourceID(serverKeyOrSourceID: serverID.rawValue)
 
         // 1. Ensure remote Source is registered in SQLite
         let remoteSource = Source(
@@ -170,7 +169,7 @@ nonisolated public final class SubsonicLibrarySyncService: Sendable {
             let playlists = try await client.playlists()
             guard !playlists.isEmpty else { return }
 
-            let sourceID = SourceID("src_\(serverID.rawValue)")
+            let sourceID = SourceID(serverKeyOrSourceID: serverID.rawValue)
             for pl in playlists {
                 let detailed = (try? await client.playlist(id: pl.id)) ?? pl
                 let songIDs = detailed.entry?.map(\.id) ?? []

@@ -6,7 +6,6 @@
 import SwiftUI
 import AppFoundation
 import AppFoundationUI
-import MediaLibrary
 import SubsonicKit
 import MusicDomain
 import MusicLibrary

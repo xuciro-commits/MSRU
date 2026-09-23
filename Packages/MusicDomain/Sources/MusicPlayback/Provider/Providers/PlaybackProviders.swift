@@ -4,7 +4,6 @@
 //
 
 import Foundation
-import MediaLibrary
 import SubsonicKit
 import MusicDomain
 import MusicLibrary
@@ -224,9 +223,14 @@ public struct RemoteSubsonicPlaybackProvider: PlaybackProvider {
     public let id: PlaybackProviderID = .subsonic
     public let priority = 950
     private let downloadStore: any RemoteAudioDownloading
+    private let resolveClient: SubsonicClientResolver
 
-    public init(downloadStore: any RemoteAudioDownloading = RemoteAudioDownloadStore()) {
+    public init(
+        downloadStore: any RemoteAudioDownloading = RemoteAudioDownloadStore(),
+        resolveClient: @escaping SubsonicClientResolver = SubsonicClientResolvers.shared
+    ) {
         self.downloadStore = downloadStore
+        self.resolveClient = resolveClient
     }
 
     public func canResolve(_ request: PlaybackRequest) -> Bool {
@@ -238,10 +242,10 @@ public struct RemoteSubsonicPlaybackProvider: PlaybackProvider {
 
         let streamURL: URL
         if let serverID = request.subsonicServerID {
-            guard let provider = LibraryProviderRegistry.shared.provider(for: LibrarySourceID(serverID)) as? SubsonicLibraryProvider else {
+            guard let client = await resolveClient(serverID) else {
                 throw SubsonicPlaybackError.serverUnavailable
             }
-            streamURL = try provider.client.streamURL(id: request.itemID)
+            streamURL = try client.streamURL(id: request.itemID)
         } else if let url = request.remoteURL {
             streamURL = url
         } else {

@@ -9,7 +9,6 @@
 import Foundation
 import AVFoundation
 import AppFoundation
-import MediaLibrary
 import SubsonicKit
 import CryptoKit
 import MusicDomain
@@ -218,18 +217,18 @@ nonisolated public struct LrcLibLyricsProvider: LyricsProvider {
 /// Uses the exact remote song identity and its source's authenticated client.
 nonisolated public struct SubsonicLyricsProvider: LyricsProvider {
     public let providerName = "OpenSubsonic"
-    private let registry: LibraryProviderRegistry
+    private let resolveClient: SubsonicClientResolver
 
-    public init(registry: LibraryProviderRegistry = .shared) {
-        self.registry = registry
+    public init(resolveClient: @escaping SubsonicClientResolver = SubsonicClientResolvers.shared) {
+        self.resolveClient = resolveClient
     }
 
     public func fetchLyrics(context: LyricsQueryContext) async throws -> String? {
         guard let songID = context.subsonicSongID, !songID.isEmpty,
               let sourceID = context.sourceID, !sourceID.isEmpty,
-              let provider = registry.provider(for: LibrarySourceID(sourceID)) as? SubsonicLibraryProvider else {
+              let client = await resolveClient(sourceID) else {
             return nil
         }
-        return try await provider.client.getLyricsBySongId(id: songID)?.toLrcText()
+        return try await client.getLyricsBySongId(id: songID)?.toLrcText()
     }
 }

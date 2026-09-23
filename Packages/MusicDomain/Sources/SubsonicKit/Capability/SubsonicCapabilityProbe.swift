@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import MediaLibrary
 
 public struct SubsonicCapabilityProbe: Sendable {
     public init() {}

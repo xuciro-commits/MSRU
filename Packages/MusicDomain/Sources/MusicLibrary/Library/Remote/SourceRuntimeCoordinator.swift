@@ -2,43 +2,175 @@
 //  SourceRuntimeCoordinator.swift
 //  MSRU
 //
-//  Coordinates lifecycle, capability probing, and reconciliation of all media library sources.
-//  Ensures capability probe executes during bootstrap prior to any synchronization.
+//  Single owner of media sources at runtime: the SQLite `sources` table is the
+//  persisted registry; this coordinator loads it, keeps one authenticated
+//  client per Subsonic server, probes capabilities before reconciling and
+//  tracks each remote source's connection status.
 //
 
 import Foundation
 import Observation
 import AppFoundation
-import MediaLibrary
 import SubsonicKit
 import GRDB
 import MusicDomain
+
+/// Looks up the authenticated client for a source ID or server key.
+public typealias SubsonicClientResolver = @Sendable (String) async -> SubsonicClient?
+
+nonisolated public enum SubsonicClientResolvers {
+    /// Resolves through the application's shared source coordinator.
+    public static let shared: SubsonicClientResolver = { value in
+        await SourceRuntimeCoordinator.shared.resolveSubsonicClient(serverKeyOrSourceID: value)
+    }
+}
+
+/// Connection status of a remote source, observed by probes. Not persisted.
+public enum RemoteSourceStatus: Hashable, Sendable {
+    case unknown
+    case online
+    case offline(message: String)
+}
 
 @MainActor
 @Observable
 public final class SourceRuntimeCoordinator {
     public static let shared = SourceRuntimeCoordinator()
 
+    /// UserDefaults key of the pre-v6 Subsonic server list, imported once.
+    public static let legacySubsonicServersKey = "com.msru.subsonic.servers"
+    static let legacyImportDoneKey = "com.msru.subsonic.servers.importedToSources"
+
     public private(set) var activeSources: [Source] = []
     public private(set) var isReconciling: [SourceID: Bool] = [:]
+    public private(set) var status: [SourceID: RemoteSourceStatus] = [:]
 
     private let db: AppDatabase
     private let sourceRepo: SourceRepository
     private let credentialStore: any SubsonicCredentialStore
+    private let legacyDefaults: UserDefaults
+    @ObservationIgnored private var clients: [SourceID: SubsonicClient] = [:]
+    @ObservationIgnored private var loadTask: Task<Void, Never>?
 
     public init(
         db: AppDatabase = AppDatabase.shared,
-        credentialStore: any SubsonicCredentialStore = KeychainSubsonicCredentialStore()
+        credentialStore: any SubsonicCredentialStore = KeychainSubsonicCredentialStore(),
+        legacyDefaults: UserDefaults = .standard
     ) {
         self.db = db
         self.sourceRepo = SourceRepository(db: db)
         self.credentialStore = credentialStore
+        self.legacyDefaults = legacyDefaults
     }
 
-    // MARK: - Bootstrap & Probing (Step 1 & Step 2)
+    public var subsonicSources: [Source] {
+        activeSources.filter { $0.sourceType == .subsonic }
+    }
+
+    // MARK: - Loading
+
+    /// Loads persisted sources and registers a client per Subsonic server.
+    /// Idempotent and cheap after the first call; does not touch the network.
+    public func loadRemoteSources() async {
+        if let loadTask {
+            await loadTask.value
+            return
+        }
+        let task = Task { @MainActor in
+            await importLegacySubsonicServersIfNeeded()
+            if let sources = try? await sourceRepo.loadAll() {
+                replaceSources(sources)
+            }
+        }
+        loadTask = task
+        await task.value
+    }
+
+    /// Returns the authenticated client for a Subsonic source.
+    public func subsonicClient(for id: SourceID) -> SubsonicClient? {
+        clients[id]
+    }
+
+    /// Resolves a client from either a source ID or a server key, waiting for
+    /// the initial load so lookups made during launch do not fail spuriously.
+    public func resolveSubsonicClient(serverKeyOrSourceID value: String) async -> SubsonicClient? {
+        await loadRemoteSources()
+        return clients[SourceID(serverKeyOrSourceID: value)]
+    }
+
+    private func replaceSources(_ sources: [Source]) {
+        activeSources = sources
+        var next: [SourceID: SubsonicClient] = [:]
+        for source in sources where source.sourceType == .subsonic {
+            if let existing = clients[source.id], existing.baseURL.absoluteString == source.uri,
+               existing.username == (source.username ?? "") {
+                next[source.id] = existing
+            } else if let client = makeClient(for: source) {
+                next[source.id] = client
+            }
+        }
+        clients = next
+    }
+
+    private func upsertActive(_ source: Source) {
+        if let index = activeSources.firstIndex(where: { $0.id == source.id }) {
+            activeSources[index] = source
+        } else {
+            activeSources.append(source)
+        }
+        if source.sourceType == .subsonic, clients[source.id] == nil {
+            clients[source.id] = makeClient(for: source)
+        }
+    }
+
+    private func makeClient(for source: Source) -> SubsonicClient? {
+        guard let url = URL(string: source.uri) else { return nil }
+        return SubsonicClient(
+            serverID: LibrarySourceID(source.id.serverKey),
+            baseURL: url,
+            username: source.username ?? "",
+            credentialStore: credentialStore
+        )
+    }
+
+    /// Copies servers from the pre-v6 UserDefaults list into `sources` once.
+    /// The legacy value is left in place as a recovery path.
+    private func importLegacySubsonicServersIfNeeded() async {
+        guard !legacyDefaults.bool(forKey: Self.legacyImportDoneKey) else { return }
+        guard let data = legacyDefaults.data(forKey: Self.legacySubsonicServersKey) else {
+            legacyDefaults.set(true, forKey: Self.legacyImportDoneKey)
+            return
+        }
+        guard let servers = try? JSONDecoder().decode([LegacySubsonicServer].self, from: data) else {
+            // Unknown shape: keep the value and retry on a later version.
+            return
+        }
+        do {
+            let existing = Set(try await sourceRepo.loadAll().map(\.id))
+            for server in servers {
+                guard let url = server.serverURL else { continue }
+                let id = SourceID(serverKeyOrSourceID: server.id.rawValue)
+                guard !existing.contains(id) else { continue }
+                try await sourceRepo.insertOrUpdate(Source(
+                    id: id,
+                    sourceType: .subsonic,
+                    uri: url.absoluteString,
+                    displayName: server.name,
+                    capabilities: [.supportsStreaming, .supportsArtwork, .supportsStableExternalID],
+                    username: server.username
+                ))
+            }
+            legacyDefaults.set(true, forKey: Self.legacyImportDoneKey)
+        } catch {
+            print("[SourceRuntimeCoordinator] Legacy server import failed: \(error)")
+        }
+    }
+
+    // MARK: - Bootstrap & Probing
 
     /// Bootstraps all registered sources from SQLite and probes remote capabilities before reconcile.
     public func bootstrapAll() async {
+        await loadRemoteSources()
         do {
             // Clean up legacy 'local' duplicates and migrate assets to canonical defaultLocal
             try? await db.dbWriter.write { db in
@@ -71,10 +203,10 @@ public final class SourceRuntimeCoordinator {
                 sources.append(localSource)
             }
 
-            self.activeSources = sources
+            replaceSources(sources)
 
-            // Probe and reconcile each remote source
-            for source in sources where source.isEnabled && !SourceID.isLocalSourceID(source.id.rawValue) {
+            // Probe each remote source
+            for source in sources where source.isEnabled && source.sourceType == .subsonic {
                 await bootstrapSource(source)
             }
         } catch {
@@ -82,99 +214,65 @@ public final class SourceRuntimeCoordinator {
         }
     }
 
-    /// Bootstraps a single source: executes Capability Probe first, updates SQLite, then triggers reconcile.
+    /// Probes a remote source's capabilities and records them and its status.
     public func bootstrapSource(_ source: Source) async {
-        guard let url = URL(string: source.uri) else { return }
+        _ = await probe(source)
+    }
 
-        let libSourceID = LibrarySourceID(source.id.rawValue.replacingOccurrences(of: "src_", with: ""))
-        let username = source.displayName.components(separatedBy: "(").last?.replacingOccurrences(of: ")", with: "").trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-
-        let client = SubsonicClient(
-            serverID: libSourceID,
-            baseURL: url,
-            username: username,
-            credentialStore: credentialStore
-        )
-
-        // Step 2: Capability Probe BEFORE Reconcile
-        let probe = SubsonicCapabilityProbe()
+    /// Probes a Subsonic source; returns the probed capabilities on success.
+    @discardableResult
+    public func probe(_ source: Source) async -> LibraryCapabilities? {
+        upsertActive(source)
+        guard let client = clients[source.id] else {
+            status[source.id] = .offline(message: String(localized: "Invalid server address"))
+            return nil
+        }
         do {
-            let (_, caps) = try await probe.probe(client: client)
-
-            var sourceCaps: SourceCapabilities = [.supportsStreaming]
-            if caps.contains(.artwork) { sourceCaps.insert(.supportsArtwork) }
-            sourceCaps.insert(.supportsStableExternalID)
-
+            let (_, caps) = try await SubsonicCapabilityProbe().probe(client: client)
             var updated = source
-            updated.capabilities = sourceCaps
+            updated.capabilities = Self.sourceCapabilities(from: caps)
             updated.lastReconciledAt = Date()
-            try await sourceRepo.insertOrUpdate(updated)
-
-            if let idx = activeSources.firstIndex(where: { $0.id == source.id }) {
-                activeSources[idx] = updated
-            }
-
-            // Mark source as online and updated
-            print("[SourceRuntimeCoordinator] Capability probe succeeded for \(source.displayName)")
+            try? await sourceRepo.insertOrUpdate(updated)
+            upsertActive(updated)
+            status[source.id] = .online
+            return caps
         } catch is CancellationError {
-            // Cooperative cancellation
+            return nil
         } catch {
-            print("[SourceRuntimeCoordinator] Capability probe failed for \(source.displayName): \(error)")
+            status[source.id] = .offline(message: error.localizedDescription)
+            return nil
         }
     }
 
-    // MARK: - Reconcile (Step 3: Refresh connection and sync playlists)
+    public func probe(sourceID: SourceID) async {
+        await loadRemoteSources()
+        guard let source = activeSources.first(where: { $0.id == sourceID }) else { return }
+        await probe(source)
+    }
+
+    static func sourceCapabilities(from caps: LibraryCapabilities) -> SourceCapabilities {
+        var result: SourceCapabilities = [.supportsStreaming, .supportsStableExternalID]
+        if caps.contains(.artwork) { result.insert(.supportsArtwork) }
+        return result
+    }
+
+    // MARK: - Reconcile (refresh connection and sync playlists)
 
     public func reconcileSource(_ source: Source, client: SubsonicClient? = nil) async {
         guard isReconciling[source.id] != true else { return }
         isReconciling[source.id] = true
         defer { isReconciling[source.id] = false }
 
-        let libSourceID = LibrarySourceID(source.id.rawValue.replacingOccurrences(of: "src_", with: ""))
-        let resolvedClient: SubsonicClient
-        if let client {
-            resolvedClient = client
-        } else {
-            guard let url = URL(string: source.uri) else { return }
-            let username = source.displayName.components(separatedBy: "(").last?.replacingOccurrences(of: ")", with: "").trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            resolvedClient = SubsonicClient(
-                serverID: libSourceID,
-                baseURL: url,
-                username: username,
-                credentialStore: credentialStore
-            )
-        }
+        guard await probe(source) != nil,
+              let resolvedClient = client ?? clients[source.id] else { return }
 
         let syncService = SubsonicLibrarySyncService(
-            serverID: libSourceID,
+            serverID: LibrarySourceID(source.id.serverKey),
             client: resolvedClient,
             db: db
         )
-
-        do {
-            // 1. Probe & refresh server status
-            let probe = SubsonicCapabilityProbe()
-            let (_, caps) = try await probe.probe(client: resolvedClient)
-
-            var sourceCaps: SourceCapabilities = [.supportsStreaming]
-            if caps.contains(.artwork) { sourceCaps.insert(.supportsArtwork) }
-            sourceCaps.insert(.supportsStableExternalID)
-
-            var updated = source
-            updated.capabilities = sourceCaps
-            updated.lastReconciledAt = Date()
-            try? await sourceRepo.insertOrUpdate(updated)
-            if let idx = activeSources.firstIndex(where: { $0.id == source.id }) {
-                activeSources[idx] = updated
-            }
-
-            // 2. Lightly sync playlists metadata (fast, ~100ms, no track scraping)
-            await syncService.syncPlaylists()
-        } catch is CancellationError {
-            // Cooperative task cancellation, ignore
-        } catch {
-            print("[SourceRuntimeCoordinator] Reconcile failed for \(source.displayName): \(error)")
-        }
+        // Lightly sync playlists metadata (fast, no track scraping)
+        await syncService.syncPlaylists()
     }
 
     // MARK: - Source Statistics & Mutations
@@ -218,8 +316,7 @@ public final class SourceRuntimeCoordinator {
     public func removeSource(id: SourceID) async {
         do {
             try await sourceRepo.delete(id: id)
-            let libSourceID = LibrarySourceID(id.rawValue.replacingOccurrences(of: "src_", with: ""))
-            try? credentialStore.deletePassword(for: libSourceID)
+            try? credentialStore.deletePassword(for: LibrarySourceID(id.serverKey))
 
             try await db.dbWriter.write { db in
                 try db.execute(sql: "DELETE FROM stream_assets WHERE asset_id IN (SELECT id FROM assets WHERE source_id = ?)", arguments: [id.rawValue])
@@ -227,11 +324,15 @@ public final class SourceRuntimeCoordinator {
             }
 
             activeSources.removeAll(where: { $0.id == id })
+            clients[id] = nil
+            status[id] = nil
         } catch {
             print("[SourceRuntimeCoordinator] Failed to delete source \(id.rawValue): \(error)")
         }
     }
 
+    /// Verifies credentials against the server, then registers it as a source.
+    /// Nothing is persisted when the probe fails.
     @discardableResult
     public func addSubsonicSource(
         name: String,
@@ -239,31 +340,53 @@ public final class SourceRuntimeCoordinator {
         username: String,
         password: String
     ) async throws -> Source {
-        let rawID = "subsonic_\(UUID().uuidString.prefix(8).lowercased())"
-        let libSourceID = LibrarySourceID(rawID)
-        let sourceID = SourceID("src_\(rawID)")
+        await loadRemoteSources()
+        let sourceID = SourceID.newSubsonic()
+        let credentialKey = LibrarySourceID(sourceID.serverKey)
+        try credentialStore.savePassword(password, for: credentialKey)
 
-        try credentialStore.savePassword(password, for: libSourceID)
+        let client = SubsonicClient(
+            serverID: credentialKey,
+            baseURL: url,
+            username: username,
+            credentialStore: credentialStore
+        )
+        let caps: LibraryCapabilities
+        do {
+            (_, caps) = try await SubsonicCapabilityProbe().probe(client: client)
+        } catch {
+            try? credentialStore.deletePassword(for: credentialKey)
+            throw error
+        }
 
         let source = Source(
             id: sourceID,
-            sourceType: .futureProvider,
+            sourceType: .subsonic,
             uri: url.absoluteString,
-            displayName: "\(name) (\(username))",
-            capabilities: [.supportsStreaming, .supportsArtwork, .supportsStableExternalID],
+            displayName: name,
+            capabilities: Self.sourceCapabilities(from: caps),
             isEnabled: true,
-            lastReconciledAt: nil
+            lastReconciledAt: Date(),
+            username: username
         )
-
-        try await sourceRepo.insertOrUpdate(source)
-        if !activeSources.contains(where: { $0.id == source.id }) {
-            activeSources.append(source)
+        do {
+            try await sourceRepo.insertOrUpdate(source)
+        } catch {
+            try? credentialStore.deletePassword(for: credentialKey)
+            throw error
         }
-
-        Task {
-            await bootstrapSource(source)
-        }
-
+        clients[sourceID] = client
+        upsertActive(source)
+        status[sourceID] = .online
         return source
     }
+}
+
+/// Shape of one entry in the pre-v6 UserDefaults server list.
+private struct LegacySubsonicServer: Decodable {
+    struct ID: Decodable { let rawValue: String }
+    let id: ID
+    let name: String
+    let serverURL: URL?
+    let username: String?
 }

@@ -8,7 +8,6 @@
 
 import Foundation
 import AppFoundation
-import MediaLibrary
 import GRDB
 import MusicDomain
 

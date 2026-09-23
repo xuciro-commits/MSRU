@@ -276,6 +276,7 @@ public enum SourceType: String, Codable, Sendable, CaseIterable {
     case localFolder = "local_folder"
     case networkFolder = "network_folder"
     case futureProvider = "future_provider"
+    case subsonic = "subsonic"
 }
 
 nonisolated public struct SourceCapabilities: OptionSet, Codable, Sendable, Hashable {
@@ -323,6 +324,8 @@ nonisolated public struct Source: Identifiable, Hashable, Codable, Sendable {
     public var isEnabled: Bool
     public var lastReconciledAt: Date?
     public var bookmarkData: Data?
+    /// Account name for remote sources that authenticate (Subsonic).
+    public var username: String?
     public let createdAt: Date
     public var updatedAt: Date
 
@@ -335,6 +338,7 @@ nonisolated public struct Source: Identifiable, Hashable, Codable, Sendable {
         isEnabled: Bool = true,
         lastReconciledAt: Date? = nil,
         bookmarkData: Data? = nil,
+        username: String? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -346,7 +350,44 @@ nonisolated public struct Source: Identifiable, Hashable, Codable, Sendable {
         self.isEnabled = isEnabled
         self.lastReconciledAt = lastReconciledAt
         self.bookmarkData = bookmarkData
+        self.username = username
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+}
+
+// MARK: - Subsonic source identity
+
+nonisolated extension SourceID {
+    /// Prefix of every SQLite source ID for a Subsonic server.
+    public static let subsonicPrefix = "src_subsonic_"
+
+    /// The server key persisted outside `sources` — Keychain accounts,
+    /// artwork references and playback requests use it — e.g. `subsonic_ab12cd34`.
+    public var serverKey: String {
+        rawValue.hasPrefix("src_") ? String(rawValue.dropFirst(4)) : rawValue
+    }
+
+    /// Accepts either a source ID (`src_subsonic_…`) or a server key (`subsonic_…`).
+    public init(serverKeyOrSourceID value: String) {
+        self.init(value.hasPrefix("src_") ? value : "src_\(value)")
+    }
+
+    public static func newSubsonic() -> SourceID {
+        SourceID(subsonicPrefix + UUID().uuidString.prefix(8).lowercased())
+    }
+}
+
+nonisolated extension Source {
+    /// Splits the pre-v6 display name shape "Name (username)".
+    public static func splitLegacySubsonicDisplayName(_ value: String) -> (name: String, username: String?) {
+        guard value.hasSuffix(")"), let open = value.lastIndex(of: "(") else {
+            return (value, nil)
+        }
+        let username = value[value.index(after: open)..<value.index(before: value.endIndex)]
+            .trimmingCharacters(in: .whitespaces)
+        let name = value[..<open].trimmingCharacters(in: .whitespaces)
+        guard !username.isEmpty, !name.isEmpty else { return (value, nil) }
+        return (name, username)
     }
 }

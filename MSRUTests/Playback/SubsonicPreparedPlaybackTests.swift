@@ -1,9 +1,9 @@
 import Foundation
-import MediaLibrary
 import Testing
 import MusicDomain
 import MusicLibrary
 import MusicPlayback
+import SubsonicKit
 @testable import MSRU
 
 @MainActor

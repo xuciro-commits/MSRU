@@ -21,8 +21,8 @@ nonisolated public final class SourceRepository: Sendable {
         try await db.dbWriter.write { db in
             try db.execute(
                 sql: """
-                INSERT INTO sources (id, source_type, uri, display_name, capabilities, is_enabled, last_reconciled_at, bookmark_blob, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO sources (id, source_type, uri, display_name, capabilities, is_enabled, last_reconciled_at, bookmark_blob, username, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     source_type = excluded.source_type,
                     uri = excluded.uri,
@@ -31,6 +31,7 @@ nonisolated public final class SourceRepository: Sendable {
                     is_enabled = excluded.is_enabled,
                     last_reconciled_at = excluded.last_reconciled_at,
                     bookmark_blob = excluded.bookmark_blob,
+                    username = excluded.username,
                     updated_at = excluded.updated_at
                 """,
                 arguments: [
@@ -42,6 +43,7 @@ nonisolated public final class SourceRepository: Sendable {
                     source.isEnabled ? 1 : 0,
                     source.lastReconciledAt,
                     source.bookmarkData,
+                    source.username,
                     source.createdAt,
                     source.updatedAt
                 ]
@@ -66,6 +68,7 @@ nonisolated public final class SourceRepository: Sendable {
                 let isEnabled: Bool = (row["is_enabled"] as? Int ?? 1) == 1
                 let lastReconciledAt: Date? = row["last_reconciled_at"]
                 let bookmarkBlob: Data? = row["bookmark_blob"]
+                let username: String? = row["username"]
 
                 return Source(
                     id: SourceID(idStr),
@@ -76,6 +79,7 @@ nonisolated public final class SourceRepository: Sendable {
                     isEnabled: isEnabled,
                     lastReconciledAt: lastReconciledAt,
                     bookmarkData: bookmarkBlob,
+                    username: username,
                     createdAt: createdAt,
                     updatedAt: updatedAt
                 )

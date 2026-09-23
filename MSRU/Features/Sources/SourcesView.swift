@@ -9,7 +9,6 @@
 import SwiftUI
 import AppFoundation
 import AppFoundationUI
-import MediaLibrary
 import SubsonicKit
 import MusicLibrary
 import MusicPlayback
@@ -70,8 +69,6 @@ struct SourcesView: View {
                 Button("移除 \(target.displayName)", role: .destructive) {
                     Task {
                         await coordinator.removeSource(id: target.id)
-                        let libSourceID = LibrarySourceID(target.id.rawValue.replacingOccurrences(of: "src_", with: ""))
-                        scene.application.subsonicServers.removeServer(id: libSourceID)
                     }
                 }
             }
@@ -425,7 +422,7 @@ enum SourcesFeature: ApplicationFeaturePresentation {
     SourceCardView(
         source: source,
         scene: MSRUPreviewData.makeScene(section: .sources),
-        coordinator: SourceRuntimeCoordinator(db: try! AppDatabase.makeEphemeral()),
+        coordinator: .preview(),
         onRemove: { _ in }
     )
     .frame(width: 700)

@@ -7,7 +7,6 @@
 
 import Foundation
 import Security
-import MediaLibrary
 
 public protocol SubsonicCredentialStore: Sendable {
     func savePassword(_ password: String, for serverID: LibrarySourceID) throws

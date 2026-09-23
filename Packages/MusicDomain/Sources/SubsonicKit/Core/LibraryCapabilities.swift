@@ -1,6 +1,6 @@
 //
 //  LibraryCapabilities.swift
-//  MediaLibrary
+//  SubsonicKit
 //
 //  Capability set discovered or configured for a media library source.
 //

@@ -1,6 +1,6 @@
 //
 //  LibraryProviderError.swift
-//  MediaLibrary
+//  SubsonicKit
 //
 //  Semantic typed errors for media library operations.
 //

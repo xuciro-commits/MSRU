@@ -7,7 +7,6 @@ import SwiftUI
 import Observation
 import AppFoundation
 import AppFoundationUI
-import MediaLibrary
 import SubsonicKit
 import MusicLibrary
 import MusicPlayback
@@ -225,8 +224,8 @@ struct LibraryView:
             availableSources = (try? await LibraryQueryEngine.shared.fetchAvailableSources(for: "recording")) ?? []
             if let servers = subsonicServers?.servers {
                 for server in servers {
-                    let sourceID = "src_\(server.id.rawValue)"
-                    if !availableSources.contains(where: { $0.sourceID == sourceID || $0.sourceID == server.id.rawValue }) {
+                    let sourceID = server.id.rawValue
+                    if !availableSources.contains(where: { $0.sourceID == sourceID }) {
                         availableSources.append(
                             SourceFilterItem(
                                 id: sourceID,
@@ -507,10 +506,8 @@ struct LibraryView:
 
     private func loadRemoteTracks(sourceID: String, query: String = "", reset: Bool = true) async {
         guard !SourceID.isLocalSourceID(sourceID), let subsonicServers else { return }
-        let cleanID = sourceID.replacingOccurrences(of: "src_", with: "")
-        guard let server = subsonicServers.servers.first(where: {
-            $0.id.rawValue == sourceID || $0.id.rawValue == cleanID
-        }),
+        let serverID = SourceID(serverKeyOrSourceID: sourceID)
+        guard let server = subsonicServers.servers.first(where: { $0.id == serverID }),
         let client = subsonicServers.client(for: server.id) else {
             return
         }

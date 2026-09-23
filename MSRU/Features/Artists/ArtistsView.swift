@@ -6,7 +6,6 @@
 import SwiftUI
 import AppFoundation
 import AppFoundationUI
-import MediaLibrary
 import SubsonicKit
 import MusicDomain
 import MusicLibrary
@@ -81,7 +80,7 @@ struct ArtistsView: View {
             seenArtistKeys = []
             return
         }
-        let cleanID = LibrarySourceID(sourceID.replacingOccurrences(of: "src_", with: ""))
+        let cleanID = SourceID(serverKeyOrSourceID: sourceID)
         guard let client = serversStore.client(for: cleanID) else {
             return
         }
@@ -121,12 +120,12 @@ struct ArtistsView: View {
                         continue
                     }
                     let artistID = album.artistId ?? artistName
-                    let dedupeKey = "\(cleanID.rawValue):\(artistID)"
+                    let dedupeKey = "\(cleanID.serverKey):\(artistID)"
                     if !seenArtistKeys.contains(dedupeKey) {
                         seenArtistKeys.insert(dedupeKey)
                         let coverArtURL = try? client.coverArtURL(id: album.coverArt ?? album.id)
                         newArtists.append(ArtistPresentationModel(
-                            id: "subsonic:\(cleanID.rawValue):\(artistID)",
+                            id: "subsonic:\(cleanID.serverKey):\(artistID)",
                             name: artistName,
                             aliases: [],
                             albumCount: 1,
@@ -162,7 +161,7 @@ struct ArtistsView: View {
             remoteSearchResults = []
             return
         }
-        let cleanID = LibrarySourceID(sourceID.replacingOccurrences(of: "src_", with: ""))
+        let cleanID = SourceID(serverKeyOrSourceID: sourceID)
         guard let client = serversStore.client(for: cleanID) else {
             return
         }
@@ -176,7 +175,7 @@ struct ArtistsView: View {
             let mapped = dtos.map { dto -> ArtistPresentationModel in
                 let coverArtURL = try? client.coverArtURL(id: dto.coverArt ?? dto.id)
                 return ArtistPresentationModel(
-                    id: "subsonic:\(cleanID.rawValue):\(dto.id)",
+                    id: "subsonic:\(cleanID.serverKey):\(dto.id)",
                     name: dto.name,
                     aliases: [],
                     albumCount: dto.albumCount ?? 0,
@@ -284,8 +283,8 @@ struct ArtistsView: View {
             availableSources = (try? await LibraryQueryEngine.shared.fetchAvailableSources(for: "artist")) ?? []
             if let servers = subsonicServers?.servers {
                 for server in servers {
-                    let sourceID = "src_\(server.id.rawValue)"
-                    if !availableSources.contains(where: { $0.sourceID == sourceID || $0.sourceID == server.id.rawValue }) {
+                    let sourceID = server.id.rawValue
+                    if !availableSources.contains(where: { $0.sourceID == sourceID }) {
                         availableSources.append(
                             SourceFilterItem(
                                 id: sourceID,
