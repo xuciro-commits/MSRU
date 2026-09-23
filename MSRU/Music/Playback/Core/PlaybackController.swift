@@ -120,6 +120,8 @@ private struct WeakSessionObserver {
 
     // MARK: - Volume & Mute State
 
+    let equalizer: EqualizerStore
+
     private(set) var volume: Float = 1.0
 
     private(set) var isMuted: Bool = false
@@ -177,6 +179,7 @@ private struct WeakSessionObserver {
         self.providerKernel = providerKernel ?? PlaybackProviderKernel.standard()
 
         self.playbackQueue = PlaybackQueueController()
+        self.equalizer = EqualizerStore()
         #if os(macOS)
         self.audioOutput = MacAudioOutputController()
         self.audioOutput.onSelectedDeviceLost = { [weak self] in
@@ -989,6 +992,45 @@ private struct WeakSessionObserver {
         applyVolumeToActiveTransport()
     }
 
+    var equalizerStatus: String {
+        guard equalizer.state.isEnabled else { return "Equalizer bypassed" }
+        guard currentResource != nil else { return "Equalizer ready for PCM playback" }
+        return pcmEngine != nil ? "Equalizer active on PCM" : "Equalizer unavailable for this stream"
+    }
+
+    #if os(macOS)
+    var outputFormatSummary: String {
+        audioOutput.formatSummary + (equalizer.state.isEnabled && pcmEngine != nil ? " · EQ active" : "")
+    }
+    #endif
+
+    func setEqualizerEnabled(_ enabled: Bool) {
+        equalizer.setEnabled(enabled)
+        pcmEngine?.applyEqualizer(equalizer.state)
+        if enabled, player != nil, let currentItem,
+           currentItem.playbackRequest.source == .subsonic {
+            resolveAndStart(currentItem, resumeAt: currentTime, autoPlay: isPlaying)
+        }
+    }
+
+    func setEqualizerGain(_ gain: Float, band: Int) {
+        equalizer.setGain(gain, band: band)
+        pcmEngine?.applyEqualizer(equalizer.state)
+    }
+
+    func applyEqualizerPreset(_ id: String) {
+        equalizer.applyPreset(id)
+        pcmEngine?.applyEqualizer(equalizer.state)
+    }
+
+    func saveEqualizerPreset(named name: String) {
+        _ = equalizer.saveCurrentPreset(named: name)
+    }
+
+    func deleteEqualizerPreset(_ id: String) {
+        equalizer.deletePreset(id)
+    }
+
     private func applyVolumeToActiveTransport() {
         let effectiveVolume = isMuted ? 0.0 : volume
         player?.volume = effectiveVolume
@@ -1093,7 +1135,7 @@ private struct WeakSessionObserver {
 
         activeResolutionID = resolutionID
 
-        let request = playbackQueue.canNext && item.playbackRequest.source == .subsonic
+        let request = (playbackQueue.canNext || equalizer.state.isEnabled) && item.playbackRequest.source == .subsonic
             ? item.playbackRequest.preparingPCM()
             : item.playbackRequest
 
@@ -1224,10 +1266,10 @@ private struct WeakSessionObserver {
 
             #if os(macOS)
             let outputRoute = try audioOutput.prepare(inputRate: pcmResource.format.sampleRate)
-            let engine = try PCMPlaybackEngine(resource: pcmResource, outputDeviceID: outputRoute.deviceID)
+            let engine = try PCMPlaybackEngine(resource: pcmResource, outputDeviceID: outputRoute.deviceID, equalizer: equalizer.state)
             audioOutput.updateEngineRate(engine.outputSampleRate)
             #else
-            let engine = try PCMPlaybackEngine(resource: pcmResource)
+            let engine = try PCMPlaybackEngine(resource: pcmResource, equalizer: equalizer.state)
             #endif
             engine.volume = isMuted ? 0.0 : volume
 

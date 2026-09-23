@@ -7,6 +7,7 @@
 - **#61 · 本地专辑连续 PCM 排程**（已实现，待用户验收）。同采样率、同声道曲目在单个播放节点接续；定向代码测试 4 项及 macOS Debug 构建通过。依据 [Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)、[播放交互 15.2](../Docs/Blueprint/InteractionAtlas.md)；当时实现见[实施记录](../Docs/Architecture/ImplementationHistory.md)。完成条件：用户确认真实专辑交接听感、曲目信息切换与队列顺序。
 - **#62 · NAS 专辑连续播放与异格式交接**（已实现，待用户验收）。普通单曲流播；专辑队列经临时下载和 PCM 预备接续，异格式退回正常切歌。定向代码测试 8 项通过；真实 NAS 听感、等待与错误体验由用户验收。依据[播放交互 15.2](../Docs/Blueprint/InteractionAtlas.md)，细节见[实施记录](../Docs/Architecture/ImplementationHistory.md)。
 - **#63 · macOS 输出设备与原生采样率链路**（代码已实现，待 DAC 实测）。可选输出设备、选定设备的原生采样率请求、HAL 独占尝试、断连与默认设备变化后恢复；记录输入/引擎/设备速率并明确不宣称 Bit-Perfect。macOS 定向测试 6 项与 iOS 模拟器构建通过。真实 DAC 切率、独占支持、失联体验及数字链路是否位级一致由用户验收；依据[播放交互 15.1](../Docs/Blueprint/InteractionAtlas.md)，细节见[实施记录](../Docs/Architecture/ImplementationHistory.md)。
+- **#64 · 10 段均衡器**（代码已实现，待用户听感验收）。PCM 播放链路接入可旁路 AVAudioUnitEQ，10 段参数、内置/自定义预设、持久化和正增益前置电平补偿；NAS 普通单曲在开启 EQ 后进入 PCM 准备。AVPlayer 直播和不可解码流明确提示 EQ 不可用。定向测试 3 项及受影响连续播放/输出路由测试通过；依据[播放交互 15.1](../Docs/Blueprint/InteractionAtlas.md)，细节见[实施记录](../Docs/Architecture/ImplementationHistory.md)。
 
 ## Stage 2 待开始（按顺序推进）
 
@@ -14,7 +15,6 @@
 
 | 编号 / 状态 | 大任务与边界 | 完成条件 / 交接依据 |
 | --- | --- | --- |
-| **#64 · 待开始** | **10 段均衡器**：在播放链路加入可旁路的 EQ、预设与持久化，并处理切歌、音量及削波；依据[Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)与[播放器 15.1](../Docs/Blueprint/InteractionAtlas.md)。 | 10 段参数、旁路/恢复、预设读写及切歌继承有定向测试；音频输出格式和 #63 的直通状态一致；交互先补图册纯文本框图，听感由用户验收。 |
 | **#65 · 待开始** | **EBU R128 / ReplayGain 响度**：扫描并持久化曲目/专辑响度与峰值，播放时提供模式和防削波策略；承接 #64 的 DSP 边界，依据[Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)。 | 固定音频样本的扫描结果、专辑/曲目模式、缺失标签回退和削波边界有代码测试；关闭标准化可恢复原始增益；用户验收音量体验。 |
 | **#66 · 待开始** | **SQLite 曲库存储收口与零数据丢失**：基于现有 GRDB/WAL 和迁移，不再让大库依赖整表加载、删除后全量重写；依据[数据边界](../Docs/Architecture/DataBoundaries.md)与[大曲库架构](../Docs/Architecture/LargeLibraryAndIdentityArchitecture.md)。 | 增量写入、分页查询、迁移重入/中断恢复、备份或回滚路径有契约测试；迁移验证成功前不删除旧数据；旧数据与收藏/歌单/来源逐项对账，无静默丢失。 |
 | **#67 · 待开始** | **50,000 首曲库性能与流式展示**：在 #66 的查询契约上收口首屏分页、滚动追加、搜索和缓存；依据[大曲库架构](../Docs/Architecture/LargeLibraryAndIdentityArchitecture.md)。 | 先固定设备、数据集、冷启动起止点和当前内存基线，再验证路线图的 <100ms、内存下降 70% 目标；保留可复现基准结果，达不到则记录瓶颈并继续优化，不凭空宣称达标。用户验收滚动体验。 |
