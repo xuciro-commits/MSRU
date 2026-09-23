@@ -6,8 +6,8 @@
 
 - **#61 · 本地专辑连续 PCM 排程**（已实现，待用户验收）。同采样率、同声道曲目在单个播放节点接续；定向代码测试 4 项及 macOS Debug 构建通过。依据 [Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)、[播放交互 15.2](../Docs/Blueprint/InteractionAtlas.md)；当时实现见[实施记录](../Docs/Architecture/ImplementationHistory.md)。完成条件：用户确认真实专辑交接听感、曲目信息切换与队列顺序。
 - **#62 · NAS 专辑连续播放与异格式交接**（已实现，待用户验收）。普通单曲流播；专辑队列经临时下载和 PCM 预备接续，异格式退回正常切歌。定向代码测试 8 项通过；真实 NAS 听感、等待与错误体验由用户验收。依据[播放交互 15.2](../Docs/Blueprint/InteractionAtlas.md)，细节见[实施记录](../Docs/Architecture/ImplementationHistory.md)。
-- **#63 · macOS 输出设备与原生采样率链路**（代码已实现，待 DAC 实测）。可选输出设备、选定设备的原生采样率请求、HAL 独占尝试、断连与默认设备变化后恢复；记录输入/引擎/设备速率并明确不宣称 Bit-Perfect。macOS 定向测试 6 项与 iOS 模拟器构建通过。真实 DAC 切率、独占支持、失联体验及数字链路是否位级一致由用户验收；依据[播放交互 15.1](../Docs/Blueprint/InteractionAtlas.md)，细节见[实施记录](../Docs/Architecture/ImplementationHistory.md)。
-- **#64 · 10 段均衡器**（代码已实现，待用户听感验收）。PCM 播放链路接入可旁路 AVAudioUnitEQ，10 段参数、内置/自定义预设、持久化和正增益前置电平补偿；NAS 普通单曲在开启 EQ 后进入 PCM 准备。AVPlayer 直播和不可解码流明确提示 EQ 不可用。定向测试 3 项及受影响连续播放/输出路由测试通过；依据[播放交互 15.1](../Docs/Blueprint/InteractionAtlas.md)，细节见[实施记录](../Docs/Architecture/ImplementationHistory.md)。
+- **#63 · macOS 输出设备与原生采样率链路**（代码已修复，待设备复验）。可选输出设备、原生采样率请求、HAL 独占尝试与失联恢复；非默认设备切换已改为旧引擎关闭后再路由，新引擎等待 HAL 稳定。macOS 定向测试与 iOS 模拟器构建通过；用户复验 DSF 切设备、DAC 切率、独占及热拔插。Bit-Perfect 未证实；依据[播放交互 15.1](../Docs/Blueprint/InteractionAtlas.md)，细节见[实施记录](../Docs/Architecture/ImplementationHistory.md)。
+- **#64 · 10 段均衡器**（代码已按试听反馈修复，待用户复验）。PCM 链路支持 10 段、旁路、预设和持久化；启用 EQ 保持原音量，正增益可能削波并在面板提示。NAS 单曲在开启 EQ 后进入 PCM 准备，AVPlayer 直播和不可解码流提示不可用。定向测试 3 项及受影响播放测试通过；依据[播放交互 15.1](../Docs/Blueprint/InteractionAtlas.md)，细节见[实施记录](../Docs/Architecture/ImplementationHistory.md)。
 
 ## Stage 2 待开始（按顺序推进）
 

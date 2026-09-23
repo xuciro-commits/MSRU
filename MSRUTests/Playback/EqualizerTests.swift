@@ -36,7 +36,7 @@ struct EqualizerTests {
         #expect(restored.state.customPresets.isEmpty)
     }
 
-    @Test("Band limits and pre-EQ headroom protect boosted output")
+    @Test("Band limits and bypass do not change the selected playback volume")
     func gainAndBypass() async throws {
         let suite = "msru-eq-tests-\(UUID().uuidString)"
         let preferences = UserDefaults(suiteName: suite)!
@@ -48,14 +48,12 @@ struct EqualizerTests {
         #expect(store.state.gains[0] == 12)
         #expect(store.state.gains[1] == -12)
         #expect(store.state.gains[2] == 0)
-        #expect(store.state.headroomMultiplier == 1)
         store.setEnabled(true)
-        #expect(store.state.headroomDecibels == 12)
 
         let url = try Fixtures.createDeterministicWAV(durationSeconds: 0.2)
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let decoded = try await AppleAudioFileDecoder().open(url)
-        let engine = try PCMPlaybackEngine(
+        let engine = try await PCMPlaybackEngine(
             resource: PCMPlaybackResource(format: decoded.format, session: decoded.session),
             equalizer: store.state
         )
@@ -63,7 +61,7 @@ struct EqualizerTests {
         let outputRate = engine.outputSampleRate
         #expect(!engine.equalizerIsBypassed)
         #expect(engine.equalizerBandGains[0] == 12)
-        #expect(engine.renderedVolume < 0.21)
+        #expect(abs(engine.renderedVolume - 0.8) < 0.001)
         #expect(engine.outputSampleRate == outputRate)
 
         store.setEnabled(false)
@@ -74,7 +72,7 @@ struct EqualizerTests {
         await engine.close()
     }
 
-    @Test("A prepared next track keeps the same equalizer and gain compensation")
+    @Test("A prepared next track keeps the same equalizer without changing volume")
     func survivesGaplessTransition() async throws {
         let firstURL = try Fixtures.createDeterministicWAV(durationSeconds: 0.3)
         let secondURL = try Fixtures.createDeterministicWAV(durationSeconds: 0.3)
@@ -88,7 +86,7 @@ struct EqualizerTests {
         var eq = EqualizerState()
         eq.isEnabled = true
         eq.gains[5] = 6
-        let engine = try PCMPlaybackEngine(
+        let engine = try await PCMPlaybackEngine(
             resource: PCMPlaybackResource(format: first.format, session: first.session),
             equalizer: eq
         )
@@ -112,7 +110,7 @@ struct EqualizerTests {
         #expect(advanced)
         #expect(!engine.equalizerIsBypassed)
         #expect(engine.equalizerBandGains[5] == 6)
-        #expect(engine.renderedVolume < 0.51)
+        #expect(abs(engine.renderedVolume - 1) < 0.001)
         await engine.close()
     }
 }

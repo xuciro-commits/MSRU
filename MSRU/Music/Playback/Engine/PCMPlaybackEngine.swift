@@ -9,14 +9,17 @@ final class PCMPlaybackEngine {
     typealias EndHandler = @MainActor () -> Void
     typealias FailureHandler = @MainActor (Error) -> Void
     typealias AdvanceHandler = @MainActor (UUID, PlaybackResource) -> Void
+    typealias ConfigurationHandler = @MainActor () -> Void
 
     var onEnded: EndHandler?
     var onFailure: FailureHandler?
     var onAdvanced: AdvanceHandler?
+    var onConfigurationChanged: ConfigurationHandler?
 
     private let audioEngine = AVAudioEngine()
     private let playerNode = AVAudioPlayerNode()
     private let equalizerNode = AVAudioUnitEQ(numberOfBands: EqualizerState.frequencies.count)
+    private var configurationObserver: NSObjectProtocol?
     private let audioFormat: AVAudioFormat
     private var session: any PCMDecodeSession
     private(set) var format: PCMStreamFormat
@@ -54,15 +57,20 @@ final class PCMPlaybackEngine {
     private let decodeBlockFrames = 8192
     private var requestedVolume: Float = 1
     private(set) var equalizerState = EqualizerState()
+    private var isStartingOutput = false
+    private var isSeeking = false
 
     var outputSampleRate: Double { audioEngine.outputNode.outputFormat(forBus: 0).sampleRate }
+    var isOutputRunning: Bool { audioEngine.isRunning }
     var renderedVolume: Float { playerNode.volume }
     var equalizerBandGains: [Float] { equalizerNode.bands.map(\.gain) }
     var equalizerIsBypassed: Bool { equalizerNode.bypass }
 
-    init(resource: PCMPlaybackResource, outputDeviceID: UInt32? = nil, equalizer: EqualizerState = EqualizerState()) throws {
+    init(resource: PCMPlaybackResource, outputDeviceID: UInt32? = nil,
+         equalizer: EqualizerState = EqualizerState(), initialTime: TimeInterval = 0) async throws {
         session = resource.session
         format = resource.format
+        baseTime = max(0, initialTime)
         guard let audioFormat = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: resource.format.sampleRate,
@@ -89,11 +97,56 @@ final class PCMPlaybackEngine {
             audioEngine.connect(equalizerNode, to: audioEngine.mainMixerNode, format: audioFormat)
         }
         applyEqualizer(equalizer)
-        #if os(macOS)
-        try audioEngine.routeToMacOutput(deviceID: outputDeviceID)
-        #endif
         audioEngine.prepare()
-        try audioEngine.start()
+        configurationObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange, object: audioEngine, queue: nil
+        ) { [weak self] _ in
+            // AVAudioEngine posts this from an internal queue. Defer rebuilding to the owner.
+            Task { @MainActor [weak self] in
+                guard let self, self.configurationObserver != nil else { return }
+                try? await Task.sleep(for: .milliseconds(80))
+                guard !self.isStartingOutput, !self.isSeeking,
+                      !self.audioEngine.isRunning else { return }
+                self.onConfigurationChanged?()
+            }
+        }
+        do {
+            try await startOutput(deviceID: outputDeviceID)
+        } catch {
+            if let configurationObserver {
+                NotificationCenter.default.removeObserver(configurationObserver)
+                self.configurationObserver = nil
+            }
+            audioEngine.stop()
+            throw error
+        }
+    }
+
+    private func startOutput(deviceID: UInt32?) async throws {
+        isStartingOutput = true
+        defer { isStartingOutput = false }
+        var lastError: Error?
+        for attempt in 0..<3 {
+            try Task.checkCancellation()
+            do {
+                if !audioEngine.isRunning {
+                    #if os(macOS)
+                    try audioEngine.routeToMacOutput(deviceID: deviceID)
+                    #endif
+                    try audioEngine.start()
+                }
+                // A routed output can report start success before its HAL format settles.
+                try await Task.sleep(for: .milliseconds(deviceID == nil ? 30 : 140))
+                if audioEngine.isRunning { return }
+                lastError = PCMPlaybackEngineError.outputStopped
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                lastError = error
+            }
+            if attempt < 2 { try await Task.sleep(for: .milliseconds(120)) }
+        }
+        throw lastError ?? PCMPlaybackEngineError.outputStopped
     }
 
     var isPlaying: Bool { wantsToPlay && playerNode.isPlaying }
@@ -103,7 +156,7 @@ final class PCMPlaybackEngine {
         get { requestedVolume }
         set {
             requestedVolume = min(max(newValue, 0), 1)
-            playerNode.volume = requestedVolume * equalizerState.headroomMultiplier
+            playerNode.volume = requestedVolume
         }
     }
 
@@ -115,7 +168,7 @@ final class PCMPlaybackEngine {
         for (band, gain) in zip(equalizerNode.bands, normalized.gains) {
             band.gain = gain
         }
-        playerNode.volume = requestedVolume * normalized.headroomMultiplier
+        playerNode.volume = requestedVolume
     }
 
     var currentTime: TimeInterval {
@@ -139,18 +192,16 @@ final class PCMPlaybackEngine {
         playerNode.pause()
     }
 
-    func stopOutput() {
-        wantsToPlay = false
-        playerNode.stop()
-        audioEngine.stop()
-    }
-
     func seek(to seconds: TimeInterval) async throws {
         let clamped = duration > 0 ? min(max(0, seconds), duration) : max(0, seconds)
+        isSeeking = true
+        defer { isSeeking = false }
         generation += 1
         decodeTask?.cancel()
         decodeTask = nil
         clearPreparedNext()
+        let shouldRestartOutput = audioEngine.isRunning
+        if shouldRestartOutput { audioEngine.pause() }
         playerNode.stop()
         scheduledBufferCount = 0
         currentTrackBufferCount = 0
@@ -167,6 +218,7 @@ final class PCMPlaybackEngine {
             await nextSession.close()
         }
         try await session.seek(to: clamped)
+        if shouldRestartOutput { try audioEngine.start() }
         beginDecoding()
     }
 
@@ -176,8 +228,12 @@ final class PCMPlaybackEngine {
         decodeTask = nil
         clearPreparedNext()
         wantsToPlay = false
-        playerNode.stop()
+        if let configurationObserver {
+            NotificationCenter.default.removeObserver(configurationObserver)
+            self.configurationObserver = nil
+        }
         audioEngine.stop()
+        playerNode.stop()
         if let pendingTransition {
             self.pendingTransition = nil
             await pendingTransition.oldSession.close()
@@ -309,6 +365,11 @@ final class PCMPlaybackEngine {
     }
 
     private func startPlayerNode() {
+        guard audioEngine.isRunning else {
+            if let onConfigurationChanged { onConfigurationChanged() }
+            else { onFailure?(PCMPlaybackEngineError.outputStopped) }
+            return
+        }
         if #available(macOS 27.0, iOS 27.0, tvOS 27.0, watchOS 27.0, *) {
             do { try playerNode.playAudio() }
             catch { onFailure?(error) }
@@ -352,12 +413,14 @@ private enum PCMPlaybackEngineError: LocalizedError {
     case invalidAudioFormat
     case invalidPCMBlock
     case bufferAllocationFailed
+    case outputStopped
 
     var errorDescription: String? {
         switch self {
         case .invalidAudioFormat: "Unable to create the PCM playback format."
         case .invalidPCMBlock: "The decoder returned an invalid PCM block."
         case .bufferAllocationFailed: "Unable to allocate an AVAudioPCMBuffer."
+        case .outputStopped: "The audio output stopped before playback could begin."
         }
     }
 }

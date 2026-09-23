@@ -24,15 +24,6 @@ struct EqualizerState: Codable, Equatable {
     var selectedPresetID: String? = "flat"
     var customPresets: [EqualizerPreset] = []
 
-    var headroomDecibels: Float {
-        guard isEnabled else { return 0 }
-        return gains.reduce(0) { $0 + max(0, $1) }
-    }
-
-    var headroomMultiplier: Float {
-        Float(pow(10, Double(-headroomDecibels) / 20))
-    }
-
     mutating func sanitize() {
         gains = Self.sanitize(gains)
         customPresets = customPresets.compactMap { preset in
