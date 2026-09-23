@@ -23,6 +23,7 @@ public enum SubsonicEndpoint: Sendable {
     case star(id: String?, albumId: String?, artistId: String?)
     case unstar(id: String?, albumId: String?, artistId: String?)
     case scrobble(id: String, time: Double?, submission: Bool)
+    case getLyricsBySongId(id: String)
 
     public var path: String {
         switch self {
@@ -41,6 +42,7 @@ public enum SubsonicEndpoint: Sendable {
         case .star: return "star.view"
         case .unstar: return "unstar.view"
         case .scrobble: return "scrobble.view"
+        case .getLyricsBySongId: return "getLyricsBySongId.view"
         }
     }
 
@@ -125,6 +127,9 @@ public enum SubsonicEndpoint: Sendable {
                 items.append(URLQueryItem(name: "time", value: "\(Int64(time * 1000))"))
             }
             return items
+
+        case .getLyricsBySongId(let id):
+            return [URLQueryItem(name: "id", value: id)]
         }
     }
 }

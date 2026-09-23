@@ -161,6 +161,52 @@ public struct LrcDocument: Sendable, Equatable, Codable {
         }
         return activeIndex
     }
+
+    /// Formats the document into standard LRC text with [mm:ss.xx] lines.
+    public func formatLrc() -> String {
+        guard isSynced else {
+            return plainText
+        }
+
+        var result: [String] = []
+
+        let standardKeys = ["ti", "ar", "al", "by", "offset"]
+        var emittedKeys = Set<String>()
+
+        for key in standardKeys {
+            if let val = metadata[key] {
+                result.append("[\(key):\(val)]")
+                emittedKeys.insert(key)
+            }
+        }
+
+        for (key, val) in metadata.sorted(by: { $0.key < $1.key }) {
+            if !emittedKeys.contains(key) {
+                result.append("[\(key):\(val)]")
+            }
+        }
+
+        for line in lines.sorted(by: { $0.timestamp < $1.timestamp }) {
+            let totalHundredths = max(0, Int((line.timestamp * 100).rounded()))
+            let totalSeconds = totalHundredths / 100
+            let hundredths = totalHundredths % 100
+            let minutes = totalSeconds / 60
+            let seconds = totalSeconds % 60
+            let tag = String(format: "[%02d:%02d.%02d]", minutes, seconds, hundredths)
+            result.append("\(tag)\(line.text)")
+        }
+
+        return result.joined(separator: "\n")
+    }
+
+    /// Returns a new document with all line timestamps shifted by `seconds`.
+    /// Negative values shift lines earlier; timestamps are clamped at >= 0.
+    public func applyingOffset(_ seconds: TimeInterval) -> LrcDocument {
+        let newLines = lines.map {
+            LrcLine(id: $0.id, timestamp: max(0, $0.timestamp + seconds), text: $0.text)
+        }
+        return LrcDocument(metadata: metadata, lines: newLines, plainText: plainText)
+    }
 }
 
 /// Robust parser for standard and extended LRC files.

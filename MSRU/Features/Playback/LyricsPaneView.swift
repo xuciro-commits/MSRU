@@ -41,6 +41,7 @@ struct LyricsPaneView: View {
                     } else if lyricsStore.isLoading && lyricsStore.currentDocument == nil {
                         loadingLyricsView
                     } else if let doc = lyricsStore.currentDocument, doc.isSynced {
+                        tuningBar
                         syncedLyricsView(doc: doc)
                     } else if let doc = lyricsStore.currentDocument, !doc.plainText.isEmpty {
                         plainLyricsView(text: doc.plainText)
@@ -85,6 +86,107 @@ struct LyricsPaneView: View {
     }
 
     // MARK: - Subviews
+
+    @ViewBuilder
+    private var tuningBar: some View {
+        HStack(spacing: 8) {
+            Button {
+                lyricsStore.adjustOffset(by: -0.5, playback: playback)
+            } label: {
+                Text("-0.5s")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .help("Delay lyrics by 0.5s")
+
+            let offset = lyricsStore.timeOffset
+            let offsetText = offset == 0 ? "±0.0s" : String(format: "%+.1fs", offset)
+            Text(offsetText)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(offset != 0 ? Color.accentColor : Color.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(
+                    offset != 0 ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                )
+
+            Button {
+                lyricsStore.adjustOffset(by: 0.5, playback: playback)
+            } label: {
+                Text("+0.5s")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .help("Advance lyrics by 0.5s")
+
+            if offset != 0 {
+                Button {
+                    lyricsStore.resetOffset(playback: playback)
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Reset offset to 0.0s")
+            }
+
+            Spacer()
+
+            if lyricsStore.isSavingTuning {
+                ProgressView()
+                    .controlSize(.mini)
+            } else if let msg = lyricsStore.lastSaveMessage {
+                HStack(spacing: 3) {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                    Text(LocalizedStringKey(msg))
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .foregroundStyle(.green)
+            } else {
+                Menu {
+                    Button("Save to .lrc Sidecar") {
+                        Task {
+                            try? await lyricsStore.saveTunedLyrics(writeSidecar: true, embedInAudio: false)
+                        }
+                    }
+                    Button("Embed in Audio File") {
+                        Task {
+                            try? await lyricsStore.saveTunedLyrics(writeSidecar: false, embedInAudio: true)
+                        }
+                    }
+                    Divider()
+                    Button("Save to Both (Sidecar & Embed)") {
+                        Task {
+                            try? await lyricsStore.saveTunedLyrics(writeSidecar: true, embedInAudio: true)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "square.and.arrow.down")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("Save")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .foregroundStyle(Color.accentColor)
+                }
+                .menuStyle(.borderlessButton)
+                .help("Write tuned lyrics permanently")
+            }
+        }
+        .padding(.horizontal, 20)
+    }
 
     @ViewBuilder
     private func syncedLyricsView(doc: LrcDocument) -> some View {

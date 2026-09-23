@@ -21,7 +21,7 @@ final class SubsonicServerStore {
 
     init(
         credentialStore: any SubsonicCredentialStore = KeychainSubsonicCredentialStore(),
-        registry: LibraryProviderRegistry = LibraryProviderRegistry(),
+        registry: LibraryProviderRegistry = .shared,
         userDefaults: UserDefaults = .standard
     ) {
         self.credentialStore = credentialStore

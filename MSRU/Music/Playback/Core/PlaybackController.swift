@@ -200,6 +200,18 @@ private struct WeakSessionObserver {
         failedItem?.localTrack
     }
 
+    // MARK: - Identity Resolution for Lyrics
+
+    /// MusicBrainz Recording MBID for the currently playing track,
+    /// resolved via the local acoustic fingerprint registry.
+    /// Updated asynchronously by LyricsStore when the track changes.
+    var currentRecordingMBID: String? = nil
+
+    /// Subsonic remote song ID for the currently playing track.
+    var currentSubsonicSongID: String? {
+        currentItem?.subsonicSongID
+    }
+
     // Typed convenience projection; PlaybackQueueController owns the queue.
 
     var queue: [LocalTrack] {
@@ -995,6 +1007,7 @@ private struct WeakSessionObserver {
 
     private func resolveAndStart(_ item: PlaybackItem) {
 
+        currentRecordingMBID = nil
         cancelActiveResolution()
 
         tearDownActiveTransport()

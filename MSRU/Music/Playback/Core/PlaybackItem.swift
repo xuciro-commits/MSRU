@@ -53,6 +53,9 @@ struct PlaybackItem:
     let payload:
         Payload
 
+    /// Server identity for remote lyrics and other song-ID scoped requests.
+    let subsonicServerID: String?
+
 
     // MARK: - Local
 
@@ -68,6 +71,7 @@ struct PlaybackItem:
             .local(
                 track
             )
+        self.subsonicServerID = nil
     }
 
 
@@ -85,6 +89,7 @@ struct PlaybackItem:
             .openverse(
                 track
             )
+        self.subsonicServerID = nil
     }
 
 
@@ -102,6 +107,7 @@ struct PlaybackItem:
             .radio(
                 station
             )
+        self.subsonicServerID = nil
     }
 
 
@@ -109,6 +115,7 @@ struct PlaybackItem:
 
     init(
         subsonic id: String,
+        serverID: LibrarySourceID? = nil,
         title: String,
         artist: String,
         album: String? = nil,
@@ -116,7 +123,8 @@ struct PlaybackItem:
         artworkReference: String? = nil,
         streamURL: URL? = nil
     ) {
-        self.id = "subsonic:\(id)"
+        self.id = serverID.map { "subsonic:\($0.rawValue):\(id)" } ?? "subsonic:\(id)"
+        self.subsonicServerID = serverID?.rawValue
         self.payload = .subsonic(
             id: id,
             title: title,
@@ -140,6 +148,7 @@ struct PlaybackItem:
     ) -> PlaybackItem {
         PlaybackItem(
             subsonic: itemID,
+            serverID: serverID,
             title: title,
             artist: artist,
             album: album,
@@ -154,6 +163,23 @@ struct PlaybackItem:
             return nil
         }
         return (itemID: id, title: title, artist: artist, album: album)
+    }
+
+    /// Album name from any payload type.
+    var album: String? {
+        switch payload {
+        case .local(let track): return track.album
+        case .subsonic(_, _, _, let album, _, _, _): return album
+        case .openverse, .radio: return nil
+        }
+    }
+
+    /// Subsonic remote song ID, nil for non-Subsonic sources.
+    var subsonicSongID: String? {
+        guard case .subsonic(let id, _, _, _, _, _, _) = payload else {
+            return nil
+        }
+        return id
     }
 
 
@@ -174,6 +200,9 @@ struct PlaybackItem:
         } else {
             self.init(
                 subsonic: summary.id,
+                serverID: summary.sourceID.map {
+                    LibrarySourceID($0.hasPrefix("src_") ? String($0.dropFirst(4)) : $0)
+                },
                 title: summary.title,
                 artist: summary.artist,
                 album: summary.album,
@@ -623,4 +652,3 @@ nonisolated enum TrackPlaybackState: Equatable, Sendable {
         return false
     }
 }
-

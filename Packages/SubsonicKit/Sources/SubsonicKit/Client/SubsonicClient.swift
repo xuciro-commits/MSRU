@@ -260,4 +260,19 @@ public actor SubsonicClient {
     public func scrobble(id: String, time: Double? = nil, submission: Bool = true) async throws {
         let _: SubsonicResponse<EmptyData> = try await execute(endpoint: .scrobble(id: id, time: time, submission: submission))
     }
+
+    /// Fetches structured lyrics for a song by its ID (OpenSubsonic `getLyricsBySongId` extension).
+    /// Returns the best available lyrics entry (synced preferred over plain), or nil.
+    public func getLyricsBySongId(id: String) async throws -> SubsonicStructuredLyricsDTO? {
+        let response: SubsonicResponse<SubsonicLyricsByIdContainer> = try await execute(
+            endpoint: .getLyricsBySongId(id: id),
+            timeout: 10.0
+        )
+        guard let entries = response.data?.lyricsList?.structuredLyrics, !entries.isEmpty else {
+            return nil
+        }
+        // Ignore empty entries, then prefer synchronized lyrics.
+        let available = entries.filter { $0.toLrcText() != nil }
+        return available.first(where: { $0.synced == true }) ?? available.first
+    }
 }

@@ -339,6 +339,7 @@ struct NowPlayingCanvasView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 80)
                     } else if let doc = lyricsStore.currentDocument, doc.isSynced {
+                        canvasTuningBar
                         VStack(alignment: .leading, spacing: 16) {
                             ForEach(Array(doc.lines.enumerated()), id: \.offset) { index, line in
                                 let isActive = (index == lyricsStore.activeLineIndex)
@@ -394,6 +395,111 @@ struct NowPlayingCanvasView: View {
         .task(id: playback.currentTime) {
             lyricsStore.sync(with: playback)
         }
+    }
+
+    @ViewBuilder
+    private var canvasTuningBar: some View {
+        HStack(spacing: 8) {
+            Button {
+                lyricsStore.adjustOffset(by: -0.5, playback: playback)
+            } label: {
+                Text("-0.5s")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .help("Delay lyrics by 0.5s")
+
+            let offset = lyricsStore.timeOffset
+            let offsetText = offset == 0 ? "±0.0s" : String(format: "%+.1fs", offset)
+            Text(offsetText)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(offset != 0 ? Color.white : Color.white.opacity(0.6))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(
+                    offset != 0 ? Color.accentColor.opacity(0.35) : Color.white.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                )
+
+            Button {
+                lyricsStore.adjustOffset(by: 0.5, playback: playback)
+            } label: {
+                Text("+0.5s")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .help("Advance lyrics by 0.5s")
+
+            if offset != 0 {
+                Button {
+                    lyricsStore.resetOffset(playback: playback)
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+                .buttonStyle(.plain)
+                .help("Reset offset to 0.0s")
+            }
+
+            Spacer()
+
+            if lyricsStore.isSavingTuning {
+                ProgressView()
+                    .controlSize(.mini)
+                    .tint(.white)
+            } else if let msg = lyricsStore.lastSaveMessage {
+                HStack(spacing: 3) {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                    Text(LocalizedStringKey(msg))
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundStyle(.green)
+            } else {
+                Menu {
+                    Button("Save to .lrc Sidecar") {
+                        Task {
+                            try? await lyricsStore.saveTunedLyrics(writeSidecar: true, embedInAudio: false)
+                        }
+                    }
+                    Button("Embed in Audio File") {
+                        Task {
+                            try? await lyricsStore.saveTunedLyrics(writeSidecar: false, embedInAudio: true)
+                        }
+                    }
+                    Divider()
+                    Button("Save to Both (Sidecar & Embed)") {
+                        Task {
+                            try? await lyricsStore.saveTunedLyrics(writeSidecar: true, embedInAudio: true)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "square.and.arrow.down")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("Save")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .foregroundStyle(.white)
+                }
+                .menuStyle(.borderlessButton)
+                .help("Write tuned lyrics permanently")
+            }
+        }
+        .padding(.horizontal, 4)
+        .padding(.top, 4)
     }
 
     // MARK: - Scrubber Row

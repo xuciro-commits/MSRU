@@ -25,6 +25,7 @@ public struct AudioStandardTags: Sendable, Equatable {
     public var releaseMBID: String?
     public var artistMBID: String?
     public var artworkData: Data?
+    public var lyrics: String?
 
     public init(
         title: String,
@@ -41,7 +42,8 @@ public struct AudioStandardTags: Sendable, Equatable {
         recordingMBID: String? = nil,
         releaseMBID: String? = nil,
         artistMBID: String? = nil,
-        artworkData: Data? = nil
+        artworkData: Data? = nil,
+        lyrics: String? = nil
     ) {
         self.title = title
         self.artist = artist
@@ -58,6 +60,7 @@ public struct AudioStandardTags: Sendable, Equatable {
         self.releaseMBID = releaseMBID
         self.artistMBID = artistMBID
         self.artworkData = artworkData
+        self.lyrics = lyrics
     }
 }
 
@@ -157,6 +160,7 @@ public struct AudioTagWriter: Sendable {
         if let rMBID = tags.recordingMBID, !rMBID.isEmpty { comments.append("MUSICBRAINZ_TRACKID=\(rMBID)") }
         if let aMBID = tags.releaseMBID, !aMBID.isEmpty { comments.append("MUSICBRAINZ_ALBUMID=\(aMBID)") }
         if let artMBID = tags.artistMBID, !artMBID.isEmpty { comments.append("MUSICBRAINZ_ARTISTID=\(artMBID)") }
+        if let lyr = tags.lyrics, !lyr.isEmpty { comments.append("LYRICS=\(lyr)") }
 
         vorbisPayload.append(UInt32(comments.count).littleEndianBytes)
         for comment in comments {
@@ -270,6 +274,9 @@ public struct AudioTagWriter: Sendable {
         if let aMBID = tags.releaseMBID, !aMBID.isEmpty {
             framesData.append(buildID3TXXXFrame(description: "MusicBrainz Album Id", text: aMBID))
         }
+        if let lyr = tags.lyrics, !lyr.isEmpty {
+            framesData.append(buildID3USLTFrame(language: "eng", description: "", text: lyr))
+        }
 
         // APIC Artwork frame
         if let art = tags.artworkData, !art.isEmpty {
@@ -313,6 +320,40 @@ public struct AudioTagWriter: Sendable {
         return fileURL
     }
 
+    /// Writes companion sidecar `.lrc` file alongside the audio file.
+    @discardableResult
+    public func writeSidecarLrc(to audioFileURL: URL, content: String) throws -> URL {
+        let lrcURL = audioFileURL.deletingPathExtension().appendingPathExtension("lrc")
+        let data = Data(content.utf8)
+        return try atomicReplace(fileURL: lrcURL, withData: data)
+    }
+
+    /// Convenience method to write lyrics either to companion .lrc or embedded in audio file tags.
+    @discardableResult
+    public func writeLyrics(
+        to fileURL: URL,
+        lrcContent: String,
+        writeSidecar: Bool = true,
+        embedInAudio: Bool = true
+    ) async throws -> URL {
+        if writeSidecar {
+            _ = try writeSidecarLrc(to: fileURL, content: lrcContent)
+        }
+        if embedInAudio {
+            let ext = fileURL.pathExtension.lowercased()
+            if ext == "flac" || ext == "mp3" {
+                var tags = AudioStandardTags(
+                    title: fileURL.deletingPathExtension().lastPathComponent,
+                    artist: "Unknown Artist",
+                    album: "Unknown Album"
+                )
+                tags.lyrics = lrcContent
+                _ = try await writeTags(to: fileURL, tags: tags)
+            }
+        }
+        return fileURL
+    }
+
     // MARK: - Atomic Replacement Helper
 
     private func atomicReplace(fileURL: URL, withData data: Data) throws -> URL {
@@ -335,6 +376,20 @@ public struct AudioTagWriter: Sendable {
             payload.append(textBytes)
         }
         return buildID3RawFrame(id: id, payload: payload)
+    }
+
+    private func buildID3USLTFrame(language: String = "eng", description: String = "", text: String) -> Data {
+        var payload = Data([0x03]) // UTF-8
+        let langData = language.data(using: .ascii) ?? Data([0x65, 0x6E, 0x67])
+        payload.append(langData.prefix(3))
+        if let descData = description.data(using: .utf8) {
+            payload.append(descData)
+        }
+        payload.append(0x00) // Null separator for description
+        if let textData = text.data(using: .utf8) {
+            payload.append(textData)
+        }
+        return buildID3RawFrame(id: "USLT", payload: payload)
     }
 
     private func buildID3TXXXFrame(description: String, text: String) -> Data {

@@ -175,6 +175,27 @@ struct SubsonicClientTests {
         return (client, credStore)
     }
 
+    @Test("getLyricsBySongId uses the authenticated song ID and prefers usable synced lyrics")
+    func lyricsBySongID() async throws {
+        let (client, _) = makeClient { request in
+            let url = try #require(request.url)
+            #expect(url.path.hasSuffix("/getLyricsBySongId.view"))
+            #expect(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "id" })?.value == "song-42")
+            let json = """
+            {"subsonic-response":{"status":"ok","version":"1.16.1","lyricsList":{"structuredLyrics":[
+              {"synced":true,"line":[]},
+              {"synced":false,"line":[{"value":"Plain text"}]},
+              {"synced":true,"offset":500,"line":[{"start":1000,"value":"Timed text"}]}
+            ]}}}
+            """
+            return (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(json.utf8))
+        }
+
+        let lyrics = try await client.getLyricsBySongId(id: "song-42")
+        #expect(lyrics?.synced == true)
+        #expect(lyrics?.toLrcText() == "[offset:500]\n[00:01.00]Timed text")
+    }
+
     @Test("SubsonicClient ping successfully decodes server info and OpenSubsonic extensions")
     func pingAndOpenSubsonicExtensions() async throws {
         let (client, _) = makeClient { request in

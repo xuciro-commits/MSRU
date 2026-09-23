@@ -384,3 +384,87 @@ public struct SubsonicSearchResult3Container: Codable, Sendable {
     }
 }
 
+// MARK: - OpenSubsonic Lyrics (getLyricsBySongId)
+
+/// A single lyrics line with an optional start time in milliseconds.
+public struct SubsonicLyricsLineDTO: Codable, Sendable {
+    public let start: Int?
+    public let value: String?
+
+    public init(start: Int? = nil, value: String? = nil) {
+        self.start = start
+        self.value = value
+    }
+}
+
+/// A lyrics entry (one language / one track).
+public struct SubsonicStructuredLyricsDTO: Codable, Sendable {
+    public let lang: String?
+    public let synced: Bool?
+    public let displayArtist: String?
+    public let displayTitle: String?
+    public let offset: Int?
+    public let line: [SubsonicLyricsLineDTO]?
+
+    public init(
+        lang: String? = nil,
+        synced: Bool? = nil,
+        displayArtist: String? = nil,
+        displayTitle: String? = nil,
+        offset: Int? = nil,
+        line: [SubsonicLyricsLineDTO]? = nil
+    ) {
+        self.lang = lang
+        self.synced = synced
+        self.displayArtist = displayArtist
+        self.displayTitle = displayTitle
+        self.offset = offset
+        self.line = line
+    }
+
+    /// Converts structured lyrics to standard LRC text format.
+    public func toLrcText() -> String? {
+        guard let lines = line, !lines.isEmpty else { return nil }
+
+        if synced == true {
+            // Build synced LRC
+            var lrcLines: [String] = []
+            if let offset, offset != 0 {
+                lrcLines.append("[offset:\(offset)]")
+            }
+            for l in lines {
+                guard let text = l.value, !text.isEmpty else { continue }
+                if let startMs = l.start {
+                    let totalSeconds = Double(startMs) / 1000.0
+                    let minutes = Int(totalSeconds) / 60
+                    let seconds = totalSeconds - Double(minutes * 60)
+                    lrcLines.append(String(format: "[%02d:%05.2f]%@", minutes, seconds, text))
+                } else {
+                    lrcLines.append(text)
+                }
+            }
+            return lrcLines.contains(where: { !$0.hasPrefix("[offset:") }) ? lrcLines.joined(separator: "\n") : nil
+        } else {
+            // Plain lyrics
+            let texts = lines.compactMap(\.value).filter { !$0.isEmpty }
+            return texts.isEmpty ? nil : texts.joined(separator: "\n")
+        }
+    }
+}
+
+/// Container for the lyricsList response field.
+public struct SubsonicLyricsByIdContainer: Codable, Sendable {
+    public let lyricsList: SubsonicLyricsListDTO?
+
+    public init(lyricsList: SubsonicLyricsListDTO? = nil) {
+        self.lyricsList = lyricsList
+    }
+}
+
+public struct SubsonicLyricsListDTO: Codable, Sendable {
+    public let structuredLyrics: [SubsonicStructuredLyricsDTO]?
+
+    public init(structuredLyrics: [SubsonicStructuredLyricsDTO]? = nil) {
+        self.structuredLyrics = structuredLyrics
+    }
+}
