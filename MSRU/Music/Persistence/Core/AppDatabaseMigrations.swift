@@ -451,5 +451,17 @@ nonisolated enum AppDatabaseMigrations {
                 t.column("played_at", .datetime).notNull()
             }
         }
+
+        // MARK: - Migration v4: Smart Playlists Rules
+        migrator.registerMigration("v4_smart_playlists_rules") { db in
+            if try db.tableExists("playlists") {
+                let columns = try db.columns(in: "playlists")
+                if !columns.contains(where: { $0.name == "rules_json" }) {
+                    try db.alter(table: "playlists") { t in
+                        t.add(column: "rules_json", .text)
+                    }
+                }
+            }
+        }
     }
 }

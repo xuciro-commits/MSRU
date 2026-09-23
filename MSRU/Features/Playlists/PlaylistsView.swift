@@ -30,7 +30,8 @@ struct PlaylistsView: View {
     @State private var availableSources: [SourceFilterItem] = []
     @State private var searchQuery: String = ""
     @State private var sortField: PlaylistSortField = .title
-    @State private var selectedPlaylist: Playlist?
+    @State private var selectedPlaylistID: UUID?
+    @State private var fallbackSelectedPlaylist: Playlist?
     @State private var isNewPlaylistSheetPresented: Bool = false
     @State private var playlistPendingDelete: Playlist?
     @State private var isDeleteConfirmationPresented: Bool = false
@@ -144,16 +145,31 @@ struct PlaylistsView: View {
         }
     }
 
+    private var activePlaylist: Playlist? {
+        guard let id = selectedPlaylistID else { return nil }
+        return playlistStore.playlists.first { $0.id == id }
+            ?? remotePlaylists.first { $0.id == id }
+            ?? fallbackSelectedPlaylist
+    }
+
+    private func selectPlaylist(_ playlist: Playlist) {
+        fallbackSelectedPlaylist = playlist
+        selectedPlaylistID = playlist.id
+    }
+
     var body: some View {
         Group {
-            if let playlist = selectedPlaylist {
+            if let playlist = activePlaylist {
                 PlaylistDetailView(
                     playlistStore: playlistStore,
                     playlist: playlist,
                     tracks: localStore.tracks,
                     subsonicServers: subsonicServers,
                     playback: playback,
-                    onBack: { selectedPlaylist = nil },
+                    onBack: {
+                        selectedPlaylistID = nil
+                        fallbackSelectedPlaylist = nil
+                    },
                     onSelectTrack: onSelectTrack
                 )
             } else {
@@ -298,10 +314,10 @@ struct PlaylistsView: View {
             availableSources = items
         }
         .sheet(isPresented: $isNewPlaylistSheetPresented) {
-            NewPlaylistSheetView { title, desc in
+            NewPlaylistSheetView { title, desc, rules in
                 Task {
-                    let created = await playlistStore.createPlaylist(title: title, description: desc)
-                    selectedPlaylist = created
+                    let created = await playlistStore.createPlaylist(title: title, description: desc, rules: rules)
+                    selectPlaylist(created)
                 }
             }
         }
@@ -364,13 +380,21 @@ struct PlaylistsView: View {
             if playlist.isPinned {
                 FoundationCardBadge("Pinned", systemImage: "pin.fill", foregroundStyle: Color.accentColor)
             }
+            if playlist.isSmart {
+                FoundationCardBadge("Smart", systemImage: "gearshape.fill", foregroundStyle: Color.purple)
+            }
             if playlist.description?.contains("极空间") == true || playlist.description?.contains("Subsonic") == true {
                 FoundationCardBadge("NAS", systemImage: "server.rack", foregroundStyle: Color.blue)
             }
         } actionOverlay: {
             FoundationCardActionButton(systemImage: "play.fill") {
-                let resolved = playlist.trackIDs.compactMap { id in
-                    localStore.tracks.first { $0.id == id || $0.fileURL.lastPathComponent == id || $0.fileURL.absoluteString.contains(id) }
+                let resolved: [LocalTrack]
+                if playlist.isSmart {
+                    resolved = playlistStore.resolveTracks(for: playlist, from: localStore.tracks)
+                } else {
+                    resolved = playlist.trackIDs.compactMap { id in
+                        localStore.tracks.first { $0.id == id || $0.fileURL.lastPathComponent == id || $0.fileURL.absoluteString.contains(id) }
+                    }
                 }
                 if let first = resolved.first {
                     playback.play(first, queue: resolved)
@@ -382,7 +406,8 @@ struct PlaylistsView: View {
                 .lineLimit(1)
         } subtitle: {
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(playlist.trackCount) songs")
+                let count = playlist.isSmart ? playlistStore.resolveTracks(for: playlist, from: localStore.tracks).count : playlist.trackCount
+                Text("\(count) songs")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 if let desc = playlist.description, desc.contains("来自") {
@@ -396,12 +421,12 @@ struct PlaylistsView: View {
         .marqueeItem(id: playlist.id)
         .simultaneousGesture(
             TapGesture(count: 2).onEnded {
-                selectedPlaylist = playlist
+                selectPlaylist(playlist)
             }
         )
         .contextMenu {
             Button("Open Playlist") {
-                selectedPlaylist = playlist
+                selectPlaylist(playlist)
             }
 
             Button {
@@ -538,6 +563,35 @@ struct PlaylistsView: View {
 
 // MARK: - Previews
 
+// MARK: - Smart Playlist Preset Option
+
+enum SmartPlaylistPresetOption: String, CaseIterable, Identifiable {
+    case recentlyAdded = "Recently Added"
+    case favorites = "Favorites"
+    case hiResAudio = "Hi-Res Audio"
+    case losslessMasters = "Lossless Masters"
+
+    var id: String { rawValue }
+
+    var localizedTitle: LocalizedStringKey {
+        switch self {
+        case .recentlyAdded: return LocalizedStringKey("Recently Added (Last 30 Days)")
+        case .favorites: return LocalizedStringKey("Favorites")
+        case .hiResAudio: return LocalizedStringKey("Hi-Res Audio (96kHz+ / 24-bit)")
+        case .losslessMasters: return LocalizedStringKey("Lossless Masters (FLAC / ALAC / WAV)")
+        }
+    }
+
+    func makeRuleGroup() -> SmartPlaylistRuleGroup {
+        switch self {
+        case .recentlyAdded: return PlaylistRuleEngine.Presets.recentlyAdded(days: 30)
+        case .favorites: return PlaylistRuleEngine.Presets.favorites()
+        case .hiResAudio: return PlaylistRuleEngine.Presets.hiResAudio()
+        case .losslessMasters: return PlaylistRuleEngine.Presets.losslessMasters()
+        }
+    }
+}
+
 // MARK: - New Playlist Sheet View
 
 @MainActor
@@ -546,26 +600,85 @@ struct NewPlaylistSheetView: View {
 
     var initialTitle: String = ""
     var initialDescription: String = ""
-    var onSave: (String, String?) -> Void
+    var initialRules: SmartPlaylistRuleGroup? = nil
+    var onSave: (String, String?, SmartPlaylistRuleGroup?) -> Void
 
     @State private var title: String = ""
     @State private var playlistDescription: String = ""
+    @State private var isSmartPlaylist: Bool = false
+    @State private var selectedPreset: SmartPlaylistPresetOption = .recentlyAdded
+    @State private var hasChangedPreset: Bool = false
+
+    private static func detectPreset(from rules: SmartPlaylistRuleGroup?) -> SmartPlaylistPresetOption {
+        guard let rules, let firstRule = rules.rules.first else { return .recentlyAdded }
+        switch firstRule.field {
+        case .isFavorite:
+            return .favorites
+        case .isHiRes:
+            return .hiResAudio
+        case .isLossless:
+            return .losslessMasters
+        case .addedAt:
+            return .recentlyAdded
+        default:
+            return .recentlyAdded
+        }
+    }
 
     init(
         initialTitle: String = "",
         initialDescription: String = "",
-        onSave: @escaping (String, String?) -> Void
+        initialRules: SmartPlaylistRuleGroup? = nil,
+        onSave: @escaping (String, String?, SmartPlaylistRuleGroup?) -> Void
     ) {
         self.initialTitle = initialTitle
         self.initialDescription = initialDescription
+        self.initialRules = initialRules
         self.onSave = onSave
         _title = State(initialValue: initialTitle)
         _playlistDescription = State(initialValue: initialDescription)
+        let isSmart = initialRules != nil
+        _isSmartPlaylist = State(initialValue: isSmart)
+        _selectedPreset = State(initialValue: Self.detectPreset(from: initialRules))
     }
 
     var body: some View {
         NavigationStack {
             Form {
+                if initialTitle.isEmpty {
+                    Section {
+                        Picker(LocalizedStringKey("Playlist Type"), selection: $isSmartPlaylist) {
+                            Text(LocalizedStringKey("Standard Playlist")).tag(false)
+                            Text(LocalizedStringKey("Smart Playlist")).tag(true)
+                        }
+                        .pickerStyle(.segmented)
+                    } header: {
+                        Text(LocalizedStringKey("Type"))
+                    }
+                }
+
+                if isSmartPlaylist {
+                    Section {
+                        Picker(LocalizedStringKey("Smart Rule Preset"), selection: $selectedPreset) {
+                            ForEach(SmartPlaylistPresetOption.allCases) { preset in
+                                Text(preset.localizedTitle).tag(preset)
+                            }
+                        }
+                        .onChange(of: selectedPreset) { _, newPreset in
+                            hasChangedPreset = true
+                            if title.isEmpty || SmartPlaylistPresetOption.allCases.map(\.rawValue).contains(title) {
+                                title = newPreset.rawValue
+                            }
+                        }
+                    } header: {
+                        Text(LocalizedStringKey("Rule Definition"))
+                    } footer: {
+                        Text(LocalizedStringKey("Smart playlists dynamically update based on rules whenever your library changes."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 Section {
                     TextField(LocalizedStringKey("Playlist Name"), text: $title)
                         .textFieldStyle(.roundedBorder)
@@ -591,13 +704,19 @@ struct NewPlaylistSheetView: View {
                         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
                         guard !trimmed.isEmpty else { return }
                         let desc = playlistDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-                        onSave(trimmed, desc.isEmpty ? nil : desc)
+                        let rules: SmartPlaylistRuleGroup?
+                        if isSmartPlaylist {
+                            rules = hasChangedPreset ? selectedPreset.makeRuleGroup() : (initialRules ?? selectedPreset.makeRuleGroup())
+                        } else {
+                            rules = nil
+                        }
+                        onSave(trimmed, desc.isEmpty ? nil : desc, rules)
                         dismiss()
                     }
                     .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
-            .frame(minWidth: 320, minHeight: 220)
+            .frame(minWidth: 360, minHeight: 280)
         }
     }
 }
@@ -694,8 +813,8 @@ enum PlaylistsFeature: ApplicationFeaturePresentation {
     NewPlaylistSheetView(
         initialTitle: "Favorites",
         initialDescription: "Top favorite tracks",
-        onSave: { title, desc in
-            print("Saved playlist:", title, desc ?? "")
+        onSave: { title, desc, rules in
+            print("Saved playlist:", title, desc ?? "", rules != nil)
         }
     )
 }

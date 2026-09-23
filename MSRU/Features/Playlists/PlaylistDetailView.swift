@@ -25,11 +25,18 @@ struct PlaylistDetailView: View {
     @State private var remoteTracks: [LocalTrack] = []
     @State private var isLoadingRemoteTracks: Bool = false
 
+    private var currentPlaylist: Playlist {
+        playlistStore.playlists.first { $0.id == playlist.id } ?? playlist
+    }
+
     private var resolvedTracks: [LocalTrack] {
         if !remoteTracks.isEmpty {
             return remoteTracks
         }
-        return playlist.trackIDs.compactMap { id in
+        if currentPlaylist.isSmart {
+            return playlistStore.resolveTracks(for: currentPlaylist, from: tracks)
+        }
+        return currentPlaylist.trackIDs.compactMap { id in
             tracks.first { $0.id == id || $0.fileURL.lastPathComponent == id || $0.fileURL.absoluteString.contains(id) }
         }
     }
@@ -67,15 +74,15 @@ struct PlaylistDetailView: View {
                         .shadow(color: .black.opacity(0.12), radius: 10, y: 5)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(LocalizedStringKey("PLAYLIST"))
+                        Text(currentPlaylist.isSmart ? "SMART PLAYLIST" : "PLAYLIST")
                             .font(.caption.bold())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(currentPlaylist.isSmart ? Color.purple : Color.secondary)
 
-                        Text(playlist.title)
+                        Text(currentPlaylist.title)
                             .font(.system(size: 32, weight: .bold))
                             .lineLimit(2)
 
-                        if let desc = playlist.description, !desc.isEmpty {
+                        if let desc = currentPlaylist.description, !desc.isEmpty {
                             Text(desc)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
@@ -190,11 +197,18 @@ struct PlaylistDetailView: View {
         .animation(.easeInOut(duration: 0.2), value: selectedTrackIDs.count)
         .sheet(isPresented: $isEditSheetPresented) {
             NewPlaylistSheetView(
-                initialTitle: playlist.title,
-                initialDescription: playlist.description ?? "",
-                onSave: { newTitle, newDesc in
+                initialTitle: currentPlaylist.title,
+                initialDescription: currentPlaylist.description ?? "",
+                initialRules: currentPlaylist.rules,
+                onSave: { newTitle, newDesc, newRules in
                     Task {
-                        await playlistStore.updatePlaylist(id: playlist.id, title: newTitle, description: newDesc)
+                        await playlistStore.updatePlaylist(
+                            id: currentPlaylist.id,
+                            title: newTitle,
+                            description: newDesc,
+                            rules: newRules,
+                            updateRules: true
+                        )
                     }
                 }
             )
@@ -206,7 +220,7 @@ struct PlaylistDetailView: View {
         ) {
             Button(LocalizedStringKey("Delete"), role: .destructive) {
                 Task {
-                    await playlistStore.deletePlaylist(id: playlist.id)
+                    await playlistStore.deletePlaylist(id: currentPlaylist.id)
                     onBack()
                 }
             }
@@ -220,7 +234,7 @@ struct PlaylistDetailView: View {
 
     @ViewBuilder
     private var heroArtwork: some View {
-        if let ref = playlist.artworkReference {
+        if let ref = currentPlaylist.artworkReference {
             MediaImageView(
                 reference: ref,
                 thumbnailPixelSize: CGSize(width: 320, height: 320),
@@ -315,7 +329,7 @@ struct PlaylistDetailView: View {
 
                 Button(role: .destructive) {
                     Task {
-                        await playlistStore.removeTrack(track.id, from: playlist.id)
+                        await playlistStore.removeTrack(track.id, from: currentPlaylist.id)
                     }
                 } label: {
                     Label(LocalizedStringKey("Remove from Playlist"), systemImage: "minus.circle")
@@ -381,7 +395,7 @@ struct PlaylistDetailView: View {
     // MARK: - Remote Loading
 
     private func loadRemoteTracksIfNeeded() async {
-        guard let desc = playlist.description,
+        guard let desc = currentPlaylist.description,
               let idRangeStart = desc.range(of: "[id:"),
               let idRangeEnd = desc.range(of: "]", range: idRangeStart.upperBound..<desc.endIndex),
               let subsonicServers else {
@@ -454,7 +468,7 @@ struct PlaylistDetailView: View {
                 let toRemove = selectedTrackIDs
                 Task {
                     for id in toRemove {
-                        await playlistStore.removeTrack(id, from: playlist.id)
+                        await playlistStore.removeTrack(id, from: currentPlaylist.id)
                     }
                     selectedTrackIDs.removeAll()
                 }

@@ -14,8 +14,13 @@ nonisolated public struct Playlist: Identifiable, Codable, Hashable, Sendable {
     public var trackIDs: [String]
     public var artworkReference: String?
     public var isPinned: Bool
+    public var rules: SmartPlaylistRuleGroup?
     public let createdAt: Date
     public var updatedAt: Date
+
+    public var isSmart: Bool {
+        rules != nil
+    }
 
     @MainActor
     public var artworkData: Data? {
@@ -29,6 +34,7 @@ nonisolated public struct Playlist: Identifiable, Codable, Hashable, Sendable {
         trackIDs: [String] = [],
         artworkReference: String? = nil,
         isPinned: Bool = false,
+        rules: SmartPlaylistRuleGroup? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -38,6 +44,7 @@ nonisolated public struct Playlist: Identifiable, Codable, Hashable, Sendable {
         self.trackIDs = trackIDs
         self.artworkReference = artworkReference
         self.isPinned = isPinned
+        self.rules = rules
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -51,6 +58,7 @@ nonisolated public struct Playlist: Identifiable, Codable, Hashable, Sendable {
         artworkReference: String? = nil,
         artworkData: Data?,
         isPinned: Bool = false,
+        rules: SmartPlaylistRuleGroup? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -69,6 +77,7 @@ nonisolated public struct Playlist: Identifiable, Codable, Hashable, Sendable {
             trackIDs: trackIDs,
             artworkReference: artRef,
             isPinned: isPinned,
+            rules: rules,
             createdAt: createdAt,
             updatedAt: updatedAt
         )
@@ -127,6 +136,11 @@ final class SQLitePlaylistRepository: PlaylistRepository {
                 let isPinned: Bool = row["is_pinned"] ?? false
                 let trackIDs = tracksByPlaylistID[idStr] ?? []
 
+                let rulesJSON: String? = row["rules_json"]
+                let rules: SmartPlaylistRuleGroup? = rulesJSON.flatMap {
+                    try? JSONDecoder().decode(SmartPlaylistRuleGroup.self, from: Data($0.utf8))
+                }
+
                 playlists.append(Playlist(
                     id: id,
                     title: title,
@@ -134,6 +148,7 @@ final class SQLitePlaylistRepository: PlaylistRepository {
                     trackIDs: trackIDs,
                     artworkReference: artworkRef,
                     isPinned: isPinned,
+                    rules: rules,
                     createdAt: createdAt,
                     updatedAt: updatedAt
                 ))
@@ -147,10 +162,19 @@ final class SQLitePlaylistRepository: PlaylistRepository {
             try db.execute(sql: "DELETE FROM playlists")
 
             for pl in playlists {
+                let rulesJSON: String?
+                if let rules = pl.rules,
+                   let data = try? JSONEncoder().encode(rules),
+                   let jsonString = String(data: data, encoding: .utf8) {
+                    rulesJSON = jsonString
+                } else {
+                    rulesJSON = nil
+                }
+
                 try db.execute(
                     sql: """
-                    INSERT INTO playlists (id, title, description, artwork_reference, is_pinned, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO playlists (id, title, description, artwork_reference, is_pinned, created_at, updated_at, rules_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     arguments: [
                         pl.id.uuidString,
@@ -159,7 +183,8 @@ final class SQLitePlaylistRepository: PlaylistRepository {
                         pl.artworkReference,
                         pl.isPinned ? 1 : 0,
                         pl.createdAt,
-                        pl.updatedAt
+                        pl.updatedAt,
+                        rulesJSON
                     ]
                 )
 
@@ -280,7 +305,8 @@ final class PlaylistStore {
         title: String,
         description: String? = nil,
         initialTrackIDs: [String] = [],
-        isPinned: Bool = false
+        isPinned: Bool = false,
+        rules: SmartPlaylistRuleGroup? = nil
     ) async -> Playlist {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedTitle = trimmedTitle.isEmpty ? "Untitled Playlist" : trimmedTitle
@@ -288,11 +314,37 @@ final class PlaylistStore {
             title: resolvedTitle,
             description: description,
             trackIDs: initialTrackIDs,
-            isPinned: isPinned
+            isPinned: isPinned,
+            rules: rules
         )
         playlists.insert(newPlaylist, at: 0)
         await persist()
         return newPlaylist
+    }
+
+    @discardableResult
+    func createSmartPlaylist(
+        title: String,
+        description: String? = nil,
+        rules: SmartPlaylistRuleGroup,
+        isPinned: Bool = false
+    ) async -> Playlist {
+        await createPlaylist(
+            title: title,
+            description: description,
+            initialTrackIDs: [],
+            isPinned: isPinned,
+            rules: rules
+        )
+    }
+
+    func resolveTracks(for playlist: Playlist, from tracks: [LocalTrack], favorites: Set<String> = []) -> [LocalTrack] {
+        if let rules = playlist.rules {
+            return PlaylistRuleEngine.evaluate(rules: rules, tracks: tracks, favorites: favorites)
+        }
+        return playlist.trackIDs.compactMap { id in
+            tracks.first { $0.id == id || $0.fileURL.lastPathComponent == id || $0.fileURL.absoluteString.contains(id) }
+        }
     }
 
     func deletePlaylist(id: UUID) async {
@@ -304,13 +356,18 @@ final class PlaylistStore {
         id: UUID,
         title: String,
         description: String? = nil,
-        isPinned: Bool? = nil
+        isPinned: Bool? = nil,
+        rules: SmartPlaylistRuleGroup? = nil,
+        updateRules: Bool = false
     ) async {
         guard let index = playlists.firstIndex(where: { $0.id == id }) else { return }
         playlists[index].title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         playlists[index].description = description
         if let isPinned {
             playlists[index].isPinned = isPinned
+        }
+        if updateRules {
+            playlists[index].rules = rules
         }
         playlists[index].updatedAt = Date()
         await persist()
