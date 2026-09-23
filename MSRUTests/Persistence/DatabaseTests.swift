@@ -11,6 +11,7 @@ import Foundation
 import AppFoundation
 import MusicDomain
 import GRDB
+import MusicLibrary
 @testable import MSRU
 
 @Suite("Database Persistence Invariants")

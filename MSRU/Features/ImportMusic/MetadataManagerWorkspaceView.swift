@@ -9,6 +9,8 @@ import SwiftUI
 import Observation
 import AppFoundation
 import AppFoundationUI
+import MusicLibrary
+import MusicPlayback
 
 /// Central Workspace combining Import Review, Local Fingerprint Memory, Path Heuristic Rules, and MusicBrainz Cache.
 struct MetadataManagerWorkspaceView: View {

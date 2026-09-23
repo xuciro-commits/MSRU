@@ -11,6 +11,8 @@
 		404EA14E305E9751003BA949 /* MSRUCodecFFmpeg in Frameworks */ = {isa = PBXBuildFile; productRef = 404EA14D305E9751003BA949 /* MSRUCodecFFmpeg */; };
 		404EA155305E9777003BA949 /* AppFoundationUI in Frameworks */ = {isa = PBXBuildFile; productRef = 404EA154305E9777003BA949 /* AppFoundationUI */; };
 		40A75D010000000000000001 /* MusicDomain in Frameworks */ = {isa = PBXBuildFile; productRef = 40A75D010000000000000002 /* MusicDomain */; };
+		40A75D010000000000000021 /* MusicPlayback in Frameworks */ = {isa = PBXBuildFile; productRef = 40A75D010000000000000022 /* MusicPlayback */; };
+		40A75D010000000000000011 /* MusicLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = 40A75D010000000000000012 /* MusicLibrary */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,6 +77,8 @@
 				404EA147305E8362003BA949 /* AppFoundation in Frameworks */,
 				404EA155305E9777003BA949 /* AppFoundationUI in Frameworks */,
 				40A75D010000000000000001 /* MusicDomain in Frameworks */,
+				40A75D010000000000000021 /* MusicPlayback in Frameworks */,
+				40A75D010000000000000011 /* MusicLibrary in Frameworks */,
 				404EA14E305E9751003BA949 /* MSRUCodecFFmpeg in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -148,6 +152,8 @@
 				404EA14D305E9751003BA949 /* MSRUCodecFFmpeg */,
 				404EA154305E9777003BA949 /* AppFoundationUI */,
 				40A75D010000000000000002 /* MusicDomain */,
+				40A75D010000000000000022 /* MusicPlayback */,
+				40A75D010000000000000012 /* MusicLibrary */,
 			);
 			productName = MSRU;
 			productReference = 40F5DDF83057009E00CA46B2 /* MSRU.app */;
@@ -732,6 +738,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 40A75D010000000000000003 /* XCLocalSwiftPackageReference "Packages/MusicDomain" */;
 			productName = MusicDomain;
+		};
+		40A75D010000000000000012 /* MusicLibrary */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 40A75D010000000000000003 /* XCLocalSwiftPackageReference "Packages/MusicDomain" */;
+			productName = MusicLibrary;
+		};
+		40A75D010000000000000022 /* MusicPlayback */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 40A75D010000000000000003 /* XCLocalSwiftPackageReference "Packages/MusicDomain" */;
+			productName = MusicPlayback;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

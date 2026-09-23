@@ -20,12 +20,11 @@ Start here (Claude Code reaches this file through `CLAUDE.md`). This file is eno
 |---|---|
 | `MSRU/App` | Composition root (`ApplicationModel`, `Composition/MSRUApplication.swift`), commands, scenes, navigation, lifecycle, intents |
 | `MSRU/Features` | Product UI features |
-| `MSRU/Music` | Music domain code still in the app target: library, persistence (GRDB/SQLite + migrations), identity, import, playback, providers, radio, queries (moving to packages in #76) |
 | `MSRU/Platform` | AppKit/UIKit/SwiftUI platform adapters, windows, menu bar, restoration. The only app folder allowed to import AppKit/UIKit or create windows/split controllers |
 | `MSRU/Shared/UI/Music` | Shared music views (cards, components) |
 | `MSRU/PreviewSupport` | Deterministic preview fixtures (`MSRUPreviewData`) |
 | `Packages/AppFoundation` | Apple client layer: `AppFoundation` (no UI) + `AppFoundationUI` (native code only under `AppFoundationUI/Platform`) |
-| `Packages/MusicDomain` | UI-free music types and toolkits |
+| `Packages/MusicDomain` | Music domain package, layered `MusicPlayback` → `MusicLibrary` → `MusicDomain`: types/toolkits, library + persistence (GRDB/SQLite + migrations), identity, import, providers, radio, queries, playback ([ADR-0004](Docs/ADR/0004-music-domain-packages.md)) |
 | `Packages/MediaLibrary`, `Packages/SubsonicKit` | Music source abstraction, Subsonic client |
 | `Packages/ChromaSwift`, `Packages/MSRUCodecFFmpeg` | Chromaprint wrapper (vendored `chromaprint/` source), FFmpeg micro XCFramework (vendored, built by script) |
 | `MSRUTests`, `MSRUUITests` | App unit/contract tests (Swift Testing), process-level UI tests |
@@ -57,7 +56,7 @@ Conflicts: the owner's latest instruction decides requirements; code and fresh v
 
 ## Where code belongs
 
-- Music-specific types, rules, storage and integrations → `Packages/MusicDomain` (or `MSRU/Music` until #76), never AppFoundation.
+- Music-specific types, rules, storage and integrations → the `Packages/MusicDomain` targets, never AppFoundation or the app target.
 - Reusable, domain-neutral Apple client mechanisms → AppFoundation, only when at least two real uses share the same lifetime and failure semantics.
 - Platform/kernel/server code → the platform repository (until it exists: design only, in `Docs/Platform.md`).
 - Product UI → `MSRU/Features`; platform adapters → `MSRU/Platform`.
@@ -77,7 +76,7 @@ After any change, the gates, the affected package tests, the macOS unit-test bui
 
 ## Migrations and compatibility
 
-- Database changes go through `MSRU/Music/Persistence/Core/AppDatabaseMigrations.swift` as new, forward-only, re-runnable migrations; never edit a shipped migration. A failed migration must not overwrite user data; keep a recovery path.
+- Database changes go through `Packages/MusicDomain/Sources/MusicLibrary/Persistence/Core/AppDatabaseMigrations.swift` as new, forward-only, re-runnable migrations; never edit a shipped migration. A failed migration must not overwrite user data; keep a recovery path.
 - Persisted/transferred payloads (restoration records, settings, caches) are versioned and decoded per record; corrupt or unknown data is preserved, not replaced by empty state.
 - Breaking changes follow expand → migrate → contract. Do not keep two production paths for one responsibility after a migration completes, and do not add forwarding shims as an end state.
 - User files are never hard-deleted (use the Trash); original tags are never destroyed.

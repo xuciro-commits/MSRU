@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import Observation
 import AppFoundationUI
+import MusicPlayback
 
 struct QueuePaneView: View {
     @Bindable var playback: PlaybackController

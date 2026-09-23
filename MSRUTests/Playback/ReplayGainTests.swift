@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import MusicDomain
+import MusicPlayback
 @testable import MSRU
 
 @Suite("R128 loudness and gain contracts")

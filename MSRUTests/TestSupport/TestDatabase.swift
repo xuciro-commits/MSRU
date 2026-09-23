@@ -9,6 +9,8 @@ import Foundation
 import AppFoundation
 import MusicDomain
 import GRDB
+import MusicPlayback
+import MusicLibrary
 @testable import MSRU
 
 enum TestDatabase {

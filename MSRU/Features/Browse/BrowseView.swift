@@ -7,6 +7,7 @@ import SwiftUI
 import Observation
 import AppFoundation
 import AppFoundationUI
+import MusicLibrary
 
 
 struct BrowseView: View {

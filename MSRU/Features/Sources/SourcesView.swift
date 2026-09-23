@@ -11,6 +11,8 @@ import AppFoundation
 import AppFoundationUI
 import MediaLibrary
 import SubsonicKit
+import MusicLibrary
+import MusicPlayback
 
 struct SourcesView: View {
     @Bindable var scene: SceneModel

@@ -9,6 +9,8 @@
 import Foundation
 import ImageIO
 import CryptoKit
+import MusicLibrary
+import MusicPlayback
 
 #if canImport(AppKit)
 import AppKit

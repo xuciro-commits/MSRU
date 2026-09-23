@@ -5,6 +5,8 @@
 
 import Foundation
 import AppFoundation
+import MusicLibrary
+import MusicPlayback
 
 
 // MARK: - Ephemeral Library Repository

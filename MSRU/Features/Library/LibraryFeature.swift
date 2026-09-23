@@ -8,6 +8,8 @@ import Observation
 import SwiftUI
 import AppFoundation
 import AppFoundationUI
+import MusicLibrary
+import MusicPlayback
 
 
 // MARK: - Feature

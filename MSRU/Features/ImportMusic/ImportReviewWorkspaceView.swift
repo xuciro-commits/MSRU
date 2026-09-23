@@ -8,6 +8,7 @@ import UniformTypeIdentifiers
 import AppFoundation
 import AppFoundationUI
 import MusicDomain
+import MusicLibrary
 
 struct ImportReviewWorkspaceView: View {
     @Bindable var localStore: LocalLibraryStore

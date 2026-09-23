@@ -5,6 +5,8 @@
 
 import SwiftUI
 import Observation
+import MusicLibrary
+import MusicPlayback
 
 struct MSRUContextPaneView: View {
 

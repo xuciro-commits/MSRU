@@ -9,6 +9,7 @@ import Foundation
 import MediaLibrary
 import SubsonicKit
 import MusicDomain
+import MusicPlayback
 
 @Suite("Subsonic Server Integration Contracts")
 struct SubsonicServerStoreTests {

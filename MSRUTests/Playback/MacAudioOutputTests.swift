@@ -1,10 +1,11 @@
 #if os(macOS)
+import MusicDomain
+import MusicPlayback
 import AVFoundation
 import AudioToolbox
 import CoreAudio
 import Foundation
 import Testing
-import MusicDomain
 @testable import MSRU
 
 @MainActor

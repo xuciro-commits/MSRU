@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import MusicLibrary
 
 struct LibraryFilterBar: View {
 

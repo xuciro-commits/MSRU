@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import MusicLibrary
 
 #if canImport(AppKit)
 import AppKit

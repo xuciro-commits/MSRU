@@ -10,6 +10,7 @@ import Foundation
 import Testing
 import AppFoundation
 import MusicDomain
+import MusicLibrary
 @testable import MSRU
 
 @MainActor

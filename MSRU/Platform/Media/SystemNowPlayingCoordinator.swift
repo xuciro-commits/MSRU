@@ -5,6 +5,8 @@
 
 import Foundation
 import MediaPlayer
+import MusicLibrary
+import MusicPlayback
 
 #if canImport(AppKit) && !targetEnvironment(macCatalyst)
 import AppKit

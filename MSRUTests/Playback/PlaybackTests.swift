@@ -8,6 +8,8 @@
 import Foundation
 import Testing
 import MusicDomain
+import MusicLibrary
+import MusicPlayback
 @testable import MSRU
 
 @MainActor

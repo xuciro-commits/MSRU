@@ -9,6 +9,8 @@ import AppFoundation
 import AppFoundationUI
 import MediaLibrary
 import SubsonicKit
+import MusicLibrary
+import MusicPlayback
 
 
 struct LibraryView:

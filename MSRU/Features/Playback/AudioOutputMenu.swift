@@ -1,4 +1,5 @@
 #if os(macOS)
+import MusicPlayback
 import SwiftUI
 
 struct AudioOutputMenu: View {

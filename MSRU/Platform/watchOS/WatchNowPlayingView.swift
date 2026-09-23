@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Observation
+import MusicPlayback
 
 // MARK: - Watch Now Playing View
 

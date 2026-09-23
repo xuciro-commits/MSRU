@@ -12,6 +12,7 @@ import AppFoundation
 import MusicDomain
 import GRDB
 import AVFoundation
+import MusicLibrary
 @testable import MSRU
 
 @Suite("Library & Deduplication Invariants")

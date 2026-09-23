@@ -6,9 +6,10 @@ MSRU is a real, shipping product and the platform's long-term validation domain 
 
 | Path | Content |
 |---|---|
-| `Packages/MusicDomain` | Music-specific, UI-free types and toolkits moved out of AppFoundation: fingerprints and signatures, external catalogue contract, metadata overlay and LRC parsing, entity aliases, version groups, matching/scoring, safe file organizer, presentation models. Transitionally declares GRDB, ChromaSwift, MediaLibrary, SubsonicKit so the app keeps linking them (see work queue #76) |
-| `MSRU/Music` | Library, persistence (GRDB/SQLite), identity, import pipeline, playback (PCM engine, CoreAudio, DSP), providers, radio, queries — still inside the app target; moves into domain packages in #76 |
-| `MSRU/Features`, `MSRU/Shared/UI/Music` | Product UI |
+| `Packages/MusicDomain` — target `MusicDomain` | UI-free, Foundation-only types and toolkits: fingerprints and signatures, external catalogue contract, metadata overlay and LRC parsing, entity aliases, version groups, matching/scoring, safe file organizer, presentation models |
+| `Packages/MusicDomain` — target `MusicLibrary` | Library, persistence (GRDB/SQLite + migrations), identity, import pipeline, catalogue providers, provider management, queries, radio, lyrics fetching |
+| `Packages/MusicDomain` — target `MusicPlayback` | Playback controller and queue, PCM engine, CoreAudio output, DSP, codecs, synchronized lyrics state |
+| `MSRU/Features`, `MSRU/Shared/UI/Music` | Product UI; the app target composes, hosts features and adapts platforms ([ADR-0004](ADR/0004-music-domain-packages.md)) |
 | `Packages/MediaLibrary`, `Packages/SubsonicKit` | Source abstraction and Subsonic/OpenSubsonic client (to be folded into the Music domain; two source representations currently coexist) |
 | `Packages/ChromaSwift`, `Packages/MSRUCodecFFmpeg` | Chromaprint wrapper; FFmpeg micro build (`Scripts/build-ffmpeg-micro-apple.sh`, vendored XCFramework) |
 

@@ -16,6 +16,8 @@ import MusicDomain
 import MediaLibrary
 import SubsonicKit
 import GRDB
+import MusicLibrary
+import MusicPlayback
 @testable import MSRU
 
 @Suite("Subsonic Architectural 4-Chain Verification")

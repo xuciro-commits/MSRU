@@ -7,6 +7,8 @@ import SwiftUI
 import Observation
 import AppFoundation
 import MusicDomain
+import MusicLibrary
+import MusicPlayback
 
 /// Fullscreen / large modal immersive canvas for Now Playing media.
 ///

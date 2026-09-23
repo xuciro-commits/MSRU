@@ -8,6 +8,7 @@
 import SwiftUI
 import AppFoundation
 import MusicDomain
+import MusicPlayback
 
 struct LyricsPaneView: View {
     let playback: PlaybackController

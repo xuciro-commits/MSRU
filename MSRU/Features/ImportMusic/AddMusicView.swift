@@ -8,6 +8,8 @@ import UniformTypeIdentifiers
 import Observation
 import AppFoundation
 import AppFoundationUI
+import MusicLibrary
+import MusicPlayback
 
 
 struct AddMusicView: View {

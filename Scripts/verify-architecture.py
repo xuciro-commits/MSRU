@@ -14,7 +14,18 @@ IMPORT = re.compile(
 )
 WINDOW_CREATION = re.compile(r"\b(?:NSWindow|NSSplitViewController)\s*\(")
 # AppFoundation is the domain-neutral Apple client layer (see AGENTS.md).
-DOMAIN_MODULES = {"GRDB", "MediaLibrary", "SubsonicKit", "ChromaSwift", "MusicDomain", "MSRUCodecFFmpeg"}
+DOMAIN_MODULES = {
+    "GRDB", "MediaLibrary", "SubsonicKit", "ChromaSwift", "MSRUCodecFFmpeg",
+    "MusicDomain", "MusicLibrary", "MusicPlayback",
+}
+UI_MODULES = {"SwiftUI", "AppKit", "UIKit", "AppFoundationUI"}
+# Music packages layer downward: MusicPlayback -> MusicLibrary -> MusicDomain.
+# Each target may not import the modules listed for it.
+MUSIC_TARGET_FORBIDDEN = {
+    "MusicDomain": UI_MODULES | DOMAIN_MODULES - {"MusicDomain"},
+    "MusicLibrary": UI_MODULES | {"MusicPlayback", "MSRUCodecFFmpeg"},
+    "MusicPlayback": UI_MODULES,
+}
 DOMAIN_VOCABULARY = re.compile(
     r"\b(?:public|open)\s+(?:final\s+)?(?:struct|class|enum|protocol|actor|typealias)\s+"
     r"(\w*(?:Track|Album|Artist|Playlist|Lyric|Lrc|Audio|Music|Song|Fingerprint)\w*)"
@@ -57,6 +68,20 @@ def violations(root: Path) -> list[str]:
     manifest = (root / "Packages/AppFoundation/Package.swift").read_text()
     if ".package(" in manifest:
         errors.append("Packages/AppFoundation/Package.swift: AppFoundation must not declare package dependencies")
+
+    music = root / "Packages/MusicDomain/Sources"
+    for target, forbidden in MUSIC_TARGET_FORBIDDEN.items():
+        for path in sorted((music / target).rglob("*.swift")):
+            for number, line in enumerate(path.read_text().splitlines(), 1):
+                match = IMPORT.match(line)
+                if not match:
+                    continue
+                if line.lstrip().startswith("@_exported"):
+                    errors.append(f"{path.relative_to(root)}:{number}: music packages must not re-export modules")
+                elif match.group(1) in forbidden:
+                    errors.append(
+                        f"{path.relative_to(root)}:{number}: {target} must not import {match.group(1)}"
+                    )
 
     for path in sorted((root / "MSRU").rglob("*.swift")):
         if path.is_relative_to(root / "MSRU/Platform"):

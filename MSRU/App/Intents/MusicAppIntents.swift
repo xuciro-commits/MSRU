@@ -1,4 +1,6 @@
 import AppIntents
+import MusicLibrary
+import MusicPlayback
 
 nonisolated enum MusicIntentLibrarySearch {
     static func exactTrack(title: String, artist: String?, in tracks: [LocalTrack]) -> LocalTrack? {

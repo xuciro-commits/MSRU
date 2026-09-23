@@ -10,6 +10,7 @@
 import SwiftUI
 import AppFoundationUI
 import MusicDomain
+import MusicLibrary
 
 #Preview("Music Cards") {
     HStack(alignment: .top, spacing: 20) {

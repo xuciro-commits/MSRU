@@ -9,6 +9,7 @@ import SwiftUI
 import Observation
 import AppFoundation
 import MusicDomain
+import MusicLibrary
 
 /// Import Review & Resolution Dashboard.
 struct ImportReviewView: View {

@@ -4,6 +4,8 @@
 //
 
 import SwiftUI
+import MusicLibrary
+import MusicPlayback
 
 struct VisualizerPaneView: View {
     let playback: PlaybackController

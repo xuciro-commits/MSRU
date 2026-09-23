@@ -5,6 +5,7 @@
 
 import SwiftUI
 import AppFoundationUI
+import MusicLibrary
 
 // MARK: - Music Artwork View
 

@@ -10,6 +10,8 @@ import SwiftUI
 import Observation
 import AppFoundation
 import AppFoundationUI
+import MusicLibrary
+import MusicPlayback
 
 struct ListenNowView: View {
     @Bindable var store: MusicCatalogStore

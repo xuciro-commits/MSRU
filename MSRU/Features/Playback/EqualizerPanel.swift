@@ -1,4 +1,6 @@
 import SwiftUI
+import MusicLibrary
+import MusicPlayback
 
 struct EqualizerPanel: View {
     @Bindable var playback: PlaybackController

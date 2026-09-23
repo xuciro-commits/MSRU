@@ -7,10 +7,12 @@
 
 #if os(macOS)
 
+import MusicDomain
+import MusicPlayback
+import MusicLibrary
 import Foundation
 import Testing
 import AppFoundation
-import MusicDomain
 import SwiftUI
 @testable import MSRU
 

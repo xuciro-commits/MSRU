@@ -9,6 +9,8 @@ import Foundation
 import Testing
 import AppFoundation
 import MusicDomain
+import MusicPlayback
+import MusicLibrary
 @testable import MSRU
 
 @MainActor

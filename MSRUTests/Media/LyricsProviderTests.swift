@@ -4,6 +4,7 @@ import AppFoundation
 import MusicDomain
 import MediaLibrary
 import SubsonicKit
+import MusicLibrary
 @testable import MSRU
 
 private final class LyricsURLProtocol: URLProtocol, @unchecked Sendable {

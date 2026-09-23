@@ -9,6 +9,8 @@ import Foundation
 import Observation
 import MediaLibrary
 import SubsonicKit
+import MusicLibrary
+import MusicPlayback
 
 @MainActor
 @Observable

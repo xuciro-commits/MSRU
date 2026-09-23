@@ -8,6 +8,7 @@
 import Foundation
 import Testing
 import MusicDomain
+import MusicLibrary
 @testable import MSRU
 
 @Suite("Security Scope Policy Invariants")

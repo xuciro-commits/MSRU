@@ -8,6 +8,8 @@
 
 import SwiftUI
 import AppFoundation
+import MusicPlayback
+import MusicLibrary
 
 public struct SourceFilterBarView: View {
     public let sources: [SourceFilterItem]

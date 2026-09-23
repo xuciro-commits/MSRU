@@ -12,6 +12,8 @@ import Foundation
 import AppFoundation
 @testable import MSRU
 import MusicDomain
+import MusicLibrary
+import MusicPlayback
 
 @Suite("Lyrics Timestamp Tuning & Writeback")
 @MainActor

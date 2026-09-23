@@ -5,6 +5,8 @@
 
 #if os(macOS)
 
+import MusicLibrary
+import MusicPlayback
 import AppKit
 import AppFoundation
 import CoreSpotlight

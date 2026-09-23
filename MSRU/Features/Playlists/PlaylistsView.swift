@@ -9,6 +9,8 @@ import AppFoundationUI
 import CryptoKit
 import MediaLibrary
 import SubsonicKit
+import MusicLibrary
+import MusicPlayback
 
 enum PlaylistSortField: String, CaseIterable, Identifiable {
     case title = "Title"

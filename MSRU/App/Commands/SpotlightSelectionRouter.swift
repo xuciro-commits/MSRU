@@ -1,5 +1,7 @@
 import Foundation
 import AppFoundation
+import MusicLibrary
+import MusicPlayback
 
 @MainActor
 enum SpotlightSelectionRouter {

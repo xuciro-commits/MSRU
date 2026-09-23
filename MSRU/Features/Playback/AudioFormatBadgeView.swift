@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import MusicPlayback
 
 struct AudioFormatBadgeView: View {
     let info: AudioFormatInfo?

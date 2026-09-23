@@ -7,6 +7,8 @@
 
 #if os(macOS)
 
+import MusicLibrary
+import MusicPlayback
 import SwiftUI
 import AppKit
 import AppFoundation

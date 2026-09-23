@@ -10,6 +10,8 @@ import Testing
 import AppFoundation
 import MusicDomain
 import GRDB
+import MusicLibrary
+import MusicPlayback
 @testable import MSRU
 
 @Suite("Multi-Source Query & Identity Invariants")

@@ -11,10 +11,11 @@ import Foundation
 import AppFoundation
 import MusicDomain
 import GRDB
+import MusicLibrary
+import MusicPlayback
 @testable import MSRU
 
-@MainActor
-private final class InMemoryLibraryRepository: LibraryRepository {
+private actor InMemoryLibraryRepository: LibraryRepository {
     var tracks: [LibraryTrack] = []
     init(tracks: [LibraryTrack] = []) { self.tracks = tracks }
     func loadTracks() async throws -> [LibraryTrack] { tracks }

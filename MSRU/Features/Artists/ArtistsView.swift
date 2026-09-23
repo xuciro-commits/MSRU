@@ -9,6 +9,8 @@ import AppFoundationUI
 import MediaLibrary
 import SubsonicKit
 import MusicDomain
+import MusicLibrary
+import MusicPlayback
 
 struct ArtistsView: View {
     @Bindable var localStore: LocalLibraryStore

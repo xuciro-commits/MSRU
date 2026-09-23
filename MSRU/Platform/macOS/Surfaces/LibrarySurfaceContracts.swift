@@ -8,6 +8,7 @@
 import Foundation
 import AppFoundation
 import MusicDomain
+import MusicLibrary
 
 #if canImport(AppKit)
 import AppKit

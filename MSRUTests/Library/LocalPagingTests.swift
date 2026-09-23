@@ -3,6 +3,7 @@ import GRDB
 import AppFoundation
 import MusicDomain
 import Testing
+import MusicLibrary
 @testable import MSRU
 
 @Suite("Local SQLite paging")

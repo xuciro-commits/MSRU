@@ -8,6 +8,8 @@ import AppFoundation
 import AppFoundationUI
 import MediaLibrary
 import SubsonicKit
+import MusicLibrary
+import MusicPlayback
 
 @MainActor
 struct PlaylistDetailView: View {

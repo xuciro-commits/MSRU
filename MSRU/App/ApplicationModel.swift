@@ -8,6 +8,8 @@ import Observation
 import AppFoundation
 import AppIntents
 import MediaLibrary
+import MusicLibrary
+import MusicPlayback
 
 
 // MARK: - Application Scope

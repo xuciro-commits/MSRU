@@ -1,5 +1,7 @@
 #if os(iOS) || os(visionOS)
 
+import MusicLibrary
+import MusicPlayback
 import Foundation
 import SwiftUI
 import AppFoundation
