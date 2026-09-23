@@ -160,10 +160,10 @@ enum BrowseFeature:
 
 
         @Dependency(
-            \.library
+            \.webLibrary
         )
         private var library:
-            LibraryStore
+            WebLibraryStore
 
 
         // MARK: Init
@@ -208,8 +208,8 @@ enum BrowseFeature:
 
             library
                 .contains(
-                    openverse:
-                        item
+                    openverseID:
+                        item.id
                 )
         }
 
@@ -614,8 +614,8 @@ enum BrowseFeature:
                 let isSaved =
                     library
                         .contains(
-                            openverse:
-                                item
+                            openverseID:
+                                item.id
                         )
 
 
@@ -633,8 +633,8 @@ enum BrowseFeature:
 
                             await library
                                 .remove(
-                                    openverse:
-                                        item
+                                    openverseID:
+                                        item.id
                                 )
 
                         } else {
@@ -665,11 +665,11 @@ enum BrowseFeature:
             case .libraryMutationFinished:
 
                 /*
-                 LibraryStore 自身是 Observable。
+                 WebLibraryStore 自身是 Observable。
 
                  View 对 isSaved 的读取
                  会观察同一个 application-scoped
-                 LibraryStore。
+                 WebLibraryStore。
 
                  所以 Browse State 不复制 saved IDs。
                  */

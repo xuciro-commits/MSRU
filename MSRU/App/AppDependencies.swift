@@ -21,42 +21,6 @@ import MusicPlayback
  - 网络
  */
 
-private actor EphemeralLibraryRepository:
-    LibraryRepository {
-
-    private var tracks:
-        [LibraryTrack]
-
-
-    init(
-        tracks:
-            [LibraryTrack] = []
-    ) {
-
-        self.tracks =
-            tracks
-    }
-
-
-    func loadTracks()
-        async throws
-        -> [LibraryTrack] {
-
-        tracks
-    }
-
-
-    func saveTracks(
-        _ tracks:
-            [LibraryTrack]
-    ) async throws {
-
-        self.tracks =
-            tracks
-    }
-}
-
-
 // MARK: - Openverse Search
 
 @MainActor
@@ -137,13 +101,13 @@ private enum LibraryDependencyKey:
     // MARK: Live
 
     static var liveValue:
-        LibraryStore {
+        WebLibraryStore {
 
         fatalError(
             """
-            LibraryStore dependency is not configured.
+            WebLibraryStore dependency is not configured.
 
-            Create the application-scoped LibraryStore
+            Create the application-scoped WebLibraryStore
             in ApplicationModel and inject it through DependencyValues.
             """
         )
@@ -153,19 +117,13 @@ private enum LibraryDependencyKey:
     // MARK: Preview
 
     static let previewValue =
-        LibraryStore(
-            repository:
-                EphemeralLibraryRepository()
-        )
+        WebLibraryStore(db: try! AppDatabase.makeEphemeral())
 
 
     // MARK: Test
 
     static let testValue =
-        LibraryStore(
-            repository:
-                EphemeralLibraryRepository()
-        )
+        WebLibraryStore(db: try! AppDatabase.makeEphemeral())
 }
 
 
@@ -228,8 +186,8 @@ extension DependencyValues {
     // MARK: Library
 
     @MainActor
-    var library:
-        LibraryStore {
+    var webLibrary:
+        WebLibraryStore {
 
         get {
 

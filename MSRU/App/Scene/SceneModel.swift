@@ -75,7 +75,6 @@ final class SceneModel: Identifiable, ApplicationSceneRuntime {
 
     var selectedMusicContent: MusicContent?
     var selectedLocalTrack: LocalTrack?
-    var selectedLibraryTrack: LibraryTrack?
     var selectedRadioStation: RadioStation?
     var selectedSourceFilter: String?
     var requestedAlbumID: String?
@@ -113,7 +112,6 @@ final class SceneModel: Identifiable, ApplicationSceneRuntime {
         guard !isClosed else { return }
         self.selectedLocalTrack = localTrack
         if localTrack != nil {
-            self.selectedLibraryTrack = nil
             self.selectedMusicContent = nil
             self.selectedRadioStation = nil
             self.activeContextPane = .inspector
@@ -126,19 +124,6 @@ final class SceneModel: Identifiable, ApplicationSceneRuntime {
         self.selectedMusicContent = musicContent
         if musicContent != nil {
             self.selectedLocalTrack = nil
-            self.selectedLibraryTrack = nil
-            self.selectedRadioStation = nil
-            self.activeContextPane = .inspector
-            self.isQueuePresented = true
-        }
-    }
-
-    func select(libraryTrack: LibraryTrack?) {
-        guard !isClosed else { return }
-        self.selectedLibraryTrack = libraryTrack
-        if libraryTrack != nil {
-            self.selectedLocalTrack = nil
-            self.selectedMusicContent = nil
             self.selectedRadioStation = nil
             self.activeContextPane = .inspector
             self.isQueuePresented = true
@@ -150,7 +135,6 @@ final class SceneModel: Identifiable, ApplicationSceneRuntime {
         self.selectedRadioStation = radioStation
         if radioStation != nil {
             self.selectedLocalTrack = nil
-            self.selectedLibraryTrack = nil
             self.selectedMusicContent = nil
             self.activeContextPane = .inspector
             self.isQueuePresented = true

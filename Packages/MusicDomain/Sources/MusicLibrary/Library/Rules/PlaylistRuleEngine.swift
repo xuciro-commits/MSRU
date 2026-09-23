@@ -330,24 +330,6 @@ nonisolated public struct TrackEvaluationContext: Identifiable, Sendable {
         )
     }
 
-    public init(_ track: LibraryTrack, isFavorite: Bool = false) {
-        self.init(
-            id: track.id.uuidString,
-            title: track.title,
-            artist: track.artist,
-            album: track.album ?? "",
-            genre: "",
-            isFavorite: isFavorite,
-            isLossless: false,
-            isHiRes: false,
-            sampleRate: 44100.0,
-            bitDepth: 16,
-            year: nil,
-            addedAt: track.dateAdded,
-            playCount: 0,
-            duration: track.duration ?? 0
-        )
-    }
 }
 
 // MARK: - Functional Rule Engine
@@ -396,18 +378,6 @@ nonisolated public struct PlaylistRuleEngine: Sendable {
         }
         let evaluated = evaluate(rules: rules, tracks: contexts, referenceDate: referenceDate)
         let trackMap = Dictionary(uniqueKeysWithValues: tracks.map { ($0.id, $0) })
-        return evaluated.compactMap { trackMap[$0.id] }
-    }
-
-    public static func evaluate(
-        rules: SmartPlaylistRuleGroup,
-        tracks: [LibraryTrack],
-        favorites: Set<String> = [],
-        referenceDate: Date = Date()
-    ) -> [LibraryTrack] {
-        let contexts = tracks.map { TrackEvaluationContext($0, isFavorite: favorites.contains($0.id.uuidString)) }
-        let evaluated = evaluate(rules: rules, tracks: contexts, referenceDate: referenceDate)
-        let trackMap = Dictionary(uniqueKeysWithValues: tracks.map { ($0.id.uuidString, $0) })
         return evaluated.compactMap { trackMap[$0.id] }
     }
 

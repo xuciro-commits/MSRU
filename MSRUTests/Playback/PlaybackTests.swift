@@ -86,50 +86,6 @@ struct PlaybackTests {
         #expect(radioItem.playbackRequest.remoteURL == URL(string: "https://live.kexp.org/kexp128.mp3"))
     }
 
-    @Test("PlaybackItem initializes from LibraryTrack with source precedence")
-    func playbackItemLibraryPrecedence() {
-        let fileURL = URL(fileURLWithPath: "/tmp/local-version.m4a")
-        let localSource = LibraryPlaybackSource(kind: .local, localFileURL: fileURL)
-        let openverseSource = LibraryPlaybackSource(kind: .openverse, externalID: "ov-99", remoteURL: URL(string: "https://example.com/ov.mp3"))
-
-        // 1. Both sources present: Local takes priority
-        let multiSourceTrack = LibraryTrack(
-            id: UUID(),
-            title: "Multi Source Song",
-            artist: "Artist",
-            album: "Album",
-            duration: 200,
-            sources: [localSource, openverseSource]
-        )
-        let item1 = PlaybackItem(library: multiSourceTrack)
-        #expect(item1 != nil)
-        #expect(item1?.source == .local)
-
-        // 2. Only Openverse source present
-        let remoteOnlyTrack = LibraryTrack(
-            id: UUID(),
-            title: "Remote Song",
-            artist: "Artist",
-            album: "Album",
-            duration: 180,
-            sources: [openverseSource]
-        )
-        let item2 = PlaybackItem(library: remoteOnlyTrack)
-        #expect(item2 != nil)
-        #expect(item2?.source == .openverse)
-
-        // 3. Only unsupported future source present -> returns nil
-        let unsupportedTrack = LibraryTrack(
-            id: UUID(),
-            title: "Future Song",
-            artist: "Artist",
-            album: "Album",
-            sources: [LibraryPlaybackSource(kind: .jamendo, remoteURL: URL(string: "https://jamendo.com/123"))]
-        )
-        let item3 = PlaybackItem(library: unsupportedTrack)
-        #expect(item3 == nil)
-    }
-
     // MARK: - PlaybackQueueController Invariants
 
     private func makeItem(_ id: String, title: String) -> PlaybackItem {

@@ -14,310 +14,67 @@ import MusicPlayback
 
 // MARK: - Feature
 
+/// The Library destination. Its only own state is which web tracks are being
+/// removed; everything else is read from the shared stores.
 enum LibraryFeature:
     Feature {
-
-    // MARK: State
 
     @MainActor
     @Observable
     final class State {
-
-        fileprivate(set) var pendingRemovalIDs:
-            Set<UUID> = []
-
-
-        init(
-            pendingRemovalIDs:
-                Set<UUID> = []
-        ) {
-
-            self.pendingRemovalIDs =
-                pendingRemovalIDs
-        }
+        fileprivate(set) var pendingRemovalIDs: Set<String> = []
     }
-
-
-    // MARK: Action
 
     enum Action {
-        case playRequested(id: UUID)
-        case playNextRequested(id: UUID)
-        case enqueueRequested(id: UUID)
-
-        case removeRequested(
-            id:
-                UUID
-        )
-
-        case removeFinished(
-            id:
-                UUID
-        )
+        /// Removes web tracks (identified by `LocalTrack.id`) from the Library.
+        case removeWebTracksRequested(Set<String>)
+        case removeWebTracksFinished(Set<String>)
     }
 
-
-    // MARK: Initial State
-
     @MainActor
-    static func makeInitialState()
-        -> State {
-
+    static func makeInitialState() -> State {
         State()
     }
 
-
-    // MARK: Service
-
     @MainActor
-    struct Service:
-        FeatureService {
-
-        private enum TaskID {
-
-            static func remove(
-                _ id:
-                    UUID
-            ) -> FeatureTaskID {
-
-                "library.remove.\(id)"
-            }
-        }
-
-
-        // MARK: Dependency
-
-        @Dependency(
-            \.library
-        )
-        private var library:
-            LibraryStore
-
-
-        @Dependency(\.playback) private var playback: PlaybackController
-
-        // MARK: Init
+    struct Service: FeatureService {
+        @Dependency(\.webLibrary) private var webLibrary: WebLibraryStore
 
         init() {}
 
+        var webTracks: [LocalTrack] { webLibrary.tracks }
+        var errorMessage: String? { webLibrary.errorMessage }
 
-        // MARK: Projection
-
-        var tracks:
-            [LibraryTrack] {
-
-            library
-                .tracks
-        }
-
-
-        var isLoading:
-            Bool {
-
-            library
-                .isLoading
-        }
-
-
-        var isSaving:
-            Bool {
-
-            library
-                .isSaving
-        }
-
-
-        var errorMessage:
-            String? {
-
-            library
-                .errorMessage
-        }
-
-
-        var libraryStore:
-            LibraryStore {
-
-            library
-        }
-
-
-        // MARK: Handle
-
-        func handle(
-            _ action:
-                Action,
-            state:
-                State
-        ) -> [FeatureTask<Action>] {
-
+        func handle(_ action: Action, state: State) -> [FeatureTask<Action>] {
             switch action {
-            case .playRequested(let id):
-                guard let track = library.track(id: id), let item = PlaybackItem(library: track) else { return [] }
-                if playback.currentItem?.id == item.id {
-                    playback.toggle()
-                } else {
-                    playback.play(item, context: library.tracks.compactMap { PlaybackItem(library: $0) })
-                }
-                return []
-            case .playNextRequested(let id):
-                guard let track = library.track(id: id), let item = PlaybackItem(library: track) else { return [] }
-                playback.playNext(item)
-                return []
-            case .enqueueRequested(let id):
-                guard let track = library.track(id: id), let item = PlaybackItem(library: track) else { return [] }
-                playback.addToQueue(item)
-                return []
-
-            // MARK: Remove
-
-            case .removeRequested(
-                let id
-            ):
-
-                guard
-                    library.contains(
-                        id:
-                            id
-                    )
-                else {
-
-                    return []
-                }
-
-
-                guard
-                    !state
-                        .pendingRemovalIDs
-                        .contains(
-                            id
-                        )
-                else {
-
-                    return []
-                }
-
-
-                state
-                    .pendingRemovalIDs
-                    .insert(
-                        id
-                    )
-
-
+            case .removeWebTracksRequested(let ids):
+                let pending = ids.subtracting(state.pendingRemovalIDs)
+                guard !pending.isEmpty else { return [] }
+                state.pendingRemovalIDs.formUnion(pending)
                 return [
-
-                    .run(
-                        id:
-                            TaskID.remove(
-                                id
-                            ),
-                        cancelInFlight:
-                            true
-                    ) {
-                        send in
-
-                        await library
-                            .remove(
-                                id:
-                                    id
-                            )
-
-
-                        guard
-                            !Task.isCancelled
-                        else {
-
-                            return
-                        }
-
-
-                        send(
-                            .removeFinished(
-                                id:
-                                    id
-                            )
-                        )
+                    .run(id: "library.remove.\(pending.sorted().joined(separator: ","))", cancelInFlight: true) { send in
+                        await webLibrary.remove(trackIDs: pending)
+                        guard !Task.isCancelled else { return }
+                        send(.removeWebTracksFinished(pending))
                     }
                 ]
-
-
-            // MARK: Remove Finished
-
-            case .removeFinished(
-                let id
-            ):
-
-                state
-                    .pendingRemovalIDs
-                    .remove(
-                        id
-                    )
-
-
+            case .removeWebTracksFinished(let ids):
+                state.pendingRemovalIDs.subtract(ids)
                 return []
             }
         }
     }
 }
 
-
 // MARK: - Runtime Projection
 
 @MainActor
-extension FeatureHost
-where F == LibraryFeature {
+extension FeatureHost where F == LibraryFeature {
+    var webTracks: [LocalTrack] { service.webTracks }
+    var errorMessage: String? { service.errorMessage }
 
-    var tracks:
-        [LibraryTrack] {
-
-        service
-            .tracks
-    }
-
-
-    var isLoading:
-        Bool {
-
-        service
-            .isLoading
-    }
-
-
-    var isSaving:
-        Bool {
-
-        service
-            .isSaving
-    }
-
-
-    var errorMessage:
-        String? {
-
-        service
-            .errorMessage
-    }
-
-
-    var libraryStore:
-        LibraryStore {
-
-        service
-            .libraryStore
-    }
-
-
-    func isRemoving(
-        _ track:
-            LibraryTrack
-    ) -> Bool {
-
-        state
-            .pendingRemovalIDs
-            .contains(
-                track.id
-            )
+    func isRemoving(_ track: LocalTrack) -> Bool {
+        state.pendingRemovalIDs.contains(track.id)
     }
 }
 
@@ -390,10 +147,6 @@ private struct LibraryFeatureDestination: View {
             selectedLocalTrack: Binding(
                 get: { scene.selectedLocalTrack },
                 set: { scene.select(localTrack: $0) }
-            ),
-            selectedLibraryTrack: Binding(
-                get: { scene.selectedLibraryTrack },
-                set: { scene.select(libraryTrack: $0) }
             ),
             selectedSourceID: Binding(
                 get: { scene.selectedSourceFilter },

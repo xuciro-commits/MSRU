@@ -55,53 +55,8 @@ enum LibrarySortField: String, CaseIterable, Identifiable, Codable, Sendable {
 
 enum LibraryCollectionSortFilter {
 
-    static func filterAndSort(
-        tracks: [LibraryTrack],
-        query: String,
-        field: LibrarySortField,
-        ascending: Bool
-    ) -> [LibraryTrack] {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let filtered: [LibraryTrack]
-        if trimmed.isEmpty {
-            filtered = tracks
-        } else {
-            let lower = trimmed.localizedLowercase
-            filtered = tracks.filter { track in
-                track.title.localizedCaseInsensitiveContains(lower) ||
-                track.artist.localizedCaseInsensitiveContains(lower) ||
-                (track.album?.localizedCaseInsensitiveContains(lower) ?? false)
-            }
-        }
-
-        return filtered.sorted { a, b in
-            let comparison: ComparisonResult
-            switch field {
-            case .title:
-                comparison = a.title.localizedStandardCompare(b.title)
-            case .artist:
-                comparison = a.artist.localizedStandardCompare(b.artist)
-            case .album:
-                comparison = (a.album ?? "").localizedStandardCompare(b.album ?? "")
-            case .duration:
-                let durA = a.duration ?? 0
-                let durB = b.duration ?? 0
-                if durA == durB { comparison = .orderedSame }
-                else if durA < durB { comparison = .orderedAscending }
-                else { comparison = .orderedDescending }
-            case .dateAdded:
-                if a.dateAdded == b.dateAdded { comparison = .orderedSame }
-                else if a.dateAdded < b.dateAdded { comparison = .orderedAscending }
-                else { comparison = .orderedDescending }
-            }
-
-            if comparison == .orderedSame {
-                return a.title.localizedStandardCompare(b.title) == .orderedAscending
-            }
-            return ascending ? (comparison == .orderedAscending) : (comparison == .orderedDescending)
-        }
-    }
-
+    /// Filters and sorts an in-memory track list. `tracks` must be newest
+    /// first; date sorting keeps (or reverses) that order.
     static func filterAndSort(
         tracks: [LocalTrack],
         query: String,
@@ -109,39 +64,24 @@ enum LibraryCollectionSortFilter {
         ascending: Bool
     ) -> [LocalTrack] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let filtered: [LocalTrack]
-        if trimmed.isEmpty {
-            filtered = tracks
-        } else {
-            let lower = trimmed.localizedLowercase
-            filtered = tracks.filter { track in
-                track.title.localizedCaseInsensitiveContains(lower) ||
-                track.artist.localizedCaseInsensitiveContains(lower) ||
-                (track.album?.localizedCaseInsensitiveContains(lower) ?? false)
-            }
+        let filtered = trimmed.isEmpty ? tracks : tracks.filter { track in
+            track.title.localizedCaseInsensitiveContains(trimmed) ||
+            track.artist.localizedCaseInsensitiveContains(trimmed) ||
+            (track.album?.localizedCaseInsensitiveContains(trimmed) ?? false)
         }
-
-        return filtered.sorted { a, b in
-            let comparison: ComparisonResult
-            switch field {
-            case .title:
-                comparison = a.title.localizedStandardCompare(b.title)
-            case .artist:
-                comparison = a.artist.localizedStandardCompare(b.artist)
-            case .album:
-                comparison = (a.album ?? "").localizedStandardCompare(b.album ?? "")
-            case .duration:
-                if a.duration == b.duration { comparison = .orderedSame }
-                else if a.duration < b.duration { comparison = .orderedAscending }
-                else { comparison = .orderedDescending }
-            case .dateAdded:
-                comparison = a.title.localizedStandardCompare(b.title)
-            }
-
-            if comparison == .orderedSame {
-                return a.title.localizedStandardCompare(b.title) == .orderedAscending
-            }
-            return ascending ? (comparison == .orderedAscending) : (comparison == .orderedDescending)
+        let ordered: [LocalTrack]
+        switch field {
+        case .dateAdded:
+            return ascending ? filtered.reversed() : filtered
+        case .title:
+            ordered = filtered.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        case .artist:
+            ordered = filtered.sorted { $0.artist.localizedStandardCompare($1.artist) == .orderedAscending }
+        case .album:
+            ordered = filtered.sorted { ($0.album ?? "").localizedStandardCompare($1.album ?? "") == .orderedAscending }
+        case .duration:
+            ordered = filtered.sorted { $0.duration < $1.duration }
         }
+        return ascending ? ordered : ordered.reversed()
     }
 }

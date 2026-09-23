@@ -526,11 +526,8 @@ extension MSRUPreviewData {
          而不是 Service initializer 参数。
          */
 
-        let library =
-            LibraryStore(
-                repository:
-                    PreviewLibraryRepository()
-            )
+        let webLibrary =
+            WebLibraryStore(db: try! AppDatabase.makeEphemeral())
 
 
         let playback =
@@ -562,8 +559,8 @@ extension MSRUPreviewData {
             playback
 
 
-        dependencies.library =
-            library
+        dependencies.webLibrary =
+            webLibrary
 
 
         return withDependencies(
@@ -587,35 +584,6 @@ extension MSRUPreviewData {
     }
 }
 
-
-// MARK: - Preview Library Repository
-
-private actor PreviewLibraryRepository:
-    LibraryRepository {
-
-    private var tracks: [LibraryTrack]
-
-    init(tracks: [LibraryTrack] = []) {
-        self.tracks = tracks
-    }
-
-    func loadTracks()
-        async throws
-        -> [LibraryTrack] {
-
-        tracks
-    }
-
-
-    func saveTracks(
-        _ tracks:
-            [LibraryTrack]
-    ) async throws {
-
-        self.tracks =
-            tracks
-    }
-}
 
 // Provider previews never read preferences or contact a remote endpoint.
 extension MSRUPreviewData {
@@ -671,11 +639,11 @@ extension MSRUPreviewData {
     }
 
     @MainActor
-    static func makeApplication(savedTracks: [LibraryTrack] = []) -> ApplicationModel {
+    static func makeApplication() -> ApplicationModel {
         ApplicationModel(
             musicCatalog: makeCatalogStore(),
             localLibrary: makeLocalLibraryStore(),
-            library: LibraryStore(repository: PreviewLibraryRepository(tracks: savedTracks)),
+            webLibrary: WebLibraryStore(db: try! AppDatabase.makeEphemeral()),
             musicLibrary: makeAppleMusicStore(),
             playback: makePlaybackController(),
             providerManager: makeProviderStore(),

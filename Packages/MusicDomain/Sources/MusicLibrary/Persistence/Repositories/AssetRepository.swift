@@ -73,64 +73,68 @@ nonisolated public final class AssetRepository: Sendable {
     public func batchUpsert(_ assets: [PersistedAssetRecord]) async throws {
         guard !assets.isEmpty else { return }
         try await db.dbWriter.write { db in
-            let statement = try db.makeStatement(sql: """
-                INSERT INTO assets (
-                    id, source_id, relative_path, file_size, mtime, sha256,
-                    format, bit_depth, sample_rate, channels, bitrate_kbps,
-                    duration, recording_id, created_at, updated_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(source_id, relative_path) DO UPDATE SET
-                    file_size = excluded.file_size,
-                    mtime = excluded.mtime,
-                    sha256 = excluded.sha256,
-                    format = excluded.format,
-                    bit_depth = excluded.bit_depth,
-                    sample_rate = excluded.sample_rate,
-                    channels = excluded.channels,
-                    bitrate_kbps = excluded.bitrate_kbps,
-                    duration = excluded.duration,
-                    recording_id = COALESCE(excluded.recording_id, assets.recording_id),
-                    updated_at = excluded.updated_at
-            """)
+            try Self.batchUpsert(_: assets, in: db)
+        }
+    }
 
-            let fileAssetStmt = try db.makeStatement(sql: """
-                INSERT INTO file_assets (asset_id, relative_path, file_size, mtime, physical_signature)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(asset_id) DO UPDATE SET
-                    relative_path = excluded.relative_path,
-                    file_size = excluded.file_size,
-                    mtime = excluded.mtime,
-                    physical_signature = excluded.physical_signature
-            """)
+    nonisolated public static func batchUpsert(_ assets: [PersistedAssetRecord], in db: Database) throws {
+        let statement = try db.makeStatement(sql: """
+            INSERT INTO assets (
+                id, source_id, relative_path, file_size, mtime, sha256,
+                format, bit_depth, sample_rate, channels, bitrate_kbps,
+                duration, recording_id, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(source_id, relative_path) DO UPDATE SET
+                file_size = excluded.file_size,
+                mtime = excluded.mtime,
+                sha256 = excluded.sha256,
+                format = excluded.format,
+                bit_depth = excluded.bit_depth,
+                sample_rate = excluded.sample_rate,
+                channels = excluded.channels,
+                bitrate_kbps = excluded.bitrate_kbps,
+                duration = excluded.duration,
+                recording_id = COALESCE(excluded.recording_id, assets.recording_id),
+                updated_at = excluded.updated_at
+        """)
 
-            for asset in assets {
-                try statement.execute(arguments: [
-                    asset.id.rawValue,
-                    asset.sourceID.rawValue,
-                    asset.relativePath,
-                    asset.fileSize,
-                    asset.mtime,
-                    asset.sha256,
-                    asset.format,
-                    asset.bitDepth,
-                    asset.sampleRate,
-                    asset.channels,
-                    asset.bitrateKbps,
-                    asset.duration,
-                    asset.recordingID?.rawValue,
-                    asset.createdAt,
-                    asset.updatedAt
-                ])
+        let fileAssetStmt = try db.makeStatement(sql: """
+            INSERT INTO file_assets (asset_id, relative_path, file_size, mtime, physical_signature)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(asset_id) DO UPDATE SET
+                relative_path = excluded.relative_path,
+                file_size = excluded.file_size,
+                mtime = excluded.mtime,
+                physical_signature = excluded.physical_signature
+        """)
 
-                try fileAssetStmt.execute(arguments: [
-                    asset.id.rawValue,
-                    asset.relativePath,
-                    asset.fileSize,
-                    asset.mtime,
-                    asset.sha256
-                ])
-            }
+        for asset in assets {
+            try statement.execute(arguments: [
+                asset.id.rawValue,
+                asset.sourceID.rawValue,
+                asset.relativePath,
+                asset.fileSize,
+                asset.mtime,
+                asset.sha256,
+                asset.format,
+                asset.bitDepth,
+                asset.sampleRate,
+                asset.channels,
+                asset.bitrateKbps,
+                asset.duration,
+                asset.recordingID?.rawValue,
+                asset.createdAt,
+                asset.updatedAt
+            ])
+
+            try fileAssetStmt.execute(arguments: [
+                asset.id.rawValue,
+                asset.relativePath,
+                asset.fileSize,
+                asset.mtime,
+                asset.sha256
+            ])
         }
     }
 
@@ -207,25 +211,88 @@ nonisolated public final class AssetRepository: Sendable {
     public func batchUpsertStreamAssets(_ streamAssets: [PersistedStreamAssetRecord]) async throws {
         guard !streamAssets.isEmpty else { return }
         try await db.dbWriter.write { db in
-            let stmt = try db.makeStatement(sql: """
-                INSERT INTO stream_assets (asset_id, provider_id, remote_item_id, stream_url, is_hls, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(asset_id) DO UPDATE SET
-                    provider_id = excluded.provider_id,
-                    remote_item_id = excluded.remote_item_id,
-                    stream_url = excluded.stream_url,
-                    is_hls = excluded.is_hls,
-                    expires_at = excluded.expires_at
+            try Self.batchUpsertStreamAssets(_: streamAssets, in: db)
+        }
+    }
+
+    nonisolated public static func batchUpsertStreamAssets(_ streamAssets: [PersistedStreamAssetRecord], in db: Database) throws {
+        let stmt = try db.makeStatement(sql: """
+            INSERT INTO stream_assets (asset_id, provider_id, remote_item_id, stream_url, is_hls, expires_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(asset_id) DO UPDATE SET
+                provider_id = excluded.provider_id,
+                remote_item_id = excluded.remote_item_id,
+                stream_url = excluded.stream_url,
+                is_hls = excluded.is_hls,
+                expires_at = excluded.expires_at
+        """)
+        for sa in streamAssets {
+            try stmt.execute(arguments: [
+                sa.assetID.rawValue,
+                sa.providerID,
+                sa.remoteItemID,
+                sa.streamURL,
+                sa.isHLS,
+                sa.expiresAt
+            ])
+        }
+    }
+
+    /// Deletes assets and only the identity rows (recordings, releases,
+    /// artists) that this deletion leaves without any asset. Rows that were
+    /// already asset-less are kept: their favorites and play counts survive.
+    nonisolated public static func deleteAssets(_ assetIDs: [String], in db: Database) throws {
+        guard !assetIDs.isEmpty else { return }
+        var recordingIDs: [String] = []
+        for assetID in assetIDs {
+            if let recordingID = try String.fetchOne(db, sql: "SELECT recording_id FROM assets WHERE id = ?", arguments: [assetID]) {
+                recordingIDs.append(recordingID)
+            }
+            try db.execute(sql: "DELETE FROM stream_assets WHERE asset_id = ?", arguments: [assetID])
+            try db.execute(sql: "DELETE FROM assets WHERE id = ?", arguments: [assetID])
+        }
+        guard !recordingIDs.isEmpty else { return }
+
+        try db.execute(sql: "CREATE TEMP TABLE IF NOT EXISTS removed_source_recordings (id TEXT PRIMARY KEY)")
+        try db.execute(sql: "DELETE FROM removed_source_recordings")
+        for recordingID in recordingIDs {
+            try db.execute(sql: "INSERT OR IGNORE INTO removed_source_recordings (id) VALUES (?)", arguments: [recordingID])
+        }
+        defer { try? db.execute(sql: "DROP TABLE IF EXISTS removed_source_recordings") }
+
+        // Recordings that lost their last asset in this removal.
+        try db.execute(sql: "DROP TABLE IF EXISTS orphaned_recordings")
+        try db.execute(sql: """
+            CREATE TEMP TABLE orphaned_recordings AS
+            SELECT id FROM removed_source_recordings r
+            WHERE NOT EXISTS (SELECT 1 FROM assets a WHERE a.recording_id = r.id)
             """)
-            for sa in streamAssets {
-                try stmt.execute(arguments: [
-                    sa.assetID.rawValue,
-                    sa.providerID,
-                    sa.remoteItemID,
-                    sa.streamURL,
-                    sa.isHLS,
-                    sa.expiresAt
-                ])
+        defer { try? db.execute(sql: "DROP TABLE IF EXISTS orphaned_recordings") }
+        // Releases and artists reached only through those recordings.
+        let releaseIDs = try String.fetchAll(db, sql: """
+            SELECT DISTINCT release_id FROM release_tracks
+            WHERE recording_id IN (SELECT id FROM orphaned_recordings)
+            """)
+        let artistIDs = try String.fetchAll(db, sql: """
+            SELECT DISTINCT artist_id FROM artist_credits
+            WHERE (entity_type = 'recording' AND entity_id IN (SELECT id FROM orphaned_recordings))
+               OR (entity_type = 'release' AND entity_id IN (
+                    SELECT release_id FROM release_tracks WHERE recording_id IN (SELECT id FROM orphaned_recordings)))
+            """)
+
+        try db.execute(sql: "DELETE FROM artist_credits WHERE entity_type = 'recording' AND entity_id IN (SELECT id FROM orphaned_recordings)")
+        try db.execute(sql: "DELETE FROM recordings WHERE id IN (SELECT id FROM orphaned_recordings)")
+        for releaseID in releaseIDs {
+            let remaining = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM release_tracks WHERE release_id = ?", arguments: [releaseID]) ?? 0
+            if remaining == 0 {
+                try db.execute(sql: "DELETE FROM artist_credits WHERE entity_type = 'release' AND entity_id = ?", arguments: [releaseID])
+                try db.execute(sql: "DELETE FROM releases WHERE id = ?", arguments: [releaseID])
+            }
+        }
+        for artistID in artistIDs {
+            let remaining = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM artist_credits WHERE artist_id = ?", arguments: [artistID]) ?? 0
+            if remaining == 0 {
+                try db.execute(sql: "DELETE FROM artists WHERE id = ?", arguments: [artistID])
             }
         }
     }

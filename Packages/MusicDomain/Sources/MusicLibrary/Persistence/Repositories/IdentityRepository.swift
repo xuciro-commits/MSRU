@@ -240,107 +240,119 @@ nonisolated public final class IdentityRepository: Sendable {
         artistCredits: [(artistID: ArtistID, entityType: String, entityID: String)]
     ) async throws {
         try await db.dbWriter.write { db in
-            let date = Date()
+            try Self.batchUpsertEntities(artists: artists, recordings: recordings, releaseGroups: releaseGroups, releases: releases, releaseTracks: releaseTracks, artistCredits: artistCredits, in: db)
+        }
+    }
 
-            // 1. Artists
-            let artistStmt = try db.makeStatement(sql: """
-                INSERT OR IGNORE INTO artists (id, name, sort_name, created_at)
-                VALUES (?, ?, ?, ?)
-            """)
-            for a in artists {
-                let sortName = a.name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-                try artistStmt.execute(arguments: [a.id.rawValue, a.name, sortName, date])
-            }
+    nonisolated public static func batchUpsertEntities(
+        artists: [(id: ArtistID, name: String)],
+        recordings: [(id: RecordingID, title: String, duration: Double?)],
+        releaseGroups: [(id: ReleaseGroupID, title: String)],
+        releases: [(id: ReleaseID, releaseGroupID: ReleaseGroupID?, title: String, year: Int?, artworkAssetID: String?)],
+        releaseTracks: [(id: ReleaseTrackID, releaseID: ReleaseID, trackNumber: Int, title: String, duration: Double?, recordingID: RecordingID)],
+        artistCredits: [(artistID: ArtistID, entityType: String, entityID: String)],
+        in db: Database
+    ) throws {
+        let date = Date()
 
-            // 2. Release Groups
-            let rgStmt = try db.makeStatement(sql: """
-                INSERT OR IGNORE INTO release_groups (id, title, sort_title, primary_type, created_at)
-                VALUES (?, ?, ?, 'album', ?)
-            """)
-            for rg in releaseGroups {
-                let sortTitle = rg.title.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-                try rgStmt.execute(arguments: [rg.id.rawValue, rg.title, sortTitle, date])
-            }
+        // 1. Artists
+        let artistStmt = try db.makeStatement(sql: """
+            INSERT OR IGNORE INTO artists (id, name, sort_name, created_at)
+            VALUES (?, ?, ?, ?)
+        """)
+        for a in artists {
+            let sortName = a.name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            try artistStmt.execute(arguments: [a.id.rawValue, a.name, sortName, date])
+        }
 
-            // 2.5 Artwork Assets (ensure FK integrity for releases.artwork_asset_id)
-            let artAssetStmt = try db.makeStatement(sql: """
-                INSERT OR IGNORE INTO artwork_assets (id, sha256, mime_type, byte_size, storage_relative_path, created_at)
-                VALUES (?, ?, 'image/jpeg', 0, ?, ?)
-            """)
-            for r in releases {
-                if let art = r.artworkAssetID, !art.isEmpty {
-                    try artAssetStmt.execute(arguments: [art, art, art, date])
-                }
-            }
+        // 2. Release Groups
+        let rgStmt = try db.makeStatement(sql: """
+            INSERT OR IGNORE INTO release_groups (id, title, sort_title, primary_type, created_at)
+            VALUES (?, ?, ?, 'album', ?)
+        """)
+        for rg in releaseGroups {
+            let sortTitle = rg.title.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            try rgStmt.execute(arguments: [rg.id.rawValue, rg.title, sortTitle, date])
+        }
 
-            // 3. Releases
-            let relStmt = try db.makeStatement(sql: """
-                INSERT INTO releases (id, release_group_id, title, sort_title, release_year, artwork_asset_id, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET
-                    title = excluded.title,
-                    sort_title = excluded.sort_title,
-                    release_year = COALESCE(excluded.release_year, releases.release_year),
-                    artwork_asset_id = COALESCE(excluded.artwork_asset_id, releases.artwork_asset_id)
-            """)
-            for r in releases {
-                let sortTitle = r.title.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-                try relStmt.execute(arguments: [r.id.rawValue, r.releaseGroupID?.rawValue, r.title, sortTitle, r.year, r.artworkAssetID, date])
+        // 2.5 Artwork Assets (ensure FK integrity for releases.artwork_asset_id)
+        let artAssetStmt = try db.makeStatement(sql: """
+            INSERT OR IGNORE INTO artwork_assets (id, sha256, mime_type, byte_size, storage_relative_path, created_at)
+            VALUES (?, ?, 'image/jpeg', 0, ?, ?)
+        """)
+        for r in releases {
+            if let art = r.artworkAssetID, !art.isEmpty {
+                try artAssetStmt.execute(arguments: [art, art, art, date])
             }
+        }
 
-            // 4. Recordings
-            let recStmt = try db.makeStatement(sql: """
-                INSERT OR IGNORE INTO recordings (id, title, sort_title, duration, is_live, created_at)
-                VALUES (?, ?, ?, ?, 0, ?)
-            """)
-            for rec in recordings {
-                let sortTitle = rec.title.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-                try recStmt.execute(arguments: [rec.id.rawValue, rec.title, sortTitle, rec.duration, date])
-            }
+        // 3. Releases
+        let relStmt = try db.makeStatement(sql: """
+            INSERT INTO releases (id, release_group_id, title, sort_title, release_year, artwork_asset_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                title = excluded.title,
+                sort_title = excluded.sort_title,
+                release_year = COALESCE(excluded.release_year, releases.release_year),
+                artwork_asset_id = COALESCE(excluded.artwork_asset_id, releases.artwork_asset_id)
+        """)
+        for r in releases {
+            let sortTitle = r.title.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            try relStmt.execute(arguments: [r.id.rawValue, r.releaseGroupID?.rawValue, r.title, sortTitle, r.year, r.artworkAssetID, date])
+        }
 
-            // 5. Release Tracks
-            let rtStmt = try db.makeStatement(sql: """
-                INSERT OR IGNORE INTO release_tracks (id, release_id, medium_position, track_position, track_number, title, sort_title, duration, recording_id, created_at)
-                VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
-            """)
-            for rt in releaseTracks {
-                let sortTitle = rt.title.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-                try rtStmt.execute(arguments: [rt.id.rawValue, rt.releaseID.rawValue, rt.trackNumber, "\(rt.trackNumber)", rt.title, sortTitle, rt.duration, rt.recordingID.rawValue, date])
-            }
+        // 4. Recordings
+        let recStmt = try db.makeStatement(sql: """
+            INSERT OR IGNORE INTO recordings (id, title, sort_title, duration, is_live, created_at)
+            VALUES (?, ?, ?, ?, 0, ?)
+        """)
+        for rec in recordings {
+            let sortTitle = rec.title.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            try recStmt.execute(arguments: [rec.id.rawValue, rec.title, sortTitle, rec.duration, date])
+        }
 
-            // 6. Artist Credits
-            let acStmt = try db.makeStatement(sql: """
-                INSERT OR IGNORE INTO artist_credits (id, artist_id, entity_type, entity_id, position, role)
-                VALUES (?, ?, ?, ?, 0, 'primary')
-            """)
-            for ac in artistCredits {
-                let creditID = "\(ac.entityType):\(ac.entityID):\(ac.artistID.rawValue)"
-                try acStmt.execute(arguments: [creditID, ac.artistID.rawValue, ac.entityType, ac.entityID])
-            }
+        // 5. Release Tracks
+        let rtStmt = try db.makeStatement(sql: """
+            INSERT OR IGNORE INTO release_tracks (id, release_id, medium_position, track_position, track_number, title, sort_title, duration, recording_id, created_at)
+            VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
+        """)
+        for rt in releaseTracks {
+            let sortTitle = rt.title.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            try rtStmt.execute(arguments: [rt.id.rawValue, rt.releaseID.rawValue, rt.trackNumber, "\(rt.trackNumber)", rt.title, sortTitle, rt.duration, rt.recordingID.rawValue, date])
+        }
 
-            // 7. Sync FTS5 with rich multi-lingual tokens
-            let ftsStmt = try db.makeStatement(sql: """
-                INSERT INTO library_fts (recording_id, track_title, artist_name, release_title, search_tokens)
-                VALUES (?, ?, ?, ?, ?)
-            """)
-            var artistLookup: [String: String] = [:]
-            for a in artists { artistLookup[a.id.rawValue] = a.name }
-            var releaseLookup: [String: String] = [:]
-            for r in releases { releaseLookup[r.id.rawValue] = r.title }
-            var recToRelLookup: [String: String] = [:]
-            for rt in releaseTracks { recToRelLookup[rt.recordingID.rawValue] = releaseLookup[rt.releaseID.rawValue] ?? "" }
-            var recToArtLookup: [String: String] = [:]
-            for ac in artistCredits where ac.entityType == "recording" {
-                recToArtLookup[ac.entityID] = artistLookup[ac.artistID.rawValue] ?? ""
-            }
+        // 6. Artist Credits
+        let acStmt = try db.makeStatement(sql: """
+            INSERT OR IGNORE INTO artist_credits (id, artist_id, entity_type, entity_id, position, role)
+            VALUES (?, ?, ?, ?, 0, 'primary')
+        """)
+        for ac in artistCredits {
+            let creditID = "\(ac.entityType):\(ac.entityID):\(ac.artistID.rawValue)"
+            try acStmt.execute(arguments: [creditID, ac.artistID.rawValue, ac.entityType, ac.entityID])
+        }
 
-            for rec in recordings {
-                let artName = recToArtLookup[rec.id.rawValue] ?? ""
-                let relTitle = recToRelLookup[rec.id.rawValue] ?? ""
-                let combinedText = "\(rec.title) \(artName) \(relTitle)"
-                let tokens = SearchTokenNormalizer.generateSearchTokens(for: combinedText)
-                try ftsStmt.execute(arguments: [rec.id.rawValue, rec.title, artName, relTitle, tokens])
-            }
+        // 7. Sync FTS5 with rich multi-lingual tokens
+        let ftsStmt = try db.makeStatement(sql: """
+            INSERT INTO library_fts (recording_id, track_title, artist_name, release_title, search_tokens)
+            VALUES (?, ?, ?, ?, ?)
+        """)
+        var artistLookup: [String: String] = [:]
+        for a in artists { artistLookup[a.id.rawValue] = a.name }
+        var releaseLookup: [String: String] = [:]
+        for r in releases { releaseLookup[r.id.rawValue] = r.title }
+        var recToRelLookup: [String: String] = [:]
+        for rt in releaseTracks { recToRelLookup[rt.recordingID.rawValue] = releaseLookup[rt.releaseID.rawValue] ?? "" }
+        var recToArtLookup: [String: String] = [:]
+        for ac in artistCredits where ac.entityType == "recording" {
+            recToArtLookup[ac.entityID] = artistLookup[ac.artistID.rawValue] ?? ""
+        }
+
+        for rec in recordings {
+            let artName = recToArtLookup[rec.id.rawValue] ?? ""
+            let relTitle = recToRelLookup[rec.id.rawValue] ?? ""
+            let combinedText = "\(rec.title) \(artName) \(relTitle)"
+            let tokens = SearchTokenNormalizer.generateSearchTokens(for: combinedText)
+            try ftsStmt.execute(arguments: [rec.id.rawValue, rec.title, artName, relTitle, tokens])
         }
     }
 
@@ -461,28 +473,12 @@ nonisolated public final class IdentityRepository: Sendable {
                     localPaths.formUnion(paths)
                 }
                 let orderedPaths = localPaths.sorted()
-                var affectedSavedTrackIDs = Set<String>()
                 for start in stride(from: 0, to: orderedPaths.count, by: 400) {
                     let paths = Array(orderedPaths[start..<min(start + 400, orderedPaths.count)])
-                    let placeholders = Array(repeating: "?", count: paths.count).joined(separator: ",")
-                    let saved = try String.fetchAll(db, sql: """
-                        SELECT DISTINCT library_track_id FROM saved_library_sources
-                        WHERE kind = 'local' AND local_url IN (\(placeholders))
-                        """, arguments: StatementArguments(paths))
-                    affectedSavedTrackIDs.formUnion(saved)
-                    try db.execute(sql: """
-                        DELETE FROM saved_library_sources WHERE kind = 'local' AND local_url IN (\(placeholders))
-                        """, arguments: StatementArguments(paths))
                     let playlistIDs = paths.flatMap { [URL(fileURLWithPath: $0).absoluteString, $0] }
                     let playlistPlaceholders = Array(repeating: "?", count: playlistIDs.count).joined(separator: ",")
                     try db.execute(sql: "DELETE FROM playlist_tracks WHERE track_id IN (\(playlistPlaceholders))",
                                    arguments: StatementArguments(playlistIDs))
-                }
-                for savedID in affectedSavedTrackIDs {
-                    try db.execute(sql: """
-                        DELETE FROM saved_library_tracks WHERE id = ?
-                        AND NOT EXISTS (SELECT 1 FROM saved_library_sources WHERE library_track_id = ?)
-                        """, arguments: [savedID, savedID])
                 }
             }
 

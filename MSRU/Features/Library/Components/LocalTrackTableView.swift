@@ -395,7 +395,7 @@ struct LocalTrackTableView: View {
             }
         }
 
-        if onDeleteTracks != nil, track.fileURL.isFileURL {
+        if onDeleteTracks != nil {
             Divider()
             Button(role: .destructive) {
                 if selectedTrackIDs.contains(track.id) && selectedTrackIDs.count > 1 {

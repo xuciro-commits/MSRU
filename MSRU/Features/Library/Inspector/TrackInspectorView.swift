@@ -11,12 +11,10 @@ import MusicPlayback
 
 struct TrackInspectorView: View {
 
-    var libraryTrack: LibraryTrack? = nil
     var localTrack: LocalTrack? = nil
     var musicContent: MusicContent? = nil
 
     @Bindable var playback: PlaybackController
-    @Bindable var library: LibraryStore
     var localStore: LocalLibraryStore? = nil
 
     var onRevealInFinder: ((URL) -> Void)? = nil
@@ -34,9 +32,7 @@ struct TrackInspectorView: View {
 
     var body: some View {
         Group {
-            if let track = libraryTrack {
-                libraryTrackContent(track)
-            } else if let track = localTrack {
+            if let track = localTrack {
                 localTrackContent(track)
             } else if let content = musicContent {
                 musicContentDetails(content)
@@ -77,209 +73,6 @@ struct TrackInspectorView: View {
         .padding(.horizontal, 14)
         .padding(.top, 10)
         .padding(.bottom, 6)
-    }
-
-    private func libraryTrackContent(_ track: LibraryTrack) -> some View {
-        VStack(spacing: 0) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        // Header & Artwork
-                        VStack(alignment: .center, spacing: 14) {
-                            artwork(track)
-                                .frame(width: 160, height: 160)
-                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
-
-                            VStack(spacing: 4) {
-                                Text(track.title)
-                                    .font(.title3.bold())
-                                    .multilineTextAlignment(.center)
-                                    .lineLimit(2)
-
-                                Text(track.artist + (track.album.map { " · " + $0 } ?? ""))
-                                    .font(.callout)
-                                    .foregroundStyle(.secondary)
-                                    .multilineTextAlignment(.center)
-                                    .lineLimit(2)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 12)
-
-                        // Action Buttons
-                        actionsSection(track)
-
-                        Divider()
-
-                        // Properties
-                        propertiesSection(track)
-
-                        Divider()
-
-                        // Source (Read-only)
-                        sourceSection(track)
-                    }
-                    .padding(18)
-                }
-                .scrollIndicators(.hidden)
-                .hideScrollIndicatorsCompletely()
-        }
-    }
-
-    private func actionsSection(_ track: LibraryTrack) -> some View {
-        VStack(spacing: 10) {
-            let item = PlaybackItem(library: track)
-            let isCurrent = playback.currentItem?.id == item?.id
-            let isPlaying = isCurrent && playback.isPlaying
-
-            HStack(spacing: 10) {
-                Button {
-                    playback.toggle(library: track)
-                } label: {
-                        Label(isPlaying ? "Pause" : "Play", systemImage: isPlaying ? "pause.fill" : "play.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Color.accentColor)
-                .disabled(item == nil)
-
-                let isSaved = library.contains(id: track.id)
-                Button {
-                    Task {
-                        if isSaved {
-                            await library.remove(id: track.id)
-                        } else {
-                            await library.add(track)
-                        }
-                    }
-                } label: {
-                    Image(systemName: isSaved ? "checkmark.circle.fill" : "plus.circle")
-                        .foregroundStyle(isSaved ? Color.accentColor : Color.primary)
-                }
-                .buttonStyle(.bordered)
-                .tint(Color.accentColor)
-                .help(isSaved ? "Remove from Library" : "Add to Library")
-            }
-
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 10) {
-                    Button {
-                        playback.playNext(track)
-                    } label: {
-                        Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
-                            .font(.caption)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(Color.accentColor)
-                    .disabled(item == nil)
-
-                    Button {
-                        playback.addToQueue(track)
-                    } label: {
-                        Label("Add to Queue", systemImage: "text.badge.plus")
-                            .font(.caption)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(Color.accentColor)
-                    .disabled(item == nil)
-                }
-
-                VStack(spacing: 8) {
-                    Button {
-                        playback.playNext(track)
-                    } label: {
-                        Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
-                            .font(.caption)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(Color.accentColor)
-                    .disabled(item == nil)
-
-                    Button {
-                        playback.addToQueue(track)
-                    } label: {
-                        Label("Add to Queue", systemImage: "text.badge.plus")
-                            .font(.caption)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(Color.accentColor)
-                    .disabled(item == nil)
-                }
-            }
-        }
-    }
-
-    private func propertiesSection(_ track: LibraryTrack) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Properties")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-
-            propertyRow(label: "Title", value: track.title)
-            propertyRow(label: "Artist", value: track.artist)
-            if let album = track.album {
-                propertyRow(label: "Album", value: album)
-            }
-            if let duration = track.duration {
-                propertyRow(label: "Duration", value: durationString(duration))
-            }
-            propertyRow(label: "Date Added", value: track.dateAdded.formatted(date: .abbreviated, time: .shortened))
-            let sourceSummary = track.sources.map { $0.kind.rawValue.capitalized }.joined(separator: ", ")
-            if !sourceSummary.isEmpty {
-                propertyRow(label: "Source", value: sourceSummary)
-            }
-        }
-    }
-
-    private func sourceSection(_ track: LibraryTrack) -> some View {
-        let localSource = track.sources.first { $0.kind == .local && $0.localFileURL != nil }
-        return VStack(alignment: .leading, spacing: 10) {
-            Text("Source (Read-only)")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-
-            if let localSource, let fileURL = localSource.localFileURL {
-                propertyRow(label: "Kind", value: "Local Audio File")
-                propertyRow(label: "Format", value: fileURL.pathExtension.uppercased())
-                if let size = fileSizeString(for: fileURL) {
-                    propertyRow(label: "Size", value: size)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Location")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Text(fileURL.path)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(3)
-                        .textSelection(.enabled)
-                }
-
-                if let onRevealInFinder {
-                    Button {
-                        onRevealInFinder(fileURL)
-                    } label: {
-                        Label("Reveal in Finder", systemImage: "arrow.up.forward.square")
-                            .font(.callout)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.accentColor)
-                    .padding(.top, 4)
-                }
-            } else {
-                let kindName = track.sources.first?.kind.rawValue.capitalized ?? "Remote Catalog"
-                propertyRow(label: "Kind", value: kindName)
-                if let externalID = track.sources.first?.externalID {
-                    propertyRow(label: "External ID", value: externalID)
-                }
-            }
-        }
     }
 
     // MARK: - Local Track Content
@@ -591,16 +384,6 @@ struct TrackInspectorView: View {
     }
 
     @ViewBuilder
-    private func artwork(_ track: LibraryTrack) -> some View {
-        MediaImageView(
-            reference: track.artworkReference ?? track.artworkURL?.absoluteString,
-            thumbnailPixelSize: CGSize(width: 320, height: 320),
-            placeholderSystemImage: "music.note",
-            cornerRadius: 14
-        )
-    }
-
-    @ViewBuilder
     private func artwork(_ track: LocalTrack) -> some View {
         MediaImageView(
             reference: track.artworkReference,
@@ -636,22 +419,6 @@ struct TrackInspectorView: View {
         localTrack: MSRUPreviewData.localTracks[0],
         musicContent: nil,
         playback: application.playback,
-        library: application.library,
-        onRevealInFinder: { _ in },
-        onClose: {}
-    )
-    .frame(width: 320, height: 600)
-}
-
-#Preview("Track Inspector · Library Track") {
-    let saved = LibraryTrack(local: MSRUPreviewData.localTracks[0])
-    let application = MSRUPreviewData.makeApplication(savedTracks: [saved])
-    TrackInspectorView(
-        libraryTrack: saved,
-        localTrack: nil,
-        musicContent: nil,
-        playback: application.playback,
-        library: application.library,
         onRevealInFinder: { _ in },
         onClose: {}
     )
@@ -664,7 +431,6 @@ struct TrackInspectorView: View {
         localTrack: nil,
         musicContent: nil,
         playback: application.playback,
-        library: application.library,
         onRevealInFinder: { _ in },
         onClose: {}
     )

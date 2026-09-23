@@ -516,5 +516,31 @@ public nonisolated enum AppDatabaseMigrations {
                 )
             }
         }
+
+        // Moves web tracks saved in the separate saved-library tables into the
+        // index, so the Library has one model. Local-file entries there were only
+        // a membership marker for files already indexed and are not converted
+        // (in particular not into favorites). The old tables are left untouched
+        // as a recovery path and are no longer read.
+        migrator.registerMigration("v7_saved_web_tracks_into_index") { db in
+            guard try db.tableExists("saved_library_tracks"), try db.tableExists("saved_library_sources") else { return }
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT t.title, t.artist, t.duration, t.artwork_reference, t.date_added,
+                       s.external_id, s.remote_url
+                FROM saved_library_tracks t
+                JOIN saved_library_sources s ON s.library_track_id = t.id
+                WHERE s.kind = 'openverse' AND s.external_id IS NOT NULL AND s.remote_url IS NOT NULL
+                """)
+            for row in rows {
+                let duration: Double? = row["duration"]
+                try WebLibraryIndex.ingest(
+                    WebTrack(itemID: row["external_id"], title: row["title"], artist: row["artist"],
+                             duration: (duration ?? 0) > 0 ? duration : nil,
+                             streamURL: row["remote_url"], thumbnailURL: row["artwork_reference"]),
+                    dateAdded: row["date_added"] ?? Date(),
+                    in: db
+                )
+            }
+        }
     }
 }

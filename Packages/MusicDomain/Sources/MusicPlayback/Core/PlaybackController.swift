@@ -583,19 +583,6 @@ private struct WeakSessionObserver {
 
     // MARK: - Library Play
 
-    public func play(_ track: LibraryTrack, queue: [LibraryTrack]? = nil) {
-
-        guard let item = PlaybackItem(library: track) else {
-            return
-        }
-
-        let context = queue?.compactMap { track in
-            PlaybackItem(library: track)
-        }
-
-        play(item, context: context)
-    }
-
     // MARK: - Toggle Current
 
     public func toggle() {
@@ -729,32 +716,6 @@ private struct WeakSessionObserver {
 
     // MARK: - Toggle Library
 
-    public func toggle(library track: LibraryTrack, queue: [LibraryTrack]? = nil) {
-
-        guard let item = PlaybackItem(library: track) else {
-            return
-        }
-
-        if currentItem?.id == item.id {
-
-            if let queue {
-
-                playbackQueue.start(
-                    item,
-                    context: queue.compactMap {
-                        PlaybackItem(library: $0)
-                    }
-                )
-                refreshPCMNext()
-            }
-
-            toggle()
-            return
-        }
-
-        play(track, queue: queue)
-    }
-
     public func playQueuedItem(id: UUID) {
         guard let selected = playbackQueue.select(id: id) else { return }
         resolveAndStart(selected.item)
@@ -811,24 +772,6 @@ private struct WeakSessionObserver {
     }
 
     // MARK: - Library Queue Actions
-
-    public func playNext(_ track: LibraryTrack) {
-
-        guard let item = PlaybackItem(library: track) else {
-            return
-        }
-
-        playNext(item)
-    }
-
-    public func addToQueue(_ track: LibraryTrack) {
-
-        guard let item = PlaybackItem(library: track) else {
-            return
-        }
-
-        addToQueue(item)
-    }
 
     // MARK: - Remove / Move Queue
 

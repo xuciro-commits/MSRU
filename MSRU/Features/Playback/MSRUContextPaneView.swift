@@ -44,11 +44,9 @@ struct MSRUContextPaneView: View {
                     )
                 } else {
                     TrackInspectorView(
-                        libraryTrack: scene.selectedLibraryTrack,
                         localTrack: scene.selectedLocalTrack,
                         musicContent: scene.selectedMusicContent,
                         playback: scene.application.playback,
-                        library: scene.application.library,
                         localStore: scene.application.localLibrary,
                         onRevealInFinder: onRevealInFinder,
                         onClose: {

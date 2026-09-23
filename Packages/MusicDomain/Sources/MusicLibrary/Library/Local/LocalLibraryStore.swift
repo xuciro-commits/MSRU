@@ -25,7 +25,6 @@ public final class LocalLibraryStore {
     private let repository: any LocalLibraryRepository
     private let db: AppDatabase
     private let summaryRepository: LocalSummaryRepository
-    private weak var libraryStore: LibraryStore?
     private weak var playlistStore: PlaylistStore?
     private weak var playbackController: (any LocalTrackRemovalObserver)?
     private var spotlightIndexer: SpotlightIndexingService?
@@ -38,11 +37,9 @@ public final class LocalLibraryStore {
     }
 
     public func attachCascadeCollaborators(
-        libraryStore: LibraryStore?,
         playlistStore: PlaylistStore?,
         playbackController: (any LocalTrackRemovalObserver)?
     ) {
-        self.libraryStore = libraryStore
         self.playlistStore = playlistStore
         self.playbackController = playbackController
     }
@@ -264,12 +261,9 @@ public final class LocalLibraryStore {
 
             // SQLite removes persisted references in the same transaction as assets.
             // These store calls synchronize any already-loaded in-memory collections.
-            let librarySynchronized = await self.libraryStore?.purgeTracks(
-                matchingIDs: deletedTrackIDs, localURLs: deletedURLs) ?? true
             let playlistsSynchronized = await self.playlistStore?.purgeTracks(withIDs: deletedTrackIDs) ?? true
-            if !librarySynchronized || !playlistsSynchronized {
-                if !librarySynchronized { await self.libraryStore?.load() }
-                if !playlistsSynchronized { await self.playlistStore?.load() }
+            if !playlistsSynchronized {
+                await self.playlistStore?.load()
                 self.errorMessage = "Local files were removed, but saved collections could not refresh. Reopen the library to retry."
             }
             self.playbackController?.purgeTracks(withIDs: deletedTrackIDs, localURLs: deletedURLs)

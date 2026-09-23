@@ -53,8 +53,8 @@ final class ApplicationModel {
 
     // MARK: - Library
 
-    let library:
-        LibraryStore
+    let webLibrary:
+        WebLibraryStore
 
 
     // MARK: - Apple Music
@@ -153,8 +153,8 @@ final class ApplicationModel {
                 MusicCatalogStore(),
             localLibrary:
                 LocalLibraryStore(),
-            library:
-                LibraryStore(),
+            webLibrary:
+                WebLibraryStore(),
             musicLibrary:
                 AppleMusicLibraryStore(),
             playback:
@@ -191,8 +191,8 @@ final class ApplicationModel {
             MusicCatalogStore,
         localLibrary:
             LocalLibraryStore,
-        library:
-            LibraryStore,
+        webLibrary:
+            WebLibraryStore,
         musicLibrary:
             AppleMusicLibraryStore,
         playback:
@@ -221,8 +221,8 @@ final class ApplicationModel {
             localLibrary
 
 
-        self.library =
-            library
+        self.webLibrary =
+            webLibrary
 
 
         self.musicLibrary =
@@ -263,7 +263,6 @@ final class ApplicationModel {
             resolvedSubsonicServers
 
         self.localLibrary.attachCascadeCollaborators(
-            libraryStore: library,
             playlistStore: resolvedPlaylistStore,
             playbackController: playback
         )
@@ -276,8 +275,8 @@ final class ApplicationModel {
                 .live
 
 
-        dependencies.library =
-            library
+        dependencies.webLibrary =
+            webLibrary
 
 
         dependencies.playback =
@@ -331,8 +330,8 @@ final class ApplicationModel {
         localLibrary.attachSpotlightIndexer(spotlightIndexer)
 
 
-        let library =
-            library
+        let webLibrary =
+            webLibrary
 
         let playlistStore =
             playlistStore
@@ -349,7 +348,7 @@ final class ApplicationModel {
 
             await localLibrary
                 .loadIfNeeded()
-            await library
+            await webLibrary
                 .load()
             await playlistStore
                 .load()

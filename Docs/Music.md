@@ -17,6 +17,7 @@ MSRU is a real, shipping product and the platform's long-term validation domain 
 
 - The SQLite `sources` table is the only persisted registry of sources (local folders and Subsonic servers; `username` since migration v6). `SourceRuntimeCoordinator` owns them at runtime: it keeps one authenticated client per server, probes capabilities and holds each server's connection status (not persisted). Feature code reaches servers through `SubsonicServerStore`, which adds no state.
 - A Subsonic server has a source ID `src_subsonic_<8 hex>` and a server key `subsonic_<8 hex>` (`SourceID.serverKey`). The key names the Keychain account and appears inside persisted artwork and remote-item references, so it must not change; convert only through `SourceID.serverKey` / `SourceID(serverKeyOrSourceID:)`.
+- The Library is one index. Web catalogue tracks (Openverse) are members under the `src_openverse` source (`WebLibraryStore`); migration v7 moved them out of the former `saved_library_*` tables, which are no longer read and stay as a recovery path. Library membership is not a preference: nothing maps membership to `library_entries.is_favorite`.
 - The pre-v6 UserDefaults list `com.msru.subsonic.servers` is imported once and kept untouched as a recovery path; delete it in a later contract step.
 
 ## Model

@@ -46,9 +46,6 @@ struct LibraryView:
     var selectedLocalTrack:
         LocalTrack?
 
-    @Binding
-    var selectedLibraryTrack:
-        LibraryTrack?
 
 
     let onAddMusic:
@@ -81,9 +78,6 @@ struct LibraryView:
         Bool = false
 
     @State
-    private var selectedSavedTrackIDs: Set<UUID> = []
-
-    @State
     private var selectedLocalTrackIDs: Set<String> = []
 
     @State
@@ -112,8 +106,6 @@ struct LibraryView:
             PlaybackController,
         selectedLocalTrack:
             Binding<LocalTrack?>,
-        selectedLibraryTrack:
-            Binding<LibraryTrack?> = .constant(nil),
         selectedSourceID:
             Binding<String?> = .constant(nil),
         onAddMusic:
@@ -124,7 +116,6 @@ struct LibraryView:
         self.subsonicServers = subsonicServers
         self.playback = playback
         self._selectedLocalTrack = selectedLocalTrack
-        self._selectedLibraryTrack = selectedLibraryTrack
         self._selectedSourceID = selectedSourceID
         self.onAddMusic = onAddMusic
     }
@@ -161,21 +152,12 @@ struct LibraryView:
             titleVisibility: .visible
         ) {
             Button("Remove from Library (\(selectedLocalTrackIDs.count) items)", role: .destructive) {
-                Task {
-                    await localStore.deleteTracks(withIDs: selectedLocalTrackIDs)
-                    selectedLocalTrackIDs.removeAll()
-                }
+                removeFromLibrary(selectedLocalTrackIDs)
+                selectedLocalTrackIDs.removeAll()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The songs leave the Library. Their files stay on disk.")
-        }
-        .onChange(of: selectedSavedTrackIDs) { _, newIDs in
-            if newIDs.count == 1, let found = filteredSavedTracks.first(where: { $0.id == newIDs.first }) {
-                selectedLibraryTrack = found
-            } else if newIDs.isEmpty {
-                selectedLibraryTrack = nil
-            }
+            Text("The songs leave the Library. Files stay on disk.")
         }
         .onChange(of: selectedLocalTrackIDs) { _, newIDs in
             if newIDs.count == 1, let found = filteredLocalTracks.first(where: { $0.id == newIDs.first }) {
@@ -238,10 +220,7 @@ struct LibraryView:
 
     @ViewBuilder
     private var gridOverlayBar: some View {
-        if isWebSourceActive && selectedSavedTrackIDs.count > 1 {
-            savedGridBatchBar
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-        } else if !isWebSourceActive && selectedLocalTrackIDs.count > 1 {
+        if selectedLocalTrackIDs.count > 1 {
             localGridBatchBar
                 .transition(.move(edge: .bottom).combined(with: .opacity))
         }
@@ -273,11 +252,7 @@ struct LibraryView:
                         .padding(.vertical, 12)
                     }
                 } else {
-                    if isWebSourceActive {
-                        savedGridContent
-                    } else {
-                        localGridContent
-                    }
+                    localGridContent
                 }
             }
             .padding(24)
@@ -286,7 +261,6 @@ struct LibraryView:
         .overlay(alignment: .bottom) {
             gridOverlayBar
         }
-        .animation(.easeInOut(duration: 0.2), value: selectedSavedTrackIDs.count)
         .animation(.easeInOut(duration: 0.2), value: selectedLocalTrackIDs.count)
     }
 
@@ -316,11 +290,7 @@ struct LibraryView:
                     .background(.ultraThinMaterial)
                 }
             } else {
-                if isWebSourceActive {
-                    savedTableContent
-                } else {
-                    localTableContent
-                }
+                localTableContent
             }
         }
     }
@@ -405,12 +375,9 @@ struct LibraryView:
     @ViewBuilder
     private var errorBanners: some View {
         if let error = feature.errorMessage {
-            VStack(alignment: .leading, spacing: 8) {
-                Label(error, systemImage: "exclamationmark.triangle")
-                Button("Reload Library") { Task { await feature.libraryStore.load() } }
-            }
-            .font(.callout)
-            .padding(.horizontal, 20)
+            Label(error, systemImage: "exclamationmark.triangle")
+                .font(.callout)
+                .padding(.horizontal, 20)
         }
         if let error = playback.playbackErrorMessage {
             Label(error, systemImage: "speaker.slash")
@@ -426,20 +393,28 @@ struct LibraryView:
 
     // MARK: - Filtered Queries
 
-    /// Saved tracks without a local file: the Web source.
-    private var webTracks: [LibraryTrack] {
-        feature.tracks.filter { track in
-            !track.sources.contains(where: { $0.kind == .local })
-        }
+    private var webTracks: [LocalTrack] {
+        feature.webTracks
     }
 
-    private var filteredSavedTracks: [LibraryTrack] {
-        LibraryCollectionSortFilter.filterAndSort(
-            tracks: webTracks,
-            query: searchQuery,
-            field: sortField,
-            ascending: sortAscending
-        )
+    /// Paged index of local files; the default Library scope.
+    private var isLocalPagerActive: Bool {
+        !isWebSourceActive && !isRemoteSourceActive
+    }
+
+    /// Server tracks are browsed live and are not Library members to remove.
+    private var canRemoveFromLibrary: Bool {
+        !isRemoteSourceActive
+    }
+
+    /// One removal path: files leave the index (files stay on disk); web
+    /// tracks leave the index.
+    private func removeFromLibrary(_ ids: Set<String>) {
+        if isWebSourceActive {
+            feature.send(.removeWebTracksRequested(ids))
+        } else {
+            Task { await localStore.deleteTracks(withIDs: ids) }
+        }
     }
 
     private var sourceFilterItems: [SourceFilterItem] {
@@ -540,6 +515,10 @@ struct LibraryView:
     }
 
     private var filteredLocalTracks: [LocalTrack] {
+        if isWebSourceActive {
+            return LibraryCollectionSortFilter.filterAndSort(
+                tracks: webTracks, query: searchQuery, field: sortField, ascending: sortAscending)
+        }
         if isRemoteSourceActive {
             return remoteTracks
         }
@@ -548,7 +527,7 @@ struct LibraryView:
 
     private func playLocalPageTrack(_ track: LocalTrack, queue: [LocalTrack]) {
         playback.toggle(track: track, queue: queue)
-        if !isRemoteSourceActive {
+        if isLocalPagerActive {
             playback.continueLocalQueue(using: localPager?.makePlaybackPageSource())
         }
     }
@@ -560,57 +539,18 @@ struct LibraryView:
     // MARK: - Grid Contents
 
     @ViewBuilder
-    private var savedGridContent: some View {
-        if feature.isLoading {
-            loadingView
-        } else if feature.tracks.isEmpty {
-            emptySavedView
-        } else if filteredSavedTracks.isEmpty {
-            emptySearchView
-        } else {
-            MarqueeSelectionContainer(selectedIDs: $selectedSavedTrackIDs) {
-                LazyVGrid(columns: gridColumns, spacing: 24) {
-                    ForEach(filteredSavedTracks) { track in
-                        LibrarySavedTrackCardItemView(
-                            track: track,
-                            isRemoving: feature.isRemoving(track),
-                            isSelected: selectedSavedTrackIDs.contains(track.id) || selectedLibraryTrack?.id == track.id,
-                            isPlaying: playback.currentItem?.id == PlaybackItem(library: track)?.id && playback.isPlaying,
-                            onSelect: {
-                                SelectionHelper.handleTap(
-                                    for: track.id,
-                                    selectedIDs: $selectedSavedTrackIDs,
-                                    allIDs: filteredSavedTracks.map(\.id)
-                                )
-                                if selectedSavedTrackIDs.count == 1, let found = filteredSavedTracks.first(where: { $0.id == selectedSavedTrackIDs.first }) {
-                                    selectedLibraryTrack = found
-                                } else if selectedSavedTrackIDs.isEmpty {
-                                    selectedLibraryTrack = nil
-                                }
-                            },
-                            onPlay: { feature.send(.playRequested(id: track.id)) },
-                            onPlayNext: { feature.send(.playNextRequested(id: track.id)) },
-                            onEnqueue: { feature.send(.enqueueRequested(id: track.id)) },
-                            onRemove: { feature.send(.removeRequested(id: track.id)) }
-                        )
-                        .marqueeItem(id: track.id)
-                    }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
     private var localGridContent: some View {
         if (isRemoteSourceActive && isLoadingRemoteTracks && remoteTracks.isEmpty) || isSearchingRemoteTracks {
             loadingView
-        } else if !isRemoteSourceActive && localStore.isLoading {
+        } else if isLocalPagerActive && localStore.isLoading {
             loadingView
-        } else if !isRemoteSourceActive && (localPager == nil || (localPager?.isLoading == true && localPager?.tracks.isEmpty == true)) {
+        } else if isLocalPagerActive && (localPager == nil || (localPager?.isLoading == true && localPager?.tracks.isEmpty == true)) {
             loadingView
         } else if isRemoteSourceActive && remoteTracks.isEmpty {
             remoteEmptyView
-        } else if !isRemoteSourceActive && (localPager?.totalCount ?? 0) == 0 {
+        } else if isWebSourceActive && webTracks.isEmpty {
+            emptyWebView
+        } else if isLocalPagerActive && (localPager?.totalCount ?? 0) == 0 {
             emptyLocalView
         } else if filteredLocalTracks.isEmpty {
             emptySearchView
@@ -642,13 +582,7 @@ struct LibraryView:
                                     PlatformFileViewer.revealInFinder(url: track.fileURL)
                                 }
                             },
-                            onDelete: {
-                                if !isRemoteSourceActive {
-                                    Task {
-                                        await localStore.deleteTracks(withIDs: [track.id])
-                                    }
-                                }
-                            }
+                            onRemove: canRemoveFromLibrary ? { removeFromLibrary([track.id]) } : nil
                         )
                         .marqueeItem(id: track.id)
                         .onAppear {
@@ -658,7 +592,7 @@ struct LibraryView:
                                         await loadRemoteTracks(sourceID: sourceID, query: "", reset: false)
                                     }
                                 }
-                            } else if !isRemoteSourceActive && track.id == localPager?.tracks.last?.id && localPager?.hasMore == true {
+                            } else if isLocalPagerActive && track.id == localPager?.tracks.last?.id && localPager?.hasMore == true {
                                 Task { await localPager?.loadMore() }
                             }
                         }
@@ -669,52 +603,6 @@ struct LibraryView:
     }
 
     // MARK: - Grid Batch Bars
-
-    @ViewBuilder
-    private var savedGridBatchBar: some View {
-        FloatingBatchBar(
-            count: selectedSavedTrackIDs.count,
-            title: "\(selectedSavedTrackIDs.count) songs",
-            onDeselect: { selectedSavedTrackIDs.removeAll() }
-        ) {
-            Button {
-                let selected = filteredSavedTracks.filter { selectedSavedTrackIDs.contains($0.id) }
-                if let first = selected.first {
-                    feature.send(.playRequested(id: first.id))
-                    for track in selected.dropFirst() {
-                        feature.send(.enqueueRequested(id: track.id))
-                    }
-                }
-            } label: {
-                Label("Play Selected", systemImage: "play.fill")
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-
-            Button {
-                let selected = filteredSavedTracks.filter { selectedSavedTrackIDs.contains($0.id) }
-                for track in selected {
-                    feature.send(.enqueueRequested(id: track.id))
-                }
-            } label: {
-                Label("Add to Queue", systemImage: "text.badge.plus")
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-
-            Button(role: .destructive) {
-                let selected = filteredSavedTracks.filter { selectedSavedTrackIDs.contains($0.id) }
-                for track in selected {
-                    feature.send(.removeRequested(id: track.id))
-                }
-                selectedSavedTrackIDs.removeAll()
-            } label: {
-                Label("Remove from Library", systemImage: "trash")
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-        }
-    }
 
     @ViewBuilder
     private var localGridBatchBar: some View {
@@ -745,7 +633,7 @@ struct LibraryView:
             .buttonStyle(.bordered)
             .controlSize(.small)
 
-            if !isRemoteSourceActive {
+            if canRemoveFromLibrary {
                 Button(role: .destructive) {
                     isDeleteConfirmationPresented = true
                 } label: {
@@ -760,34 +648,18 @@ struct LibraryView:
     // MARK: - Table Contents
 
     @ViewBuilder
-    private var savedTableContent: some View {
-        if feature.isLoading {
-            loadingView
-        } else if feature.tracks.isEmpty {
-            emptySavedView
-        } else if filteredSavedTracks.isEmpty {
-            emptySearchView
-        } else {
-            LibraryTrackTableView(
-                tracks: filteredSavedTracks,
-                selectedTrack: $selectedLibraryTrack,
-                playback: playback,
-                library: feature.libraryStore
-            )
-        }
-    }
-
-    @ViewBuilder
     private var localTableContent: some View {
         if (isRemoteSourceActive && isLoadingRemoteTracks && remoteTracks.isEmpty) || isSearchingRemoteTracks {
             loadingView
-        } else if !isRemoteSourceActive && localStore.isLoading {
+        } else if isLocalPagerActive && localStore.isLoading {
             loadingView
-        } else if !isRemoteSourceActive && (localPager == nil || (localPager?.isLoading == true && localPager?.tracks.isEmpty == true)) {
+        } else if isLocalPagerActive && (localPager == nil || (localPager?.isLoading == true && localPager?.tracks.isEmpty == true)) {
             loadingView
         } else if isRemoteSourceActive && remoteTracks.isEmpty {
             remoteEmptyView
-        } else if !isRemoteSourceActive && (localPager?.totalCount ?? 0) == 0 {
+        } else if isWebSourceActive && webTracks.isEmpty {
+            emptyWebView
+        } else if isLocalPagerActive && (localPager?.totalCount ?? 0) == 0 {
             emptyLocalView
         } else if filteredLocalTracks.isEmpty {
             emptySearchView
@@ -803,11 +675,7 @@ struct LibraryView:
                         PlatformFileViewer.revealInFinder(url: url)
                     }
                 },
-                onDeleteTracks: isRemoteSourceActive ? nil : { ids in
-                    Task {
-                        await localStore.deleteTracks(withIDs: ids)
-                    }
-                },
+                onDeleteTracks: canRemoveFromLibrary ? { removeFromLibrary($0) } : nil,
                 onTrackAppear: { track in
                     if isRemoteSourceActive && track.id == remoteTracks.last?.id && hasMoreRemoteTracks && !isLoadingMoreRemoteTracks && !isLoadingRemoteTracks && searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         if let sourceID = selectedSourceID {
@@ -815,7 +683,7 @@ struct LibraryView:
                                 await loadRemoteTracks(sourceID: sourceID, query: "", reset: false)
                             }
                         }
-                    } else if !isRemoteSourceActive && track.id == localPager?.tracks.last?.id && localPager?.hasMore == true {
+                    } else if isLocalPagerActive && track.id == localPager?.tracks.last?.id && localPager?.hasMore == true {
                         Task { await localPager?.loadMore() }
                     }
                 },
@@ -838,7 +706,7 @@ struct LibraryView:
         .frame(maxWidth: .infinity, minHeight: 280)
     }
 
-    private var emptySavedView: some View {
+    private var emptyWebView: some View {
         ContentUnavailableView {
             Label("No Web Songs", systemImage: "globe")
         } description: {
@@ -881,88 +749,6 @@ struct LibraryView:
 
     // MARK: - Card Views
 
-    fileprivate struct LibrarySavedTrackCardItemView: View {
-        let track: LibraryTrack
-        let isRemoving: Bool
-        let isSelected: Bool
-        let isPlaying: Bool
-        let onSelect: () -> Void
-        let onPlay: () -> Void
-        let onPlayNext: () -> Void
-        let onEnqueue: () -> Void
-        let onRemove: () -> Void
-
-        @State private var isHovered: Bool = false
-
-        private var durationText: String? {
-            track.duration.map { duration in
-                let seconds = max(0, Int(duration.rounded()))
-                return String(format: "%d:%02d", seconds / 60, seconds % 60)
-            }
-        }
-
-        var body: some View {
-            UnifiedTrackCardView(
-                title: track.title,
-                subtitle: track.artist,
-                secondaryText: track.album,
-                durationText: durationText,
-                qualityBadge: track.sources.first?.kind.rawValue.uppercased(),
-                isPlaying: isPlaying,
-                isSelected: isSelected,
-                onSelect: onSelect,
-                onPlay: onPlay
-            ) {
-                MediaImageView(
-                    reference: track.artworkReference,
-                    thumbnailPixelSize: CGSize(width: 240, height: 240),
-                    placeholderSystemImage: "music.note",
-                    cornerRadius: 10
-                )
-            } actionsMenu: {
-                if isRemoving {
-                    ProgressView()
-                        .controlSize(.small)
-                } else if isHovered {
-                    Menu {
-                        menuContent
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .frame(width: 22, height: 18)
-                    }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize()
-                } else {
-                    Color.clear
-                        .frame(width: 22, height: 18)
-                }
-            }
-            .frame(height: 236)
-            .contextMenu {
-                menuContent
-            }
-            .onHover { hovering in
-                if isHovered != hovering {
-                    isHovered = hovering
-                }
-            }
-        }
-
-        @ViewBuilder
-        private var menuContent: some View {
-            let supported = PlaybackItem(library: track) != nil
-            Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward", action: onPlayNext)
-                .disabled(!supported)
-            Button("Add to Queue", systemImage: "text.badge.plus", action: onEnqueue)
-                .disabled(!supported)
-            if !isRemoving {
-                Button(role: .destructive, action: onRemove) {
-                    Label("Remove from Library", systemImage: "trash")
-                }
-            }
-        }
-    }
-
     fileprivate struct LibraryLocalTrackCardItemView: View {
         let track: LocalTrack
         let isSelected: Bool
@@ -972,7 +758,7 @@ struct LibraryView:
         let onPlayNext: () -> Void
         let onEnqueue: () -> Void
         let onReveal: () -> Void
-        let onDelete: () -> Void
+        let onRemove: (() -> Void)?
 
         @State private var isHovered: Bool = false
 
@@ -1031,12 +817,13 @@ struct LibraryView:
         private var menuContent: some View {
             Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward", action: onPlayNext)
             Button("Add to Queue", systemImage: "text.badge.plus", action: onEnqueue)
-            // File actions exist only for tracks backed by a file.
             if track.fileURL.isFileURL {
                 Divider()
                 Button("Show in Finder", systemImage: "folder", action: onReveal)
+            }
+            if let onRemove {
                 Divider()
-                Button(role: .destructive, action: onDelete) {
+                Button(role: .destructive, action: onRemove) {
                     Label("Remove from Library", systemImage: "trash")
                 }
             }
@@ -1046,142 +833,16 @@ struct LibraryView:
 
     // MARK: - Source
 
-    @ViewBuilder
-    private func sourceLabels(
-        _ track:
-            LibraryTrack
-    ) -> some View {
-
-        let kinds =
-            Array(
-                Set(
-                    track.sources
-                        .map(
-                            \.kind
-                        )
-                )
-            )
-            .sorted {
-                lhs,
-                rhs in
-
-                lhs.rawValue
-                    < rhs.rawValue
-            }
-
-
-        HStack(
-            spacing:
-                4
-        ) {
-
-            ForEach(
-                kinds,
-                id:
-                    \.self
-            ) {
-                kind in
-
-                Text(
-                    sourceTitle(
-                        kind
-                    )
-                )
-                .font(
-                    .caption2
-                        .weight(
-                            .medium
-                        )
-                )
-                .foregroundStyle(
-                    .secondary
-                )
-                .padding(
-                    .horizontal,
-                    7
-                )
-                .padding(
-                    .vertical,
-                    3
-                )
-                .background(
-                    .quaternary,
-                    in:
-                        Capsule()
-                )
-            }
-        }
-    }
-
-
-    private func sourceTitle(
-        _ kind:
-            LibraryPlaybackSourceKind
-    ) -> String {
-
-        switch kind {
-
-        case .local:
-
-            return
-                "LOCAL"
-
-
-        case .openverse:
-
-            return
-                "OPENVERSE"
-
-
-        case .jamendo:
-
-            return
-                "JAMENDO"
-
-
-        case .appleMusic:
-
-            return
-                "APPLE"
-
-
-        case .openSubsonic:
-
-            return
-                "SUBSONIC"
-        }
-    }
-
-
     // MARK: - Artwork
 
-    private func artwork(_ track: LibraryTrack) -> some View {
-        MediaImageView(
-            reference: track.artworkReference ?? track.artworkURL?.absoluteString,
-            thumbnailPixelSize: CGSize(width: 240, height: 240),
-            placeholderSystemImage: "music.note",
-            cornerRadius: 10
-        )
-    }
 }
 
-#Preview("Saved Library · Empty") {
+#Preview("Library") {
     @Previewable @State var selectedTrack: LocalTrack?
     let scene = MSRUPreviewData.makeScene(section: .library)
     LibraryView(feature: scene.libraryFeature, localStore: scene.application.localLibrary,
                 playback: scene.application.playback, selectedLocalTrack: $selectedTrack, onAddMusic: {})
         .frame(width: 900, height: 650)
-}
-
-#Preview("Saved Library · Content") {
-    @Previewable @State var selectedTrack: LocalTrack?
-    let application = MSRUPreviewData.makeApplication(
-        savedTracks: MSRUPreviewData.localTracks.map { LibraryTrack(local: $0) })
-    let scene = SceneModel(application: application, section: .library)
-    LibraryView(feature: scene.libraryFeature, localStore: application.localLibrary,
-                playback: application.playback, selectedLocalTrack: $selectedTrack, onAddMusic: {})
-        .frame(width: 900, height: 650)
-        .task { await application.library.load() }
 }
 
 #Preview("Library · Compact") {
@@ -1194,15 +855,10 @@ struct LibraryView:
 #Preview("Library Cards") {
     let local = MSRUPreviewData.localTracks[0]
     HStack(spacing: 16) {
-        LibraryView.LibrarySavedTrackCardItemView(
-            track: LibraryTrack(local: local), isRemoving: false,
-            isSelected: false, isPlaying: false,
-            onSelect: {}, onPlay: {}, onPlayNext: {}, onEnqueue: {}, onRemove: {}
-        )
         LibraryView.LibraryLocalTrackCardItemView(
             track: local, isSelected: false, isPlaying: false,
             onSelect: {}, onPlay: {}, onPlayNext: {}, onEnqueue: {},
-            onReveal: {}, onDelete: {}
+            onReveal: {}, onRemove: {}
         )
     }
     .frame(width: 400)

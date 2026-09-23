@@ -93,7 +93,7 @@ struct MigrationTests {
 
     @Test
     @MainActor
-    func legacyMediaFavoritesPlaylistsAndSourceSurviveMigrationAndRetry() async throws {
+    func legacyMediaPlaylistsAndSourceSurviveMigrationAndRetry() async throws {
         struct LegacyMedia: Encodable {
             let fileURL: URL
             let title: String
@@ -113,33 +113,26 @@ struct MigrationTests {
 
         let audioURL = folder.appendingPathComponent("song.flac")
         let mediaURL = folder.appendingPathComponent("external_tracks.json")
-        let favoriteURL = folder.appendingPathComponent("Library.json")
         let playlistURL = folder.appendingPathComponent("playlists.json")
         let legacyMedia = LegacyMedia(fileURL: audioURL, title: "Song", artist: "Artist",
                                       album: "Album", duration: 180,
                                       artworkRelativePath: nil, trackNumber: 1, year: 2026)
         try JSONEncoder().encode([legacyMedia]).write(to: mediaURL)
-        let favorite = LibraryTrack(title: "Song", artist: "Artist", album: "Album",
-                                    sources: [LibraryPlaybackSource(kind: .local, localFileURL: audioURL)])
-        try JSONEncoder().encode([favorite]).write(to: favoriteURL)
         let playlist = Playlist(title: "Legacy Favorites", trackIDs: [audioURL.absoluteString])
         try JSONEncoder().encode([playlist]).write(to: playlistURL)
 
         let mediaRepo = SQLiteLocalLibraryRepository(db: db, directory: folder)
-        let favoriteRepo = SQLiteLibraryRepository(db: db, legacyFileURL: favoriteURL)
         let playlistRepo = SQLitePlaylistRepository(db: db, legacyFileURL: playlistURL)
 
         for _ in 0..<2 {
             let media = try await mediaRepo.fetchPage(LocalTrackPageRequest(limit: 128))
-            let favorites = try await favoriteRepo.loadTracks()
             let playlists = try await playlistRepo.loadPlaylists()
             #expect(media.totalCount == 1)
             #expect(media.tracks.first?.fileURL == audioURL)
-            #expect(favorites.first?.sources.first?.localFileURL == audioURL)
             #expect(playlists.first?.trackIDs == [audioURL.absoluteString])
         }
 
-        for url in [mediaURL, favoriteURL, playlistURL] {
+        for url in [mediaURL, playlistURL] {
             #expect(!FileManager.default.fileExists(atPath: url.path))
             #expect(FileManager.default.fileExists(atPath: url.appendingPathExtension("legacy.backup").path))
         }
@@ -147,11 +140,10 @@ struct MigrationTests {
             [
                 try Int.fetchOne(connection, sql: "SELECT COUNT(*) FROM sources WHERE source_type = 'local_folder'") ?? 0,
                 try Int.fetchOne(connection, sql: "SELECT COUNT(*) FROM assets") ?? 0,
-                try Int.fetchOne(connection, sql: "SELECT COUNT(*) FROM saved_library_tracks") ?? 0,
                 try Int.fetchOne(connection, sql: "SELECT COUNT(*) FROM playlists") ?? 0
             ]
         }
-        #expect(counts == [1, 1, 1, 1])
+        #expect(counts == [1, 1, 1])
     }
 
     @Test

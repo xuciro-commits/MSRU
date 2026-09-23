@@ -10,7 +10,7 @@ import MusicDomain
 @MainActor
 public final class LibraryPresentationAggregator {
 
-    public static func buildAlbums(from localTracks: [LocalTrack], libraryTracks: [LibraryTrack] = []) -> [AlbumPresentationModel] {
+    public static func buildAlbums(from localTracks: [LocalTrack]) -> [AlbumPresentationModel] {
         // 1. Group tracks by album title (or artist if unknown)
         var rawAlbumGroups: [String: [LocalTrack]] = [:]
 
@@ -94,7 +94,7 @@ public final class LibraryPresentationAggregator {
         return models.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
     }
 
-    public static func buildArtists(from localTracks: [LocalTrack], libraryTracks: [LibraryTrack] = []) -> [ArtistPresentationModel] {
+    public static func buildArtists(from localTracks: [LocalTrack]) -> [ArtistPresentationModel] {
         var artistGroups: [String: [LocalTrack]] = [:]
 
         for track in localTracks {

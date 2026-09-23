@@ -560,7 +560,6 @@ struct BrowseView: View {
                 } else {
                     Button {
                         Task {
-                            try? await OnDemandCherryPicker.shared.ingest(audio: item)
                             feature.send(.libraryToggleRequested(item))
                         }
                     } label: {

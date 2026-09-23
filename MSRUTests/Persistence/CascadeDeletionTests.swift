@@ -15,13 +15,6 @@ import MusicLibrary
 import MusicPlayback
 @testable import MSRU
 
-private actor InMemoryLibraryRepository: LibraryRepository {
-    var tracks: [LibraryTrack] = []
-    init(tracks: [LibraryTrack] = []) { self.tracks = tracks }
-    func loadTracks() async throws -> [LibraryTrack] { tracks }
-    func saveTracks(_ tracks: [LibraryTrack]) async throws { self.tracks = tracks }
-}
-
 @MainActor
 @Suite("Cascade Deletion & Orphan Garbage Collection Contracts")
 struct CascadeDeletionTests {
@@ -259,50 +252,6 @@ struct CascadeDeletionTests {
     }
 
     @Test
-    func crossStorePurgeSync() async {
-        // Arrange
-        let playlistStore = PlaylistStore(repository: PreviewPlaylistRepository(playlists: []))
-        let libraryStore = LibraryStore(repository: InMemoryLibraryRepository())
-        let playbackController = PlaybackController()
-
-        // 1. Create a playlist with track "track_test_123"
-        let pl = await playlistStore.createPlaylist(title: "My Favorite Playlist", initialTrackIDs: ["track_test_123", "track_keep_456"])
-        #expect(pl.trackIDs.count == 2)
-
-        // 2. Add to library
-        let fileURL = URL(fileURLWithPath: "/music/test_123.flac")
-        let localTrack = LocalTrack(fileURL: fileURL, title: "Test Song", artist: "Artist", duration: 180)
-        await libraryStore.add(local: localTrack)
-        let remoteSource = LibraryPlaybackSource(kind: .openverse, externalID: "remote-copy")
-        if let savedID = libraryStore.libraryTrack(for: localTrack)?.id {
-            #expect(await libraryStore.addSource(remoteSource, toTrackID: savedID))
-        }
-        #expect(libraryStore.contains(local: localTrack))
-
-        // 3. Add to playback queue
-        let playItem = PlaybackItem(local: localTrack)
-        playbackController.addToQueue(playItem)
-        #expect(playbackController.playbackQueue.upcoming.count == 1)
-
-        // Act: Purge across all 3 stores
-        await playlistStore.purgeTracks(withIDs: ["track_test_123"])
-        await libraryStore.purgeTracks(matchingIDs: ["track_test_123"], localURLs: [fileURL])
-        playbackController.purgeTracks(withIDs: ["track_test_123"], localURLs: [fileURL])
-
-        // Assert:
-        // Playlist now only has "track_keep_456"
-        let updatedPL = playlistStore.playlists.first { $0.id == pl.id }
-        #expect(updatedPL?.trackIDs == ["track_keep_456"])
-
-        // Library no longer contains the track
-        #expect(!libraryStore.contains(local: localTrack))
-        #expect(libraryStore.contains(source: remoteSource))
-
-        // Playback queue is cleared
-        #expect(playbackController.playbackQueue.upcoming.isEmpty)
-    }
-
-    @Test
     func localDeletionCascadesCollectionsAndRollsBackOnFailure() async throws {
         let db = try TestDatabase.makeEphemeral()
         let sourceID = try await TestDatabase.seedSource(in: db)
@@ -314,12 +263,6 @@ struct CascadeDeletionTests {
             PersistedAssetRecord(id: assetID, sourceID: sourceID, relativePath: path,
                                  fileSize: 100, mtime: 1, format: "FLAC", recordingID: recordingID)
         ])
-        let saved = LibraryTrack(title: "Atomic", artist: "Artist", sources: [
-            LibraryPlaybackSource(kind: .local, localFileURL: URL(fileURLWithPath: path)),
-            LibraryPlaybackSource(kind: .openverse, externalID: "remote-copy")
-        ])
-        let savedRepository = SQLiteLibraryRepository(db: db)
-        try await savedRepository.saveTracks([saved])
         let playlist = Playlist(title: "Atomic", trackIDs: [path, "keep"])
         let playlistRepository = SQLitePlaylistRepository(db: db)
         try await playlistRepository.savePlaylists([playlist])
@@ -331,16 +274,12 @@ struct CascadeDeletionTests {
         await #expect(throws: (any Error).self) {
             try await localRepository.deleteTracks(withIDs: [path], deletePhysicalFiles: false)
         }
-        let before = try await savedRepository.loadTracks()
-        #expect(before.first?.sources.count == 2)
         #expect(try await playlistRepository.loadPlaylists().first?.trackIDs == [path, "keep"])
 
         try await db.dbWriter.write { database in
             try database.execute(sql: "DROP TRIGGER reject_atomic_delete")
         }
         try await localRepository.deleteTracks(withIDs: [path], deletePhysicalFiles: false)
-        let after = try await savedRepository.loadTracks()
-        #expect(after.first?.sources.map(\.kind) == [.openverse])
         #expect(try await playlistRepository.loadPlaylists().first?.trackIDs == ["keep"])
         let assetCount = try await db.reader.read { database in
             try Int.fetchOne(database, sql: "SELECT COUNT(*) FROM assets WHERE id = ?", arguments: [assetID.rawValue]) ?? 0
