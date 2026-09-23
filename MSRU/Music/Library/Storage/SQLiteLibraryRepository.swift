@@ -22,7 +22,7 @@ final class SQLiteLibraryRepository: LibraryRepository, Sendable {
     // MARK: - Load
 
     func loadTracks() async throws -> [LibraryTrack] {
-        await migrateLegacyLibraryIfPresent()
+        try await migrateLegacyLibraryIfPresent()
 
         return try await db.reader.read { db in
             let trackRows = try Row.fetchAll(db, sql: "SELECT * FROM saved_library_tracks ORDER BY date_added DESC")
@@ -95,57 +95,73 @@ final class SQLiteLibraryRepository: LibraryRepository, Sendable {
     // MARK: - Save
 
     func saveTracks(_ tracks: [LibraryTrack]) async throws {
+        let desiredIDs = Set(tracks.map { $0.id.uuidString })
         try await db.dbWriter.write { db in
-            try db.execute(sql: "DELETE FROM saved_library_tracks")
-
-            for track in tracks {
-                try db.execute(
-                    sql: """
-                    INSERT INTO saved_library_tracks (id, title, artist, album, duration, artwork_reference, date_added, last_played_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    arguments: [
-                        track.id.uuidString,
-                        track.title,
-                        track.artist,
-                        track.album,
-                        track.duration,
-                        track.artworkReference,
-                        track.dateAdded,
-                        track.lastPlayedAt
-                    ]
-                )
-
-                for source in track.sources {
-                    try db.execute(
-                        sql: """
-                        INSERT INTO saved_library_sources (id, library_track_id, kind, local_url, remote_url, external_id, title, artist, duration)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        arguments: [
-                            source.id.uuidString,
-                            track.id.uuidString,
-                            source.kind.rawValue,
-                            source.localFileURL?.path,
-                            source.remoteURL?.absoluteString,
-                            source.externalID,
-                            nil,
-                            nil,
-                            nil
-                        ]
-                    )
-                }
+            let existingIDs = try Set(String.fetchAll(db, sql: "SELECT id FROM saved_library_tracks"))
+            for id in existingIDs.subtracting(desiredIDs) {
+                try db.execute(sql: "DELETE FROM saved_library_tracks WHERE id = ?", arguments: [id])
             }
+            for track in tracks {
+                try Self.upsert(track, in: db)
+            }
+        }
+    }
+
+    func applyChanges(upserting tracks: [LibraryTrack], deleting ids: Set<UUID>) async throws {
+        guard !tracks.isEmpty || !ids.isEmpty else { return }
+        try await db.dbWriter.write { db in
+            for id in ids {
+                try db.execute(sql: "DELETE FROM saved_library_tracks WHERE id = ?", arguments: [id.uuidString])
+            }
+            for track in tracks {
+                try Self.upsert(track, in: db)
+            }
+        }
+    }
+
+    nonisolated private static func upsert(_ track: LibraryTrack, in db: Database) throws {
+        try db.execute(
+            sql: """
+            INSERT INTO saved_library_tracks (id, title, artist, album, duration, artwork_reference, date_added, last_played_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                title = excluded.title, artist = excluded.artist, album = excluded.album,
+                duration = excluded.duration, artwork_reference = excluded.artwork_reference,
+                last_played_at = excluded.last_played_at
+            """,
+            arguments: [track.id.uuidString, track.title, track.artist, track.album,
+                        track.duration ?? 0, track.artworkReference, track.dateAdded, track.lastPlayedAt]
+        )
+        let desiredSourceIDs = Set(track.sources.map { $0.id.uuidString })
+        let existingSourceIDs = try Set(String.fetchAll(
+            db, sql: "SELECT id FROM saved_library_sources WHERE library_track_id = ?",
+            arguments: [track.id.uuidString]
+        ))
+        for id in existingSourceIDs.subtracting(desiredSourceIDs) {
+            try db.execute(sql: "DELETE FROM saved_library_sources WHERE id = ?", arguments: [id])
+        }
+        for source in track.sources {
+            try db.execute(
+                sql: """
+                INSERT INTO saved_library_sources (id, library_track_id, kind, local_url, remote_url, external_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    library_track_id = excluded.library_track_id, kind = excluded.kind,
+                    local_url = excluded.local_url, remote_url = excluded.remote_url,
+                    external_id = excluded.external_id
+                """,
+                arguments: [source.id.uuidString, track.id.uuidString, source.kind.rawValue,
+                            source.localFileURL?.path, source.remoteURL?.absoluteString, source.externalID]
+            )
         }
     }
 
     // MARK: - Legacy Migration
 
-    private func migrateLegacyLibraryIfPresent() async {
+    private func migrateLegacyLibraryIfPresent() async throws {
         guard let legacyURL = legacyFileURL ?? defaultLegacyLibraryURL(),
               FileManager.default.fileExists(atPath: legacyURL.path),
-              let data = try? Data(contentsOf: legacyURL),
-              !data.isEmpty else {
+              let data = try? Data(contentsOf: legacyURL) else {
             return
         }
 
@@ -153,11 +169,37 @@ final class SQLiteLibraryRepository: LibraryRepository, Sendable {
         isoDecoder.dateDecodingStrategy = .iso8601
         let legacyTracks = (try? isoDecoder.decode([LibraryTrack].self, from: data))
             ?? (try? JSONDecoder().decode([LibraryTrack].self, from: data))
-        if let legacyTracks, !legacyTracks.isEmpty {
-            try? await saveTracks(legacyTracks)
+        guard let legacyTracks else {
+            throw LibraryMigrationError.invalidLegacyFile(legacyURL)
         }
 
-        try? FileManager.default.removeItem(at: legacyURL)
+        try await db.dbWriter.write { db in
+            for track in legacyTracks {
+                let exists = try Int.fetchOne(
+                    db, sql: "SELECT 1 FROM saved_library_tracks WHERE id = ?", arguments: [track.id.uuidString]
+                ) != nil
+                if exists {
+                    let sourceIDs = try Set(String.fetchAll(
+                        db, sql: "SELECT id FROM saved_library_sources WHERE library_track_id = ?",
+                        arguments: [track.id.uuidString]
+                    ))
+                    guard Set(track.sources.map { $0.id.uuidString }).isSubset(of: sourceIDs) else {
+                        throw LibraryMigrationError.conflictingSources(track.id)
+                    }
+                } else {
+                    try Self.upsert(track, in: db)
+                }
+            }
+            let persistedIDs = try Set(String.fetchAll(db, sql: "SELECT id FROM saved_library_tracks"))
+            guard Set(legacyTracks.map { $0.id.uuidString }).isSubset(of: persistedIDs) else {
+                throw LibraryMigrationError.verificationFailed
+            }
+        }
+
+        let backupURL = legacyURL.appendingPathExtension("legacy.backup")
+        if !FileManager.default.fileExists(atPath: backupURL.path) {
+            try FileManager.default.moveItem(at: legacyURL, to: backupURL)
+        }
     }
 
     private func defaultLegacyLibraryURL() -> URL? {
@@ -165,5 +207,19 @@ final class SQLiteLibraryRepository: LibraryRepository, Sendable {
         let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? fileManager.temporaryDirectory
         return baseURL.appendingPathComponent("MSRU/Library.json")
+    }
+}
+
+private enum LibraryMigrationError: LocalizedError {
+    case invalidLegacyFile(URL)
+    case conflictingSources(UUID)
+    case verificationFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidLegacyFile(let url): return "Library migration could not decode \(url.lastPathComponent); the original file was kept."
+        case .conflictingSources(let id): return "Library migration found incomplete sources for \(id); the original file was kept."
+        case .verificationFailed: return "Library migration verification failed; the original file was kept."
+        }
     }
 }

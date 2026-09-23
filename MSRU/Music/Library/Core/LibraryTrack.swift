@@ -10,6 +10,17 @@ import Foundation
 protocol LibraryRepository: Sendable {
     func loadTracks() async throws -> [LibraryTrack]
     func saveTracks(_ tracks: [LibraryTrack]) async throws
+    func applyChanges(upserting tracks: [LibraryTrack], deleting ids: Set<UUID>) async throws
+}
+
+extension LibraryRepository {
+    func applyChanges(upserting tracks: [LibraryTrack], deleting ids: Set<UUID>) async throws {
+        var snapshot = try await loadTracks()
+        let upsertIDs = Set(tracks.map(\.id))
+        snapshot.removeAll { ids.contains($0.id) || upsertIDs.contains($0.id) }
+        snapshot.append(contentsOf: tracks)
+        try await saveTracks(snapshot)
+    }
 }
 
 // MARK: - Playback Source

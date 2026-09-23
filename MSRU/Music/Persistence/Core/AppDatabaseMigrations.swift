@@ -463,5 +463,30 @@ nonisolated enum AppDatabaseMigrations {
                 }
             }
         }
+
+        migrator.registerMigration("v5_r128_analysis") { db in
+            try db.create(table: "asset_loudness") { t in
+                t.column("file_path", .text).primaryKey()
+                t.column("file_size", .integer).notNull()
+                t.column("modified_at", .double).notNull()
+                t.column("integrated_lufs", .double).notNull()
+                t.column("sample_peak", .double).notNull()
+                t.column("duration", .double).notNull()
+                t.column("analyzed_at", .datetime).notNull()
+            }
+            try db.create(table: "album_loudness") { t in
+                t.column("album_key", .text).primaryKey()
+                t.column("asset_signature", .text).notNull()
+                t.column("integrated_lufs", .double).notNull()
+                t.column("sample_peak", .double).notNull()
+                t.column("duration", .double).notNull()
+                t.column("analyzed_at", .datetime).notNull()
+            }
+            try db.create(table: "asset_album_loudness") { t in
+                t.column("file_path", .text).primaryKey()
+                t.column("album_key", .text).notNull().references("album_loudness", onDelete: .cascade)
+            }
+            try db.create(index: "idx_asset_album_loudness_album", on: "asset_album_loudness", columns: ["album_key"])
+        }
     }
 }

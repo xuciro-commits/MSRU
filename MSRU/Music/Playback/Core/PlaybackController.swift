@@ -121,6 +121,12 @@ private struct WeakSessionObserver {
     // MARK: - Volume & Mute State
 
     let equalizer: EqualizerStore
+    let replayGainSettings: ReplayGainSettings
+    private var activeLoudness: R128Measurement?
+    private var loudnessAnalysisTask: Task<Void, Never>?
+    private var loudnessAnalysisID: UUID?
+    private(set) var isAnalyzingLoudness = false
+    private(set) var loudnessMessage: String?
 
     private(set) var volume: Float = 1.0
 
@@ -186,6 +192,7 @@ private struct WeakSessionObserver {
 
         self.playbackQueue = PlaybackQueueController()
         self.equalizer = EqualizerStore()
+        self.replayGainSettings = ReplayGainSettings()
         #if os(macOS)
         self.audioOutput = MacAudioOutputController()
         self.audioOutput.onSelectedDeviceLost = { [weak self] in
@@ -1025,6 +1032,7 @@ private struct WeakSessionObserver {
     func setEqualizerEnabled(_ enabled: Bool) {
         equalizer.setEnabled(enabled)
         pcmEngine?.applyEqualizer(equalizer.state)
+        updateReplayGainOnEngine()
         if enabled, player != nil, let currentItem,
            currentItem.playbackRequest.source == .subsonic {
             resolveAndStart(currentItem, resumeAt: currentTime, autoPlay: isPlaying)
@@ -1034,11 +1042,13 @@ private struct WeakSessionObserver {
     func setEqualizerGain(_ gain: Float, band: Int) {
         equalizer.setGain(gain, band: band)
         pcmEngine?.applyEqualizer(equalizer.state)
+        updateReplayGainOnEngine()
     }
 
     func applyEqualizerPreset(_ id: String) {
         equalizer.applyPreset(id)
         pcmEngine?.applyEqualizer(equalizer.state)
+        updateReplayGainOnEngine()
     }
 
     func saveEqualizerPreset(named name: String) {
@@ -1047,6 +1057,95 @@ private struct WeakSessionObserver {
 
     func deleteEqualizerPreset(_ id: String) {
         equalizer.deletePreset(id)
+    }
+
+    func setReplayGainMode(_ mode: ReplayGainMode) {
+        replayGainSettings.setMode(mode)
+        guard let item = currentItem else {
+            activeLoudness = nil
+            updateReplayGainOnEngine()
+            return
+        }
+        let itemID = item.id
+        Task { [weak self] in
+            guard let self else { return }
+            let measurement = await self.cachedLoudness(for: item)
+            guard self.currentItem?.id == itemID else { return }
+            self.activeLoudness = measurement
+            self.updateReplayGainOnEngine()
+        }
+    }
+
+    func analyzeCurrentLoudness(includeQueuedAlbum: Bool = false) {
+        guard let current = currentItem?.localTrack else { return }
+        loudnessAnalysisTask?.cancel()
+        let urls: [URL]
+        if includeQueuedAlbum, let album = current.album {
+            let matched = playbackQueue.allItems.compactMap { $0.item.localTrack }.filter {
+                $0.album == album && $0.artist == current.artist
+            }
+            urls = Array(Set(matched.map(\.fileURL)))
+        } else {
+            urls = [current.fileURL]
+        }
+        isAnalyzingLoudness = true
+        loudnessMessage = nil
+        let itemID = currentItem?.id
+        let analysisID = UUID()
+        loudnessAnalysisID = analysisID
+        loudnessAnalysisTask = Task(priority: .utility) { [weak self] in
+            guard let self else { return }
+            do {
+                if includeQueuedAlbum {
+                    _ = try await ReplayGainService.shared.analyzeAlbum(urls)
+                } else {
+                    _ = try await ReplayGainService.shared.analyzeTrack(current.fileURL)
+                }
+                try Task.checkCancellation()
+                guard self.loudnessAnalysisID == analysisID else { return }
+                self.loudnessMessage = "Loudness analysis complete"
+                if self.currentItem?.id == itemID, let current = self.currentItem {
+                    self.activeLoudness = await self.cachedLoudness(for: current)
+                    self.updateReplayGainOnEngine()
+                }
+            } catch is CancellationError {
+                if self.loudnessAnalysisID == analysisID {
+                    self.loudnessMessage = "Loudness analysis cancelled"
+                }
+            } catch {
+                if self.loudnessAnalysisID == analysisID {
+                    self.loudnessMessage = error.localizedDescription
+                }
+            }
+            if self.loudnessAnalysisID == analysisID {
+                self.isAnalyzingLoudness = false
+                self.loudnessAnalysisTask = nil
+                self.loudnessAnalysisID = nil
+            }
+        }
+    }
+
+    func cancelLoudnessAnalysis() {
+        loudnessAnalysisTask?.cancel()
+    }
+
+    private func cachedLoudness(for item: PlaybackItem) async -> R128Measurement? {
+        guard replayGainSettings.mode != .off, let track = item.localTrack else { return nil }
+        do {
+            if replayGainSettings.mode == .album,
+               let album = try await ReplayGainService.shared.cachedAlbum(for: track.fileURL) {
+                return album
+            }
+            return try await ReplayGainService.shared.cachedTrack(for: track.fileURL)
+        } catch {
+            return nil
+        }
+    }
+
+    private func updateReplayGainOnEngine() {
+        let eqGains = equalizer.state.isEnabled ? equalizer.state.gains : []
+        pcmEngine?.setReplayGainDB(replayGainSettings.mode == .off ? 0 :
+            ReplayGainPolicy.gainDB(for: activeLoudness, eqGains: eqGains))
     }
 
     private func applyVolumeToActiveTransport() {
@@ -1263,6 +1362,8 @@ private struct WeakSessionObserver {
 
         case .avPlayerURL(let resolvedURL):
 
+            activeLoudness = nil
+
             let newPlayer = makePlayer(resolvedURL)
             #if os(macOS)
             let outputRoute = try audioOutput.prepare(inputRate: nil)
@@ -1299,15 +1400,22 @@ private struct WeakSessionObserver {
             let targetTime = max(0, resumeAt)
             if targetTime > 0 { try await pcmResource.session.seek(to: targetTime) }
             try Task.checkCancellation()
+            let measurement = await cachedLoudness(for: item)
+            try Task.checkCancellation()
+            activeLoudness = measurement
+            let eqGains = equalizer.state.isEnabled ? equalizer.state.gains : []
+            let gainDB = replayGainSettings.mode == .off ? Float.zero :
+                ReplayGainPolicy.gainDB(for: measurement, eqGains: eqGains)
 
             #if os(macOS)
             let outputRoute = try audioOutput.prepare(inputRate: pcmResource.format.sampleRate)
             let engine = try await PCMPlaybackEngine(resource: pcmResource, outputDeviceID: outputRoute.deviceID,
-                                                     equalizer: equalizer.state, initialTime: targetTime)
+                                                     equalizer: equalizer.state, initialTime: targetTime,
+                                                     replayGainDB: gainDB)
             audioOutput.updateEngineRate(engine.outputSampleRate)
             #else
             let engine = try await PCMPlaybackEngine(resource: pcmResource, equalizer: equalizer.state,
-                                                     initialTime: targetTime)
+                                                     initialTime: targetTime, replayGainDB: gainDB)
             #endif
             engine.volume = isMuted ? 0.0 : volume
 
@@ -1357,6 +1465,16 @@ private struct WeakSessionObserver {
                 }
                 #endif
                 self.duration = engine.duration
+                self.activeLoudness = nil
+                engine.setReplayGainDB(0)
+                let nextItem = next.item
+                Task { [weak self, weak engine] in
+                    guard let self, let engine else { return }
+                    let result = await self.cachedLoudness(for: nextItem)
+                    guard self.pcmEngine === engine, self.currentItem?.id == nextItem.id else { return }
+                    self.activeLoudness = result
+                    self.updateReplayGainOnEngine()
+                }
                 self.notifyItemChanged()
                 self.refreshPCMNext()
                 print("Playback ▶︎", "[\(nextResource.providerID.rawValue)]", next.item.title)

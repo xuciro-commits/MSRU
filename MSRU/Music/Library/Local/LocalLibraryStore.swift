@@ -93,6 +93,10 @@ final class LocalLibraryStore {
         self.queryEngine = LibraryQueryEngine(db: db)
     }
 
+    func makePager() -> LocalTrackPager {
+        LocalTrackPager(repository: repository)
+    }
+
     func loadIfNeeded() async {
         await serialized {
             guard !self.didLoad else { return }
@@ -114,8 +118,6 @@ final class LocalLibraryStore {
             didLoad = true
             errorMessage = nil
 
-            await syncTracksToDatabase(tracks)
-            await reconcileDatabaseOrphans(validTracks: tracks)
             await refreshQuerySnapshot()
             triggerBackgroundArtworkBackfillIfNeeded()
         } catch {
@@ -157,7 +159,6 @@ final class LocalLibraryStore {
             }
             self.tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
             self.updateCachedPresentations()
-            await self.syncTracksToDatabase(newTracks)
             await self.refreshQuerySnapshot()
             await LocalLibraryIndexingService.shared.enqueue(newTracks)
             self.triggerBackgroundArtworkBackfillIfNeeded()
@@ -265,52 +266,20 @@ final class LocalLibraryStore {
 
             let deletedTrackIDs = Set(deletedTracks.map(\.id))
             let deletedURLs = Set(deletedTracks.map(\.fileURL))
-
-            var deletedPaths = Set<String>()
-            var deletedRelativePaths = Set<String>()
-            for t in deletedTracks {
-                let std = t.fileURL.standardizedFileURL.path
-                let raw = t.fileURL.path
-                let unenc = t.fileURL.path.removingPercentEncoding ?? raw
-                deletedPaths.insert(std)
-                deletedPaths.insert(raw)
-                deletedPaths.insert(unenc)
-                if std.hasPrefix("/private") {
-                    deletedPaths.insert(String(std.dropFirst(8)))
-                } else {
-                    deletedPaths.insert("/private" + std)
-                }
-                deletedRelativePaths.insert(t.fileURL.lastPathComponent)
+            do {
+                try await self.repository.deleteTracks(withIDs: deletedTrackIDs, deletePhysicalFiles: deletePhysical)
+            } catch {
+                self.errorMessage = error.localizedDescription
+                return
             }
 
-            let sourceID = SourceID("src_local_default")
-            let deletedRecIDs = Set(deletedTracks.map {
-                DeterministicID.recording(title: $0.title, artist: $0.artist)
-            })
-            let deletedAssetIDs = Set(deletedPaths.map {
-                DeterministicID.asset(sourceID: sourceID, relativePath: $0)
-            })
-
-            // 1. Remove from in-memory tracks
             self.tracks.removeAll { deletedTrackIDs.contains($0.id) }
 
-            // 2. Remove from local JSON manifest and optionally trash physical files
-            try? await self.repository.deleteTracks(withIDs: deletedTrackIDs, deletePhysicalFiles: deletePhysical)
-
-            // 3. Sync deletion to SQLite database (assets, recordings, release_tracks, fts, orphan releases/artists)
-            let identityRepo = IdentityRepository(db: self.db)
-            try? await identityRepo.deleteTracks(
-                assetIDs: deletedAssetIDs,
-                recordingIDs: deletedRecIDs,
-                relativePaths: deletedPaths.union(deletedRelativePaths)
-            )
-
-            // 4. Cross-store cleanup: LibraryStore, PlaylistStore, PlaybackController
+            // Cross-store cleanup follows a successful authoritative SQLite delete.
             await self.libraryStore?.purgeTracks(matchingIDs: deletedTrackIDs, localURLs: deletedURLs)
             await self.playlistStore?.purgeTracks(withIDs: deletedTrackIDs)
             self.playbackController?.purgeTracks(withIDs: deletedTrackIDs, localURLs: deletedURLs)
 
-            // 5. Update cached presentation and query snapshot
             self.updateCachedPresentations()
             self.deregisterTracks(deletedTracks)
             await self.refreshQuerySnapshot()
@@ -657,7 +626,6 @@ final class LocalLibraryStore {
             }
             tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
             updateCachedPresentations()
-            await syncTracksToDatabase(newlyImported)
             await refreshQuerySnapshot()
             await LocalLibraryIndexingService.shared.enqueue(newlyImported)
             triggerBackgroundArtworkBackfillIfNeeded()

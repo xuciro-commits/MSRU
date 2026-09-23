@@ -4,6 +4,7 @@
 
 ## 进行中
 
+- **#65–#67 · Stage 2 当前开发波次**（实现与内部验证进行中，统一交用户验收）。#65 已接入显式 R128 曲目/队列专辑分析、签名缓存与 PCM 增益模式；#66 正收口 SQLite 增量写入、迁移保留及删除顺序；#67 已有 50,000 首固定数据集基线与 SQLite 分页，仍须移除启动整表读取和收口其它曲库入口。完成条件沿用下表，未达到前不移入完成索引。
 - **#61 · 本地专辑连续 PCM 排程**（已实现，待用户验收）。同采样率、同声道曲目在单个播放节点接续；定向代码测试 4 项及 macOS Debug 构建通过。依据 [Stage 2 路线图](../Docs/Roadmap/FoundationRoadmap.md)、[播放交互 15.2](../Docs/Blueprint/InteractionAtlas.md)；当时实现见[实施记录](../Docs/Architecture/ImplementationHistory.md)。完成条件：用户确认真实专辑交接听感、曲目信息切换与队列顺序。
 - **#62 · NAS 专辑连续播放与异格式交接**（已实现，待用户验收）。普通单曲流播；专辑队列经临时下载和 PCM 预备接续，异格式退回正常切歌。定向代码测试 8 项通过；真实 NAS 听感、等待与错误体验由用户验收。依据[播放交互 15.2](../Docs/Blueprint/InteractionAtlas.md)，细节见[实施记录](../Docs/Architecture/ImplementationHistory.md)。
 

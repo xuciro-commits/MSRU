@@ -48,6 +48,8 @@ struct LocalLibraryView: View {
     @State private var debouncedQuery:
         String = ""
 
+    @State private var pager: LocalTrackPager? = nil
+
     @State private var searchDebounceTask:
         Task<Void, Never>? = nil
 
@@ -89,6 +91,15 @@ struct LocalLibraryView: View {
             await store
                 .loadIfNeeded()
         }
+        .task(id: "\(debouncedQuery)|\(sortField.rawValue)|\(sortAscending)") {
+            let activePager = pager ?? store.makePager()
+            pager = activePager
+            await activePager.reset(
+                query: debouncedQuery,
+                sort: LocalTrackPageRequest.Sort(rawValue: sortField.rawValue) ?? .title,
+                ascending: sortAscending
+            )
+        }
         .dropDestination(
             for:
                 URL.self
@@ -122,28 +133,20 @@ struct LocalLibraryView: View {
     private var content:
         some View {
 
-        if !store.isLoaded {
+        if !store.isLoaded || pager == nil || (pager?.isLoading == true && pager?.tracks.isEmpty == true) {
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if store.tracks.isEmpty {
-
-            emptyState
+        } else if pager?.totalCount == 0 {
+            if debouncedQuery.isEmpty {
+                emptyState
+            } else {
+                ContentUnavailableView.search(text: searchQuery)
+            }
 
         } else {
 
             let isFiltered = !debouncedQuery.isEmpty
-            let tracks =
-                LibraryCollectionSortFilter
-                    .filterAndSort(
-                        tracks:
-                            store.tracks,
-                        query:
-                            debouncedQuery,
-                        field:
-                            sortField,
-                        ascending:
-                            sortAscending
-                    )
+            let tracks = pager?.tracks ?? []
 
 
             VStack(
@@ -183,7 +186,7 @@ struct LocalLibraryView: View {
                     case .table:
                         LocalTrackTableView(
                             tracks: tracks,
-                            positionLookup: store.positionLookup,
+                            positionLookup: nil,
                             isFiltered: isFiltered,
                             selectedTrack: $selectedTrack,
                             playback: playback,
@@ -194,6 +197,14 @@ struct LocalLibraryView: View {
                             onDeleteTracks: { ids in
                                 Task {
                                     await store.deleteTracks(withIDs: ids)
+                                    await pager?.reset(query: debouncedQuery,
+                                        sort: LocalTrackPageRequest.Sort(rawValue: sortField.rawValue) ?? .title,
+                                        ascending: sortAscending)
+                                }
+                            },
+                            onTrackAppear: { track in
+                                if tracks.suffix(20).contains(where: { $0.id == track.id }) {
+                                    Task { await pager?.loadMore() }
                                 }
                             }
                         )
@@ -315,6 +326,11 @@ struct LocalLibraryView: View {
                     trackCard(
                         track
                     )
+                    .onAppear {
+                        if tracks.suffix(20).contains(where: { $0.id == track.id }) {
+                            Task { await pager?.loadMore() }
+                        }
+                    }
                 }
             }
             .padding(24)

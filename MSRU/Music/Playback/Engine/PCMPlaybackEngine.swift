@@ -19,6 +19,7 @@ final class PCMPlaybackEngine {
     private let audioEngine = AVAudioEngine()
     private let playerNode = AVAudioPlayerNode()
     private let equalizerNode = AVAudioUnitEQ(numberOfBands: EqualizerState.frequencies.count)
+    private let normalizationNode = AVAudioUnitEQ(numberOfBands: 1)
     private var configurationObserver: NSObjectProtocol?
     private let audioFormat: AVAudioFormat
     private var session: any PCMDecodeSession
@@ -65,9 +66,11 @@ final class PCMPlaybackEngine {
     var renderedVolume: Float { playerNode.volume }
     var equalizerBandGains: [Float] { equalizerNode.bands.map(\.gain) }
     var equalizerIsBypassed: Bool { equalizerNode.bypass }
+    var replayGainDB: Float { normalizationNode.globalGain }
 
     init(resource: PCMPlaybackResource, outputDeviceID: UInt32? = nil,
-         equalizer: EqualizerState = EqualizerState(), initialTime: TimeInterval = 0) async throws {
+         equalizer: EqualizerState = EqualizerState(), initialTime: TimeInterval = 0,
+         replayGainDB: Float = 0) async throws {
         session = resource.session
         format = resource.format
         baseTime = max(0, initialTime)
@@ -82,6 +85,9 @@ final class PCMPlaybackEngine {
         self.audioFormat = audioFormat
         audioEngine.attach(playerNode)
         audioEngine.attach(equalizerNode)
+        audioEngine.attach(normalizationNode)
+        normalizationNode.bands[0].bypass = true
+        normalizationNode.globalGain = replayGainDB
         for (index, frequency) in EqualizerState.frequencies.enumerated() {
             let band = equalizerNode.bands[index]
             band.filterType = .parametric
@@ -91,10 +97,12 @@ final class PCMPlaybackEngine {
         }
         if #available(macOS 27.0, iOS 27.0, tvOS 27.0, watchOS 27.0, *) {
             try audioEngine.connectNode(playerNode, to: equalizerNode, format: audioFormat)
-            try audioEngine.connectNode(equalizerNode, to: audioEngine.mainMixerNode, format: audioFormat)
+            try audioEngine.connectNode(equalizerNode, to: normalizationNode, format: audioFormat)
+            try audioEngine.connectNode(normalizationNode, to: audioEngine.mainMixerNode, format: audioFormat)
         } else {
             audioEngine.connect(playerNode, to: equalizerNode, format: audioFormat)
-            audioEngine.connect(equalizerNode, to: audioEngine.mainMixerNode, format: audioFormat)
+            audioEngine.connect(equalizerNode, to: normalizationNode, format: audioFormat)
+            audioEngine.connect(normalizationNode, to: audioEngine.mainMixerNode, format: audioFormat)
         }
         applyEqualizer(equalizer)
         audioEngine.prepare()
@@ -169,6 +177,10 @@ final class PCMPlaybackEngine {
             band.gain = gain
         }
         playerNode.volume = requestedVolume
+    }
+
+    func setReplayGainDB(_ gain: Float) {
+        normalizationNode.globalGain = gain.isFinite ? min(max(gain, -30), 18) : 0
     }
 
     var currentTime: TimeInterval {

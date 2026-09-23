@@ -165,7 +165,11 @@ final class LibraryStore {
             self.errorMessage = nil
             defer { self.isSaving = false }
             do {
-                try await self.repository.saveTracks(updated)
+                let oldByID = Dictionary(uniqueKeysWithValues: self.tracks.map { ($0.id, $0) })
+                let newIDs = Set(updated.map(\.id))
+                let upserts = updated.filter { oldByID[$0.id] != $0 }
+                let deletes = Set(oldByID.keys).subtracting(newIDs)
+                try await self.repository.applyChanges(upserting: upserts, deleting: deletes)
                 self.tracks = updated
                 self.rebuildIndex()
                 return true

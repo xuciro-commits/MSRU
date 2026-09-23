@@ -79,9 +79,35 @@ struct EqualizerPanel: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Divider()
+            Picker("Loudness", selection: Binding(
+                get: { playback.replayGainSettings.mode },
+                set: { playback.setReplayGainMode($0) }
+            )) {
+                Text("Off").tag(ReplayGainMode.off)
+                Text("Track").tag(ReplayGainMode.track)
+                Text("Album").tag(ReplayGainMode.album)
+            }
+            .pickerStyle(.segmented)
+            Text("Analysis runs only when requested. Missing results play at original gain.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack {
+                Button("Analyze Track") { playback.analyzeCurrentLoudness() }
+                Button("Analyze Queued Album") { playback.analyzeCurrentLoudness(includeQueuedAlbum: true) }
+                if playback.isAnalyzingLoudness {
+                    ProgressView().controlSize(.small)
+                    Button("Cancel") { playback.cancelLoudnessAnalysis() }
+                }
+            }
+            .disabled(playback.currentItem?.localTrack == nil)
+            if let message = playback.loudnessMessage {
+                Text(message).font(.caption).foregroundStyle(.secondary)
+            }
         }
         .padding(16)
-        .frame(width: 380, height: 540)
+        .frame(width: 380, height: 650)
     }
 
     private var selectedPresetName: String {

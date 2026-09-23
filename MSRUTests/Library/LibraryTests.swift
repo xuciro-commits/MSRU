@@ -185,7 +185,10 @@ struct LibraryTests {
         let db = try TestDatabase.makeEphemeral()
         let tempFile = FileManager.default.temporaryDirectory
             .appendingPathComponent("library_legacy_\(UUID().uuidString).json")
-        defer { try? FileManager.default.removeItem(at: tempFile) }
+        defer {
+            try? FileManager.default.removeItem(at: tempFile)
+            try? FileManager.default.removeItem(at: tempFile.appendingPathExtension("legacy.backup"))
+        }
 
         let legacyTrack = LibraryTrack(
             title: "七里香",
@@ -222,5 +225,52 @@ struct LibraryTests {
         #expect(reloaded.count == 1)
         let reloadedTrack = try #require(reloaded.first)
         #expect(reloadedTrack.title == "七里香 (Remastered)")
+    }
+
+    @Test
+    @MainActor
+    func sqliteSavedLibraryDeltaKeepsUnchangedTracksAndSources() async throws {
+        let db = try TestDatabase.makeEphemeral()
+        let repo = SQLiteLibraryRepository(db: db)
+        let first = LibraryTrack(title: "First", artist: "A", sources: [
+            LibraryPlaybackSource(kind: .local, localFileURL: URL(fileURLWithPath: "/music/first.flac"))
+        ])
+        let second = LibraryTrack(title: "Second", artist: "B", sources: [
+            LibraryPlaybackSource(kind: .openverse, externalID: "openverse-2")
+        ])
+        try await repo.saveTracks([first, second])
+        var changed = first
+        changed.lastPlayedAt = Date(timeIntervalSince1970: 123)
+        try await repo.applyChanges(upserting: [changed], deleting: [])
+
+        let loaded = try await repo.loadTracks()
+        #expect(loaded.count == 2)
+        #expect(loaded.first(where: { $0.id == second.id })?.sources == second.sources)
+        #expect(loaded.first(where: { $0.id == first.id })?.lastPlayedAt == changed.lastPlayedAt)
+        try await repo.applyChanges(upserting: [], deleting: [first.id])
+        #expect(try await repo.loadTracks().map(\.id) == [second.id])
+    }
+
+    @Test
+    @MainActor
+    func corruptLegacyLibraryRetainsOriginalAndExistingRows() async throws {
+        let db = try TestDatabase.makeEphemeral()
+        let legacyURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("library_corrupt_\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: legacyURL) }
+        let repo = SQLiteLibraryRepository(db: db, legacyFileURL: legacyURL)
+        let existing = LibraryTrack(title: "Existing", artist: "A")
+        try await repo.saveTracks([existing])
+        try Data("{broken".utf8).write(to: legacyURL)
+
+        var migrationFailed = false
+        do { _ = try await repo.loadTracks() }
+        catch { migrationFailed = true }
+        #expect(migrationFailed)
+        #expect(FileManager.default.fileExists(atPath: legacyURL.path))
+        let count = try await db.reader.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM saved_library_tracks") ?? 0
+        }
+        #expect(count == 1)
     }
 }
