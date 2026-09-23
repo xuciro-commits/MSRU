@@ -5,6 +5,12 @@ import AVFoundation
 protocol LocalLibraryRepository: Sendable {
     func loadTracks() async throws -> [LocalTrack]
     func fetchPage(_ request: LocalTrackPageRequest) async throws -> LocalTrackPage
+    func fetchTracks(withIDs ids: Set<String>) async throws -> [LocalTrack]
+    func fetchTracks(forReleaseIDs ids: Set<String>) async throws -> [LocalTrack]
+    func fetchTracks(forArtistIDs ids: Set<String>) async throws -> [LocalTrack]
+    func fetchTracks(inFolder folder: URL) async throws -> [LocalTrack]
+    func findUniqueTrack(title: String, artist: String?) async throws -> LocalTrack?
+    func searchTracks(_ query: String, limit: Int) async throws -> [LocalTrack]
     func importTrack(from url: URL) async throws -> LocalTrack?
     func importTracks(from urls: [URL]) async throws -> [LocalTrack]
     func saveTrackInPlace(_ track: LocalTrack) async throws
@@ -42,6 +48,43 @@ nonisolated struct LocalTrackPage: Sendable {
 }
 
 extension LocalLibraryRepository {
+    func fetchTracks(withIDs ids: Set<String>) async throws -> [LocalTrack] {
+        try await loadTracks().filter {
+            ids.contains($0.id) || ids.contains($0.fileURL.path)
+                || ids.contains($0.fileURL.standardizedFileURL.path)
+        }
+    }
+    func fetchTracks(forReleaseIDs ids: Set<String>) async throws -> [LocalTrack] {
+        try await loadTracks().filter { track in
+            guard let album = track.album else { return false }
+            return ids.contains(DeterministicID.release(artist: track.artist, title: album).rawValue)
+        }
+    }
+    func fetchTracks(forArtistIDs ids: Set<String>) async throws -> [LocalTrack] {
+        try await loadTracks().filter {
+            ids.contains(DeterministicID.artist(name: $0.artist).rawValue)
+        }
+    }
+    func fetchTracks(inFolder folder: URL) async throws -> [LocalTrack] {
+        let prefix = folder.standardizedFileURL.path
+        return try await loadTracks().filter {
+            let path = $0.fileURL.standardizedFileURL.path
+            return path == prefix || path.hasPrefix(prefix + "/")
+        }
+    }
+    func findUniqueTrack(title: String, artist: String?) async throws -> LocalTrack? {
+        let matches = try await loadTracks().filter {
+            $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame
+                && (artist == nil || $0.artist.localizedCaseInsensitiveCompare(artist!) == .orderedSame)
+        }
+        return matches.count == 1 ? matches[0] : nil
+    }
+    func searchTracks(_ query: String, limit: Int) async throws -> [LocalTrack] {
+        try await Array(loadTracks().filter {
+            $0.title.localizedCaseInsensitiveContains(query)
+                || $0.artist.localizedCaseInsensitiveContains(query)
+        }.prefix(max(0, limit)))
+    }
     func fetchPage(_ request: LocalTrackPageRequest) async throws -> LocalTrackPage {
         let all = try await loadTracks()
         let query = request.query.trimmingCharacters(in: .whitespacesAndNewlines)

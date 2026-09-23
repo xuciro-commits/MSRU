@@ -6,6 +6,8 @@ import AppFoundation
 @Observable
 final class LocalLibraryStore {
     private(set) var tracks: [LocalTrack] = []
+    private(set) var totalTrackCount = 0
+    private(set) var isFullyLoaded = false
     private(set) var revision: UInt64 = 0
     private(set) var querySnapshot: LibraryQuerySnapshot = LibraryQuerySnapshot()
     private var cachedAlbums: [AlbumPresentationModel] = []
@@ -27,7 +29,7 @@ final class LocalLibraryStore {
     func attachSpotlightIndexer(_ indexer: SpotlightIndexingService) {
         spotlightIndexer = indexer
         if didLoad {
-            indexer.schedule(SpotlightMusicSnapshot(tracks: tracks, albums: cachedAlbums, artists: cachedArtists))
+            indexer.schedule(repository: repository, albums: albums, artists: artists)
         }
     }
 
@@ -68,19 +70,20 @@ final class LocalLibraryStore {
     }
 
     private func updateCachedPresentations() {
-        self.cachedAlbums = LibraryPresentationAggregator.buildAlbums(from: tracks)
-        self.cachedArtists = LibraryPresentationAggregator.buildArtists(from: tracks)
+        if isFullyLoaded {
+            self.cachedAlbums = LibraryPresentationAggregator.buildAlbums(from: tracks)
+            self.cachedArtists = LibraryPresentationAggregator.buildArtists(from: tracks)
+        } else {
+            self.cachedAlbums = []
+            self.cachedArtists = []
+        }
         self.revision &+= 1
-        spotlightIndexer?.schedule(SpotlightMusicSnapshot(
-            tracks: tracks,
-            albums: cachedAlbums,
-            artists: cachedArtists
-        ))
     }
 
     private func refreshQuerySnapshot() async {
-        let snapshot = await queryEngine.querySnapshot()
+        let snapshot = await queryEngine.querySnapshot(includeOrderedIDs: false)
         self.querySnapshot = snapshot
+        spotlightIndexer?.schedule(repository: repository, albums: albums, artists: artists)
     }
 
     convenience init() {
@@ -97,6 +100,87 @@ final class LocalLibraryStore {
         LocalTrackPager(repository: repository)
     }
 
+    func fetchTracks(forReleaseIDs ids: Set<String>) async throws -> [LocalTrack] {
+        try await repository.fetchTracks(forReleaseIDs: ids)
+    }
+
+    func fetchTracks(forArtistIDs ids: Set<String>) async throws -> [LocalTrack] {
+        try await repository.fetchTracks(forArtistIDs: ids)
+    }
+
+    func fetchTracks(inFolder folder: URL) async throws -> [LocalTrack] {
+        try await repository.fetchTracks(inFolder: folder)
+    }
+
+    func findTrack(id: String) async throws -> LocalTrack? {
+        try await repository.fetchTracks(withIDs: [id]).first
+    }
+
+    func findUniqueTrack(title: String, artist: String?) async throws -> LocalTrack? {
+        try await repository.findUniqueTrack(title: title, artist: artist)
+    }
+
+    func searchTracks(_ query: String, limit: Int = 10) async throws -> [LocalTrack] {
+        try await repository.searchTracks(query, limit: limit)
+    }
+
+    func resolvePlaylistTracks(_ playlist: Playlist) async throws -> [LocalTrack] {
+        if let rules = playlist.rules {
+            var matches: [LocalTrack] = []
+            var offset = 0
+            let referenceDate = Date()
+            let needsAddedAt = rules.rules.contains { $0.field == .addedAt }
+                || rules.sortBy == .dateAddedDescending
+            let narrowingQuery: String = {
+                guard rules.matchMode == .all else { return "" }
+                for rule in rules.rules {
+                    guard [.title, .artist, .album].contains(rule.field),
+                          [.contains, .equals, .startsWith, .endsWith].contains(rule.op),
+                          case .string(let value) = rule.value else { continue }
+                    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty { return trimmed }
+                }
+                return ""
+            }()
+            while true {
+                try Task.checkCancellation()
+                let page = try await repository.fetchPage(
+                    LocalTrackPageRequest(query: narrowingQuery, sort: .title,
+                                          offset: offset, limit: 512)
+                )
+                matches.append(contentsOf: page.tracks.filter {
+                    PlaylistRuleEngine.matches(
+                        rules: rules,
+                        track: TrackEvaluationContext($0, includeAddedAt: needsAddedAt),
+                        referenceDate: referenceDate
+                    )
+                })
+                offset += page.tracks.count
+                if !page.hasMore { break }
+                guard !page.tracks.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
+            }
+            return PlaylistRuleEngine.evaluate(
+                rules: rules, tracks: matches, referenceDate: referenceDate
+            )
+        }
+
+        let byID = try await repository.fetchTracks(withIDs: Set(playlist.trackIDs))
+        var lookup: [String: LocalTrack] = [:]
+        for track in byID {
+            lookup[track.id] = track
+            lookup[track.fileURL.path] = track
+            lookup[track.fileURL.standardizedFileURL.path] = track
+        }
+        let legacyNames = playlist.trackIDs.filter { !$0.contains("/") && !$0.contains(":") }
+        if !legacyNames.isEmpty {
+            let all = try await repository.loadTracks()
+            for track in all where legacyNames.contains(track.fileURL.lastPathComponent) {
+                lookup[track.fileURL.lastPathComponent] = track
+            }
+        }
+        return playlist.trackIDs.compactMap { lookup[$0] }
+    }
+
     func loadIfNeeded() async {
         await serialized {
             guard !self.didLoad else { return }
@@ -110,7 +194,15 @@ final class LocalLibraryStore {
 
     private func reloadNow() async {
         do {
-            tracks = try await repository.loadTracks()
+            if isFullyLoaded {
+                tracks = try await repository.loadTracks()
+                totalTrackCount = tracks.count
+            } else {
+                let page = try await repository.fetchPage(LocalTrackPageRequest(limit: 128))
+                tracks = page.tracks
+                totalTrackCount = page.totalCount
+                isFullyLoaded = page.totalCount <= page.tracks.count
+            }
             updateCachedPresentations()
 
             printArtworkMemoryDiagnostics()
@@ -119,10 +211,31 @@ final class LocalLibraryStore {
             errorMessage = nil
 
             await refreshQuerySnapshot()
-            triggerBackgroundArtworkBackfillIfNeeded()
+            if isFullyLoaded { triggerBackgroundArtworkBackfillIfNeeded() }
         } catch {
             didLoad = false
             errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Compatibility path for operations that still require every local track.
+    /// Primary song views and startup use paged queries.
+    func ensureAllTracksLoaded() async {
+        await loadIfNeeded()
+        await serialized {
+            guard !self.isFullyLoaded else { return }
+            do {
+                let all = try await self.repository.loadTracks()
+                self.tracks = all
+                self.totalTrackCount = all.count
+                self.isFullyLoaded = true
+                self.errorMessage = nil
+                self.updateCachedPresentations()
+                await self.refreshQuerySnapshot()
+                self.triggerBackgroundArtworkBackfillIfNeeded()
+            } catch {
+                self.errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -150,14 +263,23 @@ final class LocalLibraryStore {
         guard !newTracks.isEmpty else { return }
         try await serializedThrowing {
             try await self.repository.saveTracksInPlace(newTracks)
-            for track in newTracks {
-                if let index = self.tracks.firstIndex(where: { $0.id == track.id || $0.fileURL.standardizedFileURL == track.fileURL.standardizedFileURL }) {
-                    self.tracks[index] = track
-                } else {
-                    self.tracks.append(track)
+            if self.isFullyLoaded {
+                var indices = Dictionary(uniqueKeysWithValues: self.tracks.enumerated().map { ($0.element.id, $0.offset) })
+                for track in newTracks {
+                    if let index = indices[track.id] {
+                        self.tracks[index] = track
+                    } else {
+                        indices[track.id] = self.tracks.count
+                        self.tracks.append(track)
+                    }
                 }
+                self.tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+                self.totalTrackCount = self.tracks.count
+            } else {
+                let page = try await self.repository.fetchPage(LocalTrackPageRequest(limit: 128))
+                self.tracks = page.tracks
+                self.totalTrackCount = page.totalCount
             }
-            self.tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
             self.updateCachedPresentations()
             await self.refreshQuerySnapshot()
             await LocalLibraryIndexingService.shared.enqueue(newTracks)
@@ -165,104 +287,22 @@ final class LocalLibraryStore {
         }
     }
 
-    private func syncTracksToDatabase(_ newTracks: [LocalTrack]) async {
-        let identityRepo = IdentityRepository(db: self.db)
-        let assetRepo = AssetRepository(db: self.db)
-        let sourceRepo = SourceRepository(db: self.db)
-        let sourceID = SourceID("src_local_default")
-
-        let defaultSource = Source(
-            id: sourceID,
-            sourceType: .localFolder,
-            uri: "local://default",
-            displayName: "Local Media Library",
-            capabilities: .localFolderDefault,
-            isEnabled: true
-        )
-        try? await sourceRepo.insertOrUpdate(defaultSource)
-
-        var artists: [(id: ArtistID, name: String)] = []
-        var recordings: [(id: RecordingID, title: String, duration: Double?)] = []
-        var releaseGroups: [(id: ReleaseGroupID, title: String)] = []
-        var releases: [(id: ReleaseID, releaseGroupID: ReleaseGroupID?, title: String, year: Int?, artworkAssetID: String?)] = []
-        var releaseTracks: [(id: ReleaseTrackID, releaseID: ReleaseID, trackNumber: Int, title: String, duration: Double?, recordingID: RecordingID)] = []
-        var artistCredits: [(artistID: ArtistID, entityType: String, entityID: String)] = []
-        var assets: [PersistedAssetRecord] = []
-
-        // Group tracks by album title to derive stable primary albumArtist (prevent duet fragmentation)
-        var tracksByAlbum: [String: [LocalTrack]] = [:]
-        for t in newTracks {
-            let alb = (t.album?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
-                ? t.album!.trimmingCharacters(in: .whitespacesAndNewlines)
-                : "Unknown Album"
-            tracksByAlbum[alb, default: []].append(t)
-        }
-
-        var primaryArtistByAlbum: [String: String] = [:]
-        for (alb, tList) in tracksByAlbum {
-            let counts = tList.reduce(into: [String: Int]()) { $0[$1.artist, default: 0] += 1 }
-            let cand = counts.max(by: { $0.value < $1.value })?.key ?? tList.first?.artist ?? "Unknown Artist"
-            let primary = cand.components(separatedBy: CharacterSet(charactersIn: ",/&")).first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? cand
-            primaryArtistByAlbum[alb] = primary.isEmpty ? cand : primary
-        }
-
-        for track in newTracks {
-            let relTitle = (track.album?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
-                ? track.album!.trimmingCharacters(in: .whitespacesAndNewlines)
-                : "Unknown Album"
-            let albumArtist = primaryArtistByAlbum[relTitle] ?? track.artist
-            let recID = DeterministicID.recording(title: track.title, artist: track.artist)
-            let albumArtID = DeterministicID.artist(name: albumArtist)
-            let trackArtID = DeterministicID.artist(name: track.artist)
-            let rgID = DeterministicID.releaseGroup(artist: albumArtist, title: relTitle)
-            let relID = DeterministicID.release(artist: albumArtist, title: relTitle)
-            let trkID = DeterministicID.releaseTrack(releaseID: relID, medium: 1, track: track.trackNumber ?? 1)
-            let astID = DeterministicID.asset(sourceID: sourceID, relativePath: track.fileURL.standardizedFileURL.path)
-
-            artists.append((id: trackArtID, name: track.artist))
-            if trackArtID != albumArtID {
-                artists.append((id: albumArtID, name: albumArtist))
-            }
-
-            recordings.append((id: recID, title: track.title, duration: track.duration))
-            releaseGroups.append((id: rgID, title: relTitle))
-            releases.append((id: relID, releaseGroupID: rgID, title: relTitle, year: track.year, artworkAssetID: track.artworkReference))
-            releaseTracks.append((id: trkID, releaseID: relID, trackNumber: track.trackNumber ?? 1, title: track.title, duration: track.duration, recordingID: recID))
-            artistCredits.append((artistID: trackArtID, entityType: "recording", entityID: recID.rawValue))
-            artistCredits.append((artistID: albumArtID, entityType: "release", entityID: relID.rawValue))
-
-            assets.append(PersistedAssetRecord(
-                id: astID,
-                sourceID: sourceID,
-                relativePath: track.fileURL.standardizedFileURL.path,
-                fileSize: 0,
-                mtime: Date().timeIntervalSince1970,
-                format: track.fileURL.pathExtension.uppercased(),
-                duration: track.duration,
-                recordingID: recID
-            ))
-        }
-
-        try? await identityRepo.batchUpsertEntities(
-            artists: artists,
-            recordings: recordings,
-            releaseGroups: releaseGroups,
-            releases: releases,
-            releaseTracks: releaseTracks,
-            artistCredits: artistCredits
-        )
-        try? await assetRepo.batchUpsert(assets)
-    }
-
-    func deleteTracks(withIDs ids: Set<String>, deletePhysical: Bool = false) async {
-        guard !ids.isEmpty else { return }
+    @discardableResult
+    func deleteTracks(withIDs ids: Set<String>, deletePhysical: Bool = false) async -> Bool {
+        guard !ids.isEmpty else { return true }
+        var succeeded = false
         await serialized {
-            let deletedTracks = self.tracks.filter {
-                ids.contains($0.id) ||
-                ids.contains($0.fileURL.standardizedFileURL.path) ||
-                ids.contains($0.fileURL.path)
+            let deletedTracks: [LocalTrack]
+            do {
+                deletedTracks = try await self.repository.fetchTracks(withIDs: ids)
+            } catch {
+                self.errorMessage = error.localizedDescription
+                return
             }
-            guard !deletedTracks.isEmpty else { return }
+            guard !deletedTracks.isEmpty else {
+                succeeded = true
+                return
+            }
 
             let deletedTrackIDs = Set(deletedTracks.map(\.id))
             let deletedURLs = Set(deletedTracks.map(\.fileURL))
@@ -274,6 +314,9 @@ final class LocalLibraryStore {
             }
 
             self.tracks.removeAll { deletedTrackIDs.contains($0.id) }
+            self.totalTrackCount = self.isFullyLoaded
+                ? self.tracks.count
+                : max(0, self.totalTrackCount - deletedTracks.count)
 
             // Cross-store cleanup follows a successful authoritative SQLite delete.
             await self.libraryStore?.purgeTracks(matchingIDs: deletedTrackIDs, localURLs: deletedURLs)
@@ -283,10 +326,14 @@ final class LocalLibraryStore {
             self.updateCachedPresentations()
             self.deregisterTracks(deletedTracks)
             await self.refreshQuerySnapshot()
+            succeeded = true
         }
+        return succeeded
     }
 
     func deleteAlbum(title: String, artist: String, deletePhysical: Bool = false) async {
+        await ensureAllTracksLoaded()
+        guard isFullyLoaded else { return }
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let cleanArtist = artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
@@ -297,13 +344,18 @@ final class LocalLibraryStore {
         }.map(\.id))
 
         if !trackIDsToDelete.isEmpty {
-            await deleteTracks(withIDs: trackIDsToDelete, deletePhysical: deletePhysical)
+            guard await deleteTracks(withIDs: trackIDsToDelete, deletePhysical: deletePhysical) else { return }
         }
 
         // Always delete release in SQLite (even if in-memory tracks were already cleared)
         let releaseID = DeterministicID.release(artist: artist, title: title)
         let identityRepo = IdentityRepository(db: self.db)
-        try? await identityRepo.deleteRelease(id: releaseID, title: title, artist: artist)
+        do {
+            try await identityRepo.deleteRelease(id: releaseID, title: title, artist: artist)
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
 
         await serialized {
             self.updateCachedPresentations()
@@ -312,6 +364,8 @@ final class LocalLibraryStore {
     }
 
     func deleteArtist(name: String, deletePhysical: Bool = false) async {
+        await ensureAllTracksLoaded()
+        guard isFullyLoaded else { return }
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanName.isEmpty else { return }
 
@@ -342,25 +396,35 @@ final class LocalLibraryStore {
 
         // 1. Update collaboration tracks
         if !tracksToUpdate.isEmpty {
+            do {
+                try await repository.saveTracksInPlace(tracksToUpdate)
+            } catch {
+                errorMessage = error.localizedDescription
+                return
+            }
             await serialized {
                 for updated in tracksToUpdate {
                     if let idx = self.tracks.firstIndex(where: { $0.id == updated.id }) {
                         self.tracks[idx] = updated
                     }
                 }
-                try? await self.repository.saveTracksInPlace(tracksToUpdate)
             }
         }
 
         // 2. Delete sole-owned tracks (which cascades through SQLite and cross-stores)
         if !trackIDsToDelete.isEmpty {
-            await deleteTracks(withIDs: trackIDsToDelete, deletePhysical: deletePhysical)
+            guard await deleteTracks(withIDs: trackIDsToDelete, deletePhysical: deletePhysical) else { return }
         }
 
         // 3. Always delete artist entity and credits in SQLite (even if in-memory tracks were already cleared)
         let artistID = DeterministicID.artist(name: cleanName)
         let identityRepo = IdentityRepository(db: self.db)
-        try? await identityRepo.deleteArtist(id: artistID, name: cleanName)
+        do {
+            try await identityRepo.deleteArtist(id: artistID, name: cleanName)
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
 
         await serialized {
             self.updateCachedPresentations()
@@ -376,6 +440,8 @@ final class LocalLibraryStore {
 
     @discardableResult
     func reidentifyTrack(trackID: String) async -> Bool {
+        await ensureAllTracksLoaded()
+        guard isFullyLoaded else { return false }
         guard let index = tracks.firstIndex(where: { $0.id == trackID }) else { return false }
         let track = tracks[index]
 
@@ -406,16 +472,22 @@ final class LocalLibraryStore {
             year: track.year
         )
 
+        do {
+            try await repository.saveTracksInPlace([updatedTrack])
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
         tracks[index] = updatedTrack
-        try? await repository.saveTracksInPlace([updatedTrack])
         updateCachedPresentations()
-        await syncTracksToDatabase([updatedTrack])
         await refreshQuerySnapshot()
         return true
     }
 
     @discardableResult
     func reidentifyAlbum(albumTitle: String, artist: String) async -> Bool {
+        await ensureAllTracksLoaded()
+        guard isFullyLoaded else { return false }
         let cleanArt = artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let cleanAlb = albumTitle.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
@@ -456,19 +528,29 @@ final class LocalLibraryStore {
                 trackNumber: t.trackNumber,
                 year: t.year
             )
-            tracks[idx] = updated
             modifiedTracks.append(updated)
         }
 
-        try? await repository.saveTracksInPlace(modifiedTracks)
+        do {
+            try await repository.saveTracksInPlace(modifiedTracks)
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+        for updated in modifiedTracks {
+            if let index = tracks.firstIndex(where: { $0.id == updated.id }) {
+                tracks[index] = updated
+            }
+        }
         updateCachedPresentations()
-        await syncTracksToDatabase(modifiedTracks)
         await refreshQuerySnapshot()
         return true
     }
 
     @discardableResult
     func remediateLibraryMetadataAndArtwork(progress: ((Int, Int) -> Void)? = nil) async -> (repairedCount: Int, artworkAddedCount: Int) {
+        await ensureAllTracksLoaded()
+        guard isFullyLoaded else { return (0, 0) }
         var repaired = 0
         var artworkAdded = 0
         var updatedTracks: [LocalTrack] = []
@@ -564,14 +646,22 @@ final class LocalLibraryStore {
                     year: newYear
                 )
                 updatedTracks.append(updated)
-                tracks[i] = updated
             }
         }
 
         if !updatedTracks.isEmpty {
-            try? await repository.saveTracksInPlace(updatedTracks)
+            do {
+                try await repository.saveTracksInPlace(updatedTracks)
+            } catch {
+                errorMessage = error.localizedDescription
+                return (0, 0)
+            }
+            for updated in updatedTracks {
+                if let index = tracks.firstIndex(where: { $0.id == updated.id }) {
+                    tracks[index] = updated
+                }
+            }
             updateCachedPresentations()
-            await syncTracksToDatabase(updatedTracks)
             await refreshQuerySnapshot()
         }
 
@@ -617,14 +707,23 @@ final class LocalLibraryStore {
         errorMessage = nil
         do {
             let newlyImported = try await repository.importTracks(from: urls)
-            for track in newlyImported {
-                if let index = tracks.firstIndex(where: { $0.id == track.id || $0.fileURL.standardizedFileURL == track.fileURL.standardizedFileURL }) {
-                    tracks[index] = track
-                } else {
-                    tracks.append(track)
+            if isFullyLoaded {
+                var indices = Dictionary(uniqueKeysWithValues: tracks.enumerated().map { ($0.element.id, $0.offset) })
+                for track in newlyImported {
+                    if let index = indices[track.id] {
+                        tracks[index] = track
+                    } else {
+                        indices[track.id] = tracks.count
+                        tracks.append(track)
+                    }
                 }
+                tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+                totalTrackCount = tracks.count
+            } else {
+                let page = try await repository.fetchPage(LocalTrackPageRequest(limit: 128))
+                tracks = page.tracks
+                totalTrackCount = page.totalCount
             }
-            tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
             updateCachedPresentations()
             await refreshQuerySnapshot()
             await LocalLibraryIndexingService.shared.enqueue(newlyImported)
@@ -672,7 +771,8 @@ final class LocalLibraryStore {
         ==============================
         MSRU Artwork Memory Diagnostics
         ==============================
-        tracks total: \(tracks.count)
+        tracks total: \(totalTrackCount)
+        tracks resident: \(tracks.count)
         tracks with artwork reference: \(referenceCount)
         LocalTrack resident artwork bytes: 0 (Decoupled on-demand storage)
         ==============================
@@ -683,6 +783,7 @@ final class LocalLibraryStore {
 
     /// Triggers an asynchronous, non-blocking background task to resolve artwork for albums missing covers.
     func triggerBackgroundArtworkBackfillIfNeeded() {
+        guard isFullyLoaded else { return }
         guard backfillTask == nil else { return }
 
         backfillTask = Task(priority: .utility) { [weak self] in
@@ -750,14 +851,22 @@ final class LocalLibraryStore {
                         trackNumber: oldTrack.trackNumber,
                         year: oldTrack.year
                     )
-                    self.tracks[idx] = updated
                     updatedBatch.append(updated)
                 }
 
                 if !updatedBatch.isEmpty {
-                    try? await self.repository.saveTracksInPlace(updatedBatch)
+                    do {
+                        try await self.repository.saveTracksInPlace(updatedBatch)
+                    } catch {
+                        self.errorMessage = error.localizedDescription
+                        continue
+                    }
+                    for updated in updatedBatch {
+                        if let index = self.tracks.firstIndex(where: { $0.id == updated.id }) {
+                            self.tracks[index] = updated
+                        }
+                    }
                     self.updateCachedPresentations()
-                    await self.syncTracksToDatabase(updatedBatch)
                     await self.refreshQuerySnapshot()
                     print("[ArtworkBackfill] Backfilled artwork for album: [\(group.album ?? "Unknown")] (\(updatedBatch.count) tracks)")
                 }

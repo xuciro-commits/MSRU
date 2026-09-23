@@ -35,6 +35,7 @@ struct AlbumsView: View {
     @State private var searchQuery: String = ""
     @State private var sortField: AlbumSortField = .title
     @State private var selectedAlbum: AlbumPresentationModel?
+    @State private var selectedLocalTracks: [LocalTrack] = []
     @State private var albumPendingDelete: AlbumPresentationModel?
     @State private var isDeleteConfirmationPresented: Bool = false
     @State private var selectedAlbumIDs: Set<String> = []
@@ -241,14 +242,9 @@ struct AlbumsView: View {
     var body: some View {
         Group {
             if let album = selectedAlbum {
-                let albumTracks = localStore.tracks.filter {
-                    ($0.album?.trimmingCharacters(in: .whitespacesAndNewlines) == album.title) ||
-                    ($0.artist.trimmingCharacters(in: .whitespacesAndNewlines) == album.artist)
-                }
-
                 AlbumDetailView(
                     album: album,
-                    localTracks: albumTracks,
+                    localTracks: selectedLocalTracks,
                     subsonicServers: subsonicServers,
                     playback: playback,
                     onBack: { selectedAlbum = nil },
@@ -269,6 +265,15 @@ struct AlbumsView: View {
             } else {
                 mainAlbumsGrid
             }
+        }
+        .task(id: "\(selectedAlbum?.id ?? "")|\(localStore.revision)") {
+            guard let album = selectedAlbum, !album.id.hasPrefix("subsonic:") else {
+                selectedLocalTracks = []
+                return
+            }
+            let tracks = try? await localStore.fetchTracks(forReleaseIDs: [album.id])
+            guard !Task.isCancelled else { return }
+            selectedLocalTracks = tracks ?? []
         }
         .task(id: requestedAlbumID) {
             if let requestedAlbumID,
@@ -612,12 +617,10 @@ struct AlbumsView: View {
             return
         }
 
-        let matching = localStore.tracks.filter {
-            ($0.album?.trimmingCharacters(in: .whitespacesAndNewlines) == album.title) ||
-            ($0.artist.trimmingCharacters(in: .whitespacesAndNewlines) == album.artist)
-        }
-        if let first = matching.first {
-            playback.play(first)
+        Task {
+            guard let matching = try? await localStore.fetchTracks(forReleaseIDs: [album.id]),
+                  let first = matching.first else { return }
+            playback.play(first, queue: matching)
         }
     }
 
@@ -629,13 +632,9 @@ struct AlbumsView: View {
         ) {
             Button {
                 let selected = filteredAlbums.filter { selectedAlbumIDs.contains($0.id) }
-                let tracks = localStore.tracks.filter { t in
-                    selected.contains { a in
-                        (t.album?.trimmingCharacters(in: .whitespacesAndNewlines) == a.title) ||
-                        (t.artist.trimmingCharacters(in: .whitespacesAndNewlines) == a.artist)
-                    }
-                }
-                if let first = tracks.first {
+                Task {
+                    guard let tracks = try? await localStore.fetchTracks(forReleaseIDs: Set(selected.map(\.id))),
+                          let first = tracks.first else { return }
                     playback.toggle(track: first, queue: tracks)
                 }
             } label: {
@@ -646,14 +645,9 @@ struct AlbumsView: View {
 
             Button {
                 let selected = filteredAlbums.filter { selectedAlbumIDs.contains($0.id) }
-                let tracks = localStore.tracks.filter { t in
-                    selected.contains { a in
-                        (t.album?.trimmingCharacters(in: .whitespacesAndNewlines) == a.title) ||
-                        (t.artist.trimmingCharacters(in: .whitespacesAndNewlines) == a.artist)
-                    }
-                }
-                for t in tracks {
-                    playback.addToQueue(t)
+                Task {
+                    guard let tracks = try? await localStore.fetchTracks(forReleaseIDs: Set(selected.map(\.id))) else { return }
+                    for track in tracks { playback.addToQueue(track) }
                 }
             } label: {
                 Label("Add to Queue", systemImage: "text.badge.plus")

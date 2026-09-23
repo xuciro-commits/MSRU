@@ -243,8 +243,12 @@ final class WatchedFolderStore {
         await localStore.loadIfNeeded()
 
         let targetPath = targetURL.standardizedFileURL.path
-        let tracksInFolder = localStore.tracks.filter { track in
-            track.fileURL.standardizedFileURL.path.hasPrefix(targetPath)
+        let tracksInFolder: [LocalTrack]
+        do {
+            tracksInFolder = try await localStore.fetchTracks(inFolder: targetURL)
+        } catch {
+            print("Watcher failed to read local tracks in \(targetPath):", error.localizedDescription)
+            return 0
         }
 
         let cache = await LocalFingerprintRegistry.shared.assetCache

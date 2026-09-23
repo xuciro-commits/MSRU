@@ -108,6 +108,9 @@ struct LibraryView:
     private var searchQuery:
         String = ""
 
+    @State private var debouncedLocalQuery = ""
+    @State private var localPager: LocalTrackPager? = nil
+
     @State
     private var isDropTargeted:
         Bool = false
@@ -245,6 +248,24 @@ struct LibraryView:
                 guard !Task.isCancelled else { return }
                 await loadRemoteTracks(sourceID: sourceID, query: trimmed, reset: true)
             }
+        }
+        .task(id: searchQuery) {
+            let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                guard !Task.isCancelled else { return }
+            }
+            debouncedLocalQuery = trimmed
+        }
+        .task(id: "\(scope.rawValue)|\(selectedSourceID ?? "")|\(debouncedLocalQuery)|\(sortField.rawValue)|\(sortAscending)|\(localStore.revision)") {
+            guard scope == .local, !isRemoteSourceActive else { return }
+            let pager = localPager ?? localStore.makePager()
+            localPager = pager
+            await pager.reset(
+                query: debouncedLocalQuery,
+                sort: LocalTrackPageRequest.Sort(rawValue: sortField.rawValue) ?? .title,
+                ascending: sortAscending
+            )
         }
     }
 
@@ -408,7 +429,7 @@ struct LibraryView:
         case .saved:
             return "\(feature.tracks.count) 首收藏歌曲"
         case .local:
-            return "\(localStore.tracks.count) 首本地歌曲"
+            return "\(localPager?.totalCount ?? 0) 首本地歌曲"
         }
     }
 
@@ -446,6 +467,11 @@ struct LibraryView:
         }
         if let error = playback.playbackErrorMessage {
             Label(error, systemImage: "speaker.slash")
+                .font(.callout)
+                .padding(.horizontal, 20)
+        }
+        if let error = localPager?.errorMessage, scope == .local, !isRemoteSourceActive {
+            Label(error, systemImage: "exclamationmark.triangle")
                 .font(.callout)
                 .padding(.horizontal, 20)
         }
@@ -560,18 +586,7 @@ struct LibraryView:
         if isRemoteSourceActive {
             return remoteTracks
         }
-        var baseTracks = localStore.tracks
-        if selectedSourceID == "local" {
-            baseTracks = baseTracks.filter { track in
-                track.artworkReference?.contains("subsonic") != true && track.fileURL.isFileURL
-            }
-        }
-        return LibraryCollectionSortFilter.filterAndSort(
-            tracks: baseTracks,
-            query: searchQuery,
-            field: sortField,
-            ascending: sortAscending
-        )
+        return localPager?.tracks ?? []
     }
 
     private var gridColumns: [GridItem] {
@@ -627,9 +642,11 @@ struct LibraryView:
             loadingView
         } else if !isRemoteSourceActive && localStore.isLoading {
             loadingView
+        } else if !isRemoteSourceActive && (localPager == nil || (localPager?.isLoading == true && localPager?.tracks.isEmpty == true)) {
+            loadingView
         } else if isRemoteSourceActive && remoteTracks.isEmpty {
             remoteEmptyView
-        } else if !isRemoteSourceActive && localStore.tracks.isEmpty {
+        } else if !isRemoteSourceActive && (localPager?.totalCount ?? 0) == 0 {
             emptyLocalView
         } else if filteredLocalTracks.isEmpty {
             emptySearchView
@@ -687,6 +704,8 @@ struct LibraryView:
                                         await loadRemoteTracks(sourceID: sourceID, query: "", reset: false)
                                     }
                                 }
+                            } else if !isRemoteSourceActive && track.id == localPager?.tracks.last?.id && localPager?.hasMore == true {
+                                Task { await localPager?.loadMore() }
                             }
                         }
                     }
@@ -808,16 +827,18 @@ struct LibraryView:
             loadingView
         } else if !isRemoteSourceActive && localStore.isLoading {
             loadingView
+        } else if !isRemoteSourceActive && (localPager == nil || (localPager?.isLoading == true && localPager?.tracks.isEmpty == true)) {
+            loadingView
         } else if isRemoteSourceActive && remoteTracks.isEmpty {
             remoteEmptyView
-        } else if !isRemoteSourceActive && localStore.tracks.isEmpty {
+        } else if !isRemoteSourceActive && (localPager?.totalCount ?? 0) == 0 {
             emptyLocalView
         } else if filteredLocalTracks.isEmpty {
             emptySearchView
         } else {
             LocalTrackTableView(
                 tracks: filteredLocalTracks,
-                positionLookup: isRemoteSourceActive ? Dictionary(uniqueKeysWithValues: filteredLocalTracks.enumerated().map { ($1.id, $0 + 1) }) : localStore.positionLookup,
+                positionLookup: nil,
                 isFiltered: !searchQuery.isEmpty || isRemoteSourceActive,
                 selectedTrack: $selectedLocalTrack,
                 playback: playback,
@@ -841,6 +862,8 @@ struct LibraryView:
                                 await loadRemoteTracks(sourceID: sourceID, query: "", reset: false)
                             }
                         }
+                    } else if !isRemoteSourceActive && track.id == localPager?.tracks.last?.id && localPager?.hasMore == true {
+                        Task { await localPager?.loadMore() }
                     }
                 }
             )

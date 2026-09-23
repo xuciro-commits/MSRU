@@ -21,6 +21,9 @@ struct ArtistsView: View {
     @State private var searchQuery: String = ""
     @State private var selectedArtist: ArtistPresentationModel?
     @State private var selectedAlbum: AlbumPresentationModel?
+    @State private var selectedArtistTracks: [LocalTrack] = []
+    @State private var selectedAlbumTracks: [LocalTrack] = []
+    @State private var localArtistIDs: Set<String> = []
     @State private var artistPendingDelete: ArtistPresentationModel?
     @State private var isDeleteConfirmationPresented: Bool = false
     @State private var selectedArtistIDs: Set<String> = []
@@ -87,8 +90,7 @@ struct ArtistsView: View {
         }
 
         if let selectedSourceID, SourceID.isLocalSourceID(selectedSourceID) {
-            let localArtistNames = Set(localStore.tracks.filter { $0.fileURL.isFileURL && $0.artworkReference?.contains("subsonic") != true }.map { $0.artist.trimmingCharacters(in: .whitespacesAndNewlines) })
-            matching = matching.filter { localArtistNames.contains($0.name) }
+            matching = matching.filter { localArtistIDs.contains($0.id) }
         }
 
         return matching
@@ -215,14 +217,9 @@ struct ArtistsView: View {
     var body: some View {
         Group {
             if let album = selectedAlbum {
-                let albumTracks = localStore.tracks.filter {
-                    ($0.album?.trimmingCharacters(in: .whitespacesAndNewlines) == album.title) ||
-                    ($0.artist.trimmingCharacters(in: .whitespacesAndNewlines) == album.artist)
-                }
-
                 AlbumDetailView(
                     album: album,
-                    localTracks: albumTracks,
+                    localTracks: selectedAlbumTracks,
                     subsonicServers: subsonicServers,
                     playback: playback,
                     onBack: { selectedAlbum = nil },
@@ -232,13 +229,9 @@ struct ArtistsView: View {
                     }
                 )
             } else if let artist = selectedArtist {
-                let artistTracks = localStore.tracks.filter {
-                    $0.artist.trimmingCharacters(in: .whitespacesAndNewlines) == artist.name
-                }
-
                 ArtistDetailView(
                     artist: artist,
-                    tracks: artistTracks,
+                    tracks: selectedArtistTracks,
                     subsonicServers: subsonicServers,
                     playback: playback,
                     onBack: { selectedArtist = nil },
@@ -255,6 +248,24 @@ struct ArtistsView: View {
                 mainArtistsGrid
             }
         }
+        .task(id: "\(selectedArtist?.id ?? "")|\(localStore.revision)") {
+            guard let artist = selectedArtist, !artist.id.hasPrefix("subsonic:") else {
+                selectedArtistTracks = []
+                return
+            }
+            let tracks = try? await localStore.fetchTracks(forArtistIDs: [artist.id])
+            guard !Task.isCancelled else { return }
+            selectedArtistTracks = tracks ?? []
+        }
+        .task(id: "\(selectedAlbum?.id ?? "")|\(localStore.revision)") {
+            guard let album = selectedAlbum, !album.id.hasPrefix("subsonic:") else {
+                selectedAlbumTracks = []
+                return
+            }
+            let tracks = try? await localStore.fetchTracks(forReleaseIDs: [album.id])
+            guard !Task.isCancelled else { return }
+            selectedAlbumTracks = tracks ?? []
+        }
         .task(id: requestedArtistID) {
             if let requestedArtistID,
                let artist = localStore.artists.first(where: { $0.id == requestedArtistID }) {
@@ -263,6 +274,14 @@ struct ArtistsView: View {
             }
         }
         .task(id: selectedSourceID) {
+            if let selectedSourceID, SourceID.isLocalSourceID(selectedSourceID) {
+                let snapshot = await LibraryQueryEngine.shared.querySnapshot(
+                    sourceFilter: selectedSourceID, includeOrderedIDs: false
+                )
+                localArtistIDs = Set(snapshot.artistSummaries.map(\.id))
+            } else {
+                localArtistIDs = []
+            }
             if isRemoteSourceActive, let sourceID = selectedSourceID {
                 await loadRemoteArtists(sourceID: sourceID, reset: true)
             }
@@ -588,10 +607,9 @@ struct ArtistsView: View {
             return
         }
 
-        let matching = localStore.tracks.filter {
-            $0.artist.trimmingCharacters(in: .whitespacesAndNewlines) == artist.name
-        }
-        if let first = matching.first {
+        Task {
+            guard let matching = try? await localStore.fetchTracks(forArtistIDs: [artist.id]),
+                  let first = matching.first else { return }
             playback.toggle(track: first, queue: matching)
         }
     }
@@ -604,10 +622,9 @@ struct ArtistsView: View {
         ) {
             Button {
                 let selected = filteredArtists.filter { selectedArtistIDs.contains($0.id) }
-                let tracks = localStore.tracks.filter { t in
-                    selected.contains { $0.name == t.artist.trimmingCharacters(in: .whitespacesAndNewlines) }
-                }
-                if let first = tracks.first {
+                Task {
+                    guard let tracks = try? await localStore.fetchTracks(forArtistIDs: Set(selected.map(\.id))),
+                          let first = tracks.first else { return }
                     playback.toggle(track: first, queue: tracks)
                 }
             } label: {
@@ -618,11 +635,9 @@ struct ArtistsView: View {
 
             Button {
                 let selected = filteredArtists.filter { selectedArtistIDs.contains($0.id) }
-                let tracks = localStore.tracks.filter { t in
-                    selected.contains { $0.name == t.artist.trimmingCharacters(in: .whitespacesAndNewlines) }
-                }
-                for t in tracks {
-                    playback.addToQueue(t)
+                Task {
+                    guard let tracks = try? await localStore.fetchTracks(forArtistIDs: Set(selected.map(\.id))) else { return }
+                    for track in tracks { playback.addToQueue(track) }
                 }
             } label: {
                 Label("Add to Queue", systemImage: "text.badge.plus")

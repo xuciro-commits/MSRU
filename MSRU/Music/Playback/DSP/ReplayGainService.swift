@@ -31,15 +31,31 @@ actor ReplayGainService {
 
     func cachedAlbum(for url: URL) async throws -> R128Measurement? {
         guard try await cachedTrack(for: url) != nil else { return nil }
-        return try await db.reader.read { db in
+        let cached: (measurement: R128Measurement, signature: String, paths: [String])? = try await db.reader.read { db in
             guard let row = try Row.fetchOne(db, sql: """
-                SELECT al.integrated_lufs, al.sample_peak, al.duration
+                SELECT al.album_key, al.asset_signature, al.integrated_lufs, al.sample_peak, al.duration
                 FROM asset_album_loudness aa JOIN album_loudness al ON al.album_key = aa.album_key
                 WHERE aa.file_path = ?
-                """, arguments: [url.standardizedFileURL.path]) else { return nil }
-            return R128Measurement(integratedLUFS: row["integrated_lufs"],
-                                   samplePeak: row["sample_peak"], duration: row["duration"])
+                """, arguments: [url.standardizedFileURL.path]),
+                let key: String = row["album_key"],
+                let signature: String = row["asset_signature"] else { return nil }
+            let paths = try String.fetchAll(db, sql: """
+                SELECT file_path FROM asset_album_loudness WHERE album_key = ? ORDER BY file_path
+                """, arguments: [key])
+            return (R128Measurement(integratedLUFS: row["integrated_lufs"],
+                                    samplePeak: row["sample_peak"], duration: row["duration"]),
+                    signature, paths)
         }
+        guard let cached, !cached.paths.isEmpty else { return nil }
+        var signatures: [FileSignature] = []
+        for path in cached.paths {
+            guard let item = try? fileSignature(for: URL(fileURLWithPath: path)) else { return nil }
+            signatures.append(item)
+        }
+        let currentSignature = Self.digest(signatures.map {
+            "\($0.path):\($0.size):\($0.mtime)"
+        }.joined(separator: "\n"))
+        return currentSignature == cached.signature ? cached.measurement : nil
     }
 
     @discardableResult

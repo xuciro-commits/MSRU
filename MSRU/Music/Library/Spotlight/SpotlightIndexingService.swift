@@ -174,6 +174,68 @@ actor SpotlightIndexWorker {
         signatures = nextSignatures
         hasIndexed = true
     }
+
+    /// Indexes local tracks page by page so startup never needs a resident full track array.
+    func rebuild(repository: any LocalLibraryRepository,
+                 albums: [AlbumPresentationModel],
+                 artists: [ArtistPresentationModel]) async throws {
+        try Task.checkCancellation()
+        if !hasIndexed { try await writer.removeLocalMusic() }
+        var nextSignatures: [String: Int] = [:]
+        var batch: [SpotlightMusicRecord] = []
+        batch.reserveCapacity(batchSize)
+
+        func accept(_ record: SpotlightMusicRecord) -> [SpotlightMusicRecord]? {
+            let key = record.id.rawValue
+            let signature = record.hashValue
+            nextSignatures[key] = signature
+            if signatures[key] != signature { batch.append(record) }
+            if batch.count >= batchSize {
+                let ready = batch
+                batch.removeAll(keepingCapacity: true)
+                return ready
+            }
+            return nil
+        }
+
+        var offset = 0
+        while true {
+            try Task.checkCancellation()
+            let page = try await repository.fetchPage(
+                LocalTrackPageRequest(sort: .title, offset: offset, limit: min(batchSize, 512))
+            )
+            for track in page.tracks {
+                try Task.checkCancellation()
+                if let ready = accept(SpotlightMusicRecord(track: track)) {
+                    try await writer.index(ready)
+                }
+            }
+            offset += page.tracks.count
+            if !page.hasMore { break }
+            guard !page.tracks.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
+        }
+        for album in albums {
+            try Task.checkCancellation()
+            if let ready = accept(SpotlightMusicRecord(album: album)) {
+                try await writer.index(ready)
+            }
+        }
+        for artist in artists {
+            try Task.checkCancellation()
+            if let ready = accept(SpotlightMusicRecord(artist: artist)) {
+                try await writer.index(ready)
+            }
+        }
+        if !batch.isEmpty { try await writer.index(batch) }
+
+        let removed = signatures.keys.filter { nextSignatures[$0] == nil }
+        for start in stride(from: 0, to: removed.count, by: batchSize) {
+            try Task.checkCancellation()
+            try await writer.remove(ids: Array(removed[start..<min(start + batchSize, removed.count)]))
+        }
+        signatures = nextSignatures
+        hasIndexed = true
+    }
 }
 
 /// Coalesces library mutations; the expensive indexing work stays off MainActor.
@@ -198,6 +260,24 @@ final class SpotlightIndexingService {
                 // Superseded by a newer library revision.
             } catch {
                 print("[SpotlightIndex] Index update failed: \(error)")
+            }
+        }
+    }
+
+    func schedule(repository: any LocalLibraryRepository,
+                  albums: [AlbumPresentationModel],
+                  artists: [ArtistPresentationModel]) {
+        pending?.cancel()
+        let previous = pending
+        pending = Task { [worker] in
+            _ = await previous?.value
+            do {
+                try await Task.sleep(for: .milliseconds(700))
+                try await worker.rebuild(repository: repository, albums: albums, artists: artists)
+            } catch is CancellationError {
+                // Superseded by a newer library revision.
+            } catch {
+                print("[SpotlightIndex] Paged index update failed: \(error)")
             }
         }
     }

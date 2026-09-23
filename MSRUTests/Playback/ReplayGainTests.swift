@@ -47,4 +47,24 @@ struct ReplayGainTests {
         try FileManager.default.setAttributes([.modificationDate: nextDate], ofItemAtPath: url.path)
         #expect(try await service.cachedTrack(for: url) == nil)
     }
+
+    @Test("Changing another album member invalidates the album measurement")
+    func albumCacheChecksEveryMember() async throws {
+        let first = try Fixtures.createDeterministicWAV(durationSeconds: 1.0)
+        let second = try Fixtures.createDeterministicWAV(durationSeconds: 1.0)
+        defer {
+            try? FileManager.default.removeItem(at: first.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: second.deletingLastPathComponent())
+        }
+        let service = ReplayGainService(db: try TestDatabase.makeEphemeral())
+        let measured = try #require(try await service.analyzeAlbum([first, second]))
+        #expect(try await service.cachedAlbum(for: first) == measured)
+
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSinceNow: 15)],
+            ofItemAtPath: second.path
+        )
+        #expect(try await service.cachedTrack(for: first) != nil)
+        #expect(try await service.cachedAlbum(for: first) == nil)
+    }
 }

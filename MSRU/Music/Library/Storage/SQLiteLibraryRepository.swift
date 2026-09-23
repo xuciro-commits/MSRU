@@ -160,10 +160,8 @@ final class SQLiteLibraryRepository: LibraryRepository, Sendable {
 
     private func migrateLegacyLibraryIfPresent() async throws {
         guard let legacyURL = legacyFileURL ?? defaultLegacyLibraryURL(),
-              FileManager.default.fileExists(atPath: legacyURL.path),
-              let data = try? Data(contentsOf: legacyURL) else {
-            return
-        }
+              FileManager.default.fileExists(atPath: legacyURL.path) else { return }
+        let data = try Data(contentsOf: legacyURL)
 
         let isoDecoder = JSONDecoder()
         isoDecoder.dateDecodingStrategy = .iso8601
@@ -197,7 +195,12 @@ final class SQLiteLibraryRepository: LibraryRepository, Sendable {
         }
 
         let backupURL = legacyURL.appendingPathExtension("legacy.backup")
-        if !FileManager.default.fileExists(atPath: backupURL.path) {
+        if FileManager.default.fileExists(atPath: backupURL.path) {
+            guard try Data(contentsOf: backupURL) == data else {
+                throw LibraryMigrationError.backupConflict(backupURL)
+            }
+            try FileManager.default.removeItem(at: legacyURL)
+        } else {
             try FileManager.default.moveItem(at: legacyURL, to: backupURL)
         }
     }
@@ -214,12 +217,14 @@ private enum LibraryMigrationError: LocalizedError {
     case invalidLegacyFile(URL)
     case conflictingSources(UUID)
     case verificationFailed
+    case backupConflict(URL)
 
     var errorDescription: String? {
         switch self {
         case .invalidLegacyFile(let url): return "Library migration could not decode \(url.lastPathComponent); the original file was kept."
         case .conflictingSources(let id): return "Library migration found incomplete sources for \(id); the original file was kept."
         case .verificationFailed: return "Library migration verification failed; the original file was kept."
+        case .backupConflict(let url): return "Library migration found a different backup at \(url.lastPathComponent); the original file was kept."
         }
     }
 }

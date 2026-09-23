@@ -57,6 +57,29 @@ struct SpotlightIndexingTests {
         #expect(second.2.count == 2)
     }
 
+    @Test("Paged Spotlight rebuild never requests a full track array")
+    @MainActor
+    func pagedRebuild() async throws {
+        let tracks = (0..<3).map { index in
+            LocalTrack(fileURL: URL(fileURLWithPath: "/music/spotlight-\(index).wav"),
+                       title: "Song \(index)", artist: "Artist")
+        }
+        let repository = PagedOnlySpotlightRepository(tracks: tracks)
+        let writer = RecordingWriter()
+        let worker = SpotlightIndexWorker(writer: writer, batchSize: 2)
+
+        try await worker.rebuild(repository: repository, albums: [], artists: [])
+        let first = await writer.snapshot()
+        #expect(first.0 == 1)
+        #expect(first.2.flatMap { $0 }.map(\.id) == tracks.map { .track($0.id) })
+
+        await repository.replaceTracks([tracks[0], tracks[2]])
+        try await worker.rebuild(repository: repository, albums: [], artists: [])
+        let second = await writer.snapshot()
+        #expect(second.0 == 1)
+        #expect(second.1 == [SpotlightMusicID.track(tracks[1].id).rawValue])
+    }
+
     @Test("Shortcuts select exact tracks and bound search results")
     func intentLookup() {
         let first = LocalTrack(fileURL: URL(fileURLWithPath: "/tmp/song-a.flac"), title: "Song", artist: "One")
@@ -67,4 +90,20 @@ struct SpotlightIndexingTests {
         #expect(MusicIntentLibrarySearch.results(for: "song", in: [first, second], limit: 1) == ["Song — One"])
         #expect(MusicIntentLibrarySearch.results(for: " ", in: [first, second]).isEmpty)
     }
+}
+
+@MainActor
+private final class PagedOnlySpotlightRepository: LocalLibraryRepository {
+    private var tracks: [LocalTrack]
+
+    init(tracks: [LocalTrack]) { self.tracks = tracks }
+    func replaceTracks(_ tracks: [LocalTrack]) { self.tracks = tracks }
+    func loadTracks() async throws -> [LocalTrack] { throw CocoaError(.fileReadUnknown) }
+    func fetchPage(_ request: LocalTrackPageRequest) async throws -> LocalTrackPage {
+        let page = request.offset < tracks.count
+            ? Array(tracks[request.offset..<min(tracks.count, request.offset + request.limit)])
+            : []
+        return LocalTrackPage(tracks: page, totalCount: tracks.count, offset: request.offset)
+    }
+    func importTrack(from url: URL) async throws -> LocalTrack? { nil }
 }

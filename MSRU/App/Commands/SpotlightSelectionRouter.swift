@@ -13,7 +13,7 @@ enum SpotlightSelectionRouter {
         scene.selectedSourceFilter = nil
         switch item {
         case .track(let id):
-            guard let track = library.tracks.first(where: { $0.id == id }) else { return false }
+            guard let track = try? await library.findTrack(id: id) else { return false }
             scene.send(.navigate(.section(.library)))
             scene.select(localTrack: track)
             scene.application.playback.play(track)

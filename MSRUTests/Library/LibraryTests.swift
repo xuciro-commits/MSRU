@@ -273,4 +273,145 @@ struct LibraryTests {
         }
         #expect(count == 1)
     }
+
+    @Test("Interrupted legacy migration preserves originals and retries without duplicates")
+    @MainActor
+    func legacyLibraryBackupConflictAndRetry() async throws {
+        let db = try TestDatabase.makeEphemeral()
+        let legacyURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("library_retry_\(UUID().uuidString).json")
+        let backupURL = legacyURL.appendingPathExtension("legacy.backup")
+        defer {
+            try? FileManager.default.removeItem(at: legacyURL)
+            try? FileManager.default.removeItem(at: backupURL)
+        }
+        let track = LibraryTrack(title: "Keep Me", artist: "Artist", sources: [
+            LibraryPlaybackSource(kind: .local, localFileURL: URL(fileURLWithPath: "/music/keep.flac"))
+        ])
+        let original = try JSONEncoder().encode([track])
+        try original.write(to: legacyURL)
+        try Data("different backup".utf8).write(to: backupURL)
+        let repo = SQLiteLibraryRepository(db: db, legacyFileURL: legacyURL)
+
+        await #expect(throws: Error.self) { _ = try await repo.loadTracks() }
+        #expect(try Data(contentsOf: legacyURL) == original)
+        #expect(try await db.reader.read { connection in
+            try Int.fetchOne(connection, sql: "SELECT COUNT(*) FROM saved_library_tracks") ?? 0
+        } == 1)
+
+        try original.write(to: backupURL)
+        let loaded = try await repo.loadTracks()
+        #expect(loaded.count == 1)
+        #expect(loaded[0].sources == track.sources)
+        #expect(!FileManager.default.fileExists(atPath: legacyURL.path))
+        #expect(try Data(contentsOf: backupURL) == original)
+    }
+
+    @Test("Local manifest migration keeps unreadable input and archives verified input")
+    @MainActor
+    func localManifestMigrationPreservesAndArchives() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("local_migration_\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let manifest = directory.appendingPathComponent("external_tracks.json")
+        let backup = manifest.appendingPathExtension("legacy.backup")
+        let repo = SQLiteLocalLibraryRepository(db: try TestDatabase.makeEphemeral(), directory: directory)
+
+        try Data("{bad".utf8).write(to: manifest)
+        await #expect(throws: Error.self) { _ = try await repo.loadTracks() }
+        #expect(FileManager.default.fileExists(atPath: manifest.path))
+        #expect(!FileManager.default.fileExists(atPath: backup.path))
+
+        let track = LocalTrack(fileURL: directory.appendingPathComponent("kept.wav"),
+                               title: "Kept", artist: "Artist", album: "Album", duration: 10)
+        let original = try JSONEncoder().encode([track])
+        try original.write(to: manifest)
+        let loaded = try await repo.loadTracks()
+        #expect(loaded.count == 1)
+        #expect(loaded[0].title == track.title)
+        #expect(!FileManager.default.fileExists(atPath: manifest.path))
+        #expect(try Data(contentsOf: backup) == original)
+        #expect(try await repo.loadTracks().count == 1)
+    }
+
+    @Test("Album and artist track queries stay scoped to their SQLite identities")
+    @MainActor
+    func localTracksByReleaseAndArtist() async throws {
+        let db = try TestDatabase.makeEphemeral()
+        let repo = SQLiteLocalLibraryRepository(db: db)
+        let first = LocalTrack(fileURL: URL(fileURLWithPath: "/music/a1.wav"),
+                               title: "A1", artist: "Artist A", album: "Shared", trackNumber: 1)
+        let second = LocalTrack(fileURL: URL(fileURLWithPath: "/music/a2.wav"),
+                                title: "A2", artist: "Artist A", album: "Shared", trackNumber: 2)
+        let other = LocalTrack(fileURL: URL(fileURLWithPath: "/music/b1.wav"),
+                               title: "B1", artist: "Artist B", album: "Shared", trackNumber: 1)
+        try await repo.saveTracksInPlace([first, second])
+        try await repo.saveTracksInPlace([other])
+
+        let releaseA = DeterministicID.release(artist: "Artist A", title: "Shared").rawValue
+        let artistB = DeterministicID.artist(name: "Artist B").rawValue
+        let albumTracks = try await repo.fetchTracks(forReleaseIDs: [releaseA])
+        #expect(albumTracks.map(\.id) == [first.id, second.id])
+        #expect(try await repo.fetchTracks(forArtistIDs: [artistB]).map(\.id) == [other.id])
+        #expect(try await repo.fetchTracks(inFolder: URL(fileURLWithPath: "/music")).count == 3)
+        #expect(try await repo.fetchTracks(inFolder: URL(fileURLWithPath: "/music-other")).isEmpty)
+        #expect(try await repo.findUniqueTrack(title: "a1", artist: "ARTIST A")?.id == first.id)
+        #expect(try await repo.searchTracks("Artist A", limit: 1).map(\.id) == [first.id])
+
+        _ = try await IdentityRepository(db: db).deleteRelease(
+            id: ReleaseID(releaseA), title: "Shared", artist: "Artist A"
+        )
+        let releaseB = DeterministicID.release(artist: "Artist B", title: "Shared").rawValue
+        #expect(try await repo.fetchTracks(forReleaseIDs: [releaseB]).map(\.id) == [other.id])
+    }
+
+    @Test("Deleting one local asset preserves a same-named file in another folder")
+    @MainActor
+    func localDeletionUsesExactAssetIdentity() async throws {
+        let repo = SQLiteLocalLibraryRepository(db: try TestDatabase.makeEphemeral())
+        let first = LocalTrack(fileURL: URL(fileURLWithPath: "/music/disc-a/song.wav"),
+                               title: "Song", artist: "Artist", album: "Album", trackNumber: 1)
+        let second = LocalTrack(fileURL: URL(fileURLWithPath: "/music/disc-b/song.wav"),
+                                title: "Song", artist: "Artist", album: "Album", trackNumber: 1)
+        try await repo.saveTracksInPlace([first, second])
+        try await repo.deleteTracks(withIDs: [first.id], deletePhysicalFiles: false)
+
+        #expect(try await repo.fetchTracks(withIDs: [first.id]).isEmpty)
+        #expect(try await repo.fetchTracks(withIDs: [second.id]).map(\.id) == [second.id])
+    }
+
+    @Test("Failed local writes keep the visible track and artist credit")
+    @MainActor
+    func failedLocalMutationsKeepVisibleState() async throws {
+        let track = LocalTrack(fileURL: URL(fileURLWithPath: "/music/duet.wav"),
+                               title: "Duet", artist: "Alpha & Beta",
+                               artworkReference: "cover.jpg")
+        let store = LocalLibraryStore(
+            repository: FailingLocalMutationRepository(tracks: [track]),
+            db: try TestDatabase.makeEphemeral()
+        )
+        await store.loadIfNeeded()
+
+        await store.deleteArtist(name: "Alpha")
+        #expect(store.tracks.first?.artist == "Alpha & Beta")
+        #expect(store.errorMessage != nil)
+
+        let removed = await store.deleteTracks(withIDs: [track.id])
+        #expect(!removed)
+        #expect(store.tracks.map { $0.id } == [track.id])
+    }
+}
+
+@MainActor
+private final class FailingLocalMutationRepository: LocalLibraryRepository {
+    let tracks: [LocalTrack]
+
+    init(tracks: [LocalTrack]) { self.tracks = tracks }
+    func loadTracks() async throws -> [LocalTrack] { tracks }
+    func importTrack(from url: URL) async throws -> LocalTrack? { nil }
+    func saveTracksInPlace(_ tracks: [LocalTrack]) async throws { throw CocoaError(.fileWriteUnknown) }
+    func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws {
+        throw CocoaError(.fileWriteUnknown)
+    }
 }

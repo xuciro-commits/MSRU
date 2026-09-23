@@ -402,65 +402,58 @@ nonisolated public final class IdentityRepository: Sendable {
 
             // 1. Collect asset IDs & recording IDs by assetIDs
             if !assetIDs.isEmpty {
-                let idPlaceholders = assetIDs.map { _ in "?" }.joined(separator: ",")
-                let args = StatementArguments(assetIDs.map(\.rawValue))
-                let rows = try Row.fetchAll(db, sql: "SELECT id, recording_id FROM assets WHERE id IN (\(idPlaceholders))", arguments: args)
-                for row in rows {
-                    matchedAssetIDs.insert(row["id"])
-                    if let recID: String = row["recording_id"] {
-                        recIDsToCheck.insert(recID)
+                let values = assetIDs.map(\.rawValue).sorted()
+                for start in stride(from: 0, to: values.count, by: 500) {
+                    let batch = Array(values[start..<min(start + 500, values.count)])
+                    let placeholders = Array(repeating: "?", count: batch.count).joined(separator: ",")
+                    let rows = try Row.fetchAll(db, sql: "SELECT id, recording_id FROM assets WHERE id IN (\(placeholders))",
+                                                arguments: StatementArguments(batch))
+                    for row in rows {
+                        matchedAssetIDs.insert(row["id"])
+                        if let recID: String = row["recording_id"] { recIDsToCheck.insert(recID) }
                     }
                 }
             }
 
             // 2. Collect asset IDs & recording IDs by recordingIDs
             if !recordingIDs.isEmpty {
-                let recPlaceholders = recordingIDs.map { _ in "?" }.joined(separator: ",")
-                let args = StatementArguments(recordingIDs.map(\.rawValue))
-                let rows = try Row.fetchAll(db, sql: "SELECT id, recording_id FROM assets WHERE recording_id IN (\(recPlaceholders))", arguments: args)
-                for row in rows {
-                    matchedAssetIDs.insert(row["id"])
+                let values = recordingIDs.map(\.rawValue).sorted()
+                for start in stride(from: 0, to: values.count, by: 500) {
+                    let batch = Array(values[start..<min(start + 500, values.count)])
+                    let placeholders = Array(repeating: "?", count: batch.count).joined(separator: ",")
+                    let rows = try Row.fetchAll(db, sql: "SELECT id, recording_id FROM assets WHERE recording_id IN (\(placeholders))",
+                                                arguments: StatementArguments(batch))
+                    for row in rows { matchedAssetIDs.insert(row["id"]) }
                 }
                 for recID in recordingIDs {
                     recIDsToCheck.insert(recID.rawValue)
                 }
             }
 
-            // 3. Collect asset IDs & recording IDs by relativePaths (exact match + suffix / filename match)
+            // 3. Collect asset IDs & recording IDs by exact relative paths.
             if !relativePaths.isEmpty {
-                let pathPlaceholders = relativePaths.map { _ in "?" }.joined(separator: ",")
-                let args = StatementArguments(Array(relativePaths))
-                let rows = try Row.fetchAll(db, sql: "SELECT id, recording_id FROM assets WHERE relative_path IN (\(pathPlaceholders))", arguments: args)
-                for row in rows {
-                    matchedAssetIDs.insert(row["id"])
-                    if let recID: String = row["recording_id"] {
-                        recIDsToCheck.insert(recID)
-                    }
-                }
-
-                // Suffix / filename match for iOS sandbox / symlink path variants
-                for path in relativePaths {
-                    let filename = (path as NSString).lastPathComponent
-                    guard !filename.isEmpty else { continue }
-                    let suffixRows = try Row.fetchAll(
-                        db,
-                        sql: "SELECT id, recording_id FROM assets WHERE relative_path LIKE ? OR relative_path LIKE ?",
-                        arguments: ["%/\(filename)", "%\(filename)"]
-                    )
-                    for row in suffixRows {
+                let values = relativePaths.sorted()
+                for start in stride(from: 0, to: values.count, by: 500) {
+                    let batch = Array(values[start..<min(start + 500, values.count)])
+                    let placeholders = Array(repeating: "?", count: batch.count).joined(separator: ",")
+                    let rows = try Row.fetchAll(db, sql: "SELECT id, recording_id FROM assets WHERE relative_path IN (\(placeholders))",
+                                                arguments: StatementArguments(batch))
+                    for row in rows {
                         matchedAssetIDs.insert(row["id"])
-                        if let recID: String = row["recording_id"] {
-                            recIDsToCheck.insert(recID)
-                        }
+                        if let recID: String = row["recording_id"] { recIDsToCheck.insert(recID) }
                     }
                 }
             }
 
             // 4. Delete matched assets (SQLite cascades to file_assets, fingerprints, metadata_claims)
             if !matchedAssetIDs.isEmpty {
-                let placeholders = matchedAssetIDs.map { _ in "?" }.joined(separator: ",")
-                let args = StatementArguments(Array(matchedAssetIDs)) ?? StatementArguments()
-                try db.execute(sql: "DELETE FROM assets WHERE id IN (\(placeholders))", arguments: args)
+                let values = matchedAssetIDs.sorted()
+                for start in stride(from: 0, to: values.count, by: 500) {
+                    let batch = Array(values[start..<min(start + 500, values.count)])
+                    let placeholders = Array(repeating: "?", count: batch.count).joined(separator: ",")
+                    try db.execute(sql: "DELETE FROM assets WHERE id IN (\(placeholders))",
+                                   arguments: StatementArguments(batch))
+                }
             }
 
             // 5. Check if any recording has 0 remaining assets
@@ -491,9 +484,19 @@ nonisolated public final class IdentityRepository: Sendable {
             var targetReleaseIDs = Set<String>()
             if let id { targetReleaseIDs.insert(id.rawValue) }
 
-            if let title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if id == nil, let title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-                let rows = try Row.fetchAll(db, sql: "SELECT id FROM releases WHERE LOWER(TRIM(title)) = ? OR TRIM(title, \"'\") = ?", arguments: [cleanTitle, cleanTitle])
+                let cleanArtist = artist?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                let rows = try Row.fetchAll(db, sql: """
+                    SELECT rel.id FROM releases rel
+                    WHERE LOWER(TRIM(rel.title)) = ?
+                      AND (? IS NULL OR EXISTS (
+                          SELECT 1 FROM artist_credits ac
+                          JOIN artists art ON art.id = ac.artist_id
+                          WHERE ac.entity_type = 'release' AND ac.entity_id = rel.id
+                            AND LOWER(TRIM(art.name)) = ?
+                      ))
+                    """, arguments: [cleanTitle, cleanArtist, cleanArtist])
                 for row in rows {
                     targetReleaseIDs.insert(row["id"])
                 }

@@ -91,7 +91,7 @@ struct LocalLibraryView: View {
             await store
                 .loadIfNeeded()
         }
-        .task(id: "\(debouncedQuery)|\(sortField.rawValue)|\(sortAscending)") {
+        .task(id: "\(debouncedQuery)|\(sortField.rawValue)|\(sortAscending)|\(store.revision)") {
             let activePager = pager ?? store.makePager()
             pager = activePager
             await activePager.reset(

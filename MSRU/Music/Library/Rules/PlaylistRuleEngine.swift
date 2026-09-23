@@ -295,13 +295,15 @@ nonisolated public struct TrackEvaluationContext: Identifiable, Sendable {
         self.duration = duration
     }
 
-    public init(_ track: LocalTrack, isFavorite: Bool = false, playCount: Int = 0) {
+    public init(_ track: LocalTrack, isFavorite: Bool = false, playCount: Int = 0,
+                includeAddedAt: Bool = true) {
         let ext = track.fileURL.pathExtension.uppercased()
         let losslessExts = ["FLAC", "WAV", "AIFF", "AIF", "ALAC", "DTS", "DSF", "DSD"]
         let isLossless = losslessExts.contains(ext)
         let isHiRes = ext == "DSF" || ext == "DSD" || (isLossless && (ext == "FLAC" || ext == "WAV"))
 
         let fileAddedDate: Date = {
+            guard includeAddedAt else { return Date() }
             if let values = try? track.fileURL.resourceValues(forKeys: [.creationDateKey]),
                let date = values.creationDate {
                 return date
@@ -360,16 +362,23 @@ nonisolated public struct PlaylistRuleEngine: Sendable {
             return applyLimitAndSort(tracks: tracks, rules: rules)
         }
 
-        let filtered = tracks.filter { track in
-            switch rules.matchMode {
-            case .all:
-                return rules.rules.allSatisfy { $0.matches(track: track, referenceDate: referenceDate) }
-            case .any:
-                return rules.rules.contains { $0.matches(track: track, referenceDate: referenceDate) }
-            }
-        }
+        let filtered = tracks.filter { matches(rules: rules, track: $0, referenceDate: referenceDate) }
 
         return applyLimitAndSort(tracks: filtered, rules: rules)
+    }
+
+    public static func matches(
+        rules: SmartPlaylistRuleGroup,
+        track: TrackEvaluationContext,
+        referenceDate: Date = Date()
+    ) -> Bool {
+        guard !rules.rules.isEmpty else { return true }
+        switch rules.matchMode {
+        case .all:
+            return rules.rules.allSatisfy { $0.matches(track: track, referenceDate: referenceDate) }
+        case .any:
+            return rules.rules.contains { $0.matches(track: track, referenceDate: referenceDate) }
+        }
     }
 
     public static func evaluate(
@@ -378,7 +387,12 @@ nonisolated public struct PlaylistRuleEngine: Sendable {
         favorites: Set<String> = [],
         referenceDate: Date = Date()
     ) -> [LocalTrack] {
-        let contexts = tracks.map { TrackEvaluationContext($0, isFavorite: favorites.contains($0.id)) }
+        let needsAddedAt = rules.rules.contains { $0.field == .addedAt }
+            || rules.sortBy == .dateAddedDescending
+        let contexts = tracks.map {
+            TrackEvaluationContext($0, isFavorite: favorites.contains($0.id),
+                                   includeAddedAt: needsAddedAt)
+        }
         let evaluated = evaluate(rules: rules, tracks: contexts, referenceDate: referenceDate)
         let trackMap = Dictionary(uniqueKeysWithValues: tracks.map { ($0.id, $0) })
         return evaluated.compactMap { trackMap[$0.id] }

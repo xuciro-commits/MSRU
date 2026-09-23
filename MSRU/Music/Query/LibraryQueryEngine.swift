@@ -100,7 +100,9 @@ public actor LibraryQueryEngine {
 
             for row in sourceRows {
                 guard let sID: String = row["id"], let name: String = row["display_name"] else { continue }
-                let isLocal = SourceID.isLocalSourceID(sID) || (row["source_type"] as String?) == "localFolder"
+                let rawType: String? = row["source_type"]
+                let isLocal = SourceID.isLocalSourceID(sID)
+                    || rawType == SourceType.localFolder.rawValue || rawType == "localFolder"
                 if isLocal {
                     foundLocalSource = true
                     let c: Int = row["item_count"] ?? 0
@@ -146,7 +148,7 @@ public actor LibraryQueryEngine {
     // MARK: - DB-Backed Fast-Path Snapshots (<15ms at 100K)
 
     /// Direct SQLite index-backed snapshot generator eliminating in-memory dictionary grouping overhead.
-    public func queryDatabaseSnapshot(sourceFilter: String? = nil) async throws -> LibraryQuerySnapshot {
+    public func queryDatabaseSnapshot(sourceFilter: String? = nil, includeOrderedIDs: Bool = true) async throws -> LibraryQuerySnapshot {
         let revision = currentRevision &+ 1
         currentRevision = revision
 
@@ -157,16 +159,17 @@ public actor LibraryQueryEngine {
                 WHERE (? IS NULL OR EXISTS (SELECT 1 FROM assets a WHERE a.recording_id = r.id AND a.source_id = ?))
                 ORDER BY r.sort_title ASC
             """
-            let rows = try Row.fetchAll(db, sql: recSQL, arguments: [sourceFilter, sourceFilter])
             var orderedIDs: [String] = []
-            orderedIDs.reserveCapacity(rows.count)
             var positionLookup: [String: Int] = [:]
-            positionLookup.reserveCapacity(rows.count)
-
-            for (idx, row) in rows.enumerated() {
-                if let id: String = row["id"] {
-                    orderedIDs.append(id)
-                    positionLookup[id] = idx + 1
+            if includeOrderedIDs {
+                let rows = try Row.fetchAll(db, sql: recSQL, arguments: [sourceFilter, sourceFilter])
+                orderedIDs.reserveCapacity(rows.count)
+                positionLookup.reserveCapacity(rows.count)
+                for (idx, row) in rows.enumerated() {
+                    if let id: String = row["id"] {
+                        orderedIDs.append(id)
+                        positionLookup[id] = idx + 1
+                    }
                 }
             }
 
@@ -281,9 +284,9 @@ public actor LibraryQueryEngine {
     }
 
     /// Snapshot query delegating to the fast database engine.
-    public func querySnapshot(sourceFilter: String? = nil) async -> LibraryQuerySnapshot {
+    public func querySnapshot(sourceFilter: String? = nil, includeOrderedIDs: Bool = true) async -> LibraryQuerySnapshot {
         do {
-            return try await queryDatabaseSnapshot(sourceFilter: sourceFilter)
+            return try await queryDatabaseSnapshot(sourceFilter: sourceFilter, includeOrderedIDs: includeOrderedIDs)
         } catch {
             return LibraryQuerySnapshot(revision: currentRevision)
         }

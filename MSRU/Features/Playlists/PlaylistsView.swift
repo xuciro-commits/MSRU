@@ -32,6 +32,8 @@ struct PlaylistsView: View {
     @State private var sortField: PlaylistSortField = .title
     @State private var selectedPlaylistID: UUID?
     @State private var fallbackSelectedPlaylist: Playlist?
+    @State private var selectedPlaylistTracks: [LocalTrack] = []
+    @State private var playlistArtworkRefs: [UUID: String] = [:]
     @State private var isNewPlaylistSheetPresented: Bool = false
     @State private var playlistPendingDelete: Playlist?
     @State private var isDeleteConfirmationPresented: Bool = false
@@ -163,7 +165,7 @@ struct PlaylistsView: View {
                 PlaylistDetailView(
                     playlistStore: playlistStore,
                     playlist: playlist,
-                    tracks: localStore.tracks,
+                    tracks: selectedPlaylistTracks,
                     subsonicServers: subsonicServers,
                     playback: playback,
                     onBack: {
@@ -175,6 +177,15 @@ struct PlaylistsView: View {
             } else {
                 overviewContent
             }
+        }
+        .task(id: "\(activePlaylist?.id.uuidString ?? "")|\(localStore.revision)") {
+            guard let playlist = activePlaylist, !isRemoteSourceActive else {
+                selectedPlaylistTracks = []
+                return
+            }
+            let tracks = try? await localStore.resolvePlaylistTracks(playlist)
+            guard !Task.isCancelled else { return }
+            selectedPlaylistTracks = tracks ?? []
         }
         .task(id: selectedSourceID) {
             if isRemoteSourceActive, let sourceID = selectedSourceID {
@@ -388,15 +399,9 @@ struct PlaylistsView: View {
             }
         } actionOverlay: {
             FoundationCardActionButton(systemImage: "play.fill") {
-                let resolved: [LocalTrack]
-                if playlist.isSmart {
-                    resolved = playlistStore.resolveTracks(for: playlist, from: localStore.tracks)
-                } else {
-                    resolved = playlist.trackIDs.compactMap { id in
-                        localStore.tracks.first { $0.id == id || $0.fileURL.lastPathComponent == id || $0.fileURL.absoluteString.contains(id) }
-                    }
-                }
-                if let first = resolved.first {
+                Task {
+                    guard let resolved = try? await localStore.resolvePlaylistTracks(playlist),
+                          let first = resolved.first else { return }
                     playback.play(first, queue: resolved)
                 }
             }
@@ -406,8 +411,7 @@ struct PlaylistsView: View {
                 .lineLimit(1)
         } subtitle: {
             VStack(alignment: .leading, spacing: 2) {
-                let count = playlist.isSmart ? playlistStore.resolveTracks(for: playlist, from: localStore.tracks).count : playlist.trackCount
-                Text("\(count) songs")
+                Text(playlist.isSmart ? "Smart playlist" : "\(playlist.trackCount) songs")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 if let desc = playlist.description, desc.contains("来自") {
@@ -419,6 +423,17 @@ struct PlaylistsView: View {
             }
         }
         .marqueeItem(id: playlist.id)
+        .onAppear {
+            guard playlist.artworkReference == nil,
+                  playlistArtworkRefs[playlist.id] == nil,
+                  let firstID = playlist.trackIDs.first else { return }
+            Task {
+                if let track = try? await localStore.findTrack(id: firstID),
+                   let reference = track.artworkReference {
+                    playlistArtworkRefs[playlist.id] = reference
+                }
+            }
+        }
         .simultaneousGesture(
             TapGesture(count: 2).onEnded {
                 selectPlaylist(playlist)
@@ -430,16 +445,15 @@ struct PlaylistsView: View {
             }
 
             Button {
-                let resolved = playlist.trackIDs.compactMap { id in
-                    localStore.tracks.first { $0.id == id || $0.fileURL.lastPathComponent == id || $0.fileURL.absoluteString.contains(id) }
-                }
-                if let first = resolved.first {
+                Task {
+                    guard let resolved = try? await localStore.resolvePlaylistTracks(playlist),
+                          let first = resolved.first else { return }
                     playback.play(first, queue: resolved)
                 }
             } label: {
                 Label(LocalizedStringKey("Play"), systemImage: "play.fill")
             }
-            .disabled(playlist.trackCount == 0)
+            .disabled(!playlist.isSmart && playlist.trackCount == 0)
 
             Divider()
 
@@ -456,9 +470,7 @@ struct PlaylistsView: View {
 
     @ViewBuilder
     private func cardArtwork(for playlist: Playlist) -> some View {
-        let artworkRef = playlist.artworkReference ?? playlist.trackIDs.lazy.compactMap { id in
-            localStore.tracks.first { $0.id == id }?.artworkReference
-        }.first
+        let artworkRef = playlist.artworkReference ?? playlistArtworkRefs[playlist.id]
 
         if let artworkRef {
             MediaImageView(
@@ -520,13 +532,14 @@ struct PlaylistsView: View {
         ) {
             Button {
                 let selected = filteredPlaylists.filter { selectedPlaylistIDs.contains($0.id) }
-                let tracks = selected.flatMap { playlist in
-                    playlist.trackIDs.compactMap { id in
-                        localStore.tracks.first { $0.id == id }
+                Task {
+                    var tracks: [LocalTrack] = []
+                    for playlist in selected {
+                        if let resolved = try? await localStore.resolvePlaylistTracks(playlist) {
+                            tracks.append(contentsOf: resolved)
+                        }
                     }
-                }
-                if let first = tracks.first {
-                    playback.play(first, queue: tracks)
+                    if let first = tracks.first { playback.play(first, queue: tracks) }
                 }
             } label: {
                 Label("Play Selected", systemImage: "play.fill")
@@ -536,13 +549,11 @@ struct PlaylistsView: View {
 
             Button {
                 let selected = filteredPlaylists.filter { selectedPlaylistIDs.contains($0.id) }
-                let tracks = selected.flatMap { playlist in
-                    playlist.trackIDs.compactMap { id in
-                        localStore.tracks.first { $0.id == id }
+                Task {
+                    for playlist in selected {
+                        guard let tracks = try? await localStore.resolvePlaylistTracks(playlist) else { continue }
+                        for track in tracks { playback.addToQueue(track) }
                     }
-                }
-                for t in tracks {
-                    playback.addToQueue(t)
                 }
             } label: {
                 Label("Add to Queue", systemImage: "text.badge.plus")
@@ -818,4 +829,3 @@ enum PlaylistsFeature: ApplicationFeaturePresentation {
         }
     )
 }
-

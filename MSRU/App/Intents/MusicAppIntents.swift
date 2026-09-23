@@ -38,8 +38,8 @@ struct PlayTrackIntent: @preconcurrency AppIntent {
 
     @MainActor func perform() async throws -> some IntentResult & ProvidesDialog {
         await application.localLibrary.loadIfNeeded()
-        guard let track = MusicIntentLibrarySearch.exactTrack(
-            title: songTitle, artist: artist, in: application.localLibrary.tracks
+        guard let track = try? await application.localLibrary.findUniqueTrack(
+            title: songTitle, artist: artist
         ) else {
             return .result(dialog: "No unique local song matched. Try including the artist.")
         }
@@ -61,7 +61,8 @@ struct SearchMusicIntent: @preconcurrency AppIntent {
         await application.localLibrary.loadIfNeeded()
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !needle.isEmpty else { return .result(value: "Enter a song or artist name.") }
-        let matches = MusicIntentLibrarySearch.results(for: needle, in: application.localLibrary.tracks)
+        let tracks = (try? await application.localLibrary.searchTracks(needle)) ?? []
+        let matches = tracks.map { "\($0.title) — \($0.artist)" }
         return .result(value: matches.isEmpty ? "No matching songs." : matches.joined(separator: "\n"))
     }
 }

@@ -139,7 +139,7 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
                             WHERE rt.recording_id = r.id ORDER BY rt.id LIMIT 1) AS track_number
                     FROM assets a JOIN sources s ON s.id = a.source_id
                     LEFT JOIN recordings r ON r.id = a.recording_id
-                    WHERE s.source_type = 'localFolder'
+                    WHERE s.source_type IN ('local_folder', 'localFolder')
                 )
                 """
             let filter = query.isEmpty ? "" : " WHERE instr(lower(track_title), lower(?)) > 0 OR instr(lower(artist_name), lower(?)) > 0 OR instr(lower(COALESCE(album_title, '')), lower(?)) > 0"
@@ -163,6 +163,156 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
                                   trackNumber: number, year: row["release_year"])
             }
             return LocalTrackPage(tracks: tracks, totalCount: totalCount, offset: request.offset)
+        }
+    }
+
+    func fetchTracks(withIDs ids: Set<String>) async throws -> [LocalTrack] {
+        guard !ids.isEmpty else { return [] }
+        let paths = Set(ids.map { id in
+            if let url = URL(string: id), url.isFileURL { return url.standardizedFileURL.path }
+            return URL(fileURLWithPath: id).standardizedFileURL.path
+        })
+        let orderedPaths = paths.sorted()
+        var tracks: [LocalTrack] = []
+        for start in stride(from: 0, to: orderedPaths.count, by: 500) {
+            let batch = Array(orderedPaths[start..<min(start + 500, orderedPaths.count)])
+            let placeholders = Array(repeating: "?", count: batch.count).joined(separator: ",")
+            tracks.append(contentsOf: try await fetchLocalTracks(
+                predicate: "a.relative_path IN (\(placeholders))",
+                arguments: batch
+            ))
+        }
+        return tracks
+    }
+
+    func fetchTracks(forReleaseIDs ids: Set<String>) async throws -> [LocalTrack] {
+        guard !ids.isEmpty else { return [] }
+        let values = ids.sorted()
+        var tracks: [LocalTrack] = []
+        for start in stride(from: 0, to: values.count, by: 500) {
+            let batch = Array(values[start..<min(start + 500, values.count)])
+            let placeholders = Array(repeating: "?", count: batch.count).joined(separator: ",")
+            tracks.append(contentsOf: try await fetchLocalTracks(
+                predicate: """
+                    EXISTS (SELECT 1 FROM release_tracks selected
+                            WHERE selected.recording_id = r.id
+                              AND selected.release_id IN (\(placeholders)))
+                    """,
+                arguments: batch
+            ))
+        }
+        var seen = Set<String>()
+        return tracks.filter { seen.insert($0.id).inserted }
+    }
+
+    func fetchTracks(forArtistIDs ids: Set<String>) async throws -> [LocalTrack] {
+        guard !ids.isEmpty else { return [] }
+        let values = ids.sorted()
+        var tracks: [LocalTrack] = []
+        for start in stride(from: 0, to: values.count, by: 500) {
+            let batch = Array(values[start..<min(start + 500, values.count)])
+            let placeholders = Array(repeating: "?", count: batch.count).joined(separator: ",")
+            tracks.append(contentsOf: try await fetchLocalTracks(
+                predicate: """
+                    EXISTS (SELECT 1 FROM artist_credits selected
+                            WHERE selected.entity_type = 'recording'
+                              AND selected.entity_id = r.id
+                              AND selected.artist_id IN (\(placeholders)))
+                    """,
+                arguments: batch
+            ))
+        }
+        var seen = Set<String>()
+        return tracks.filter { seen.insert($0.id).inserted }
+    }
+
+    func fetchTracks(inFolder folder: URL) async throws -> [LocalTrack] {
+        let path = folder.standardizedFileURL.path
+        let childPrefix = path.hasSuffix("/") ? path : path + "/"
+        return try await fetchLocalTracks(
+            predicate: "a.relative_path = ? OR substr(a.relative_path, 1, length(?)) = ?",
+            arguments: [path, childPrefix, childPrefix]
+        )
+    }
+
+    func findUniqueTrack(title: String, artist: String?) async throws -> LocalTrack? {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return nil }
+        let artist = artist?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasArtist = artist?.isEmpty == false
+        let predicate = hasArtist
+            ? """
+              r.title = ? COLLATE NOCASE AND EXISTS (
+                SELECT 1 FROM artist_credits ac JOIN artists art ON art.id = ac.artist_id
+                WHERE ac.entity_type = 'recording' AND ac.entity_id = r.id
+                  AND art.name = ? COLLATE NOCASE)
+              """
+            : "r.title = ? COLLATE NOCASE"
+        let matches = try await fetchLocalTracks(
+            predicate: predicate,
+            arguments: hasArtist ? [title, artist!] : [title],
+            limit: 2
+        )
+        return matches.count == 1 ? matches[0] : nil
+    }
+
+    func searchTracks(_ query: String, limit: Int) async throws -> [LocalTrack] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty, limit > 0 else { return [] }
+        return try await fetchLocalTracks(
+            predicate: """
+                instr(lower(r.title), lower(?)) > 0 OR EXISTS (
+                    SELECT 1 FROM artist_credits ac JOIN artists art ON art.id = ac.artist_id
+                    WHERE ac.entity_type = 'recording' AND ac.entity_id = r.id
+                      AND instr(lower(art.name), lower(?)) > 0)
+                """,
+            arguments: [needle, needle],
+            limit: limit
+        )
+    }
+
+    private func fetchLocalTracks(predicate: String, arguments: [String], limit: Int? = nil) async throws -> [LocalTrack] {
+        try await migrateLegacyManifestIfPresent()
+        let mediaDir = try? mediaDirectory()
+        let limitSQL = limit.map { " LIMIT \(max(1, min($0, 512)))" } ?? ""
+        return try await db.reader.read { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT a.relative_path,
+                       COALESCE(r.title, a.relative_path) AS track_title,
+                       COALESCE(r.duration, a.duration, 0) AS duration,
+                       COALESCE((SELECT art.name FROM artist_credits ac
+                                 JOIN artists art ON art.id = ac.artist_id
+                                 WHERE ac.entity_id = r.id AND ac.entity_type = 'recording'
+                                 ORDER BY ac.position LIMIT 1), 'Unknown Artist') AS artist_name,
+                       (SELECT rel.title FROM release_tracks rt JOIN releases rel ON rel.id = rt.release_id
+                        WHERE rt.recording_id = r.id ORDER BY rt.id LIMIT 1) AS album_title,
+                       (SELECT rel.release_year FROM release_tracks rt JOIN releases rel ON rel.id = rt.release_id
+                        WHERE rt.recording_id = r.id ORDER BY rt.id LIMIT 1) AS release_year,
+                       (SELECT rel.artwork_asset_id FROM release_tracks rt JOIN releases rel ON rel.id = rt.release_id
+                        WHERE rt.recording_id = r.id ORDER BY rt.id LIMIT 1) AS artwork_asset_id,
+                       (SELECT rt.track_number FROM release_tracks rt
+                        WHERE rt.recording_id = r.id ORDER BY rt.id LIMIT 1) AS track_number
+                FROM assets a JOIN sources s ON s.id = a.source_id
+                LEFT JOIN recordings r ON r.id = a.recording_id
+                WHERE s.source_type IN ('local_folder', 'localFolder') AND (\(predicate))
+                ORDER BY album_title, track_number, track_title, a.relative_path\(limitSQL)
+                """, arguments: StatementArguments(arguments))
+            return rows.compactMap { row -> LocalTrack? in
+                guard let path: String = row["relative_path"] else { return nil }
+                let url = path.hasPrefix("/") ? URL(fileURLWithPath: path)
+                    : (mediaDir?.appendingPathComponent(path) ?? URL(fileURLWithPath: path))
+                let rawNumber: String? = row["track_number"]
+                return LocalTrack(
+                    fileURL: url,
+                    title: row["track_title"] ?? url.deletingPathExtension().lastPathComponent,
+                    artist: row["artist_name"] ?? "Unknown Artist",
+                    album: row["album_title"],
+                    duration: row["duration"] ?? 0,
+                    artworkReference: row["artwork_asset_id"],
+                    trackNumber: rawNumber.flatMap { Int($0.prefix(while: { $0.isNumber })) },
+                    year: row["release_year"]
+                )
+            }
         }
     }
 
@@ -329,39 +479,37 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
     func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws {
         guard !ids.isEmpty else { return }
 
-        // Find matching paths and file URLs
-        let (matchedPaths, matchedUrls) = try await db.reader.read { db -> (Set<String>, [URL]) in
-            var paths: Set<String> = []
+        let normalizedPaths = Set(ids.map { id in
+            if let url = URL(string: id), url.isFileURL { return url.standardizedFileURL.path }
+            return URL(fileURLWithPath: id).standardizedFileURL.path
+        })
+        let orderedPaths = normalizedPaths.sorted()
+
+        // Only registered local assets may be removed; never scan or match a remote source.
+        let (matchedIDs, matchedUrls) = try await db.reader.read { db -> (Set<AssetID>, [URL]) in
+            var ids = Set<AssetID>()
             var urls: [URL] = []
-            let rows = try Row.fetchAll(db, sql: "SELECT relative_path FROM assets")
-            for row in rows {
-                guard let path: String = row["relative_path"] else { continue }
-                let url = URL(fileURLWithPath: path)
-                if ids.contains(path) || ids.contains(url.standardizedFileURL.path) || ids.contains(url.absoluteString) {
-                    paths.insert(path)
-                    urls.append(url)
+            for start in stride(from: 0, to: orderedPaths.count, by: 500) {
+                let batch = Array(orderedPaths[start..<min(start + 500, orderedPaths.count)])
+                let placeholders = Array(repeating: "?", count: batch.count).joined(separator: ",")
+                let rows = try Row.fetchAll(db, sql: """
+                    SELECT a.id, a.relative_path FROM assets a
+                    JOIN sources s ON s.id = a.source_id
+                    WHERE s.source_type IN ('local_folder', 'localFolder') AND a.relative_path IN (\(placeholders))
+                    """, arguments: StatementArguments(batch))
+                for row in rows {
+                    if let raw: String = row["id"] { ids.insert(AssetID(raw)) }
+                    if let path: String = row["relative_path"] { urls.append(URL(fileURLWithPath: path)) }
                 }
             }
-            return (paths, urls)
+            return (ids, urls)
         }
 
-        var pathsToDelete = matchedPaths
-        var urlsToTrash = matchedUrls
-
-        if pathsToDelete.isEmpty {
-            for id in ids {
-                if id.hasPrefix("/") || id.contains("/") {
-                    pathsToDelete.insert(id)
-                    urlsToTrash.append(URL(fileURLWithPath: id))
-                }
-            }
-        }
-
-        guard !pathsToDelete.isEmpty else { return }
+        guard !matchedIDs.isEmpty else { return }
 
         var trashed: [(original: URL, destination: URL)] = []
         if deletePhysicalFiles {
-            for fileURL in urlsToTrash {
+            for fileURL in matchedUrls {
                 guard FileManager.default.fileExists(atPath: fileURL.path) else { continue }
                 let hasAccess = fileURL.startAccessingSecurityScopedResource()
                 defer { if hasAccess { fileURL.stopAccessingSecurityScopedResource() } }
@@ -381,7 +529,7 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
 
         do {
             let identityRepo = IdentityRepository(db: db)
-            _ = try await identityRepo.deleteTracks(relativePaths: pathsToDelete)
+            _ = try await identityRepo.deleteTracks(assetIDs: matchedIDs)
         } catch {
             for item in trashed.reversed() {
                 try? FileManager.default.moveItem(at: item.destination, to: item.original)
@@ -393,11 +541,9 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
     // MARK: - Legacy Migration
 
     private func migrateLegacyManifestIfPresent() async throws {
-        guard let manifestURL = try? externalManifestURL(),
-              FileManager.default.fileExists(atPath: manifestURL.path),
-              let data = try? Data(contentsOf: manifestURL) else {
-            return
-        }
+        let manifestURL = try externalManifestURL()
+        guard FileManager.default.fileExists(atPath: manifestURL.path) else { return }
+        let data = try Data(contentsOf: manifestURL)
 
         struct LegacyRecord: Codable {
             let fileURL: URL
@@ -442,7 +588,12 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
             throw CocoaError(.fileReadCorruptFile)
         }
         let backupURL = manifestURL.appendingPathExtension("legacy.backup")
-        if !FileManager.default.fileExists(atPath: backupURL.path) {
+        if FileManager.default.fileExists(atPath: backupURL.path) {
+            guard try Data(contentsOf: backupURL) == data else {
+                throw CocoaError(.fileWriteFileExists)
+            }
+            try FileManager.default.removeItem(at: manifestURL)
+        } else {
             try FileManager.default.moveItem(at: manifestURL, to: backupURL)
         }
     }
