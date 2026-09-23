@@ -15,41 +15,9 @@ import MusicPlayback
 struct LibraryView:
     View {
 
-    enum Scope:
-        String,
-        CaseIterable,
-        Identifiable {
-
-        case saved
-
-        case local
-
-
-        var id:
-            Self {
-
-            self
-        }
-
-
-        var title:
-            String {
-
-            switch self {
-
-            case .saved:
-
-                return
-                    "Library"
-
-
-            case .local:
-
-                return
-                    "Files"
-            }
-        }
-    }
+    /// Filter item for tracks saved from Browse (Openverse and other web
+    /// providers). They are library members without a file or server source.
+    static let webSourceID = "web"
 
 
     // MARK: - Feature
@@ -88,10 +56,6 @@ struct LibraryView:
 
 
     // MARK: - Local UI State
-
-    @State
-    private var scope:
-        Scope = .saved
 
     @State
     private var viewMode:
@@ -192,7 +156,7 @@ struct LibraryView:
             isDropTargeted = targeted
         }
         .confirmationDialog(
-            "Delete selected songs?",
+            "Remove selected songs from the Library?",
             isPresented: $isDeleteConfirmationPresented,
             titleVisibility: .visible
         ) {
@@ -204,7 +168,7 @@ struct LibraryView:
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Selected songs will be removed from local library. Original files will remain on disk.")
+            Text("The songs leave the Library. Their files stay on disk.")
         }
         .onChange(of: selectedSavedTrackIDs) { _, newIDs in
             if newIDs.count == 1, let found = filteredSavedTracks.first(where: { $0.id == newIDs.first }) {
@@ -258,8 +222,8 @@ struct LibraryView:
             }
             debouncedLocalQuery = trimmed
         }
-        .task(id: "\(scope.rawValue)|\(selectedSourceID ?? "")|\(debouncedLocalQuery)|\(sortField.rawValue)|\(sortAscending)|\(localStore.revision)") {
-            guard scope == .local, !isRemoteSourceActive else { return }
+        .task(id: "\(selectedSourceID ?? "")|\(debouncedLocalQuery)|\(sortField.rawValue)|\(sortAscending)|\(localStore.revision)") {
+            guard !isWebSourceActive, !isRemoteSourceActive else { return }
             let pager = localPager ?? localStore.makePager()
             localPager = pager
             await pager.reset(
@@ -274,10 +238,10 @@ struct LibraryView:
 
     @ViewBuilder
     private var gridOverlayBar: some View {
-        if scope == .saved && selectedSavedTrackIDs.count > 1 {
+        if isWebSourceActive && selectedSavedTrackIDs.count > 1 {
             savedGridBatchBar
                 .transition(.move(edge: .bottom).combined(with: .opacity))
-        } else if scope == .local && selectedLocalTrackIDs.count > 1 {
+        } else if !isWebSourceActive && selectedLocalTrackIDs.count > 1 {
             localGridBatchBar
                 .transition(.move(edge: .bottom).combined(with: .opacity))
         }
@@ -309,10 +273,9 @@ struct LibraryView:
                         .padding(.vertical, 12)
                     }
                 } else {
-                    switch scope {
-                    case .saved:
+                    if isWebSourceActive {
                         savedGridContent
-                    case .local:
+                    } else {
                         localGridContent
                     }
                 }
@@ -353,10 +316,9 @@ struct LibraryView:
                     .background(.ultraThinMaterial)
                 }
             } else {
-                switch scope {
-                case .saved:
+                if isWebSourceActive {
                     savedTableContent
-                case .local:
+                } else {
                     localTableContent
                 }
             }
@@ -370,9 +332,6 @@ struct LibraryView:
             HStack(spacing: 20) {
                 libraryTitle
                 Spacer()
-                if !isRemoteSourceActive {
-                    scopePicker.frame(width: 220)
-                }
                 importButton
             }
             .fixedSize(horizontal: true, vertical: false)
@@ -381,9 +340,6 @@ struct LibraryView:
                     libraryTitle
                     Spacer()
                     importButton
-                }
-                if !isRemoteSourceActive {
-                    scopePicker
                 }
             }
         }
@@ -397,14 +353,6 @@ struct LibraryView:
             Text("Library").font(.largeTitle.bold())
             Text(librarySubtitle).font(.callout).foregroundStyle(.secondary)
         }
-    }
-
-    private var scopePicker: some View {
-        Picker("LibraryView", selection: $scope) {
-            ForEach(Scope.allCases) { scope in Text(LocalizedStringKey(scope.title)).tag(scope) }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
     }
 
     private var importButton: some View {
@@ -426,12 +374,10 @@ struct LibraryView:
             let serverName = availableSources.first(where: { $0.sourceID == selectedSourceID })?.displayName ?? "远程媒体服务"
             return "\(serverName) • 按需在线浏览"
         }
-        switch scope {
-        case .saved:
-            return "\(feature.tracks.count) 首收藏歌曲"
-        case .local:
-            return "\(localPager?.totalCount ?? 0) 首本地歌曲"
+        if isWebSourceActive {
+            return "\(webTracks.count) 首网络歌曲"
         }
+        return "\(localPager?.totalCount ?? 0) 首歌曲"
     }
 
     // MARK: - Filter Bar
@@ -447,8 +393,8 @@ struct LibraryView:
                 prompt: isRemoteSourceActive ? "搜索远程歌曲…" : "Filter songs…"
             )
 
-            if !availableSources.isEmpty {
-                SourceFilterBarView(sources: availableSources, selectedSourceID: $selectedSourceID)
+            if sourceFilterItems.count > 1 {
+                SourceFilterBarView(sources: sourceFilterItems, selectedSourceID: $selectedSourceID)
                     .padding(.horizontal, 20)
             }
         }
@@ -471,7 +417,7 @@ struct LibraryView:
                 .font(.callout)
                 .padding(.horizontal, 20)
         }
-        if let error = localPager?.errorMessage, scope == .local, !isRemoteSourceActive {
+        if let error = localPager?.errorMessage, !isWebSourceActive, !isRemoteSourceActive {
             Label(error, systemImage: "exclamationmark.triangle")
                 .font(.callout)
                 .padding(.horizontal, 20)
@@ -480,27 +426,39 @@ struct LibraryView:
 
     // MARK: - Filtered Queries
 
-    private var filteredSavedTracks: [LibraryTrack] {
-        var baseTracks = feature.tracks
-        if let selectedSourceID {
-            baseTracks = baseTracks.filter { track in
-                if SourceID.isLocalSourceID(selectedSourceID) {
-                    return track.sources.contains(where: { $0.kind == .local })
-                } else {
-                    return track.sources.contains(where: { $0.kind == .openSubsonic })
-                }
-            }
+    /// Saved tracks without a local file: the Web source.
+    private var webTracks: [LibraryTrack] {
+        feature.tracks.filter { track in
+            !track.sources.contains(where: { $0.kind == .local })
         }
-        return LibraryCollectionSortFilter.filterAndSort(
-            tracks: baseTracks,
+    }
+
+    private var filteredSavedTracks: [LibraryTrack] {
+        LibraryCollectionSortFilter.filterAndSort(
+            tracks: webTracks,
             query: searchQuery,
             field: sortField,
             ascending: sortAscending
         )
     }
 
+    private var sourceFilterItems: [SourceFilterItem] {
+        var items = availableSources
+        if items.isEmpty {
+            items.append(SourceFilterItem(id: nil, displayName: String(localized: "All"), count: nil))
+        }
+        if !webTracks.isEmpty {
+            items.append(SourceFilterItem(id: Self.webSourceID, displayName: String(localized: "Web"), count: webTracks.count))
+        }
+        return items
+    }
+
+    private var isWebSourceActive: Bool {
+        selectedSourceID == Self.webSourceID
+    }
+
     private var isRemoteSourceActive: Bool {
-        guard let id = selectedSourceID else { return false }
+        guard let id = selectedSourceID, id != Self.webSourceID else { return false }
         return !SourceID.isLocalSourceID(id)
     }
 
@@ -664,7 +622,6 @@ struct LibraryView:
                             track: track,
                             isSelected: selectedLocalTrackIDs.contains(track.id) || selectedLocalTrack?.id == track.id,
                             isPlaying: playback.isPlaying(trackID: track.id),
-                            isSaved: feature.libraryStore.contains(local: track),
                             onSelect: {
                                 SelectionHelper.handleTap(
                                     for: track.id,
@@ -680,15 +637,6 @@ struct LibraryView:
                             onPlay: { playLocalPageTrack(track, queue: filteredLocalTracks) },
                             onPlayNext: { playback.playNext(track) },
                             onEnqueue: { playback.addToQueue(track) },
-                            onToggleLibrary: {
-                                Task {
-                                    if feature.libraryStore.contains(local: track) {
-                                        await feature.libraryStore.remove(local: track)
-                                    } else {
-                                        await feature.libraryStore.add(local: track)
-                                    }
-                                }
-                            },
                             onReveal: {
                                 if track.fileURL.isFileURL {
                                     PlatformFileViewer.revealInFinder(url: track.fileURL)
@@ -797,13 +745,15 @@ struct LibraryView:
             .buttonStyle(.bordered)
             .controlSize(.small)
 
-            Button(role: .destructive) {
-                isDeleteConfirmationPresented = true
-            } label: {
-                Label("Delete from Library", systemImage: "trash")
+            if !isRemoteSourceActive {
+                Button(role: .destructive) {
+                    isDeleteConfirmationPresented = true
+                } label: {
+                    Label("Remove from Library", systemImage: "trash")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
     }
 
@@ -848,17 +798,14 @@ struct LibraryView:
                 isFiltered: !searchQuery.isEmpty || isRemoteSourceActive,
                 selectedTrack: $selectedLocalTrack,
                 playback: playback,
-                library: feature.libraryStore,
                 onRevealInFinder: { url in
                     if url.isFileURL {
                         PlatformFileViewer.revealInFinder(url: url)
                     }
                 },
-                onDeleteTracks: { ids in
-                    if !isRemoteSourceActive {
-                        Task {
-                            await localStore.deleteTracks(withIDs: ids)
-                        }
+                onDeleteTracks: isRemoteSourceActive ? nil : { ids in
+                    Task {
+                        await localStore.deleteTracks(withIDs: ids)
                     }
                 },
                 onTrackAppear: { track in
@@ -893,9 +840,9 @@ struct LibraryView:
 
     private var emptySavedView: some View {
         ContentUnavailableView {
-            Label("Library is empty", systemImage: "music.note.house")
+            Label("No Web Songs", systemImage: "globe")
         } description: {
-            Text("Add songs from Browse or local files.")
+            Text("Songs you add to the Library from Browse appear here.")
         } actions: {
             Button("Add Music") { onAddMusic() }
         }
@@ -1020,12 +967,10 @@ struct LibraryView:
         let track: LocalTrack
         let isSelected: Bool
         let isPlaying: Bool
-        let isSaved: Bool
         let onSelect: () -> Void
         let onPlay: () -> Void
         let onPlayNext: () -> Void
         let onEnqueue: () -> Void
-        let onToggleLibrary: () -> Void
         let onReveal: () -> Void
         let onDelete: () -> Void
 
@@ -1056,12 +1001,6 @@ struct LibraryView:
                 )
             } actionsMenu: {
                 HStack(spacing: 4) {
-                    if isSaved {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(Color.accentColor)
-                            .font(.caption)
-                    }
-
                     if isHovered {
                         Menu {
                             menuContent
@@ -1092,18 +1031,14 @@ struct LibraryView:
         private var menuContent: some View {
             Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward", action: onPlayNext)
             Button("Add to Queue", systemImage: "text.badge.plus", action: onEnqueue)
-            Divider()
-            Button(action: onToggleLibrary) {
-                Label(
-                    isSaved ? "Remove from Library" : "Add to Library",
-                    systemImage: isSaved ? "heart.slash" : "heart"
-                )
-            }
-            Divider()
-            Button("Show in Finder", systemImage: "folder", action: onReveal)
-            Divider()
-            Button(role: .destructive, action: onDelete) {
-                Label("Delete from Library", systemImage: "trash")
+            // File actions exist only for tracks backed by a file.
+            if track.fileURL.isFileURL {
+                Divider()
+                Button("Show in Finder", systemImage: "folder", action: onReveal)
+                Divider()
+                Button(role: .destructive, action: onDelete) {
+                    Label("Remove from Library", systemImage: "trash")
+                }
             }
         }
     }
@@ -1265,9 +1200,9 @@ struct LibraryView:
             onSelect: {}, onPlay: {}, onPlayNext: {}, onEnqueue: {}, onRemove: {}
         )
         LibraryView.LibraryLocalTrackCardItemView(
-            track: local, isSelected: false, isPlaying: false, isSaved: true,
+            track: local, isSelected: false, isPlaying: false,
             onSelect: {}, onPlay: {}, onPlayNext: {}, onEnqueue: {},
-            onToggleLibrary: {}, onReveal: {}, onDelete: {}
+            onReveal: {}, onDelete: {}
         )
     }
     .frame(width: 400)

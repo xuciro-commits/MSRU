@@ -45,6 +45,10 @@ struct SourcesView: View {
                 }
 
                 addSourceFooter
+
+                Divider()
+
+                WatchedFoldersSection(watchedFolders: scene.application.watchedFolders)
             }
             .padding(28)
         }
@@ -173,22 +177,21 @@ private struct SourceCardView: View {
                             .padding(.vertical, 2)
                             .background(Capsule().fill(Color.blue.opacity(0.12)))
                         } else {
-                            HStack(spacing: 4) {
-                                Circle().fill(Color.green).frame(width: 6, height: 6)
-                                Text(isLocal ? "就绪" : "在线")
-                                    .font(.caption2.bold())
-                                    .foregroundStyle(.green)
-                            }
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(Color.green.opacity(0.15)))
+                            statusPill(isLocal: isLocal)
                         }
                     }
 
-                    Text(source.uri)
+                    Text(source.username.map { "\(source.uri) · \($0)" } ?? source.uri)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+
+                    if case .offline(let message) = coordinator.status[source.id] {
+                        Text(message)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .lineLimit(2)
+                    }
 
                     HStack(spacing: 6) {
                         if isLocal {
@@ -292,23 +295,7 @@ private struct SourceCardView: View {
                 Button {
                     scene.navigateToSource(sourceID: source.id.rawValue, target: .library)
                 } label: {
-                    Label("浏览歌曲", systemImage: "music.note")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-
-                Button {
-                    scene.navigateToSource(sourceID: source.id.rawValue, target: .albums)
-                } label: {
-                    Label("浏览专辑", systemImage: "square.stack")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-
-                Button {
-                    scene.navigateToSource(sourceID: source.id.rawValue, target: .playlists)
-                } label: {
-                    Label("查看歌单", systemImage: "music.note.list")
+                    Label("在资料库中显示", systemImage: "music.note.house")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -338,6 +325,27 @@ private struct SourceCardView: View {
         .task {
             await loadStats()
         }
+    }
+
+    @ViewBuilder
+    private func statusPill(isLocal: Bool) -> some View {
+        let (label, color): (LocalizedStringKey, Color) = {
+            if isLocal { return ("就绪", .green) }
+            switch coordinator.status[source.id] ?? .unknown {
+            case .online: return ("在线", .green)
+            case .offline: return ("离线", .red)
+            case .unknown: return ("未检测", .secondary)
+            }
+        }()
+        HStack(spacing: 4) {
+            Circle().fill(color).frame(width: 6, height: 6)
+            Text(label)
+                .font(.caption2.bold())
+                .foregroundStyle(color)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(Capsule().fill(color.opacity(0.15)))
     }
 
     private func loadStats() async {

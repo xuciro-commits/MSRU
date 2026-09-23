@@ -5,7 +5,6 @@
 
 import SwiftUI
 import Observation
-import UniformTypeIdentifiers
 import AppFoundation
 import AppFoundationUI
 import MusicLibrary
@@ -26,17 +25,8 @@ struct SettingsView:
     @Bindable var languageSettings:
         LanguageSettings
 
-    @Bindable var watchedFolders:
-        WatchedFolderStore
-
-    @Bindable var subsonicServers:
-        SubsonicServerStore
-
     @Environment(\.openURL)
     private var openURL
-
-    @State private var isFolderPickerPresented:
-        Bool = false
 
     @State private var selection:
         SettingsCategory =
@@ -300,14 +290,6 @@ struct SettingsView:
             }
 
 
-        case .library:
-            VStack(alignment: .leading, spacing: 32) {
-                watchedFoldersSection
-                Divider()
-                RemoteServerListView(store: subsonicServers)
-            }
-
-
         case .playback:
 
             settingsCard(
@@ -558,228 +540,6 @@ struct SettingsView:
         )
     }
 
-
-    // MARK: - Watched Folders
-
-    private var watchedFoldersSection: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(LocalizedStringKey("Watched Folders"))
-                            .font(.headline)
-                        Text(LocalizedStringKey("MSRU automatically monitors these directories in the background. Any new or modified audio files will be incrementally ingested."))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button {
-                        isFolderPickerPresented = true
-                    } label: {
-                        Label(LocalizedStringKey("Add Folder"), systemImage: "plus")
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-
-                if let msg = watchedFolders.statusMessage {
-                    HStack(spacing: 6) {
-                        Image(systemName: "info.circle.fill")
-                            .foregroundStyle(Color.accentColor)
-                        Text(LocalizedStringKey(msg))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.top, 4)
-                }
-            }
-            .padding(16)
-            .background(
-                .quaternary,
-                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-            )
-
-            if watchedFolders.folders.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "folder.badge.questionmark")
-                        .font(.system(size: 36))
-                        .foregroundStyle(.secondary)
-                    Text(LocalizedStringKey("No Watched Folders Configured"))
-                        .font(.headline)
-                    Text(LocalizedStringKey("Click 'Add Folder' to select a local directory to watch."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(32)
-                .background(
-                    .quaternary,
-                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                )
-            } else {
-                ForEach(watchedFolders.folders) { folder in
-                    watchedFolderCard(folder)
-                }
-            }
-
-            HStack {
-                if watchedFolders.isScanning {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text(LocalizedStringKey("Scanning watched folders…"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button {
-                    Task {
-                        await watchedFolders.rescanAll()
-                    }
-                } label: {
-                    Label(LocalizedStringKey("Rescan All"), systemImage: "arrow.clockwise")
-                }
-                .buttonStyle(.bordered)
-                .disabled(watchedFolders.isScanning)
-            }
-        }
-        .fileImporter(
-            isPresented: $isFolderPickerPresented,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            if case .success(let urls) = result, let url = urls.first {
-                Task {
-                    await watchedFolders.addFolder(url: url)
-                }
-            }
-        }
-    }
-
-    private func watchedFolderCard(_ folder: WatchedFolder) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: "folder.fill")
-                    .font(.title2)
-                    .foregroundStyle(folder.isEnabled ? Color.accentColor : Color.secondary)
-                    .frame(width: 32, height: 32)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Text(folder.displayName)
-                            .font(.headline)
-
-                        if folder.isEnabled {
-                            if folder.isNetworkVolume {
-                                HStack(spacing: 4) {
-                                    Circle()
-                                        .fill(Color.blue)
-                                        .frame(width: 6, height: 6)
-                                    Text(LocalizedStringKey("Network (Snapshot)"))
-                                        .font(.caption2.bold())
-                                        .foregroundStyle(.blue)
-                                }
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.blue.opacity(0.12), in: Capsule())
-                            } else {
-                                HStack(spacing: 4) {
-                                    Circle()
-                                        .fill(Color.green)
-                                        .frame(width: 6, height: 6)
-                                    Text(LocalizedStringKey("Monitoring"))
-                                        .font(.caption2.bold())
-                                        .foregroundStyle(.green)
-                                }
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.green.opacity(0.12), in: Capsule())
-                            }
-                        } else {
-                            Text(LocalizedStringKey("Paused"))
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.secondary.opacity(0.12), in: Capsule())
-                        }
-                    }
-
-                    Text(folder.path)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-
-                    HStack(spacing: 12) {
-                        Text("\(folder.trackCount) " + String(localized: "tracks"))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-
-                        if let lastScan = folder.lastScannedAt {
-                            Text(String(localized: "Last scanned:") + " \(lastScan.formatted(date: .abbreviated, time: .shortened))")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.top, 2)
-                }
-
-                Spacer()
-
-                HStack(spacing: 8) {
-                    Button {
-                        Task {
-                            await watchedFolders.rescanFolder(id: folder.id)
-                        }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .buttonStyle(.borderless)
-                    .help(String(localized: "Rescan this folder"))
-
-                    Button {
-                        openURL(folder.url)
-                    } label: {
-                        Image(systemName: "arrow.up.forward.square")
-                    }
-                    .buttonStyle(.borderless)
-                    .help(String(localized: "Show in Finder"))
-
-                    Button(role: .destructive) {
-                        watchedFolders.removeFolder(id: folder.id)
-                    } label: {
-                        Image(systemName: "trash")
-                    }
-                    .buttonStyle(.borderless)
-                    .help(String(localized: "Remove watched folder"))
-                }
-            }
-
-            Divider()
-
-            HStack {
-                Toggle(LocalizedStringKey("Active Monitoring"), isOn: Binding(
-                    get: { folder.isEnabled },
-                    set: { _ in watchedFolders.toggleFolder(id: folder.id) }
-                ))
-                .toggleStyle(.switch)
-                .controlSize(.small)
-
-                Spacer()
-
-                Toggle(LocalizedStringKey("Auto-Ingest into Library"), isOn: Binding(
-                    get: { folder.autoIngest },
-                    set: { watchedFolders.setAutoIngest(id: folder.id, autoIngest: $0) }
-                ))
-                .toggleStyle(.switch)
-                .controlSize(.small)
-            }
-        }
-        .padding(16)
-        .background(
-            .quaternary,
-            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-        )
-    }
 }
 
 
@@ -792,7 +552,6 @@ private enum SettingsCategory:
 
     case general
 
-    case library
 
     case playback
 
@@ -816,11 +575,6 @@ private enum SettingsCategory:
         case .general:
 
             "General"
-
-
-        case .library:
-
-            "Library"
 
 
         case .playback:
@@ -850,11 +604,6 @@ private enum SettingsCategory:
             "App behavior and appearance."
 
 
-        case .library:
-
-            "Storage, import, and unified library behavior."
-
-
         case .playback:
 
             "Playback quality and resolution behavior."
@@ -880,11 +629,6 @@ private enum SettingsCategory:
         case .general:
 
             "gearshape"
-
-
-        case .library:
-
-            "music.note.house"
 
 
         case .playback:
@@ -1067,9 +811,7 @@ enum SettingsFeature: ApplicationFeaturePresentation {
                 SettingsView(
                     playback: scene.application.playback,
                     providerManager: scene.application.providerManager,
-                    languageSettings: scene.application.languageSettings,
-                    watchedFolders: scene.application.watchedFolders,
-                    subsonicServers: scene.application.subsonicServers
+                    languageSettings: scene.application.languageSettings
                 )
             }
         ]
@@ -1083,9 +825,7 @@ enum SettingsFeature: ApplicationFeaturePresentation {
     SettingsView(
         playback: app.playback,
         providerManager: app.providerManager,
-        languageSettings: app.languageSettings,
-        watchedFolders: app.watchedFolders,
-        subsonicServers: app.subsonicServers
+        languageSettings: app.languageSettings
     )
     .frame(width: 1000, height: 700)
 }

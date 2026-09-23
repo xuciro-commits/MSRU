@@ -131,8 +131,8 @@ struct LibraryTrackTableView: View {
             }
             .width(min: 50, ideal: 60, max: 70)
 
-            // Favorite column
-            TableColumn("Favorite") { track in
+            // Library membership column
+            TableColumn("In Library") { track in
                 let isSaved = library.contains(id: track.id)
                 Button {
                     Task {
@@ -143,8 +143,8 @@ struct LibraryTrackTableView: View {
                         }
                     }
                 } label: {
-                    Image(systemName: isSaved ? "heart.fill" : "heart")
-                        .foregroundStyle(isSaved ? Color.red : Color.secondary)
+                    Image(systemName: isSaved ? "checkmark.circle.fill" : "plus.circle")
+                        .foregroundStyle(isSaved ? Color.accentColor : Color.secondary)
                         .font(.callout)
                 }
                 .buttonStyle(.plain)
@@ -224,7 +224,7 @@ struct LibraryTrackTableView: View {
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.secondary)
 
-            // Favorite Button
+            // Library membership button
             Button {
                 Task {
                     if isSaved {
@@ -234,8 +234,8 @@ struct LibraryTrackTableView: View {
                     }
                 }
             } label: {
-                Image(systemName: isSaved ? "heart.fill" : "heart")
-                    .foregroundStyle(isSaved ? Color.red : Color.secondary)
+                Image(systemName: isSaved ? "checkmark.circle.fill" : "plus.circle")
+                    .foregroundStyle(isSaved ? Color.accentColor : Color.secondary)
                     .font(.callout)
             }
             .buttonStyle(.plain)
@@ -301,16 +301,12 @@ struct LibraryTrackTableView: View {
             Button {
                 let selected = tracks.filter { selectedTrackIDs.contains($0.id) }
                 Task {
-                    for track in selected {
-                        if library.contains(id: track.id) {
-                            await library.remove(id: track.id)
-                        } else {
-                            await library.add(track)
-                        }
+                    for track in selected where library.contains(id: track.id) {
+                        await library.remove(id: track.id)
                     }
                 }
             } label: {
-                Label("Toggle Favorites", systemImage: "heart")
+                Label("Remove from Library", systemImage: "minus.circle")
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
@@ -384,7 +380,7 @@ struct LibraryTrackTableView: View {
             }
         } label: {
             Label(isSaved ? "Remove from Library" : "Add to Library",
-                  systemImage: isSaved ? "heart.slash" : "heart")
+                  systemImage: isSaved ? "minus.circle" : "plus.circle")
         }
 
         if let localURL = track.sources.first(where: { $0.kind == .local && $0.localFileURL != nil })?.localFileURL,

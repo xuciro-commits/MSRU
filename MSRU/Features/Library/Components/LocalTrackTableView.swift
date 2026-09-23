@@ -16,7 +16,6 @@ struct LocalTrackTableView: View {
     let isFiltered: Bool
     @Binding var selectedTrack: LocalTrack?
     @Bindable var playback: PlaybackController
-    @Bindable var library: LibraryStore
 
     var onRevealInFinder: ((URL) -> Void)? = nil
     var onDeleteTracks: ((Set<String>) -> Void)? = nil
@@ -32,7 +31,6 @@ struct LocalTrackTableView: View {
         isFiltered: Bool = false,
         selectedTrack: Binding<LocalTrack?>,
         playback: PlaybackController,
-        library: LibraryStore,
         onRevealInFinder: ((URL) -> Void)? = nil,
         onDeleteTracks: ((Set<String>) -> Void)? = nil,
         onTrackAppear: ((LocalTrack) -> Void)? = nil,
@@ -52,7 +50,6 @@ struct LocalTrackTableView: View {
         }
         self._selectedTrack = selectedTrack
         self.playback = playback
-        self.library = library
         self.onRevealInFinder = onRevealInFinder
         self.onDeleteTracks = onDeleteTracks
         self.onTrackAppear = onTrackAppear
@@ -78,7 +75,7 @@ struct LocalTrackTableView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: selectedTrackIDs.count)
         .confirmationDialog(
-            "Delete selected songs?",
+            "Remove selected songs from the Library?",
             isPresented: $isDeleteConfirmationPresented,
             titleVisibility: .visible
         ) {
@@ -88,7 +85,7 @@ struct LocalTrackTableView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Selected songs will be removed from local library. Original files will remain on disk.")
+            Text("The songs leave the Library. Their files stay on disk.")
         }
         .onChange(of: selectedTrackIDs) { _, newIDs in
             if let firstID = newIDs.first, let found = tracks.first(where: { $0.id == firstID }) {
@@ -171,12 +168,6 @@ struct LocalTrackTableView: View {
                     .foregroundStyle(.secondary)
             }
             .width(min: 50, ideal: 60, max: 70)
-
-            // Favorite column (isolated favorite store observation)
-            TableColumn("Favorite") { track in
-                TrackFavoriteButton(track: track, library: library)
-            }
-            .width(min: 32, ideal: 36, max: 40)
         }
         .id(isFiltered ? "library-table-filtered" : "library-table-all")
         .transaction { $0.animation = nil }
@@ -246,9 +237,6 @@ struct LocalTrackTableView: View {
             Text(durationString(track.duration))
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.secondary)
-
-            // Favorite Button (isolated)
-            TrackFavoriteButton(track: track, library: library)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -323,13 +311,15 @@ struct LocalTrackTableView: View {
             .buttonStyle(.bordered)
             .controlSize(.small)
 
-            Button(role: .destructive) {
-                isDeleteConfirmationPresented = true
-            } label: {
-                Label("Delete from Library", systemImage: "trash")
+            if onDeleteTracks != nil {
+                Button(role: .destructive) {
+                    isDeleteConfirmationPresented = true
+                } label: {
+                    Label("Remove from Library", systemImage: "trash")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
 
             Button("Deselect All") {
                 selectedTrackIDs.removeAll()
@@ -396,23 +386,8 @@ struct LocalTrackTableView: View {
             Label("Add to Queue", systemImage: "text.badge.plus")
         }
 
-        Divider()
-
-        let isSaved = library.contains(local: track)
-        Button {
-            Task {
-                if isSaved {
-                    await library.remove(local: track)
-                } else {
-                    await library.add(local: track)
-                }
-            }
-        } label: {
-            Label(isSaved ? "Remove from Library" : "Add to Library",
-                  systemImage: isSaved ? "heart.slash" : "heart")
-        }
-
-        if let onRevealInFinder {
+        if let onRevealInFinder, track.fileURL.isFileURL {
+            Divider()
             Button {
                 onRevealInFinder(track.fileURL)
             } label: {
@@ -420,7 +395,7 @@ struct LocalTrackTableView: View {
             }
         }
 
-        if onDeleteTracks != nil {
+        if onDeleteTracks != nil, track.fileURL.isFileURL {
             Divider()
             Button(role: .destructive) {
                 if selectedTrackIDs.contains(track.id) && selectedTrackIDs.count > 1 {
@@ -431,8 +406,8 @@ struct LocalTrackTableView: View {
             } label: {
                 Label(
                     selectedTrackIDs.contains(track.id) && selectedTrackIDs.count > 1
-                        ? "Delete selected from Library (\(selectedTrackIDs.count) items)"
-                        : "Delete from Library",
+                        ? "Remove \(selectedTrackIDs.count) Songs from Library"
+                        : "Remove from Library",
                     systemImage: "trash"
                 )
             }
@@ -484,30 +459,6 @@ private struct TrackTitleView: View {
     }
 }
 
-private struct TrackFavoriteButton: View {
-    let track: LocalTrack
-    @Bindable var library: LibraryStore
-
-    var body: some View {
-        let isSaved = library.contains(local: track)
-        Button {
-            Task {
-                if isSaved {
-                    await library.remove(local: track)
-                } else {
-                    await library.add(local: track)
-                }
-            }
-        } label: {
-            Image(systemName: isSaved ? "heart.fill" : "heart")
-                .foregroundStyle(isSaved ? Color.red : Color.secondary)
-                .font(.callout)
-        }
-        .buttonStyle(.plain)
-        .help(isSaved ? "Remove from Library" : "Add to Library")
-    }
-}
-
 // MARK: - Previews
 
 #Preview("Local Track Cells") {
@@ -516,7 +467,6 @@ private struct TrackFavoriteButton: View {
     HStack(spacing: 12) {
         TrackIndexIndicatorView(trackID: track.id, position: 1, playback: application.playback)
         TrackTitleView(trackID: track.id, title: track.title, playback: application.playback)
-        TrackFavoriteButton(track: track, library: application.library)
     }
     .padding()
 }
@@ -530,7 +480,6 @@ private struct TrackFavoriteButton: View {
         tracks: tracks,
         selectedTrack: $selectedTrack,
         playback: application.playback,
-        library: application.library,
         onRevealInFinder: { _ in }
     )
     .frame(width: 800, height: 400)
@@ -544,7 +493,6 @@ private struct TrackFavoriteButton: View {
         tracks: [],
         selectedTrack: $selectedTrack,
         playback: application.playback,
-        library: application.library,
         onRevealInFinder: { _ in }
     )
     .frame(width: 800, height: 400)
@@ -559,7 +507,6 @@ private struct TrackFavoriteButton: View {
         tracks: tracks,
         selectedTrack: $selectedTrack,
         playback: application.playback,
-        library: application.library,
         onRevealInFinder: { _ in }
     )
     .frame(width: 360, height: 400)

@@ -23,17 +23,12 @@ struct TrackInspectorView: View {
     var onClose: (() -> Void)? = nil
 
     @State private var inspectorTab: InspectorTab = .details
-    @State private var titleOverlayTier: String = "Canonical"
-    @State private var artistOverlayTier: String = "Multi-language Alias"
-    @State private var albumOverlayTier: String = "Canonical"
-    @State private var tagOverlayTier: String = "Original"
     @State private var isReidentifying: Bool = false
     @State private var reidentifyStatus: String? = nil
 
     enum InspectorTab: String, CaseIterable, Identifiable {
         case details = "Track Details"
-        case versions = "Versions (3)"
-        case overlay = "Metadata Override Layers"
+        case identification = "Identification"
         var id: String { rawValue }
     }
 
@@ -86,10 +81,6 @@ struct TrackInspectorView: View {
 
     private func libraryTrackContent(_ track: LibraryTrack) -> some View {
         VStack(spacing: 0) {
-            tabPicker
-
-            switch inspectorTab {
-            case .details:
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         // Header & Artwork
@@ -132,19 +123,6 @@ struct TrackInspectorView: View {
                 }
                 .scrollIndicators(.hidden)
                 .hideScrollIndicatorsCompletely()
-            case .versions:
-                ScrollView {
-                    versionsContent(title: track.title)
-                }
-                .scrollIndicators(.hidden)
-                .hideScrollIndicatorsCompletely()
-            case .overlay:
-                ScrollView {
-                    overlayContent(title: track.title, artist: track.artist, album: track.album)
-                }
-                .scrollIndicators(.hidden)
-                .hideScrollIndicatorsCompletely()
-            }
         }
     }
 
@@ -175,8 +153,8 @@ struct TrackInspectorView: View {
                         }
                     }
                 } label: {
-                    Image(systemName: isSaved ? "heart.fill" : "heart")
-                        .foregroundStyle(isSaved ? Color.red : Color.primary)
+                    Image(systemName: isSaved ? "checkmark.circle.fill" : "plus.circle")
+                        .foregroundStyle(isSaved ? Color.accentColor : Color.primary)
                 }
                 .buttonStyle(.bordered)
                 .tint(Color.accentColor)
@@ -354,15 +332,9 @@ struct TrackInspectorView: View {
                 }
                 .scrollIndicators(.hidden)
                 .hideScrollIndicatorsCompletely()
-            case .versions:
+            case .identification:
                 ScrollView {
-                    versionsContent(title: track.title)
-                }
-                .scrollIndicators(.hidden)
-                .hideScrollIndicatorsCompletely()
-            case .overlay:
-                ScrollView {
-                    overlayContent(title: track.title, artist: track.artist, album: track.album)
+                    identificationContent(track)
                 }
                 .scrollIndicators(.hidden)
                 .hideScrollIndicatorsCompletely()
@@ -370,288 +342,50 @@ struct TrackInspectorView: View {
         }
     }
 
-    // MARK: - Versions & Overlay Panels
+    // MARK: - Identification Panel
 
-    private func versionsContent(title: String) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Current Primary Version:")
-                    .font(.caption.bold())
-                    .foregroundStyle(.secondary)
-
-                HStack(spacing: 8) {
-                    Image(systemName: "star.fill")
-                        .foregroundStyle(Color.yellow)
-                    Text("2020 Remaster · FLAC 24-bit/96kHz (Master)")
-                        .font(.callout.bold())
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.yellow.opacity(0.1), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("All Available Versions:")
-                    .font(.caption.bold())
-                    .foregroundStyle(.secondary)
-
-                versionItemRow(isPrimary: true, tag: "[★ Primary]", desc: "2020 Remaster (FLAC 24/96)", size: "104.2 MB")
-                versionItemRow(isPrimary: false, tag: "[Alternate]", desc: "2003 Taiwan CD (FLAC 16/44.1)", size: "28.6 MB")
-                versionItemRow(isPrimary: false, tag: "[Portable]", desc: "Digital Release (AAC 256k)", size: "8.4 MB")
-            }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Actions:")
-                    .font(.caption.bold())
-                    .foregroundStyle(.secondary)
-
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 8) {
-                        Button("Set as Primary") {}
-                            .buttonStyle(.borderedProminent)
-                            .tint(Color.accentColor)
-                            .controlSize(.small)
-
-                        Button("Reveal in Finder") {}
-                            .buttonStyle(.bordered)
-                            .tint(Color.accentColor)
-                            .controlSize(.small)
-
-                        Button("Remove from Group") {}
-                            .buttonStyle(.bordered)
-                            .tint(Color.accentColor)
-                            .controlSize(.small)
-                    }
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Button("Set as Primary") {}
-                            .buttonStyle(.borderedProminent)
-                            .tint(Color.accentColor)
-                            .controlSize(.small)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                        Button("Reveal in Finder") {}
-                            .buttonStyle(.bordered)
-                            .tint(Color.accentColor)
-                            .controlSize(.small)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                        Button("Remove from Group") {}
-                            .buttonStyle(.bordered)
-                            .tint(Color.accentColor)
-                            .controlSize(.small)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-            }
-        }
-        .padding(18)
-    }
-
-    private func versionItemRow(isPrimary: Bool, tag: String, desc: String, size: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: isPrimary ? "record.circle.fill" : "circle")
-                .foregroundStyle(isPrimary ? Color.accentColor : Color.secondary)
-
-            Text(tag)
-                .font(.caption.bold())
-                .foregroundStyle(isPrimary ? Color.accentColor : Color.secondary)
-
-            Text(desc)
-                .font(.caption)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Text(size)
-                .font(.caption2.monospacedDigit())
-                .foregroundStyle(.tertiary)
-        }
-        .padding(8)
-        .background(isPrimary ? Color.accentColor.opacity(0.18) : Color.clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .stroke(isPrimary ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1)
-        )
-    }
-
-    private func overlayContent(title: String, artist: String, album: String?) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Three-layer Metadata Override Settings:")
+    private func identificationContent(_ track: LocalTrack) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Fingerprint & External Catalog:")
                 .font(.caption.bold())
                 .foregroundStyle(.secondary)
 
-            overlaySelectorRow(field: "• Title：", selection: $titleOverlayTier, value: "(\(title))", options: ["Canonical", "User", "Original"])
-            overlaySelectorRow(field: "• Artist: ", selection: $artistOverlayTier, value: "(\(artist))", options: ["Canonical", "Multi-language Alias", "Original"])
-            overlaySelectorRow(field: "• Album：", selection: $albumOverlayTier, value: "(\(album ?? "Not Set"))", options: ["Canonical", "User", "Original"])
-            overlaySelectorRow(field: "• Tags: ", selection: $tagOverlayTier, value: "(Never modifies original files)", options: ["Original", "Locked / Read-only"])
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Fingerprint & External Catalog:")
-                    .font(.caption.bold())
-                    .foregroundStyle(.secondary)
-
-                HStack(spacing: 8) {
-                    Image(systemName: "waveform.badge.magnifyingglass")
-                        .foregroundStyle(Color.accentColor)
-                    Text("Local Acoustic Fingerprint Memory")
-                        .font(.callout.bold())
-                    Spacer()
-                    Text("Active")
-                        .font(.caption2.bold())
-                        .foregroundStyle(.green)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.green.opacity(0.12), in: Capsule())
+            Button {
+                guard !isReidentifying, let localStore else { return }
+                isReidentifying = true
+                reidentifyStatus = nil
+                Task {
+                    defer { isReidentifying = false }
+                    let success = await localStore.reidentifyTrack(trackID: track.id)
+                    reidentifyStatus = success
+                        ? String(localized: "Successfully matched and updated artwork!")
+                        : String(localized: "No online match found on MusicBrainz.")
                 }
-                .padding(10)
-                .background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-                Button {
-                    guard !isReidentifying else { return }
-                    isReidentifying = true
-                    reidentifyStatus = nil
-                    Task {
-                        defer { isReidentifying = false }
-                        if let localTrack, let localStore {
-                            let success = await localStore.reidentifyTrack(trackID: localTrack.id)
-                            if success {
-                                reidentifyStatus = String(localized: "Successfully matched and updated artwork!")
-                            } else {
-                                reidentifyStatus = String(localized: "No online match found on MusicBrainz.")
-                            }
-                        } else {
-                            let results = try? await MusicBrainzCatalogClient.shared.searchReleases(artist: artist, album: album ?? "")
-                            if let list = results, !list.isEmpty {
-                                reidentifyStatus = String(localized: "Found \(list.count) candidate releases.")
-                            } else {
-                                reidentifyStatus = String(localized: "No matching release found.")
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        if isReidentifying {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Image(systemName: "arrow.clockwise")
-                        }
-                        Text("Online Re-identification (MusicBrainz)")
-                    }
-                    .font(.caption)
-                }
-                .buttonStyle(.bordered)
-                .tint(Color.accentColor)
-                .controlSize(.small)
-                .disabled(isReidentifying)
-
-                if let status = reidentifyStatus {
-                    Text(status)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Divider()
-
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 10) {
-                    Button("Reset All Overrides to Canonical") {
-                        titleOverlayTier = "Canonical"
-                        artistOverlayTier = "Canonical"
-                        albumOverlayTier = "Canonical"
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Color.accentColor)
-                    .controlSize(.small)
-
-                    Spacer()
-
-                    Button("Revert to Original File Tags") {
-                        titleOverlayTier = "Original"
-                        artistOverlayTier = "Original"
-                        albumOverlayTier = "Original"
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(Color.accentColor)
-                    .controlSize(.small)
-                }
-
-                VStack(spacing: 8) {
-                    Button("Reset All Overrides to Canonical") {
-                        titleOverlayTier = "Canonical"
-                        artistOverlayTier = "Canonical"
-                        albumOverlayTier = "Canonical"
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Color.accentColor)
-                    .controlSize(.small)
-                    .frame(maxWidth: .infinity)
-
-                    Button("Revert to Original File Tags") {
-                        titleOverlayTier = "Original"
-                        artistOverlayTier = "Original"
-                        albumOverlayTier = "Original"
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(Color.accentColor)
-                    .controlSize(.small)
-                    .frame(maxWidth: .infinity)
-                }
-            }
-        }
-        .padding(18)
-    }
-
-    private func overlaySelectorRow(field: String, selection: Binding<String>, value: String, options: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ViewThatFits(in: .horizontal) {
+            } label: {
                 HStack(spacing: 6) {
-                    Text(LocalizedStringKey(field))
-                        .font(.caption.bold())
-                        .frame(width: 55, alignment: .leading)
-                        .lineLimit(1)
-
-                    Picker("", selection: selection) {
-                        ForEach(options, id: \.self) { opt in
-                            Text(LocalizedStringKey(opt)).tag(opt)
-                        }
+                    if isReidentifying {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
                     }
-                    .labelsHidden()
-                    .tint(Color.accentColor)
-                    .frame(maxWidth: 140)
-
-                    Spacer()
+                    Text("Online Re-identification (MusicBrainz)")
                 }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(LocalizedStringKey(field))
-                        .font(.caption.bold())
-
-                    Picker("", selection: selection) {
-                        ForEach(options, id: \.self) { opt in
-                            Text(LocalizedStringKey(opt)).tag(opt)
-                        }
-                    }
-                    .labelsHidden()
-                    .tint(Color.accentColor)
-                }
+                .font(.caption)
             }
+            .buttonStyle(.bordered)
+            .tint(Color.accentColor)
+            .controlSize(.small)
+            .disabled(isReidentifying || localStore == nil || !track.fileURL.isFileURL)
 
-            Text(LocalizedStringKey(value))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .padding(.leading, 8)
-                .lineLimit(1)
-                .truncationMode(.middle)
+            if let status = reidentifyStatus {
+                Text(status)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
     }
 
     // MARK: - Actions Section
@@ -670,23 +404,6 @@ struct TrackInspectorView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Color.accentColor)
-
-                let isSaved = library.contains(local: track)
-                Button {
-                    Task {
-                        if isSaved {
-                            await library.remove(local: track)
-                        } else {
-                            await library.add(local: track)
-                        }
-                    }
-                } label: {
-                    Image(systemName: isSaved ? "heart.fill" : "heart")
-                        .foregroundStyle(isSaved ? Color.red : Color.primary)
-                }
-                .buttonStyle(.bordered)
-                .tint(Color.accentColor)
-                .help(isSaved ? "Remove from Library" : "Add to Library")
             }
 
             ViewThatFits(in: .horizontal) {
