@@ -12,6 +12,7 @@ protocol LocalLibraryRepository: Sendable {
     func fetchTracks(withFilenames names: Set<String>) async throws -> [LocalTrack]
     func fetchTracks(matchingAlbum title: String, artist: String) async throws -> [LocalTrack]
     func fetchTracks(matchingArtist name: String) async throws -> [LocalTrack]
+    func fetchMaintenancePage(afterPath: String?, limit: Int) async throws -> LocalMaintenancePage
     func findUniqueTrack(title: String, artist: String?) async throws -> LocalTrack?
     func searchTracks(_ query: String, limit: Int) async throws -> [LocalTrack]
     func importTrack(from url: URL) async throws -> LocalTrack?
@@ -50,6 +51,11 @@ nonisolated struct LocalTrackPage: Sendable {
     var hasMore: Bool { offset + tracks.count < totalCount }
 }
 
+nonisolated struct LocalMaintenancePage: Sendable {
+    let tracks: [LocalTrack]
+    let nextPath: String?
+}
+
 extension LocalLibraryRepository {
     func fetchTracks(withIDs ids: Set<String>) async throws -> [LocalTrack] {
         try await loadTracks().filter {
@@ -86,6 +92,13 @@ extension LocalLibraryRepository {
     }
     func fetchTracks(matchingArtist name: String) async throws -> [LocalTrack] {
         try await loadTracks().filter { ArtistCreditCleaner.containsArtist(name, in: $0.artist) }
+    }
+    func fetchMaintenancePage(afterPath: String?, limit: Int) async throws -> LocalMaintenancePage {
+        let page = try await Array(loadTracks()
+            .filter { track in afterPath.map { track.fileURL.standardizedFileURL.path > $0 } ?? true }
+            .sorted { $0.fileURL.standardizedFileURL.path < $1.fileURL.standardizedFileURL.path }
+            .prefix(max(1, limit)))
+        return LocalMaintenancePage(tracks: page, nextPath: page.last?.fileURL.standardizedFileURL.path)
     }
     func findUniqueTrack(title: String, artist: String?) async throws -> LocalTrack? {
         let matches = try await loadTracks().filter {

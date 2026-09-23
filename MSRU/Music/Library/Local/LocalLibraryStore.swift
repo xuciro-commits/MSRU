@@ -128,6 +128,23 @@ final class LocalLibraryStore {
         try await repository.searchTracks(query, limit: limit)
     }
 
+    func fingerprintCleanupReferences() async throws -> (keys: Set<String>, paths: Set<String>) {
+        var keys = Set<String>()
+        var paths = Set<String>()
+        var afterPath: String?
+        while true {
+            try Task.checkCancellation()
+            let page = try await repository.fetchMaintenancePage(afterPath: afterPath, limit: 512)
+            guard !page.tracks.isEmpty else { break }
+            for track in page.tracks {
+                keys.insert("\(track.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())::\(track.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())")
+                paths.insert(track.fileURL.resolvingSymlinksInPath().standardizedFileURL.path)
+            }
+            afterPath = page.nextPath
+        }
+        return (keys, paths)
+    }
+
     func resolvePlaylistTracks(_ playlist: Playlist) async throws -> [LocalTrack] {
         if let rules = playlist.rules {
             var matches: [LocalTrack] = []
@@ -198,15 +215,10 @@ final class LocalLibraryStore {
 
     private func reloadNow() async {
         do {
-            if isFullyLoaded {
-                tracks = try await repository.loadTracks()
-                totalTrackCount = tracks.count
-            } else {
-                let page = try await repository.fetchPage(LocalTrackPageRequest(limit: 128))
-                tracks = page.tracks
-                totalTrackCount = page.totalCount
-                isFullyLoaded = page.totalCount <= page.tracks.count
-            }
+            let page = try await repository.fetchPage(LocalTrackPageRequest(limit: 128))
+            tracks = page.tracks
+            totalTrackCount = page.totalCount
+            isFullyLoaded = page.totalCount <= page.tracks.count
             updateCachedPresentations()
 
             printArtworkMemoryDiagnostics()
@@ -222,68 +234,14 @@ final class LocalLibraryStore {
         }
     }
 
-    /// Compatibility path for operations that still require every local track.
-    /// Primary song views and startup use paged queries.
-    func ensureAllTracksLoaded() async {
-        await loadIfNeeded()
-        await serialized {
-            guard !self.isFullyLoaded else { return }
-            do {
-                let all = try await self.repository.loadTracks()
-                self.tracks = all
-                self.totalTrackCount = all.count
-                self.isFullyLoaded = true
-                self.errorMessage = nil
-                self.updateCachedPresentations()
-                await self.refreshQuerySnapshot()
-                self.triggerBackgroundArtworkBackfillIfNeeded()
-            } catch {
-                self.errorMessage = error.localizedDescription
-            }
-        }
-    }
-
-    private func reconcileDatabaseOrphans(validTracks: [LocalTrack]) async {
-        var validPaths = Set<String>()
-        var validFilenames = Set<String>()
-        var validRecIDs = Set<RecordingID>()
-
-        for t in validTracks {
-            validPaths.insert(t.fileURL.standardizedFileURL.path)
-            validPaths.insert(t.fileURL.path)
-            validFilenames.insert(t.fileURL.lastPathComponent)
-            validRecIDs.insert(DeterministicID.recording(title: t.title, artist: t.artist))
-        }
-
-        let identityRepo = IdentityRepository(db: self.db)
-        try? await identityRepo.reconcileLocalAssets(
-            validPaths: validPaths,
-            validFilenames: validFilenames,
-            validRecordingIDs: validRecIDs
-        )
-    }
-
     func addTracks(_ newTracks: [LocalTrack]) async throws {
         guard !newTracks.isEmpty else { return }
         try await serializedThrowing {
             try await self.repository.saveTracksInPlace(newTracks)
-            if self.isFullyLoaded {
-                var indices = Dictionary(uniqueKeysWithValues: self.tracks.enumerated().map { ($0.element.id, $0.offset) })
-                for track in newTracks {
-                    if let index = indices[track.id] {
-                        self.tracks[index] = track
-                    } else {
-                        indices[track.id] = self.tracks.count
-                        self.tracks.append(track)
-                    }
-                }
-                self.tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-                self.totalTrackCount = self.tracks.count
-            } else {
-                let page = try await self.repository.fetchPage(LocalTrackPageRequest(limit: 128))
-                self.tracks = page.tracks
-                self.totalTrackCount = page.totalCount
-            }
+            let page = try await self.repository.fetchPage(LocalTrackPageRequest(limit: 128))
+            self.tracks = page.tracks
+            self.totalTrackCount = page.totalCount
+            self.isFullyLoaded = page.totalCount <= page.tracks.count
             self.updateCachedPresentations()
             await self.refreshQuerySnapshot()
             await LocalLibraryIndexingService.shared.enqueue(newTracks)
@@ -558,15 +516,30 @@ final class LocalLibraryStore {
 
     @discardableResult
     func remediateLibraryMetadataAndArtwork(progress: ((Int, Int) -> Void)? = nil) async -> (repairedCount: Int, artworkAddedCount: Int) {
-        await ensureAllTracksLoaded()
-        guard isFullyLoaded else { return (0, 0) }
+        await loadIfNeeded()
+        guard didLoad else { return (0, 0) }
         var repaired = 0
         var artworkAdded = 0
-        var updatedTracks: [LocalTrack] = []
+        var anyUpdates = false
+        var afterPath: String?
+        var processed = 0
+        let total = totalTrackCount
+        while true {
+            let page: LocalMaintenancePage
+            do {
+                page = try await repository.fetchMaintenancePage(afterPath: afterPath, limit: 128)
+            } catch {
+                errorMessage = error.localizedDescription
+                return (repaired, artworkAdded)
+            }
+            guard !page.tracks.isEmpty else { break }
+            afterPath = page.nextPath
+            var updatedTracks: [LocalTrack] = []
+            var pageArtworkAdded = 0
 
-        let total = tracks.count
-        for (i, currentTrack) in tracks.enumerated() {
-            progress?(i + 1, total)
+            for currentTrack in page.tracks {
+                processed += 1
+                progress?(processed, total)
 
             var modified = false
             var newTitle = currentTrack.title
@@ -601,7 +574,7 @@ final class LocalLibraryStore {
                     }
                     if let freshArt = fresh.artworkReference, newArtRef == nil {
                         newArtRef = freshArt
-                        artworkAdded += 1
+                        pageArtworkAdded += 1
                         modified = true
                     }
                 }
@@ -619,7 +592,7 @@ final class LocalLibraryStore {
                 if let folderArtData = LocalArtworkExtractor.extractFromDirectory(folderURL: folder) {
                     let artRef = LocalArtworkStorage.shared.storeArtwork(folderArtData)
                     newArtRef = artRef
-                    artworkAdded += 1
+                    pageArtworkAdded += 1
                     modified = true
                 }
             }
@@ -637,13 +610,12 @@ final class LocalLibraryStore {
                        newAlbum == nil || newAlbum?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == newArtist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
                         newAlbum = canonical
                     }
-                    artworkAdded += 1
+                    pageArtworkAdded += 1
                     modified = true
                 }
             }
 
             if modified {
-                repaired += 1
                 let updated = LocalTrack(
                     fileURL: currentTrack.fileURL,
                     title: newTitle,
@@ -656,20 +628,26 @@ final class LocalLibraryStore {
                 )
                 updatedTracks.append(updated)
             }
-        }
-
-        if !updatedTracks.isEmpty {
-            do {
-                try await repository.saveTracksInPlace(updatedTracks)
-            } catch {
-                errorMessage = error.localizedDescription
-                return (0, 0)
             }
-            for updated in updatedTracks {
-                if let index = tracks.firstIndex(where: { $0.id == updated.id }) {
-                    tracks[index] = updated
+            if !updatedTracks.isEmpty {
+                do {
+                    try await repository.saveTracksInPlace(updatedTracks)
+                } catch {
+                    errorMessage = error.localizedDescription
+                    return (repaired, artworkAdded)
+                }
+                repaired += updatedTracks.count
+                artworkAdded += pageArtworkAdded
+                anyUpdates = true
+                let updatedByID = Dictionary(uniqueKeysWithValues: updatedTracks.map { ($0.id, $0) })
+                for index in tracks.indices {
+                    if let updated = updatedByID[tracks[index].id] {
+                        tracks[index] = updated
+                    }
                 }
             }
+        }
+        if anyUpdates {
             updateCachedPresentations()
             await refreshQuerySnapshot()
         }
@@ -716,23 +694,10 @@ final class LocalLibraryStore {
         errorMessage = nil
         do {
             let newlyImported = try await repository.importTracks(from: urls)
-            if isFullyLoaded {
-                var indices = Dictionary(uniqueKeysWithValues: tracks.enumerated().map { ($0.element.id, $0.offset) })
-                for track in newlyImported {
-                    if let index = indices[track.id] {
-                        tracks[index] = track
-                    } else {
-                        indices[track.id] = tracks.count
-                        tracks.append(track)
-                    }
-                }
-                tracks.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-                totalTrackCount = tracks.count
-            } else {
-                let page = try await repository.fetchPage(LocalTrackPageRequest(limit: 128))
-                tracks = page.tracks
-                totalTrackCount = page.totalCount
-            }
+            let page = try await repository.fetchPage(LocalTrackPageRequest(limit: 128))
+            tracks = page.tracks
+            totalTrackCount = page.totalCount
+            isFullyLoaded = page.totalCount <= page.tracks.count
             updateCachedPresentations()
             await refreshQuerySnapshot()
             await LocalLibraryIndexingService.shared.enqueue(newlyImported)

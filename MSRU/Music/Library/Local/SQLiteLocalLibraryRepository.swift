@@ -281,6 +281,25 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
         return candidates.filter { ArtistCreditCleaner.containsArtist(cleanName, in: $0.artist) }
     }
 
+    func fetchMaintenancePage(afterPath: String?, limit: Int) async throws -> LocalMaintenancePage {
+        try await migrateLegacyManifestIfPresent()
+        let paths = try await db.reader.read { db in
+            try String.fetchAll(db, sql: """
+                SELECT a.relative_path FROM assets a JOIN sources s ON s.id = a.source_id
+                WHERE s.source_type IN ('local_folder', 'localFolder')
+                  AND (? IS NULL OR a.relative_path > ?)
+                ORDER BY a.relative_path LIMIT ?
+                """, arguments: [afterPath, afterPath, max(1, min(limit, 512))])
+        }
+        guard !paths.isEmpty else { return LocalMaintenancePage(tracks: [], nextPath: nil) }
+        let placeholders = Array(repeating: "?", count: paths.count).joined(separator: ",")
+        let tracks = try await fetchLocalTracks(
+            predicate: "a.relative_path IN (\(placeholders))",
+            arguments: paths, orderBy: "a.relative_path"
+        )
+        return LocalMaintenancePage(tracks: tracks, nextPath: paths.last)
+    }
+
     func findUniqueTrack(title: String, artist: String?) async throws -> LocalTrack? {
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return nil }
@@ -317,7 +336,8 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
         )
     }
 
-    private func fetchLocalTracks(predicate: String, arguments: [String], limit: Int? = nil) async throws -> [LocalTrack] {
+    private func fetchLocalTracks(predicate: String, arguments: [String], limit: Int? = nil,
+                                  orderBy: String = "album_title, track_number, track_title, a.relative_path") async throws -> [LocalTrack] {
         try await migrateLegacyManifestIfPresent()
         let mediaDir = try? mediaDirectory()
         let limitSQL = limit.map { " LIMIT \(max(1, min($0, 512)))" } ?? ""
@@ -341,7 +361,7 @@ actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
                 FROM assets a JOIN sources s ON s.id = a.source_id
                 LEFT JOIN recordings r ON r.id = a.recording_id
                 WHERE s.source_type IN ('local_folder', 'localFolder') AND (\(predicate))
-                ORDER BY album_title, track_number, track_title, a.relative_path\(limitSQL)
+                ORDER BY \(orderBy)\(limitSQL)
                 """, arguments: StatementArguments(arguments))
             return rows.compactMap { row -> LocalTrack? in
                 guard let path: String = row["relative_path"] else { return nil }

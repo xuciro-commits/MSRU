@@ -401,6 +401,29 @@ struct LibraryTests {
         #expect(!removed)
         #expect(store.tracks.map { $0.id } == [track.id])
     }
+
+    @Test("Explicit metadata repair streams pages without loading the whole library")
+    @MainActor
+    func metadataRepairUsesMaintenancePages() async throws {
+        let tracks = (0..<3).map { index in
+            LocalTrack(fileURL: URL(fileURLWithPath: "/not-present/\(index).wav"),
+                       title: "Song \(index)", artist: "Artist", album: "Artist",
+                       artworkReference: "already-present.jpg")
+        }
+        let repository = PagedMaintenanceRepository(tracks: tracks)
+        let store = LocalLibraryStore(repository: repository, db: try TestDatabase.makeEphemeral())
+        await store.loadIfNeeded()
+        let active = try await store.fingerprintCleanupReferences()
+        #expect(active.keys.count == 3)
+        #expect(active.paths.count == 3)
+        let result = await store.remediateLibraryMetadataAndArtwork()
+
+        #expect(result.repairedCount == 3)
+        #expect(result.artworkAddedCount == 0)
+        #expect(!store.isFullyLoaded)
+        #expect(repository.saved.count == 3)
+        #expect(repository.saved.allSatisfy { $0.album == nil })
+    }
 }
 
 @MainActor
@@ -414,4 +437,25 @@ private final class FailingLocalMutationRepository: LocalLibraryRepository {
     func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws {
         throw CocoaError(.fileWriteUnknown)
     }
+}
+
+@MainActor
+private final class PagedMaintenanceRepository: LocalLibraryRepository {
+    let source: [LocalTrack]
+    var saved: [LocalTrack] = []
+
+    init(tracks: [LocalTrack]) { source = tracks }
+    func loadTracks() async throws -> [LocalTrack] { throw CocoaError(.fileReadTooLarge) }
+    func fetchPage(_ request: LocalTrackPageRequest) async throws -> LocalTrackPage {
+        LocalTrackPage(tracks: Array(source.prefix(1)), totalCount: source.count, offset: 0)
+    }
+    func fetchMaintenancePage(afterPath: String?, limit: Int) async throws -> LocalMaintenancePage {
+        let next = source.filter { track in
+            afterPath.map { track.fileURL.path > $0 } ?? true
+        }.prefix(1)
+        let tracks = Array(next)
+        return LocalMaintenancePage(tracks: tracks, nextPath: tracks.last?.fileURL.path)
+    }
+    func importTrack(from url: URL) async throws -> LocalTrack? { nil }
+    func saveTracksInPlace(_ tracks: [LocalTrack]) async throws { saved.append(contentsOf: tracks) }
 }

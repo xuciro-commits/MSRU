@@ -5,6 +5,36 @@ import Testing
 
 @Suite("Local SQLite paging")
 struct LocalPagingTests {
+    @Test("Maintenance cursor uses stored relative paths")
+    @MainActor
+    func maintenanceCursorOnRelativePaths() async throws {
+        let db = try TestDatabase.makeEphemeral()
+        try await db.dbWriter.write { connection in
+            try connection.execute(sql: """
+                INSERT INTO sources (id, source_type, uri, display_name, capabilities, is_enabled, created_at, updated_at)
+                VALUES ('src_local_default', 'local_folder', '/music', 'Local', 1, 1, ?, ?)
+                """, arguments: [Date(), Date()])
+            for (index, path) in ["a/one.wav", "b/two.wav", "c/three.wav"].enumerated() {
+                try connection.execute(sql: """
+                    INSERT INTO recordings (id, title, sort_title, created_at) VALUES (?, ?, ?, ?)
+                    """, arguments: ["rec_\(index)", "Song \(index)", "song \(index)", Date()])
+                try connection.execute(sql: """
+                    INSERT INTO assets (id, source_id, relative_path, file_size, mtime, format,
+                                        sample_rate, duration, recording_id, created_at, updated_at)
+                    VALUES (?, 'src_local_default', ?, 1000, 1, 'WAV', 48000, 180, ?, ?, ?)
+                    """, arguments: ["ast_\(index)", path, "rec_\(index)", Date(), Date()])
+            }
+        }
+        let repo = SQLiteLocalLibraryRepository(db: db, directory: URL(fileURLWithPath: "/music"))
+        let first = try await repo.fetchMaintenancePage(afterPath: nil, limit: 1)
+        #expect(first.nextPath == "a/one.wav")
+        #expect(first.tracks.first?.fileURL.path == "/music/a/one.wav")
+        let second = try await repo.fetchMaintenancePage(afterPath: first.nextPath, limit: 1)
+        #expect(second.nextPath == "b/two.wav")
+        let third = try await repo.fetchMaintenancePage(afterPath: second.nextPath, limit: 1)
+        #expect(third.nextPath == "c/three.wav")
+    }
+
     @Test("50,000-row first page, deep page and search stay bounded")
     @MainActor
     func fiftyThousandRows() async throws {

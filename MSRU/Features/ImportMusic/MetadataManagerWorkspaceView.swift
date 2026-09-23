@@ -369,10 +369,16 @@ struct MetadataManagerWorkspaceView: View {
                 if !fingerprintRecords.isEmpty {
                     Button("Clean orphaned fingerprints") {
                         Task {
-                            await localStore.ensureAllTracksLoaded()
-                            let cleaned = await LocalFingerprintRegistry.shared.cleanOrphanRecords(activeTracks: localStore.tracks)
-                            await loadFingerprintRecords()
-                            orphanCleanFeedback = cleaned > 0 ? "Cleaned \(cleaned) orphaned fingerprints" : "No orphaned fingerprints"
+                            do {
+                                let active = try await localStore.fingerprintCleanupReferences()
+                                let cleaned = await LocalFingerprintRegistry.shared.cleanOrphanRecords(
+                                    activeKeys: active.keys, activePaths: active.paths
+                                )
+                                await loadFingerprintRecords()
+                                orphanCleanFeedback = cleaned > 0 ? "Cleaned \(cleaned) orphaned fingerprints" : "No orphaned fingerprints"
+                            } catch {
+                                orphanCleanFeedback = error.localizedDescription
+                            }
                             try? await Task.sleep(for: .seconds(3))
                             orphanCleanFeedback = nil
                         }

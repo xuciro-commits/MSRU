@@ -420,8 +420,14 @@ public actor LocalFingerprintRegistry: Sendable {
             "\($0.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())::\($0.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())"
         })
         let activePaths = Set(activeTracks.map { $0.fileURL.resolvingSymlinksInPath().standardizedFileURL.path })
+        return cleanOrphanRecords(activeKeys: activeKeys, activePaths: activePaths)
+    }
 
+    @discardableResult
+    public func cleanOrphanRecords(activeKeys: Set<String>, activePaths: Set<String>) -> Int {
         let beforeCount = records.count
+        let beforeCacheCount = assetCache.count
+        let beforeSignatureCount = signatures.count
         records.removeAll { record in
             let key = "\(record.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())::\(record.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())"
             return !activeKeys.contains(key)
@@ -430,7 +436,7 @@ public actor LocalFingerprintRegistry: Sendable {
         signatures = signatures.filter { activePaths.contains($0.key) }
 
         let removed = beforeCount - records.count
-        if removed > 0 {
+        if removed > 0 || assetCache.count != beforeCacheCount || signatures.count != beforeSignatureCount {
             save()
         }
         return removed
@@ -598,4 +604,3 @@ public actor LocalFingerprintRegistry: Sendable {
 
 /// Canonical typealias for LocalAudioSignatureRegistry.
 public typealias LocalAudioSignatureRegistry = LocalFingerprintRegistry
-
