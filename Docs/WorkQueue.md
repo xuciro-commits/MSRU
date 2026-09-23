@@ -29,3 +29,5 @@ Repository split ([ADR-0003](ADR/0003-repository-split.md)) happens once #75–#
 ## Music product track
 
 Music keeps shipping. Re-emphasize professional library management (identity, claims, review, corrections, sources, de-duplication) — it is also the prerequisite for drills E2/E3. Listening features (e.g. LAN remote control) are scheduled on owner request. Unproven audio claims (bit-perfect, DAC exclusivity/rate switching/hot-plug) need dedicated hardware verification before being stated.
+
+- **Risk (found in #76, pre-existing):** `SourceRuntimeCoordinator.bootstrapAll()` runs on every Sources view appearance and hard-deletes recordings, releases, credits and artists that have no asset. That can drop identity data and user corrections, e.g. after a server is temporarily removed. Move the purge behind an explicit, previewed maintenance action with a recovery path.
