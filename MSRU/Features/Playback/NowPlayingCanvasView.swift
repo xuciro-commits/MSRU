@@ -67,6 +67,11 @@ struct NowPlayingCanvasView: View {
             }
         }
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: isQueueDrawerPresented)
+        .onChange(of: isLyricsPresented) { _, presented in
+            if presented {
+                lyricsStore.sync(with: playback)
+            }
+        }
         .preferredColorScheme(.dark)
     }
 
@@ -403,6 +408,22 @@ struct NowPlayingCanvasView: View {
                             Text("Place a .lrc file in the same folder as the audio, and it will be loaded automatically.")
                                 .font(.caption)
                                 .foregroundStyle(.white.opacity(0.6))
+
+                            Button {
+                                lyricsStore.reload(playback: playback)
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("Retry")
+                                }
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.white.opacity(0.8))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 6)
+                                .background(Color.white.opacity(0.12), in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.top, 4)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 80)
@@ -419,6 +440,9 @@ struct NowPlayingCanvasView: View {
             }
         }
         .task(id: playback.currentTime) {
+            lyricsStore.sync(with: playback)
+        }
+        .task(id: playback.unifiedTitle) {
             lyricsStore.sync(with: playback)
         }
     }

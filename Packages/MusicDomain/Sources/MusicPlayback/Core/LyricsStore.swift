@@ -66,6 +66,12 @@ public final class LyricsStore {
         }
     }
 
+    /// Forces re-fetching lyrics for the currently playing track.
+    public func reload(playback: PlaybackController) {
+        loadedKey = nil
+        sync(with: playback)
+    }
+
     public func loadLyrics(context: LyricsQueryContext, playback: PlaybackController? = nil, identityKey: String? = nil) {
         let key = identityKey ?? "\(context.title)::\(context.artist)"
         loadedKey = key
