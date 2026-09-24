@@ -23,6 +23,7 @@ struct NowPlayingCanvasView: View {
     @State private var isQueueDrawerPresented: Bool = false
     @State private var isLyricsPresented: Bool = false
     @State private var isEqualizerPresented: Bool = false
+    @State private var isLyricsSearchPresented: Bool = false
     @State private var lyricsStore = LyricsStore.shared
 
     var body: some View {
@@ -71,6 +72,9 @@ struct NowPlayingCanvasView: View {
             if presented {
                 lyricsStore.sync(with: playback)
             }
+        }
+        .sheet(isPresented: $isLyricsSearchPresented) {
+            LyricsSourcePickerSheet(playback: playback)
         }
         .preferredColorScheme(.dark)
     }
@@ -409,20 +413,37 @@ struct NowPlayingCanvasView: View {
                                 .font(.caption)
                                 .foregroundStyle(.white.opacity(0.6))
 
-                            Button {
-                                lyricsStore.reload(playback: playback)
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "arrow.clockwise")
-                                    Text("Retry")
+                            HStack(spacing: 12) {
+                                Button {
+                                    lyricsStore.reload(playback: playback)
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "arrow.clockwise")
+                                        Text("Retry")
+                                    }
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(.white.opacity(0.8))
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 6)
+                                    .background(Color.white.opacity(0.12), in: Capsule())
                                 }
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.white.opacity(0.8))
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 6)
-                                .background(Color.white.opacity(0.12), in: Capsule())
+                                .buttonStyle(.plain)
+
+                                Button {
+                                    isLyricsSearchPresented = true
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "magnifyingglass")
+                                        Text("Search Lyrics")
+                                    }
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(Color.accentColor)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 6)
+                                    .background(Color.white.opacity(0.12), in: Capsule())
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                             .padding(.top, 4)
                         }
                         .frame(maxWidth: .infinity)
@@ -546,6 +567,23 @@ struct NowPlayingCanvasView: View {
                 }
                 .menuStyle(.borderlessButton)
                 .help("Write tuned lyrics permanently")
+
+                Button {
+                    isLyricsSearchPresented = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("Search")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .foregroundStyle(.white.opacity(0.85))
+                }
+                .buttonStyle(.plain)
+                .help("Search and switch lyrics source")
             }
         }
         .padding(.horizontal, 4)

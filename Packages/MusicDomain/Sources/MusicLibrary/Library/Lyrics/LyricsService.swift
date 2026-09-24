@@ -273,6 +273,46 @@ public actor LrcLibClient {
         let results = await performSearchRequest(queryItems: [URLQueryItem(name: "q", value: query)])
         return Self.bestCandidate(from: results)
     }
+
+    /// Searches LRCLIB and returns all candidate matches for user manual selection.
+    public func searchCandidates(query: String) async -> [LrcLibResponse] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        var candidates: [LrcLibResponse] = []
+        var seenIDs = Set<Int>()
+
+        // 1. General query search
+        let qResults = await performSearchRequest(queryItems: [URLQueryItem(name: "q", value: trimmed)])
+        for item in qResults {
+            if let id = item.id, seenIDs.insert(id).inserted {
+                candidates.append(item)
+            }
+        }
+
+        // 2. Track name search
+        let trackResults = await performSearchRequest(queryItems: [URLQueryItem(name: "track_name", value: trimmed)])
+        for item in trackResults {
+            if let id = item.id, seenIDs.insert(id).inserted {
+                candidates.append(item)
+            }
+        }
+
+        // 3. Script variants (Traditional / Simplified)
+        if candidates.isEmpty {
+            for v in Self.scriptVariants(for: trimmed) where v != trimmed {
+                let vResults = await performSearchRequest(queryItems: [URLQueryItem(name: "q", value: v)])
+                for item in vResults {
+                    if let id = item.id, seenIDs.insert(id).inserted {
+                        candidates.append(item)
+                    }
+                }
+                if !candidates.isEmpty { break }
+            }
+        }
+
+        return candidates
+    }
 }
 
 /// Multi-tier lyrics retrieval service driven by a pluggable provider chain.
@@ -362,6 +402,27 @@ public actor LyricsService {
             fileURL: fileURL
         )
         return await resolveLyrics(context: context)
+    }
+
+    /// Searches remote lyrics candidates matching a query string.
+    public func searchCandidates(query: String) async -> [LrcLibResponse] {
+        await LrcLibClient.shared.searchCandidates(query: query)
+    }
+
+    /// Applies a user-chosen candidate directly to the track context, saving it to the cache directory.
+    public func applyCandidate(response: LrcLibResponse, context: LyricsQueryContext) -> LrcDocument? {
+        let text = (response.syncedLyrics?.isEmpty == false ? response.syncedLyrics : response.plainLyrics) ?? ""
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let doc = LrcParser.parse(trimmed)
+        guard !doc.lines.isEmpty || !doc.plainText.isEmpty else { return nil }
+
+        // Cache chosen lyrics locally
+        let cacheFile = CachedLyricsProvider.cacheFileURL(context: context, cacheDirectory: cacheDirectory)
+        try? trimmed.write(to: cacheFile, atomically: true, encoding: .utf8)
+
+        return doc
     }
 
 }

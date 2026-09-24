@@ -72,6 +72,32 @@ public final class LyricsStore {
         sync(with: playback)
     }
 
+    /// Injects a user-selected candidate into the active store and updates the local cache.
+    public func applyCandidate(_ candidate: LrcLibResponse, playback: PlaybackController?) async {
+        let ctx = currentContext ?? LyricsQueryContext(
+            title: playback?.unifiedTitle ?? currentTitle,
+            artist: playback?.unifiedSubtitle ?? currentArtist,
+            album: playback?.currentTrack?.album ?? playback?.currentItem?.album,
+            duration: (playback?.duration ?? 0) > 0 ? playback?.duration : nil,
+            fileURL: playback?.currentTrack?.fileURL ?? currentFileURL,
+            recordingMBID: playback?.currentRecordingMBID,
+            subsonicSongID: playback?.currentSubsonicSongID,
+            sourceID: playback?.currentItem?.subsonicServerID
+        )
+
+        currentTask?.cancel()
+        if let doc = await LyricsService.shared.applyCandidate(response: candidate, context: ctx) {
+            currentDocument = doc
+            activeLineIndex = nil
+            timeOffset = 0.0
+            lastSaveMessage = nil
+            isLoading = false
+            if let playback {
+                updateActiveLine(currentTime: playback.currentTime)
+            }
+        }
+    }
+
     public func loadLyrics(context: LyricsQueryContext, playback: PlaybackController? = nil, identityKey: String? = nil) {
         let key = identityKey ?? "\(context.title)::\(context.artist)"
         loadedKey = key

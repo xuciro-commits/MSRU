@@ -15,6 +15,7 @@ struct LyricsPaneView: View {
     var onExpandCanvas: (() -> Void)? = nil
 
     @State private var lyricsStore = LyricsStore.shared
+    @State private var isSearchPresented: Bool = false
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -84,6 +85,9 @@ struct LyricsPaneView: View {
         }
         .task(id: playback.unifiedTitle) {
             lyricsStore.sync(with: playback)
+        }
+        .sheet(isPresented: $isSearchPresented) {
+            LyricsSourcePickerSheet(playback: playback)
         }
     }
 
@@ -185,6 +189,23 @@ struct LyricsPaneView: View {
                 }
                 .menuStyle(.borderlessButton)
                 .help("Write tuned lyrics permanently")
+
+                Button {
+                    isSearchPresented = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("Search")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Search alternative lyrics")
             }
         }
         .padding(.horizontal, 20)
@@ -256,20 +277,37 @@ struct LyricsPaneView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            Button {
-                lyricsStore.reload(playback: playback)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.clockwise")
-                    Text("Retry")
+            HStack(spacing: 10) {
+                Button {
+                    lyricsStore.reload(playback: playback)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Retry")
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .background(Color.secondary.opacity(0.12), in: Capsule())
                 }
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.primary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
-                .background(Color.secondary.opacity(0.12), in: Capsule())
+                .buttonStyle(.plain)
+
+                Button {
+                    isSearchPresented = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass")
+                        Text("Search Lyrics")
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .background(Color.accentColor.opacity(0.12), in: Capsule())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             .padding(.top, 4)
         }
         .frame(maxWidth: .infinity)
