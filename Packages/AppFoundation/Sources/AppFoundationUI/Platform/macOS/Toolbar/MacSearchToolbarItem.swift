@@ -102,14 +102,8 @@ public struct MacToolbarSearchField: View {
                 .accessibilityLabel("Clear search")
             }
         }
-        .padding(.horizontal, 10)
-        .frame(width: 350, height: 28)
-        #if os(visionOS)
-        .glassBackgroundEffect(in: Capsule())
-        #else
-        .glassEffect(.regular, in: Capsule())
-        #endif
-        .clipShape(Capsule())
+        .padding(.horizontal, 12)
+        .frame(width: 350, height: 36)
     }
 }
 
@@ -153,7 +147,7 @@ public final class MacSearchToolbarItem: NSToolbarItem {
         hostingView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             hostingView.widthAnchor.constraint(equalToConstant: 350),
-            hostingView.heightAnchor.constraint(equalToConstant: 28)
+            hostingView.heightAnchor.constraint(equalToConstant: 36)
         ])
         self.view = hostingView
     }
@@ -165,7 +159,7 @@ public final class MacSearchToolbarItem: NSToolbarItem {
 #Preview("MacToolbarSearchField") {
     MacToolbarSearchField(
         state: MacToolbarSearchState(
-            prompt: "Filter artists...",
+            prompt: "Filter artists…",
             text: "Beatles",
             isEnabled: true
         )
