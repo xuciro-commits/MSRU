@@ -103,7 +103,7 @@ public actor AudioFingerprintService: Sendable {
     public private(set) var skippedCount: Int = 0
 
     public init(
-        fingerprinter: any AcousticFingerprintExtracting = AcoustIDFingerprintExtractor(),
+        fingerprinter: any AcousticFingerprintExtracting = ChromaprintFingerprintExtractor(),
         registry: LocalFingerprintRegistry = .shared
     ) {
         self.fingerprinter = fingerprinter
@@ -183,7 +183,7 @@ public actor AudioFingerprintService: Sendable {
 
         for track in tracks {
             let fileURL = track.fileURL
-            guard LocalAudioFormatSupport.isNativeAppleFormat(fileURL) else {
+            guard LocalAudioFormatSupport.supports(fileURL) else {
                 continue
             }
 

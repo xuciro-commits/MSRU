@@ -89,6 +89,9 @@ struct LibraryView:
     @State
     private var isDeduplicationSheetPresented: Bool = false
 
+    @State
+    private var isRefreshingMetadata: Bool = false
+
     @Binding var selectedSourceID: String?
     @State private var availableSources: [SourceFilterItem] = []
     @State private var remoteTracks: [LocalTrack] = []
@@ -615,7 +618,12 @@ struct LibraryView:
                             onRemove: canRemoveFromLibrary ? { removeFromLibrary([track.id]) } : nil,
                             onEditMetadata: {
                                 if selectedLocalTrackIDs.contains(track.id) && selectedLocalTrackIDs.count > 1 {
-                                    metadataEditTracks = filteredLocalTracks.filter { selectedLocalTrackIDs.contains($0.id) }
+                                    let selected = filteredLocalTracks.filter { selectedLocalTrackIDs.contains($0.id) }
+                                    Task {
+                                        isRefreshingMetadata = true
+                                        defer { isRefreshingMetadata = false }
+                                        _ = try? await localStore.refreshMetadata(for: selected)
+                                    }
                                 } else {
                                     metadataEditTracks = [track]
                                 }
@@ -670,14 +678,36 @@ struct LibraryView:
             .buttonStyle(.bordered)
             .controlSize(.small)
 
-            Button {
-                let selected = filteredLocalTracks.filter { selectedLocalTrackIDs.contains($0.id) }
-                metadataEditTracks = selected
-            } label: {
-                Label("Edit Info...", systemImage: "info.circle")
+            if selectedLocalTrackIDs.count == 1 {
+                Button {
+                    let selected = filteredLocalTracks.filter { selectedLocalTrackIDs.contains($0.id) }
+                    metadataEditTracks = selected
+                } label: {
+                    Label("Edit Info...", systemImage: "info.circle")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            } else if selectedLocalTrackIDs.count > 1 {
+                Button {
+                    let selected = filteredLocalTracks.filter { selectedLocalTrackIDs.contains($0.id) }
+                    Task {
+                        isRefreshingMetadata = true
+                        defer { isRefreshingMetadata = false }
+                        _ = try? await localStore.refreshMetadata(for: selected)
+                    }
+                } label: {
+                    if isRefreshingMetadata {
+                        ProgressView()
+                            .controlSize(.small)
+                            .padding(.horizontal, 4)
+                    } else {
+                        Label("Get Info", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(isRefreshingMetadata)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
 
             if canRemoveFromLibrary {
                 Button(role: .destructive) {
@@ -724,6 +754,9 @@ struct LibraryView:
                 onDeleteTracks: canRemoveFromLibrary ? { removeFromLibrary($0) } : nil,
                 onEditMetadata: { tracks in
                     metadataEditTracks = tracks
+                },
+                onRefreshMetadata: { tracks in
+                    _ = try? await localStore.refreshMetadata(for: tracks)
                 },
                 onTrackAppear: { track in
                     if isRemoteSourceActive && track.id == remoteTracks.last?.id && hasMoreRemoteTracks && !isLoadingMoreRemoteTracks && !isLoadingRemoteTracks && searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

@@ -303,8 +303,12 @@ nonisolated public final class IdentityRepository: Sendable {
 
         // 4. Recordings
         let recStmt = try db.makeStatement(sql: """
-            INSERT OR IGNORE INTO recordings (id, title, sort_title, duration, is_live, created_at)
+            INSERT INTO recordings (id, title, sort_title, duration, is_live, created_at)
             VALUES (?, ?, ?, ?, 0, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                title = excluded.title,
+                sort_title = excluded.sort_title,
+                duration = COALESCE(excluded.duration, recordings.duration)
         """)
         for rec in recordings {
             let sortTitle = rec.title.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
@@ -312,9 +316,24 @@ nonisolated public final class IdentityRepository: Sendable {
         }
 
         // 5. Release Tracks
+        // When updating tracks (e.g. from Unknown Album to an identified release), clean up stale links
+        let cleanupRtStmt = try db.makeStatement(sql: """
+            DELETE FROM release_tracks WHERE recording_id = ? AND release_id != ?
+        """)
+        for rt in releaseTracks {
+            try cleanupRtStmt.execute(arguments: [rt.recordingID.rawValue, rt.releaseID.rawValue])
+        }
+
         let rtStmt = try db.makeStatement(sql: """
-            INSERT OR IGNORE INTO release_tracks (id, release_id, medium_position, track_position, track_number, title, sort_title, duration, recording_id, created_at)
+            INSERT INTO release_tracks (id, release_id, medium_position, track_position, track_number, title, sort_title, duration, recording_id, created_at)
             VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                release_id = excluded.release_id,
+                track_position = excluded.track_position,
+                track_number = excluded.track_number,
+                title = excluded.title,
+                sort_title = excluded.sort_title,
+                duration = excluded.duration
         """)
         for rt in releaseTracks {
             let sortTitle = rt.title.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
@@ -322,6 +341,14 @@ nonisolated public final class IdentityRepository: Sendable {
         }
 
         // 6. Artist Credits
+        let cleanupAcStmt = try db.makeStatement(sql: """
+            DELETE FROM artist_credits WHERE entity_type = 'recording' AND entity_id = ?
+        """)
+        let recordingEntityIDs = Set(artistCredits.filter { $0.entityType == "recording" }.map { $0.entityID })
+        for recID in recordingEntityIDs {
+            try cleanupAcStmt.execute(arguments: [recID])
+        }
+
         let acStmt = try db.makeStatement(sql: """
             INSERT OR IGNORE INTO artist_credits (id, artist_id, entity_type, entity_id, position, role)
             VALUES (?, ?, ?, ?, 0, 'primary')
@@ -332,6 +359,13 @@ nonisolated public final class IdentityRepository: Sendable {
         }
 
         // 7. Sync FTS5 with rich multi-lingual tokens
+        let deleteFtsStmt = try db.makeStatement(sql: """
+            DELETE FROM library_fts WHERE recording_id = ?
+        """)
+        for rec in recordings {
+            try deleteFtsStmt.execute(arguments: [rec.id.rawValue])
+        }
+
         let ftsStmt = try db.makeStatement(sql: """
             INSERT INTO library_fts (recording_id, track_title, artist_name, release_title, search_tokens)
             VALUES (?, ?, ?, ?, ?)

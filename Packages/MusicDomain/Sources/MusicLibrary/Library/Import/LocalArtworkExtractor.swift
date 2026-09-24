@@ -15,19 +15,26 @@ nonisolated public enum LocalArtworkExtractor {
 
     private static let commonImageFileNames: [String] = [
         "cover.jpg", "cover.jpeg", "cover.png",
+        "Cover.jpg", "Cover.jpeg", "Cover.png",
         "folder.jpg", "folder.jpeg", "folder.png",
         "Folder.jpg", "Folder.jpeg", "Folder.png",
         "front.jpg", "front.jpeg", "front.png",
+        "Front.jpg", "Front.jpeg", "Front.png",
         "album.jpg", "album.jpeg", "album.png",
         "artwork.jpg", "artwork.jpeg", "artwork.png",
-        "Artwork.jpg", "Artwork.png"
+        "Artwork.jpg", "Artwork.png",
+        "封面.jpg", "封面.jpeg", "封面.png",
+        "封底.jpg", "封底.jpeg", "封底.png",
+        "封套.jpg", "封套.jpeg", "封套.png",
+        "CD.jpg", "cd.jpg", "盘面.jpg",
+        "Disc.jpg", "Disc1.jpg", "disc.jpg", "disc1.jpg"
     ]
 
     /// Extracts artwork data for a given audio file URL by trying:
-    /// 1. Same-folder image files (cover.jpg, folder.jpg, front.jpg, etc.)
-    /// 2. Embedded metadata in the audio file (.commonIdentifierArtwork, FLAC Vorbis picture, DSF ID3 APIC)
-    /// 3. Remote Cover Art Archive if releaseMBID / releaseGroupMBID is available
-    /// 4. Remote MusicBrainz search fallback if artist and album/title are provided
+    /// 1. Same-folder image files (cover.jpg, folder.jpg, front.jpg, 封面.jpg, etc.)
+    /// 2. Embedded metadata in the audio file (AudioTagReader Vorbis PICTURE, ID3 APIC, DSF)
+    /// 3. Remote Apple Music / iTunes official high-resolution artwork
+    /// 4. Remote Cover Art Archive / MusicBrainz search fallback
     public static func extractArtwork(
         for fileURL: URL,
         releaseMBID: String? = nil,
@@ -48,14 +55,21 @@ nonisolated public enum LocalArtworkExtractor {
             return embedded
         }
 
-        // 3. Remote Cover Art Archive fallback if releaseMBID or releaseGroupMBID is present
+        // 3. Apple Music / iTunes Catalog high-res artwork (Primary Authority)
+        if let artist, !artist.isEmpty {
+            if let apple = await fetchAppleMusicCover(artist: artist, album: album, title: title) {
+                return apple.data
+            }
+        }
+
+        // 4. Remote Cover Art Archive fallback if releaseMBID or releaseGroupMBID is present
         if (releaseMBID != nil && !releaseMBID!.isEmpty) || (releaseGroupMBID != nil && !releaseGroupMBID!.isEmpty) {
             if let remoteData = await fetchRemoteCover(releaseMBID: releaseMBID, releaseGroupMBID: releaseGroupMBID) {
                 return remoteData
             }
         }
 
-        // 4. Remote MusicBrainz search fallback if artist is known
+        // 5. Remote MusicBrainz search fallback if artist is known
         if let artist, !artist.isEmpty {
             if let resolved = await resolveRemoteArtwork(artist: artist, album: album, title: title) {
                 return resolved.data
@@ -85,13 +99,15 @@ nonisolated public enum LocalArtworkExtractor {
             }
         }
 
-        // Broad check: any jpg or png containing "cover" or "folder" or "front" in name
+        // Broad check: any jpg or png containing "cover" or "folder" or "front" or "封面" etc.
         if let files = try? fm.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: nil) {
             for file in files {
                 let ext = file.pathExtension.lowercased()
-                if ext == "jpg" || ext == "jpeg" || ext == "png" {
+                if ext == "jpg" || ext == "jpeg" || ext == "png" || ext == "webp" {
                     let base = file.deletingPathExtension().lastPathComponent.lowercased()
-                    if base.contains("cover") || base.contains("folder") || base.contains("front") || base.contains("artwork") {
+                    if base.contains("cover") || base.contains("folder") || base.contains("front") ||
+                       base.contains("artwork") || base.contains("封面") || base.contains("封底") ||
+                       base.contains("封套") || base == "cd" || base.hasPrefix("disc") {
                         if let data = try? Data(contentsOf: file), isValidImageData(data) {
                             return data
                         }
@@ -112,14 +128,13 @@ nonisolated public enum LocalArtworkExtractor {
             }
         }
 
-        // Fast path for DSF
-        if url.pathExtension.lowercased() == "dsf" {
-            if let dsfArt = DSFHeaderReader.readMetadata(from: url)?.artworkData, isValidImageData(dsfArt) {
-                return dsfArt
-            }
-            return nil
+        // 1. Tag reader direct parse (FLAC Vorbis picture blocks, DSF, ID3v2 APIC)
+        let tagDetails = await AudioTagReader().readDetails(from: url)
+        if let tagArt = tagDetails.tags.artworkData, isValidImageData(tagArt) {
+            return tagArt
         }
 
+        // 2. AVURLAsset common identifier fallback
         let asset = AVURLAsset(url: url)
         var allItems: [AVMetadataItem] = []
         if let common = try? await asset.load(.commonMetadata) {
@@ -129,7 +144,6 @@ nonisolated public enum LocalArtworkExtractor {
             allItems.append(contentsOf: other)
         }
 
-        // 1. Common artwork identifier
         let commonItems = AVMetadataItem.metadataItems(from: allItems, filteredByIdentifier: .commonIdentifierArtwork)
         for item in commonItems {
             if let data = try? await item.load(.dataValue), isValidImageData(data) {
@@ -137,7 +151,6 @@ nonisolated public enum LocalArtworkExtractor {
             }
         }
 
-        // 2. Picture / artwork items (FLAC vorb/METADATA_BLOCK_PICTURE, ID3 APIC, etc.)
         for item in allItems {
             let idStr = item.identifier?.rawValue.lowercased() ?? ""
             let keyStr = (item.key as? String)?.lowercased() ?? ""
@@ -145,13 +158,6 @@ nonisolated public enum LocalArtworkExtractor {
                 if let data = try? await item.load(.dataValue), isValidImageData(data) {
                     return data
                 }
-            }
-        }
-
-        // 3. Fallback to any item containing valid image data
-        for item in allItems {
-            if let data = try? await item.load(.dataValue), isValidImageData(data) {
-                return data
             }
         }
 
@@ -227,7 +233,7 @@ nonisolated public enum LocalArtworkExtractor {
         return nil
     }
 
-    /// Searches MusicBrainz for artist and album/title, returning downloaded image data and canonical metadata.
+    /// Searches Apple Music (Primary) and MusicBrainz (Fallback) for artist and album/title, returning downloaded image data and canonical metadata.
     public static func resolveRemoteArtwork(
         artist: String,
         album: String? = nil,
@@ -236,7 +242,12 @@ nonisolated public enum LocalArtworkExtractor {
         let cleanArt = artist.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanArt.isEmpty else { return nil }
 
-        // Strategy 1: Search by album if available and not equal to artist name
+        // Strategy 1: Apple Music / iTunes Public Search API (Primary Authority: 1400x1400 official artwork & speed)
+        if let appleResult = await fetchAppleMusicCover(artist: cleanArt, album: album, title: title) {
+            return (appleResult.data, appleResult.canonicalAlbum, nil, nil)
+        }
+
+        // Strategy 2: Search MusicBrainz by album if available and not equal to artist name
         if let alb = album?.trimmingCharacters(in: .whitespacesAndNewlines),
            !alb.isEmpty,
            alb.lowercased() != cleanArt.lowercased() {
@@ -249,7 +260,7 @@ nonisolated public enum LocalArtworkExtractor {
             }
         }
 
-        // Strategy 2: Search by track title if album didn't match or was absent
+        // Strategy 3: Search MusicBrainz by track title if album didn't match or was absent
         if let trkTitle = title?.trimmingCharacters(in: .whitespacesAndNewlines), !trkTitle.isEmpty {
             let recordings = await MusicBrainzCatalogClient.shared.searchRecordings(artist: cleanArt, title: trkTitle)
             for rec in recordings {
@@ -258,11 +269,6 @@ nonisolated public enum LocalArtworkExtractor {
                     return (imgData, rec.albumTitle, firstRelMBID, rec.releaseGroupMBID)
                 }
             }
-        }
-
-        // Strategy 3: Apple Music / iTunes Public Search API fallback (high-resolution official artwork)
-        if let appleResult = await fetchAppleMusicCover(artist: cleanArt, album: album, title: title) {
-            return (appleResult.data, appleResult.canonicalAlbum, nil, nil)
         }
 
         return nil

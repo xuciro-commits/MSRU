@@ -736,147 +736,52 @@ public actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
         let url = url.resolvingSymlinksInPath().standardizedFileURL
         let values = try url.resourceValues(forKeys: [.isRegularFileKey])
         guard values.isRegularFile == true else { throw CocoaError(.fileReadNoSuchFile) }
-        let asset = AVURLAsset(url: url)
+        // 1. Read comprehensive tags via AudioTagReader (handles Vorbis comment & PICTURE blocks, DSF, ID3, MP4)
+        let details = await AudioTagReader().readDetails(from: url)
+        let tags = details.tags
+        let specs = details.specs
 
-        // Fast path for DSD DSF files: bypass AVFoundation to prevent CoreAudio FFR errors
-        if url.pathExtension.lowercased() == "dsf", let dsfMeta = DSFHeaderReader.readMetadata(from: url) {
-            let parsed = FileNameHeuristicParser.parse(fileURL: url)
-            let rule = PathHeuristicRuleStore.shared.match(fileURL: url)
-            let title = dsfMeta.title ?? parsed.title
-            let artist = dsfMeta.artist ?? rule?.targetArtist ?? parsed.artist ?? "Unknown Artist"
-            var album = dsfMeta.album ?? rule?.targetAlbum ?? parsed.album
-            if let alb = album, FileNameHeuristicParser.isGenericFolderName(alb) {
-                album = nil
-            }
-            let artworkData = dsfMeta.artworkData ?? LocalArtworkExtractor.extractFromDirectory(folderURL: url.deletingLastPathComponent())
-            let trackNumber = dsfMeta.trackNumber ?? parsed.trackNumber
-            let year = dsfMeta.year ?? parsed.year
-
-            return LocalTrack(
-                fileURL: url,
-                title: title,
-                artist: artist,
-                album: album,
-                duration: dsfMeta.duration,
-                artworkData: artworkData,
-                trackNumber: trackNumber,
-                year: year
-            )
-        }
-
-        var metadata: [AVMetadataItem] = []
-        if let common = try? await asset.load(.commonMetadata) {
-            metadata.append(contentsOf: common)
-        }
-        if let all = try? await asset.load(.metadata) {
-            metadata.append(contentsOf: all)
-        }
-        if let formats = try? await asset.load(.availableMetadataFormats) {
-            for fmt in formats {
-                if let items = try? await asset.loadMetadata(for: fmt) {
-                    metadata.append(contentsOf: items)
-                }
-            }
-        }
-
-        // Title
+        // 2. Heuristics fallback for un-tagged files
         let parsed = FileNameHeuristicParser.parse(fileURL: url)
         let rule = PathHeuristicRuleStore.shared.match(fileURL: url)
 
-        let rawTitle = await metadataString(
-            identifier: .commonIdentifierTitle,
-            alternateKeys: ["title"],
-            metadata: metadata
-        )
-        let title = (rawTitle != nil && !rawTitle!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            ? rawTitle!
-            : parsed.title
-
-        // Artist
-        let rawArtist = await metadataString(
-            identifier: .commonIdentifierArtist,
-            alternateKeys: ["artist", "albumartist", "composer"],
-            metadata: metadata
-        )
-        let artist: String
-        if let rawArtist, !rawArtist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, rawArtist != "Unknown Artist" {
-            artist = rawArtist
-        } else {
-            artist = rule?.targetArtist ?? parsed.artist ?? "Unknown Artist"
-        }
-
-        // Clean redundant artist prefix from title if present (e.g. "李克勤-一生不变" -> "一生不变")
-        var finalTitle = title
-        if finalTitle.lowercased().hasPrefix(artist.lowercased()) {
-            let stripped = finalTitle.dropFirst(artist.count).trimmingCharacters(in: CharacterSet(charactersIn: " -–—_"))
-            if !stripped.isEmpty {
-                finalTitle = stripped
+        let initialTitle = (!tags.title.isEmpty && tags.title != "Unknown Title") ? tags.title : parsed.title
+        let initialArtist = (!tags.artist.isEmpty && tags.artist != "Unknown Artist")
+            ? tags.artist
+            : (rule?.targetArtist ?? parsed.artist ?? "Unknown Artist")
+        let initialAlbum: String? = {
+            let trimmed = tags.album.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                return trimmed
             }
-        }
+            return rule?.targetAlbum ?? parsed.album
+        }()
+        let initialTrackNo = tags.trackNumber ?? parsed.trackNumber
+        let initialYear = tags.year ?? parsed.year
 
-        // Album
-        let rawAlbum = await metadataString(
-            identifier: .commonIdentifierAlbumName,
-            alternateKeys: ["album"],
-            metadata: metadata
+        // 3. Central sanitization (clean prefixes, format/edition noise, anomaly checking)
+        let sanitized = MetadataSanitizer.sanitize(
+            title: initialTitle,
+            artist: initialArtist,
+            album: initialAlbum,
+            trackNumber: initialTrackNo
         )
-        var finalAlbum = (rawAlbum != nil && !rawAlbum!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            ? rawAlbum
-            : (rule?.targetAlbum ?? parsed.album)
 
-        // Safety gate: never allow album == artist or generic folder name
-        if let alb = finalAlbum {
-            let trimmed = alb.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.lowercased() == artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() || FileNameHeuristicParser.isGenericFolderName(trimmed) {
-                finalAlbum = nil
-            }
-        }
-
-        // Artwork
-        var artworkData = await metadataData(
-            identifier: .commonIdentifierArtwork,
-            metadata: metadata
-        )
+        // 4. Artwork: embedded tags -> directory artwork
+        var artworkData = tags.artworkData
         if artworkData == nil {
             artworkData = LocalArtworkExtractor.extractFromDirectory(folderURL: url.deletingLastPathComponent())
         }
 
-        // TrackNumber & Year
-        var trackNumber: Int? = parsed.trackNumber
-        if let rawTrk = await metadataString(identifier: .id3MetadataTrackNumber, alternateKeys: ["tracknumber", "trck"], metadata: metadata) {
-            let digits = rawTrk.prefix(while: { $0.isNumber })
-            if let num = Int(digits) {
-                trackNumber = num
-            }
-        }
-
-        var year: Int? = parsed.year
-        if let rawDate = await metadataString(identifier: .id3MetadataYear, alternateKeys: ["date", "year", "tyer", "tdrc"], metadata: metadata) {
-            let digits = rawDate.prefix(while: { $0.isNumber })
-            if digits.count >= 4, let yr = Int(digits.prefix(4)) {
-                year = yr
-            }
-        }
-
-        // Duration
-        let duration: TimeInterval
-        do {
-            let durationValue = try await asset.load(.duration)
-            let seconds = durationValue.seconds
-            duration = seconds.isFinite && seconds > 0 ? seconds : 0
-        } catch {
-            duration = 0
-        }
-
         return LocalTrack(
             fileURL: url,
-            title: finalTitle,
-            artist: artist,
-            album: finalAlbum,
-            duration: duration,
+            title: sanitized.cleanTitle,
+            artist: sanitized.cleanArtist,
+            album: sanitized.cleanAlbum,
+            duration: specs.duration,
             artworkData: artworkData,
-            trackNumber: trackNumber,
-            year: year
+            trackNumber: sanitized.trackNumber,
+            year: initialYear
         )
     }
 

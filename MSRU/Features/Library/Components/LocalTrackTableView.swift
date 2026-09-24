@@ -20,11 +20,13 @@ struct LocalTrackTableView: View {
     var onRevealInFinder: ((URL) -> Void)? = nil
     var onDeleteTracks: ((Set<String>) -> Void)? = nil
     var onEditMetadata: (([LocalTrack]) -> Void)? = nil
+    var onRefreshMetadata: (([LocalTrack]) async -> Void)? = nil
     var onTrackAppear: ((LocalTrack) -> Void)? = nil
     var onPlay: ((LocalTrack, [LocalTrack]) -> Void)? = nil
 
     @State private var selectedTrackIDs: Set<String> = []
     @State private var isDeleteConfirmationPresented: Bool = false
+    @State private var isRefreshingMetadata: Bool = false
 
     init(
         tracks: [LocalTrack],
@@ -35,6 +37,7 @@ struct LocalTrackTableView: View {
         onRevealInFinder: ((URL) -> Void)? = nil,
         onDeleteTracks: ((Set<String>) -> Void)? = nil,
         onEditMetadata: (([LocalTrack]) -> Void)? = nil,
+        onRefreshMetadata: (([LocalTrack]) async -> Void)? = nil,
         onTrackAppear: ((LocalTrack) -> Void)? = nil,
         onPlay: ((LocalTrack, [LocalTrack]) -> Void)? = nil
     ) {
@@ -55,6 +58,7 @@ struct LocalTrackTableView: View {
         self.onRevealInFinder = onRevealInFinder
         self.onDeleteTracks = onDeleteTracks
         self.onEditMetadata = onEditMetadata
+        self.onRefreshMetadata = onRefreshMetadata
         self.onTrackAppear = onTrackAppear
         self.onPlay = onPlay
     }
@@ -314,7 +318,7 @@ struct LocalTrackTableView: View {
             .buttonStyle(.bordered)
             .controlSize(.small)
 
-            if let onEditMetadata {
+            if selectedTrackIDs.count == 1, let onEditMetadata {
                 Button {
                     let selected = tracks.filter { selectedTrackIDs.contains($0.id) }
                     onEditMetadata(selected)
@@ -323,6 +327,26 @@ struct LocalTrackTableView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+            } else if selectedTrackIDs.count > 1, let onRefreshMetadata {
+                Button {
+                    let selected = tracks.filter { selectedTrackIDs.contains($0.id) }
+                    Task {
+                        isRefreshingMetadata = true
+                        defer { isRefreshingMetadata = false }
+                        await onRefreshMetadata(selected)
+                    }
+                } label: {
+                    if isRefreshingMetadata {
+                        ProgressView()
+                            .controlSize(.small)
+                            .padding(.horizontal, 4)
+                    } else {
+                        Label("Get Info", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(isRefreshingMetadata)
             }
 
             if onDeleteTracks != nil {
@@ -409,24 +433,41 @@ struct LocalTrackTableView: View {
             }
         }
 
-        if let onEditMetadata {
-            Divider()
-            Button {
-                if selectedTrackIDs.contains(track.id) && selectedTrackIDs.count > 1 {
+        if selectedTrackIDs.contains(track.id) && selectedTrackIDs.count > 1 {
+            if let onRefreshMetadata {
+                Divider()
+                Button {
                     let selected = tracks.filter { selectedTrackIDs.contains($0.id) }
-                    onEditMetadata(selected)
-                } else {
-                    onEditMetadata([track])
+                    Task {
+                        isRefreshingMetadata = true
+                        defer { isRefreshingMetadata = false }
+                        await onRefreshMetadata(selected)
+                    }
+                } label: {
+                    Label("Get Info (\(selectedTrackIDs.count) Tracks)...", systemImage: "arrow.triangle.2.circlepath")
                 }
-            } label: {
-                Label(
-                    selectedTrackIDs.contains(track.id) && selectedTrackIDs.count > 1
-                        ? "Get Info (\(selectedTrackIDs.count) Tracks)..."
-                        : "Get Info / Edit Metadata...",
-                    systemImage: "info.circle"
-                )
             }
-            .keyboardShortcut("i", modifiers: .command)
+        } else {
+            if let onEditMetadata {
+                Divider()
+                Button {
+                    onEditMetadata([track])
+                } label: {
+                    Label("Edit Info...", systemImage: "info.circle")
+                }
+                .keyboardShortcut("i", modifiers: .command)
+            }
+            if let onRefreshMetadata {
+                Button {
+                    Task {
+                        isRefreshingMetadata = true
+                        defer { isRefreshingMetadata = false }
+                        await onRefreshMetadata([track])
+                    }
+                } label: {
+                    Label("Get Info", systemImage: "arrow.triangle.2.circlepath")
+                }
+            }
         }
 
         if onDeleteTracks != nil {

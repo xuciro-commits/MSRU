@@ -545,6 +545,104 @@ public final class LocalLibraryStore {
         revision += 1
     }
 
+    /// Re-reads physical tags, applies online enrichment via Apple Catalog,
+    /// and overwrites library records in-place without creating duplicate assets.
+    @discardableResult
+    public func refreshMetadata(for targetTracks: [LocalTrack]) async throws -> Int {
+        guard !targetTracks.isEmpty else { return 0 }
+        await loadIfNeeded()
+
+        var updatedTracks: [LocalTrack] = []
+
+        // Group selected tracks by directory/album to enable batch album alignment
+        var tracksByFolder: [URL: [LocalTrack]] = [:]
+        for track in targetTracks {
+            let folder = track.fileURL.deletingLastPathComponent()
+            tracksByFolder[folder, default: []].append(track)
+        }
+
+        for (folder, folderTracks) in tracksByFolder {
+            var reReadTracks: [LocalTrack] = []
+            for track in folderTracks {
+                if let fresh = try? await repository.readTrack(from: track.fileURL) {
+                    reReadTracks.append(fresh)
+                } else {
+                    reReadTracks.append(track)
+                }
+            }
+
+            let folderName = folder.lastPathComponent
+            let primaryArtist = reReadTracks.compactMap { $0.artist }.first(where: { !$0.isEmpty && $0 != "Unknown Artist" })
+                ?? folderTracks.first?.artist ?? "Unknown Artist"
+            let commonAlbum = reReadTracks.compactMap { $0.album }.first(where: { !$0.isEmpty && $0 != "Unknown Album" })
+            let albumHint = commonAlbum ?? MetadataSanitizer.cleanAlbumTitle(folderName, artist: primaryArtist)
+
+            var alignedMap: [URL: LocalTrack] = [:]
+            var canonicalAlbumName: String?
+            var officialArtworkRef: String?
+
+            if let (alignedList, canonicalAlbum, albumArtRef) = await AppleCatalogService.shared.alignAlbum(
+                artistHint: primaryArtist,
+                albumHint: albumHint,
+                localTracks: reReadTracks
+            ) {
+                canonicalAlbumName = canonicalAlbum
+                officialArtworkRef = albumArtRef
+                for aligned in alignedList {
+                    alignedMap[aligned.fileURL] = aligned
+                }
+            }
+
+            var companionArtworkRef: String?
+            if officialArtworkRef == nil {
+                if let folderArtData = LocalArtworkExtractor.extractFromDirectory(folderURL: folder) {
+                    companionArtworkRef = LocalArtworkStorage.shared.storeArtwork(folderArtData)
+                }
+            }
+
+            for track in reReadTracks {
+                let aligned = alignedMap[track.fileURL]
+                let finalTitle = aligned?.title ?? track.title
+                let finalArtist = aligned?.artist ?? track.artist
+                var finalAlbum = aligned?.album ?? canonicalAlbumName ?? track.album
+                let finalTrackNo = aligned?.trackNumber ?? track.trackNumber
+                let finalYear = aligned?.year ?? track.year
+                var finalArtworkRef = aligned?.artworkReference ?? officialArtworkRef ?? track.artworkReference ?? companionArtworkRef
+
+                if finalArtworkRef == nil {
+                    if let remote = await LocalArtworkExtractor.resolveRemoteArtwork(artist: finalArtist, album: finalAlbum, title: finalTitle) {
+                        finalArtworkRef = LocalArtworkStorage.shared.storeArtwork(remote.data)
+                        if finalAlbum == nil, let can = remote.canonicalAlbum {
+                            finalAlbum = can
+                        }
+                    }
+                }
+
+                if let alb = finalAlbum, alb.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == finalArtist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+                    finalAlbum = canonicalAlbumName
+                }
+
+                let updated = LocalTrack(
+                    fileURL: track.fileURL,
+                    title: finalTitle,
+                    artist: finalArtist,
+                    album: finalAlbum,
+                    duration: track.duration,
+                    artworkReference: finalArtworkRef,
+                    trackNumber: finalTrackNo,
+                    year: finalYear
+                )
+                updatedTracks.append(updated)
+            }
+        }
+
+        if !updatedTracks.isEmpty {
+            try await saveTracksInPlace(updatedTracks)
+        }
+
+        return updatedTracks.count
+    }
+
     @discardableResult
     public func remediateLibraryMetadataAndArtwork(progress: ((Int, Int) -> Void)? = nil) async -> (repairedCount: Int, artworkAddedCount: Int) {
         await loadIfNeeded()
@@ -581,7 +679,8 @@ public final class LocalLibraryStore {
             var newArtRef = currentTrack.artworkReference
 
             // 1. Re-read tags from file if accessible
-            if FileManager.default.fileExists(atPath: currentTrack.fileURL.path) {
+            let fileExists = FileManager.default.fileExists(atPath: currentTrack.fileURL.path)
+            if fileExists {
                 if let fresh = try? await FileLocalLibraryRepository.readTrack(from: currentTrack.fileURL) {
                     if fresh.title != newTitle {
                         newTitle = fresh.title
@@ -628,8 +727,8 @@ public final class LocalLibraryStore {
                 }
             }
 
-            // 4. Remote artwork resolution fallback (MusicBrainz Pinyin + Apple Music)
-            if newArtRef == nil {
+            // 4. Remote artwork resolution fallback (Apple Music prioritized + MusicBrainz)
+            if fileExists && newArtRef == nil {
                 if let remoteResult = await LocalArtworkExtractor.resolveRemoteArtwork(
                     artist: newArtist,
                     album: newAlbum,
@@ -643,6 +742,44 @@ public final class LocalLibraryStore {
                     }
                     pageArtworkAdded += 1
                     modified = true
+                }
+            }
+
+            // 5. Apple Music Catalog Alignment for anomalous tracks or missing albums
+            if fileExists && (MetadataSanitizer.isAnomalousTitle(newTitle) || (newAlbum == nil && currentTrack.album != currentTrack.artist)) {
+                let folderName = currentTrack.fileURL.deletingLastPathComponent().lastPathComponent
+                let albumHint = newAlbum ?? MetadataSanitizer.cleanAlbumTitle(folderName, artist: newArtist)
+                if let (alignedTracks, canonicalAlb, art) = await AppleCatalogService.shared.alignAlbum(
+                    artistHint: newArtist,
+                    albumHint: albumHint,
+                    localTracks: [LocalTrack(
+                        fileURL: currentTrack.fileURL,
+                        title: newTitle,
+                        artist: newArtist,
+                        album: newAlbum,
+                        duration: currentTrack.duration,
+                        artworkReference: newArtRef,
+                        trackNumber: newTrackNo,
+                        year: newYear
+                    )]
+                ), let aligned = alignedTracks.first {
+                    if aligned.title != newTitle {
+                        newTitle = aligned.title
+                        modified = true
+                    }
+                    if let a = canonicalAlb, a != newAlbum {
+                        newAlbum = a
+                        modified = true
+                    }
+                    if let tNo = aligned.trackNumber, tNo != newTrackNo {
+                        newTrackNo = tNo
+                        modified = true
+                    }
+                    if newArtRef == nil, let artRef = art ?? aligned.artworkReference {
+                        newArtRef = artRef
+                        pageArtworkAdded += 1
+                        modified = true
+                    }
                 }
             }
 
@@ -792,7 +929,6 @@ public final class LocalLibraryStore {
 
     /// Triggers an asynchronous, non-blocking background task to resolve artwork for albums missing covers.
     public func triggerBackgroundArtworkBackfillIfNeeded() {
-        guard isFullyLoaded else { return }
         guard backfillTask == nil else { return }
 
         backfillTask = Task(priority: .utility) { [weak self] in
