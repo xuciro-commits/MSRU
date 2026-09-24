@@ -570,18 +570,24 @@ public nonisolated enum AppDatabaseMigrations {
                 SELECT id, entity_id, field, override_value, updated_at FROM user_metadata_overrides
                 WHERE entity_type = 'recording' AND field IN ('title', 'artist', 'album') ORDER BY updated_at
                 """)
+            // Plain SQL with this migration's columns: migrations never call code that later versions change.
             for row in overrides {
-                var s = DecisionSubmission()
-                s.tenantId = UserDecisionLog.localTenant
-                s.principalId = "unknown"
-                s.authority = UserDecisionLog.deviceAuthority
-                s.target = DecisionTarget(type: "recording", id: row["entity_id"])
-                s.schema = MetadataCorrections.schema
-                s.idempotencyKey = "v8-backfill:" + (row["id"] as String)
-                s.payload = try JSONEncoder().encode(MetadataCorrections.Payload(
-                    field: MetadataCorrections.Field(rawValue: row["field"])!, value: row["override_value"]))
-                try UserDecisionLog.submit(s, knownSchemas: [MetadataCorrections.schema],
-                                           at: row["updated_at"] ?? Date(), in: db)
+                let payload = try JSONEncoder().encode(["field": row["field"] as String, "value": row["override_value"] as String])
+                let time: Date = row["updated_at"] ?? Date()
+                try db.execute(sql: """
+                    INSERT INTO user_decisions (change_id, tenant_id, principal_id, authority, target_type, target_id,
+                        schema_name, schema_version, valid_time, submitted_valid_time, recorded_time, causation_id,
+                        correlation_id, idempotency_key, payload)
+                    VALUES (?, 'local', 'unknown', 'device', 'recording', ?, 'music.metadata-correction', 1, ?, NULL, ?, '', '', ?, ?)
+                    """, arguments: [UUID().uuidString, row["entity_id"] as String, time, time,
+                                     "v8-backfill:" + (row["id"] as String), payload])
+            }
+        }
+
+        // Decisions cite the facts they rest on (contract v1alpha1 K4 C11).
+        migrator.registerMigration("v9_user_decision_evidence") { db in
+            try db.alter(table: "user_decisions") { t in
+                t.add(column: "evidence_fact_ids", .text).notNull().defaults(to: "[]")
             }
         }
     }

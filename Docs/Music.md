@@ -51,7 +51,7 @@ Apple-decodable local files play through a PCM engine (`AVAudioPlayerNode` → 1
 
 ## User decisions
 
-User corrections of a track's title, artist or album are decisions in `user_decisions`, a K4 change log (contract `v1alpha1`) with principal, device authority, causation and idempotency. The personal library is one tenant (`local`) with one principal (`local-owner`). `user_metadata_overrides` is only the current-value projection; restoring a field is a new decision, never a deletion of history. Corrections never change file tags, scanned values or IDs, and never reach ID derivation: they are applied only when tracks are read for display (`fetchPage`), never in paths that save tracks. `MusicLibraryTests` runs the contract's K4 vectors (pinned copy in `Tests/MusicLibraryTests/Vectors`) against this log.
+User corrections of a track's title, artist or album are decisions in `user_decisions`, a K4 change log (contract `v1alpha1`) with principal, device authority, causation and idempotency. The personal library is one tenant (`local`) with one principal (`local-owner`). `user_metadata_overrides` is only the current-value projection; restoring a field is a new decision, never a deletion of history. Corrections never change file tags, scanned values or IDs, and never reach ID derivation: they are applied only when tracks are read for display (`fetchPage`), never in paths that save tracks. A decision may cite the metadata claims it overrides (`evidence_fact_ids`, C11). `MusicLibraryTests` runs the contract's K4 vectors (pinned copy in `Tests/MusicLibraryTests/Vectors`) against this log.
 
 **IDs.** Content-derived IDs are de-duplication keys at first import; once assigned an ID is opaque (K1) and corrections never re-derive it.
 

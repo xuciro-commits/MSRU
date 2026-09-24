@@ -78,7 +78,7 @@ After any change, the gates, the affected package tests, the macOS unit-test bui
 
 ## Migrations and compatibility
 
-- Database changes go through `Packages/MusicDomain/Sources/MusicLibrary/Persistence/Core/AppDatabaseMigrations.swift` as new, forward-only, re-runnable migrations; never edit a shipped migration. A failed migration must not overwrite user data; keep a recovery path.
+- Database changes go through `Packages/MusicDomain/Sources/MusicLibrary/Persistence/Core/AppDatabaseMigrations.swift` as new, forward-only, re-runnable migrations; never edit a shipped migration. Migrations use plain SQL against their own schema and never call repository or domain code, which later versions change. A failed migration must not overwrite user data; keep a recovery path.
 - Persisted/transferred payloads (restoration records, settings, caches) are versioned and decoded per record; corrupt or unknown data is preserved, not replaced by empty state.
 - Breaking changes follow expand → migrate → contract. Do not keep two production paths for one responsibility after a migration completes, and do not add forwarding shims as an end state.
 - User files are never hard-deleted (use the Trash); original tags are never destroyed.

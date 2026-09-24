@@ -42,6 +42,8 @@ nonisolated public struct DecisionSubmission: Hashable, Codable, Sendable {
     public var correlationId = ""
     public var idempotencyKey = ""
     public var payload = Data()
+    /// Facts (here: metadata claims) the decision is based on (C11).
+    public var evidenceFactIds: [String] = []
 
     public init() {}
 
@@ -58,6 +60,7 @@ nonisolated public struct DecisionSubmission: Hashable, Codable, Sendable {
         correlationId = try c.decodeIfPresent(String.self, forKey: .correlationId) ?? ""
         idempotencyKey = try c.decodeIfPresent(String.self, forKey: .idempotencyKey) ?? ""
         payload = try c.decodeIfPresent(Data.self, forKey: .payload) ?? Data()
+        evidenceFactIds = try c.decodeIfPresent([String].self, forKey: .evidenceFactIds) ?? []
     }
 }
 
@@ -82,9 +85,11 @@ nonisolated public enum UserDecisionLog {
     public static let localPrincipal = "local-owner"
     public static let deviceAuthority = "device"
 
-    /// Accepts a submission or rejects it; a rejection writes nothing (C1–C9).
+    /// Accepts a submission or rejects it; a rejection writes nothing (C1–C11). `knownFact`
+    /// overrides where evidence is looked up; by default the local tenant's metadata claims.
     @discardableResult
     public static func submit(_ s: DecisionSubmission, knownSchemas: Set<DecisionSchema>, at now: Date,
+                              knownFact: ((_ tenant: String, _ factId: String) -> Bool)? = nil,
                               in db: Database) throws -> DecisionRecord {
         let required = [s.tenantId, s.principalId, s.authority, s.idempotencyKey, s.target.type, s.target.id, s.schema.name]
         guard !required.contains(where: \.isEmpty) else { throw DecisionError.invalidArgument }
@@ -99,6 +104,11 @@ nonisolated public enum UserDecisionLog {
             """, arguments: [s.tenantId, s.causationId]) == true {
             throw DecisionError.invalidReference
         }
+        for fact in s.evidenceFactIds {
+            let known = try knownFact?(s.tenantId, fact) ?? (s.tenantId == localTenant && Bool.fetchOne(db, sql:
+                "SELECT EXISTS (SELECT 1 FROM metadata_claims WHERE id = ?)", arguments: [fact]) == true)
+            guard known else { throw DecisionError.invalidReference }
+        }
         let last = try Date.fetchOne(db, sql: "SELECT MAX(recorded_time) FROM user_decisions WHERE tenant_id = ?",
                                      arguments: [s.tenantId])
         let recorded = max(now, last ?? now)
@@ -107,11 +117,12 @@ nonisolated public enum UserDecisionLog {
         try db.execute(sql: """
             INSERT INTO user_decisions (change_id, tenant_id, principal_id, authority, target_type, target_id,
                 schema_name, schema_version, valid_time, submitted_valid_time, recorded_time, causation_id,
-                correlation_id, idempotency_key, payload)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                correlation_id, idempotency_key, payload, evidence_fact_ids)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, arguments: [result.changeId, s.tenantId, s.principalId, s.authority, s.target.type, s.target.id,
                              s.schema.name, s.schema.version, result.validTime, s.validTime, recorded, s.causationId,
-                             s.correlationId, s.idempotencyKey, s.payload])
+                             s.correlationId, s.idempotencyKey, s.payload,
+                             String(decoding: try JSONEncoder().encode(s.evidenceFactIds), as: UTF8.self)])
         return result
     }
 
@@ -135,6 +146,7 @@ nonisolated public enum UserDecisionLog {
         s.correlationId = row["correlation_id"]
         s.idempotencyKey = row["idempotency_key"]
         s.payload = row["payload"]
+        s.evidenceFactIds = (try? JSONDecoder().decode([String].self, from: Data((row["evidence_fact_ids"] as String? ?? "[]").utf8))) ?? []
         return DecisionRecord(changeId: row["change_id"], submission: s,
                               validTime: row["valid_time"], recordedTime: row["recorded_time"])
     }

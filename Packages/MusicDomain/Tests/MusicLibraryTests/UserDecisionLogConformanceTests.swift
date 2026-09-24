@@ -14,7 +14,11 @@ struct UserDecisionLogConformanceTests {
     }
 
     struct Vector: Decodable {
-        struct Given: Decodable { let schemas: [DecisionSchema] }
+        struct Given: Decodable {
+            struct Fact: Decodable { let tenantId, factId: String }
+            let schemas: [DecisionSchema]
+            let facts: [Fact]?
+        }
         struct Step: Decodable {
             struct Expect: Decodable {
                 struct Accepted: Decodable {
@@ -44,6 +48,7 @@ struct UserDecisionLogConformanceTests {
         for vector in file.vectors {
             let queue = try DatabaseQueue()
             try AppDatabase(dbWriter: queue).migrator.migrate(queue)
+            let facts = Set((vector.given.facts ?? []).map { [$0.tenantId, $0.factId] })
             var changeIDs: [Int: String] = [:]
             for (index, step) in vector.steps.enumerated() {
                 let label = Comment(rawValue: "\(vector.id) step \(index)")
@@ -53,7 +58,8 @@ struct UserDecisionLogConformanceTests {
                 }
                 do {
                     let record = try queue.write { db in
-                        try UserDecisionLog.submit(submission, knownSchemas: Set(vector.given.schemas), at: step.at, in: db)
+                        try UserDecisionLog.submit(submission, knownSchemas: Set(vector.given.schemas), at: step.at,
+                                                   knownFact: { facts.contains([$0, $1]) }, in: db)
                     }
                     changeIDs[index] = record.changeId
                     let expected = try #require(step.expect.accepted, label)
