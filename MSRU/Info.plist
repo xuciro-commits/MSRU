@@ -20,5 +20,7 @@
 		<key>NSAllowsArbitraryLoadsForMedia</key>
 		<true/>
 	</dict>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>MSRU uses your Apple Music library to display and import your albums, artists, and songs.</string>
 </dict>
 </plist>

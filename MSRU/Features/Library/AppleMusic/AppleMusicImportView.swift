@@ -13,9 +13,17 @@ struct AppleMusicImportView: View {
     @Bindable var store:
         AppleMusicLibraryStore
 
+    @Bindable var localStore:
+        LocalLibraryStore
+
+    var playlistStore:
+        PlaylistStore? = nil
+
     let onImportCompleted:
         () -> Void
 
+    @Environment(\.openURL)
+    private var openURL
 
     @State private var options =
         LibraryImportOptions()
@@ -114,7 +122,6 @@ struct AppleMusicImportView: View {
 
             Divider()
 
-
             importOption(
                 title:
                     "Import Apple Music Albums",
@@ -122,6 +129,17 @@ struct AppleMusicImportView: View {
                     "Include albums from Apple Music library.",
                 isOn:
                     $options.importsAlbums
+            )
+
+            Divider()
+
+            importOption(
+                title:
+                    "Import Apple Music Playlists",
+                description:
+                    "Include user playlists from Apple Music library.",
+                isOn:
+                    $options.importsPlaylists
             )
         }
         .padding(.vertical, 10)
@@ -187,40 +205,127 @@ struct AppleMusicImportView: View {
 
         if store.isImporting {
 
+            VStack(
+                alignment: .leading,
+                spacing: 10
+            ) {
+
+                HStack(
+                    spacing: 10
+                ) {
+
+                    ProgressView()
+                        .controlSize(
+                            .small
+                        )
+
+                    Text(
+                        store.importStatusText.isEmpty
+                        ? "Importing Apple Music library…"
+                        : store.importStatusText
+                    )
+                    .font(.callout)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+
+                ProgressView(
+                    value: store.importProgress
+                )
+                .progressViewStyle(
+                    .linear
+                )
+            }
+            .padding(
+                .bottom,
+                16
+            )
+
+        } else if let error =
+                    store.lastError {
+
+            VStack(
+                alignment: .leading,
+                spacing: 10
+            ) {
+
+                HStack(
+                    spacing: 8
+                ) {
+
+                    Image(
+                        systemName:
+                            "exclamationmark.triangle.fill"
+                    )
+                    .foregroundStyle(
+                        .orange
+                    )
+
+                    Text(error)
+                        .font(.callout)
+                        .foregroundStyle(
+                            .primary
+                        )
+                }
+
+                if store.isAuthorizationDenied {
+
+                    Button {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Media") {
+                            openURL(url)
+                        }
+                    } label: {
+
+                        Label(
+                            "Open System Settings",
+                            systemImage: "gear"
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+            .padding(14)
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+            .background(
+                .quaternary.opacity(0.6),
+                in: RoundedRectangle(cornerRadius: 10)
+            )
+            .padding(
+                .bottom,
+                16
+            )
+
+        } else if store.importedTrackCount > 0 {
+
             HStack(
                 spacing: 10
             ) {
 
-                ProgressView()
-                    .controlSize(
-                        .small
-                    )
-
+                Image(
+                    systemName:
+                        "checkmark.circle.fill"
+                )
+                .foregroundStyle(
+                    .green
+                )
 
                 Text(
-                    "Importing Apple Music library…"
+                    "Successfully imported \(store.importedTrackCount) songs into your library!"
                 )
+                .font(.callout)
                 .foregroundStyle(
                     .secondary
                 )
             }
             .padding(
                 .bottom,
-                12
+                16
             )
-
-        } else if let error =
-                    store.lastError {
-
-            Text(error)
-                .font(.callout)
-                .foregroundStyle(
-                    .red
-                )
-                .padding(
-                    .bottom,
-                    12
-                )
         }
     }
 
@@ -235,7 +340,7 @@ struct AppleMusicImportView: View {
             if store.hasContent {
 
                 Text(
-                    "\(store.albumCount) Albums · \(store.artistCount) Artists · \(store.songCount) Songs"
+                    "\(store.albumCount) Albums · \(store.artistCount) Artists · \(store.songCount) Songs · \(store.playlistCount) Playlists"
                 )
                 .font(.callout)
                 .foregroundStyle(
@@ -247,39 +352,65 @@ struct AppleMusicImportView: View {
             Spacer()
 
 
-            Button {
-                Task {
+            if store.importedTrackCount > 0 && !store.isImporting {
 
-                    let success =
-                        await store
-                            .importLibrary(
-                                options:
-                                    options
-                            )
+                Button {
 
+                    onImportCompleted()
+                } label: {
 
-                    if success {
-                        onImportCompleted()
-                    }
+                    Label(
+                        "View in Library",
+                        systemImage: "music.note.list"
+                    )
                 }
-            } label: {
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .controlSize(
+                    .large
+                )
 
-                Text(
-                    store.isImporting
-                    ? "Importing…"
-                    : "Start Import"
+            } else {
+
+                Button {
+
+                    Task {
+
+                        let success =
+                            await store
+                                .importLibrary(
+                                    options:
+                                        options,
+                                    into:
+                                        localStore,
+                                    playlistStore:
+                                        playlistStore
+                                )
+
+                        if success && store.importedTrackCount > 0 {
+                            onImportCompleted()
+                        }
+                    }
+                } label: {
+
+                    Text(
+                        store.isImporting
+                        ? "Importing…"
+                        : "Start Import"
+                    )
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .controlSize(
+                    .large
+                )
+                .disabled(
+                    !options.hasSelection
+                    || store.isImporting
                 )
             }
-            .buttonStyle(
-                .borderedProminent
-            )
-            .controlSize(
-                .large
-            )
-            .disabled(
-                !options.hasSelection
-                || store.isImporting
-            )
         }
     }
 }
@@ -289,6 +420,8 @@ struct AppleMusicImportView: View {
     AppleMusicImportView(
         store:
             MSRUPreviewData.makeAppleMusicStore(),
+        localStore:
+            MSRUPreviewData.makeLocalLibraryStore(),
         onImportCompleted: {}
     )
     .frame(

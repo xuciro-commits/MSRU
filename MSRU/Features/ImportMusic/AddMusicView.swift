@@ -20,6 +20,9 @@ struct AddMusicView: View {
     @Bindable var appleMusicStore:
         AppleMusicLibraryStore
 
+    var playlistStore:
+        PlaylistStore? = nil
+
     let onOpenLibrary:
         () -> Void
 
@@ -240,6 +243,10 @@ struct AddMusicView: View {
             AppleMusicImportView(
                 store:
                     appleMusicStore,
+                localStore:
+                    localStore,
+                playlistStore:
+                    playlistStore,
                 onImportCompleted: {
 
                     onOpenLibrary()
@@ -429,6 +436,7 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
                     AddMusicView(
                         localStore: scene.application.localLibrary,
                         appleMusicStore: scene.application.musicLibrary,
+                        playlistStore: scene.application.playlistStore,
                         onOpenLibrary: {
                             scene.send(.navigate(.section(.library)))
                         }
