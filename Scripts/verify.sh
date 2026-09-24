@@ -36,7 +36,7 @@ if [[ "$MODE" == all || "$MODE" == packages ]]; then
 fi
 
 if [[ "$MODE" == all || "$MODE" == contract ]]; then
-  step contract-schema bash -c 'cd Contract/proto && buf lint && PATH="$(go env GOPATH)/bin:$PATH" buf generate && git diff --exit-code -- ../go/gen'
+  step contract-schema bash -c 'cd Contract/proto && export PATH="$(go env GOPATH)/bin:$PATH" && gen() { find ../go/gen -type f -exec shasum {} + | sort; } && before=$(gen) && buf lint && buf generate && { [ "$before" = "$(gen)" ] || { echo "generated code was stale; buf generate updated Contract/go/gen"; exit 1; }; }'
   step contract-go bash -c 'cd Contract/go && go vet ./... && go test -count=1 ./...'
   step contract-swift swift test --package-path Contract/swift
 fi
