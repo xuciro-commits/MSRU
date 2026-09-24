@@ -262,6 +262,16 @@ public final class WatchedFolderStore {
         )
 
         if folder.autoIngest {
+            // Apply moved tracks first (in-place path update without losing recording identity, play counts, or favorites)
+            for moved in result.movedTracks {
+                let oldURL = URL(fileURLWithPath: moved.oldPath)
+                do {
+                    try await localStore.moveTrack(from: oldURL, to: moved.newTrack.fileURL)
+                } catch {
+                    print("Watcher failed to move track:", moved.oldPath, error.localizedDescription)
+                }
+            }
+
             let tracksToIngest = result.newTracks + result.modifiedTracks
             if !tracksToIngest.isEmpty {
                 do {

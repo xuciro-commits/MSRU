@@ -1475,6 +1475,7 @@ private struct WeakSessionObserver {
                 self.notifyItemChanged()
                 self.refreshPCMNext()
                 print("Playback ▶︎", "[\(nextResource.providerID.rawValue)]", next.item.title)
+                self.recordPlaybackHistory(for: next.item)
             }
 
             pcmEngine = engine
@@ -1505,6 +1506,37 @@ private struct WeakSessionObserver {
 
         print("Playback ▶︎", "[\(resource.providerID.rawValue)]", item.title)
         notifyItemChanged()
+        recordPlaybackHistory(for: item)
+    }
+
+    private func recordPlaybackHistory(for item: PlaybackItem) {
+        let title = item.title
+        let artist = item.subtitle
+        let album = item.album
+        let duration = item.duration ?? 0
+        let artwork = item.artworkReference
+        let fileURL: URL?
+        switch item.payload {
+        case .local(let track):
+            fileURL = track.fileURL
+        default:
+            fileURL = nil
+        }
+
+        Task.detached(priority: .utility) {
+            do {
+                try await UserLibraryRepository().recordPlayback(
+                    title: title,
+                    artist: artist,
+                    album: album,
+                    duration: duration,
+                    artworkReference: artwork,
+                    fileURL: fileURL
+                )
+            } catch {
+                print("[PlaybackController] Failed to record playback: \(error)")
+            }
+        }
     }
 
     // MARK: - Active Transport

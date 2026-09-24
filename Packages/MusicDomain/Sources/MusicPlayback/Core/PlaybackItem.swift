@@ -370,6 +370,19 @@ public struct PlaybackItem:
         }
     }
 
+    public var artworkReference: String? {
+        switch payload {
+        case .local(let track):
+            return track.artworkReference
+        case .subsonic(_, _, _, _, _, let ref, _):
+            return ref
+        case .openverse(let track):
+            return track.thumbnailURL?.absoluteString
+        case .radio(let station):
+            return station.artworkURL?.absoluteString
+        }
+    }
+
     // MARK: - Duration
 
     public var duration:

@@ -10,7 +10,7 @@ import AVFoundation
 import MusicDomain
 
 /// Standard audio metadata fields for physical file tag writing.
-public struct AudioStandardTags: Sendable, Equatable {
+nonisolated public struct AudioStandardTags: Sendable, Equatable {
     public var title: String
     public var artist: String
     public var album: String
@@ -28,7 +28,7 @@ public struct AudioStandardTags: Sendable, Equatable {
     public var artworkData: Data?
     public var lyrics: String?
 
-    public init(
+    nonisolated public init(
         title: String,
         artist: String,
         album: String,
@@ -112,11 +112,11 @@ public struct AudioTagWriter: Sendable {
             return try await writeFLACTags(to: fileURL, tags: tags)
         case "mp3":
             return try await writeMP3Tags(to: fileURL, tags: tags)
-        case "m4a", "mp4", "aac":
+        case "m4a", "mp4", "aac", "alac":
             return try await writeM4ATags(to: fileURL, tags: tags)
+        case "wav", "wave":
+            return try await writeWAVTags(to: fileURL, tags: tags)
         default:
-            // For WAV, AIFF, or formats where rewriting headers without loss is non-standard:
-            // Write companion sidecar / preserve audio
             return fileURL
         }
     }
@@ -246,12 +246,9 @@ public struct AudioTagWriter: Sendable {
         return try atomicReplace(fileURL: fileURL, withData: newFLAC)
     }
 
-    // MARK: - MP3 ID3v2.4 Tag Writing
+    // MARK: - ID3v2.4 Tag Builder
 
-    private func writeMP3Tags(to fileURL: URL, tags: AudioStandardTags) async throws -> URL {
-        let originalData = try Data(contentsOf: fileURL)
-
-        // Build ID3v2.4 frames
+    public func buildID3v2Tag(tags: AudioStandardTags) -> Data {
         var framesData = Data()
         framesData.append(buildID3TextFrame(id: "TIT2", text: tags.title))
         framesData.append(buildID3TextFrame(id: "TPE1", text: tags.artist))
@@ -296,8 +293,15 @@ public struct AudioTagWriter: Sendable {
         id3Tag.append(contentsOf: [0x04, 0x00, 0x00]) // ID3v2.4
         id3Tag.append(contentsOf: encodeSynchSafeInt(framesData.count))
         id3Tag.append(framesData)
+        return id3Tag
+    }
 
-        // Find where audio starts in existing MP3 (skip old ID3v2 tag if present)
+    // MARK: - MP3 ID3v2.4 Tag Writing
+
+    private func writeMP3Tags(to fileURL: URL, tags: AudioStandardTags) async throws -> URL {
+        let originalData = try Data(contentsOf: fileURL)
+        let id3Tag = buildID3v2Tag(tags: tags)
+
         var audioStart = 0
         if originalData.count >= 10,
            originalData[0] == 0x49, originalData[1] == 0x44, originalData[2] == 0x33 {
@@ -313,12 +317,216 @@ public struct AudioTagWriter: Sendable {
         return try atomicReplace(fileURL: fileURL, withData: newMP3)
     }
 
-    // MARK: - M4A Tags via In-Place Atomic Rewrite
+    // MARK: - M4A / ALAC Tags via Passthrough Export
 
     private func writeM4ATags(to fileURL: URL, tags: AudioStandardTags) async throws -> URL {
-        // For M4A/AAC, ensure atomic replacement occurs safely
-        // Return URL directly after verification
-        return fileURL
+        let asset = AVURLAsset(url: fileURL)
+        guard let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetPassthrough) else {
+            throw AudioTagWriterError.unsupportedFormat("m4a")
+        }
+        let tempURL = fileURL.deletingLastPathComponent().appendingPathComponent(".msru_tag_\(UUID().uuidString).m4a")
+
+        var metadataItems: [AVMutableMetadataItem] = []
+
+        let titleItem = AVMutableMetadataItem()
+        titleItem.identifier = .commonIdentifierTitle
+        titleItem.value = tags.title as (NSCopying & NSObjectProtocol)
+        metadataItems.append(titleItem)
+
+        let artistItem = AVMutableMetadataItem()
+        artistItem.identifier = .commonIdentifierArtist
+        artistItem.value = tags.artist as (NSCopying & NSObjectProtocol)
+        metadataItems.append(artistItem)
+
+        let albumItem = AVMutableMetadataItem()
+        albumItem.identifier = .commonIdentifierAlbumName
+        albumItem.value = tags.album as (NSCopying & NSObjectProtocol)
+        metadataItems.append(albumItem)
+
+        if let albumArtist = tags.albumArtist, !albumArtist.isEmpty {
+            let item = AVMutableMetadataItem()
+            item.identifier = .iTunesMetadataAlbumArtist
+            item.value = albumArtist as (NSCopying & NSObjectProtocol)
+            metadataItems.append(item)
+        }
+
+        if let genre = tags.genre, !genre.isEmpty {
+            let item = AVMutableMetadataItem()
+            item.identifier = .quickTimeMetadataGenre
+            item.value = genre as (NSCopying & NSObjectProtocol)
+            metadataItems.append(item)
+        }
+
+        if let year = tags.year {
+            let item = AVMutableMetadataItem()
+            item.identifier = .commonIdentifierCreationDate
+            item.value = "\(year)" as (NSCopying & NSObjectProtocol)
+            metadataItems.append(item)
+        }
+
+        if let trackNumber = tags.trackNumber {
+            let item = AVMutableMetadataItem()
+            item.identifier = .iTunesMetadataTrackNumber
+            var trackData = Data(count: 8)
+            trackData[3] = UInt8(trackNumber & 0xFF)
+            if let total = tags.totalTracks {
+                trackData[5] = UInt8(total & 0xFF)
+            }
+            item.value = trackData as (NSCopying & NSObjectProtocol)
+            metadataItems.append(item)
+        }
+
+        if let artwork = tags.artworkData, !artwork.isEmpty {
+            let item = AVMutableMetadataItem()
+            item.identifier = .commonIdentifierArtwork
+            item.value = artwork as (NSCopying & NSObjectProtocol)
+            metadataItems.append(item)
+        }
+
+        if let lyrics = tags.lyrics, !lyrics.isEmpty {
+            let item = AVMutableMetadataItem()
+            item.identifier = .iTunesMetadataLyrics
+            item.value = lyrics as (NSCopying & NSObjectProtocol)
+            metadataItems.append(item)
+        }
+
+        exportSession.metadata = metadataItems
+        if #available(macOS 27.0, iOS 27.0, *) {
+            do {
+                try await exportSession.export(to: tempURL, as: .m4a)
+            } catch {
+                try? FileManager.default.removeItem(at: tempURL)
+                throw AudioTagWriterError.atomicWriteFailed(error.localizedDescription)
+            }
+        } else {
+            exportSession.outputURL = tempURL
+            exportSession.outputFileType = .m4a
+            await exportSession.export()
+            guard exportSession.status == .completed else {
+                try? FileManager.default.removeItem(at: tempURL)
+                throw AudioTagWriterError.atomicWriteFailed(exportSession.error?.localizedDescription ?? "Export failed")
+            }
+        }
+
+        do {
+            _ = try FileManager.default.replaceItemAt(fileURL, withItemAt: tempURL)
+            return fileURL
+        } catch {
+            try? FileManager.default.removeItem(at: tempURL)
+            throw AudioTagWriterError.atomicWriteFailed(error.localizedDescription)
+        }
+    }
+
+    // MARK: - WAV RIFF Tag Writing
+
+    private func writeWAVTags(to fileURL: URL, tags: AudioStandardTags) async throws -> URL {
+        let originalData = try Data(contentsOf: fileURL)
+        guard originalData.count >= 12,
+              originalData[0] == 0x52, originalData[1] == 0x49, originalData[2] == 0x46, originalData[3] == 0x46, // "RIFF"
+              originalData[8] == 0x57, originalData[9] == 0x41, originalData[10] == 0x56, originalData[11] == 0x45 // "WAVE"
+        else {
+            throw AudioTagWriterError.corruptedAudioHeader
+        }
+
+        var offset = 12
+        var chunks: [(id: String, data: Data)] = []
+
+        while offset + 8 <= originalData.count {
+            guard let chunkID = String(bytes: originalData[offset..<offset + 4], encoding: .ascii) else { break }
+            let chunkSize = Int(originalData[offset + 4]) |
+                            (Int(originalData[offset + 5]) << 8) |
+                            (Int(originalData[offset + 6]) << 16) |
+                            (Int(originalData[offset + 7]) << 24)
+            offset += 8
+
+            let chunkEnd = min(originalData.count, offset + chunkSize)
+            let chunkData = originalData.subdata(in: offset..<chunkEnd)
+            offset = chunkEnd
+            if chunkSize % 2 != 0 && offset < originalData.count {
+                offset += 1
+            }
+
+            let lowerID = chunkID.lowercased()
+            if lowerID != "id3 " && lowerID != "id3" && chunkID != "LIST" {
+                chunks.append((id: chunkID, data: chunkData))
+            }
+        }
+
+        // Build new ID3 chunk
+        let id3Data = buildID3v2Tag(tags: tags)
+        var newID3Chunk = Data()
+        newID3Chunk.append("id3 ".data(using: .ascii)!)
+        newID3Chunk.append(UInt32(id3Data.count).littleEndianBytes)
+        newID3Chunk.append(id3Data)
+        if id3Data.count % 2 != 0 {
+            newID3Chunk.append(0x00)
+        }
+
+        // Build LIST INFO chunk for legacy WAV players
+        var infoListPayload = Data()
+        infoListPayload.append("INFO".data(using: .ascii)!)
+
+        func appendSubchunk(_ id: String, text: String) {
+            guard let textData = (text + "\0").data(using: .utf8) else { return }
+            var sub = Data()
+            sub.append(id.data(using: .ascii)!)
+            sub.append(UInt32(textData.count).littleEndianBytes)
+            sub.append(textData)
+            if textData.count % 2 != 0 {
+                sub.append(0x00)
+            }
+            infoListPayload.append(sub)
+        }
+
+        appendSubchunk("INAM", text: tags.title)
+        appendSubchunk("IART", text: tags.artist)
+        appendSubchunk("IPRD", text: tags.album)
+        if let yr = tags.year { appendSubchunk("ICRD", text: "\(yr)") }
+        if let gn = tags.genre, !gn.isEmpty { appendSubchunk("IGNR", text: gn) }
+        if let tn = tags.trackNumber { appendSubchunk("ITRK", text: "\(tn)") }
+
+        var listChunk = Data()
+        listChunk.append("LIST".data(using: .ascii)!)
+        listChunk.append(UInt32(infoListPayload.count).littleEndianBytes)
+        listChunk.append(infoListPayload)
+        if infoListPayload.count % 2 != 0 {
+            listChunk.append(0x00)
+        }
+
+        // Reassemble WAV: "RIFF" + size + "WAVE" + fmt + id3 + LIST + data
+        var assembledPayload = Data()
+        assembledPayload.append("WAVE".data(using: .ascii)!)
+
+        if let fmtChunk = chunks.first(where: { $0.id == "fmt " }) {
+            assembledPayload.append("fmt ".data(using: .ascii)!)
+            assembledPayload.append(UInt32(fmtChunk.data.count).littleEndianBytes)
+            assembledPayload.append(fmtChunk.data)
+            if fmtChunk.data.count % 2 != 0 { assembledPayload.append(0x00) }
+        }
+
+        assembledPayload.append(newID3Chunk)
+        assembledPayload.append(listChunk)
+
+        for chunk in chunks where chunk.id != "fmt " && chunk.id != "data" {
+            assembledPayload.append(chunk.id.data(using: .ascii)!)
+            assembledPayload.append(UInt32(chunk.data.count).littleEndianBytes)
+            assembledPayload.append(chunk.data)
+            if chunk.data.count % 2 != 0 { assembledPayload.append(0x00) }
+        }
+
+        if let dataChunk = chunks.first(where: { $0.id == "data" }) {
+            assembledPayload.append("data".data(using: .ascii)!)
+            assembledPayload.append(UInt32(dataChunk.data.count).littleEndianBytes)
+            assembledPayload.append(dataChunk.data)
+            if dataChunk.data.count % 2 != 0 { assembledPayload.append(0x00) }
+        }
+
+        var newWAV = Data()
+        newWAV.append("RIFF".data(using: .ascii)!)
+        newWAV.append(UInt32(assembledPayload.count).littleEndianBytes)
+        newWAV.append(assembledPayload)
+
+        return try atomicReplace(fileURL: fileURL, withData: newWAV)
     }
 
     /// Writes companion sidecar `.lrc` file alongside the audio file.

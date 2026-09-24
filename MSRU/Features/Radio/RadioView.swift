@@ -39,8 +39,11 @@ struct RadioView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 26) {
+            LazyVStack(alignment: .leading, spacing: 28) {
                 header
+                    .padding(.horizontal, 28)
+                    .padding(.top, 28)
+
                 genreFilterBar
 
                 if state.searchQuery.isEmpty {
@@ -50,6 +53,7 @@ struct RadioView: View {
 
                     if let heroStation = featuredHeroStation {
                         featuredSection(heroStation)
+                            .padding(.horizontal, 28)
                     }
 
                     if !state.recentStations.isEmpty {
@@ -58,8 +62,9 @@ struct RadioView: View {
                 }
 
                 stationsGridSection
+                    .padding(.horizontal, 28)
             }
-            .padding(28)
+            .padding(.bottom, 60)
         }
         .scrollIndicators(.hidden)
         .hideScrollIndicatorsCompletely()
@@ -135,6 +140,7 @@ struct RadioView: View {
                     .buttonStyle(.plain)
                 }
             }
+            .padding(.horizontal, 28)
             .padding(.vertical, 2)
         }
         .hideScrollIndicatorsCompletely()
@@ -143,86 +149,69 @@ struct RadioView: View {
     // MARK: - Favorites Section
 
     private var favoritesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "heart.fill")
-                    .foregroundStyle(.red)
-                Text("Favorite")
-                    .font(.title3.bold())
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    ForEach(state.favoriteStations) { station in
-                        RadioStationCardView(
-                            station: station,
-                            isSelected: selectedStation?.id == station.id,
-                            isCurrent: feature.isCurrent(station),
-                            playbackState: feature.state(for: station),
-                            isFavorite: true,
-                            onToggleFavorite: {
-                                feature.send(.toggleFavoriteRequested(station))
-                            },
-                            onDelete: station.isCustom ? {
-                                feature.send(.deleteCustomStationRequested(station.id))
-                            } : nil,
-                            onPlayPause: {
-                                feature.send(.playPauseRequested(station))
-                            },
-                            onSelect: {
-                                onSelectStation?(station)
-                            }
-                        )
-                        .frame(width: 200)
-                    }
+        ContinuousShelfView(
+            title: "Favorite",
+            hasChevronHeader: true,
+            items: state.favoriteStations,
+            spacing: 16,
+            leadingInset: 28
+        ) { station in
+            RadioStationCardView(
+                station: station,
+                isSelected: selectedStation?.id == station.id,
+                isCurrent: feature.isCurrent(station),
+                playbackState: feature.state(for: station),
+                isFavorite: true,
+                onToggleFavorite: {
+                    feature.send(.toggleFavoriteRequested(station))
+                },
+                onDelete: station.isCustom ? {
+                    feature.send(.deleteCustomStationRequested(station.id))
+                } : nil,
+                onPlayPause: {
+                    feature.send(.playPauseRequested(station))
+                },
+                onSelect: {
+                    onSelectStation?(station)
                 }
-                .padding(.vertical, 4)
-            }
-            .hideScrollIndicatorsCompletely()
+            )
+            .frame(width: 200)
         }
     }
 
     // MARK: - Recently Played Section
 
     private var recentlyPlayedSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "clock.arrow.circlepath")
-                    .foregroundStyle(.secondary)
-                Text("Recently Played")
-                    .font(.title3.bold())
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    ForEach(state.recentStations) { station in
-                        RadioStationCardView(
-                            station: station,
-                            isSelected: selectedStation?.id == station.id,
-                            isCurrent: feature.isCurrent(station),
-                            playbackState: feature.state(for: station),
-                            isFavorite: state.isFavorite(station),
-                            onToggleFavorite: {
-                                feature.send(.toggleFavoriteRequested(station))
-                            },
-                            onDelete: station.isCustom ? {
-                                feature.send(.deleteCustomStationRequested(station.id))
-                            } : nil,
-                            onPlayPause: {
-                                feature.send(.playPauseRequested(station))
-                            },
-                            onSelect: {
-                                onSelectStation?(station)
-                            }
-                        )
-                        .frame(width: 200)
-                    }
+        ContinuousShelfView(
+            title: "Recently Played",
+            hasChevronHeader: true,
+            items: state.recentStations,
+            spacing: 16,
+            leadingInset: 28
+        ) { station in
+            RadioStationCardView(
+                station: station,
+                isSelected: selectedStation?.id == station.id,
+                isCurrent: feature.isCurrent(station),
+                playbackState: feature.state(for: station),
+                isFavorite: state.isFavorite(station),
+                onToggleFavorite: {
+                    feature.send(.toggleFavoriteRequested(station))
+                },
+                onDelete: station.isCustom ? {
+                    feature.send(.deleteCustomStationRequested(station.id))
+                } : nil,
+                onPlayPause: {
+                    feature.send(.playPauseRequested(station))
+                },
+                onSelect: {
+                    onSelectStation?(station)
                 }
-                .padding(.vertical, 4)
-            }
-            .hideScrollIndicatorsCompletely()
+            )
+            .frame(width: 200)
         }
     }
+
 
     // MARK: - Hero Station
 

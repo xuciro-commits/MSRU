@@ -289,6 +289,29 @@ public final class LocalLibraryStore {
         return succeeded
     }
 
+    public func moveTrack(from oldURL: URL, to newURL: URL) async throws {
+        try await serializedThrowing {
+            try await self.repository.moveTrack(from: oldURL, to: newURL)
+            let oldStdPath = oldURL.standardizedFileURL.path
+            if let idx = self.tracks.firstIndex(where: { $0.fileURL.standardizedFileURL.path == oldStdPath }) {
+                let oldTrack = self.tracks[idx]
+                let updated = LocalTrack(
+                    fileURL: newURL,
+                    title: oldTrack.title,
+                    artist: oldTrack.artist,
+                    album: oldTrack.album,
+                    duration: oldTrack.duration,
+                    artworkReference: oldTrack.artworkReference,
+                    artworkData: oldTrack.artworkData,
+                    trackNumber: oldTrack.trackNumber,
+                    year: oldTrack.year
+                )
+                self.tracks[idx] = updated
+            }
+            self.updateCachedPresentations()
+        }
+    }
+
     public func deleteAlbum(title: String, artist: String, deletePhysical: Bool = false) async {
         let trackIDsToDelete: Set<String>
         do {
@@ -508,6 +531,18 @@ public final class LocalLibraryStore {
         updateCachedPresentations()
         scheduleSpotlightRefresh()
         return true
+    }
+
+    public func saveTracksInPlace(_ updatedTracks: [LocalTrack]) async throws {
+        try await repository.saveTracksInPlace(updatedTracks)
+        for updated in updatedTracks {
+            if let index = tracks.firstIndex(where: { $0.id == updated.id }) {
+                tracks[index] = updated
+            }
+        }
+        updateCachedPresentations()
+        scheduleSpotlightRefresh()
+        revision += 1
     }
 
     @discardableResult

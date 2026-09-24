@@ -132,7 +132,7 @@ struct CompactApplicationShell: View {
                         scene.send(.navigate(.section(newSection)))
                     }
                 )) {
-                    Text(LocalizedStringKey("Listen Now")).tag(SceneSection.listenNow)
+                    Text(LocalizedStringKey("Home")).tag(SceneSection.listenNow)
                     Text(LocalizedStringKey("Browse")).tag(SceneSection.browse)
                 }
                 .pickerStyle(.segmented)

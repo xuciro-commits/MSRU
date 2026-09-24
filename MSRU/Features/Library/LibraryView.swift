@@ -83,6 +83,12 @@ struct LibraryView:
     @State
     private var isDeleteConfirmationPresented: Bool = false
 
+    @State
+    private var metadataEditTracks: [LocalTrack]? = nil
+
+    @State
+    private var isDeduplicationSheetPresented: Bool = false
+
     @Binding var selectedSourceID: String?
     @State private var availableSources: [SourceFilterItem] = []
     @State private var remoteTracks: [LocalTrack] = []
@@ -215,6 +221,25 @@ struct LibraryView:
                 query: debouncedLocalQuery,
                 sort: LocalTrackPageRequest.Sort(rawValue: sortField.rawValue) ?? .title,
                 ascending: sortAscending
+            )
+        }
+        .sheet(isPresented: Binding(
+            get: { metadataEditTracks != nil },
+            set: { if !$0 { metadataEditTracks = nil } }
+        )) {
+            if let tracks = metadataEditTracks {
+                MetadataEditorSheet(
+                    tracks: tracks,
+                    localStore: localStore,
+                    onDismiss: { metadataEditTracks = nil }
+                )
+            }
+        }
+        .sheet(isPresented: $isDeduplicationSheetPresented) {
+            DeduplicationManagerSheet(
+                localStore: localStore,
+                playback: playback,
+                onDismiss: { isDeduplicationSheetPresented = false }
             )
         }
     }
@@ -364,7 +389,8 @@ struct LibraryView:
                 searchQuery: $searchQuery,
                 isSearching: isSearchingRemoteTracks,
                 showsSearch: false,
-                prompt: isRemoteSourceActive ? "搜索远程歌曲…" : "Filter songs…"
+                prompt: isRemoteSourceActive ? "搜索远程歌曲…" : "Filter songs…",
+                onOpenDeduplication: { isDeduplicationSheetPresented = true }
             )
 
             if sourceFilterItems.count > 1 {
@@ -586,7 +612,14 @@ struct LibraryView:
                                     PlatformFileViewer.revealInFinder(url: track.fileURL)
                                 }
                             },
-                            onRemove: canRemoveFromLibrary ? { removeFromLibrary([track.id]) } : nil
+                            onRemove: canRemoveFromLibrary ? { removeFromLibrary([track.id]) } : nil,
+                            onEditMetadata: {
+                                if selectedLocalTrackIDs.contains(track.id) && selectedLocalTrackIDs.count > 1 {
+                                    metadataEditTracks = filteredLocalTracks.filter { selectedLocalTrackIDs.contains($0.id) }
+                                } else {
+                                    metadataEditTracks = [track]
+                                }
+                            }
                         )
                         .marqueeItem(id: track.id)
                         .onAppear {
@@ -637,6 +670,15 @@ struct LibraryView:
             .buttonStyle(.bordered)
             .controlSize(.small)
 
+            Button {
+                let selected = filteredLocalTracks.filter { selectedLocalTrackIDs.contains($0.id) }
+                metadataEditTracks = selected
+            } label: {
+                Label("Edit Info...", systemImage: "info.circle")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
             if canRemoveFromLibrary {
                 Button(role: .destructive) {
                     isDeleteConfirmationPresented = true
@@ -680,6 +722,9 @@ struct LibraryView:
                     }
                 },
                 onDeleteTracks: canRemoveFromLibrary ? { removeFromLibrary($0) } : nil,
+                onEditMetadata: { tracks in
+                    metadataEditTracks = tracks
+                },
                 onTrackAppear: { track in
                     if isRemoteSourceActive && track.id == remoteTracks.last?.id && hasMoreRemoteTracks && !isLoadingMoreRemoteTracks && !isLoadingRemoteTracks && searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         if let sourceID = selectedSourceID {
@@ -763,6 +808,7 @@ struct LibraryView:
         let onEnqueue: () -> Void
         let onReveal: () -> Void
         let onRemove: (() -> Void)?
+        var onEditMetadata: (() -> Void)? = nil
 
         @State private var isHovered: Bool = false
 
@@ -823,6 +869,9 @@ struct LibraryView:
             Button("Add to Queue", systemImage: "text.badge.plus", action: onEnqueue)
             if track.fileURL.isFileURL {
                 Divider()
+                if let onEditMetadata {
+                    Button("Get Info / Edit Metadata...", systemImage: "info.circle", action: onEditMetadata)
+                }
                 Button("Show in Finder", systemImage: "folder", action: onReveal)
             }
             if let onRemove {

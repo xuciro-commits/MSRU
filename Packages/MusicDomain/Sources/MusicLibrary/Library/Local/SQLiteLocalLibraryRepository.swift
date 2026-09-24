@@ -456,19 +456,25 @@ public actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
 
         let bookmarkOptions = SecurityScopePolicy.bookmarkCreationOptions
 
+        let relativePaths = tracks.map { $0.fileURL.standardizedFileURL.path }
+        let existingBindings = try await db.reader.read { db in
+            try AssetRepository.existingAssetBindings(forSourceID: sourceID, relativePaths: relativePaths, in: db)
+        }
+
         for track in tracks {
             let relTitle = (track.album?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
                 ? track.album!.trimmingCharacters(in: .whitespacesAndNewlines)
                 : "Unknown Album"
             let albumArtist = primaryArtistByAlbum[relTitle] ?? track.artist
-            let recID = DeterministicID.recording(title: track.title, artist: track.artist)
+            let relativePath = track.fileURL.standardizedFileURL.path
+            let existing = existingBindings[relativePath]
+            let recID = existing?.recordingID ?? DeterministicID.recording(title: track.title, artist: track.artist)
+            let astID = existing?.assetID ?? DeterministicID.asset(sourceID: sourceID, relativePath: relativePath)
             let albumArtID = DeterministicID.artist(name: albumArtist)
             let trackArtID = DeterministicID.artist(name: track.artist)
             let rgID = DeterministicID.releaseGroup(artist: albumArtist, title: relTitle)
             let relID = DeterministicID.release(artist: albumArtist, title: relTitle)
             let trkID = DeterministicID.releaseTrack(releaseID: relID, medium: 1, track: track.trackNumber ?? 1)
-            let relativePath = track.fileURL.standardizedFileURL.path
-            let astID = DeterministicID.asset(sourceID: sourceID, relativePath: relativePath)
 
             artists.append((id: trackArtID, name: track.artist))
             if trackArtID != albumArtID {
@@ -533,6 +539,15 @@ public actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
 
     public func batchUpsertTracks(_ tracks: [LocalTrack]) async throws {
         try await saveTracksInPlace(tracks)
+    }
+
+    public func moveTrack(from oldURL: URL, to newURL: URL) async throws {
+        let oldPath = oldURL.standardizedFileURL.path
+        let newPath = newURL.standardizedFileURL.path
+        let sourceID = SourceID("src_local_default")
+        try await db.dbWriter.write { db in
+            try AssetRepository.moveAsset(from: oldPath, to: newPath, sourceID: sourceID, in: db)
+        }
     }
 
     // MARK: - Import

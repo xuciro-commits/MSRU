@@ -77,6 +77,56 @@ nonisolated public final class AssetRepository: Sendable {
         }
     }
 
+    /// Looks up existing assets by sourceID and relative paths to retrieve their current assetID and recordingID.
+    nonisolated public static func existingAssetBindings(
+        forSourceID sourceID: SourceID,
+        relativePaths: [String],
+        in db: Database
+    ) throws -> [String: (assetID: AssetID, recordingID: RecordingID?)] {
+        guard !relativePaths.isEmpty else { return [:] }
+        var result: [String: (assetID: AssetID, recordingID: RecordingID?)] = [:]
+        let chunkSize = 500
+        for i in stride(from: 0, to: relativePaths.count, by: chunkSize) {
+            let chunk = Array(relativePaths[i..<min(i + chunkSize, relativePaths.count)])
+            let placeholders = chunk.map { _ in "?" }.joined(separator: ",")
+            var args = [sourceID.rawValue]
+            args.append(contentsOf: chunk)
+            let rows = try Row.fetchAll(
+                db,
+                sql: "SELECT id, relative_path, recording_id FROM assets WHERE source_id = ? AND relative_path IN (\(placeholders))",
+                arguments: StatementArguments(args)
+            )
+            for row in rows {
+                if let path: String = row["relative_path"],
+                   let idStr: String = row["id"] {
+                    let recIDStr: String? = row["recording_id"]
+                    let assetID = AssetID(idStr)
+                    let recID: RecordingID? = recIDStr.map { RecordingID($0) }
+                    result[path] = (assetID: assetID, recordingID: recID)
+                }
+            }
+        }
+        return result
+    }
+
+    /// Renames or moves an asset from old relative path to new relative path,
+    /// preserving its asset ID, recording ID, play count, favorites, and lyrics bindings.
+    nonisolated public static func moveAsset(
+        from oldPath: String,
+        to newPath: String,
+        sourceID: SourceID,
+        in db: Database
+    ) throws {
+        try db.execute(
+            sql: "UPDATE assets SET relative_path = ?, updated_at = ? WHERE source_id = ? AND relative_path = ?",
+            arguments: [newPath, Date(), sourceID.rawValue, oldPath]
+        )
+        try db.execute(
+            sql: "UPDATE file_assets SET relative_path = ? WHERE relative_path = ?",
+            arguments: [newPath, oldPath]
+        )
+    }
+
     nonisolated public static func batchUpsert(_ assets: [PersistedAssetRecord], in db: Database) throws {
         let statement = try db.makeStatement(sql: """
             INSERT INTO assets (

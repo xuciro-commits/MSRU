@@ -2,8 +2,9 @@
 //  ListenNowView.swift
 //  MSRU
 //
-//  User-centric personalized home surface.
-//  Backed strictly by real SQLite listening behavior (Recently Played, Added, Frequently Played, Favorites).
+//  Apple Music-styled Home (主页) surface.
+//  Backed by real SQLite listening behavior (Recently Played, Added, Frequently Played, Favorites).
+//  Features edge-to-edge continuous scrolling under sidebar/inspector panels with translucent chevrons.
 //
 
 import SwiftUI
@@ -12,6 +13,13 @@ import AppFoundation
 import AppFoundationUI
 import MusicLibrary
 import MusicPlayback
+
+// MARK: - Presentation Types
+
+typealias HomeView = ListenNowView
+typealias HomeFeature = ListenNowFeature
+
+// MARK: - Home View
 
 struct ListenNowView: View {
     @Bindable var store: MusicCatalogStore
@@ -38,51 +46,67 @@ struct ListenNowView: View {
         ScrollView(showsIndicators: false) {
             LazyVStack(alignment: .leading, spacing: 32) {
                 header
+                    .padding(.horizontal, 28)
+                    .padding(.top, 28)
 
                 if isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity, minHeight: 200)
-                } else if snapshot.recentlyPlayed.isEmpty && snapshot.recentlyAdded.isEmpty && snapshot.favorites.isEmpty {
-                    emptyHomeState
                 } else {
-                    if let hero = snapshot.heroItem {
-                        heroCard(hero)
-                    }
+                    // 1. 专属精选推荐 (Top Picks)
+                    topPicksSection
 
-                    if !snapshot.recentlyPlayed.isEmpty {
-                        shelfSection(title: "Recently Played", systemImage: "clock.arrow.circlepath", items: snapshot.recentlyPlayed)
-                    }
+                    // 2. 最近播放 (Recently Played)
+                    recentlyPlayedSection
 
-                    if !snapshot.recentlyAdded.isEmpty {
-                        shelfSection(title: "Recently Added", systemImage: "sparkles", items: snapshot.recentlyAdded)
-                    }
+                    // 3. 为你打造 (Made for You)
+                    madeForYouSection
 
+                    // 4. 常听经典 (Heavy Rotation)
                     if !snapshot.frequentlyPlayed.isEmpty {
-                        shelfSection(title: "Heavy Rotation", systemImage: "repeat", items: snapshot.frequentlyPlayed)
+                        heavyRotationSection
                     }
 
-                    if !snapshot.favorites.isEmpty {
-                        shelfSection(title: "Favorites", systemImage: "heart.fill", items: snapshot.favorites)
+                    // 5. 最近添加 (Recently Added)
+                    if !snapshot.recentlyAdded.isEmpty {
+                        recentlyAddedSection
                     }
+
+                    // 6. 听歌回忆与里程碑 (Replay / Stats)
+                    listeningStatsSection
+                        .padding(.horizontal, 28)
                 }
             }
-            .padding(.bottom, 40)
+            .padding(.bottom, 60)
         }
         .hideScrollIndicatorsCompletely()
         .task {
-            await loadData()
+            await loadData(initial: true)
+        }
+        .onAppear {
+            Task {
+                await loadData()
+            }
+        }
+        .onChange(of: playback?.currentItem?.id) { _, _ in
+            Task {
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                await loadData()
+            }
         }
         .refreshable {
             await loadData()
         }
     }
 
-    private func loadData() async {
-        isLoading = true
+    private func loadData(initial: Bool = false) async {
+        if initial && snapshot.recentlyPlayed.isEmpty {
+            isLoading = true
+        }
         do {
             snapshot = try await LibraryQueryEngine.shared.fetchBehaviorSnapshot()
         } catch {
-            print("[ListenNowView] Failed to fetch behavior snapshot: \(error)")
+            print("[HomeView] Failed to fetch behavior snapshot: \(error)")
         }
         isLoading = false
     }
@@ -90,167 +114,464 @@ struct ListenNowView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(alignment: .bottom) {
+        HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Listen Now")
-                    .font(.largeTitle.bold())
-
-                Text("Your personal music hub, shaped by your listening habits.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Text(LocalizedStringKey("Home"))
+                    .font(.system(size: 34, weight: .bold))
             }
 
             Spacer()
         }
-        .padding(.horizontal, 28)
-        .padding(.top, 28)
     }
 
-    // MARK: - Hero Card
+    // MARK: - 1. 专属精选推荐 (Top Picks)
 
-    private func heroCard(_ item: TrackRowSummary) -> some View {
-        HStack(spacing: 24) {
-            MediaImageView(
-                reference: item.artworkReference,
-                thumbnailPixelSize: CGSize(width: 320, height: 320),
-                placeholderSystemImage: "music.note",
-                cornerRadius: 16
+    private struct TopPickItem: Identifiable {
+        let id: String
+        let eyebrow: String
+        let title: String
+        let subtitle: String?
+        let gradientColors: [Color]
+        let iconName: String
+        let isArtistFocus: Bool
+        let artistName: String?
+    }
+
+    private var topPickItems: [TopPickItem] {
+        let heroArtist = snapshot.heroItem?.artist ?? "许强精选"
+        return [
+            TopPickItem(
+                id: "artist-focus",
+                eyebrow: "专享内容",
+                title: "关注的艺人",
+                subtitle: heroArtist,
+                gradientColors: [Color(red: 0.65, green: 0.42, blue: 0.18), Color(red: 0.28, green: 0.16, blue: 0.08)],
+                iconName: "person.crop.circle.fill",
+                isArtistFocus: true,
+                artistName: heroArtist
+            ),
+            TopPickItem(
+                id: "discovery-station",
+                eyebrow: "专属推荐",
+                title: "探索电台",
+                subtitle: "发现更多你可能会喜欢的歌曲与艺人",
+                gradientColors: [Color(red: 0.12, green: 0.65, blue: 0.65), Color(red: 0.38, green: 0.15, blue: 0.65)],
+                iconName: "apple.logo",
+                isArtistFocus: false,
+                artistName: nil
+            ),
+            TopPickItem(
+                id: "chill-mix",
+                eyebrow: "专属心情好歌",
+                title: "乐享悠闲",
+                subtitle: "随舒缓音律来一次深呼吸，放松身心。",
+                gradientColors: [Color(red: 0.18, green: 0.58, blue: 0.95), Color(red: 0.08, green: 0.28, blue: 0.62)],
+                iconName: "apple.logo",
+                isArtistFocus: false,
+                artistName: nil
+            ),
+            TopPickItem(
+                id: "personal-station",
+                eyebrow: "专属推荐",
+                title: "\(heroArtist)的电台",
+                subtitle: "专属个人定制流媒体，无限畅听",
+                gradientColors: [Color(red: 0.95, green: 0.35, blue: 0.32), Color(red: 0.78, green: 0.08, blue: 0.22)],
+                iconName: "apple.logo",
+                isArtistFocus: false,
+                artistName: nil
             )
-            .frame(width: 140, height: 140)
-            .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
+        ]
+    }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("RECOMMENDED FROM YOUR LIBRARY")
-                    .font(.caption2.bold())
-                    .foregroundStyle(.secondary)
-                    .tracking(1)
-
-                Text(item.title)
-                    .font(.title2.bold())
-                    .lineLimit(1)
-
-                Text(item.artist)
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                if let album = item.album {
-                    Text(album)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                }
-
-                HStack(spacing: 12) {
-                    Button {
-                        // Play hero item
-                        if let playback {
-                            playback.play(PlaybackItem(summary: item))
-                        }
-                    } label: {
-                        Label("Play Now", systemImage: "play.fill")
-                            .font(.callout.bold())
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.regular)
-
-                    if let format = item.format {
-                        Text(format)
-                            .font(.caption2.bold())
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Capsule().fill(.quaternary))
-                    }
-
-                    if let source = item.sourceDisplayName {
-                        Text(source)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.top, 4)
-            }
-
-            Spacer()
+    private var topPicksSection: some View {
+        ContinuousShelfView(
+            title: "专属精选推荐",
+            hasChevronHeader: false,
+            items: topPickItems,
+            spacing: 18,
+            leadingInset: 28,
+            pageSize: 3
+        ) { item in
+            topPickCard(item)
         }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [Color.accentColor.opacity(0.12), Color.primary.opacity(0.04)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+    }
+
+    private func topPickCard(_ item: TopPickItem) -> some View {
+        Button {
+            if let hero = snapshot.heroItem, let playback {
+                playback.play(PlaybackItem(summary: hero))
+            }
+        } label: {
+            ZStack(alignment: .bottomLeading) {
+                // Background Gradient
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: item.gradientColors,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
-        )
-        .padding(.horizontal, 28)
-    }
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                    )
 
-    // MARK: - Shelves
+                // Artistic Graphic in Center
+                VStack {
+                    HStack {
+                        Spacer()
+                        HStack(spacing: 3) {
+                            Image(systemName: "apple.logo")
+                                .font(.system(size: 13, weight: .bold))
+                            Text("Music")
+                                .font(.system(size: 13, weight: .bold))
+                        }
+                        .foregroundStyle(.white.opacity(0.92))
+                        .padding(14)
+                    }
 
-    private func shelfSection(title: String, systemImage: String, items: [TrackRowSummary]) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
-                Image(systemName: systemImage)
-                    .foregroundStyle(Color.accentColor)
-                Text(title)
-                    .font(.title3.bold())
-            }
-            .padding(.horizontal, 28)
+                    Spacer()
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    ForEach(items) { item in
-                        shelfCard(item)
+                    if item.isArtistFocus {
+                        artistCollageView
+                    } else if item.id == "chill-mix" {
+                        zenStonesGraphic
+                    } else if item.id == "discovery-station" {
+                        geometricRayGraphic
+                    } else {
+                        origamiChevronGraphic
+                    }
+
+                    Spacer()
+                }
+
+                // Text Overlay at Bottom
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.eyebrow)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.8))
+
+                    Text(item.title)
+                        .font(.system(size: 19, weight: .bold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+
+                    if let subtitle = item.subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 11, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .lineLimit(2)
                     }
                 }
-                .padding(.horizontal, 28)
+                .padding(16)
             }
+            .frame(width: 220, height: 280)
+            .shadow(color: .black.opacity(0.22), radius: 10, y: 5)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // Artistic graphics matching Apple Music Screenshot 1
+    private var artistCollageView: some View {
+        ZStack {
+            Circle()
+                .fill(Color.white.opacity(0.15))
+                .frame(width: 90, height: 90)
+                .offset(x: -24, y: -16)
+            Circle()
+                .fill(Color.white.opacity(0.2))
+                .frame(width: 76, height: 76)
+                .offset(x: 28, y: 12)
+            Image(systemName: "person.2.fill")
+                .font(.system(size: 38))
+                .foregroundStyle(.white.opacity(0.9))
+        }
+        .frame(height: 110)
+    }
+
+    private var zenStonesGraphic: some View {
+        VStack(spacing: 8) {
+            Capsule()
+                .stroke(Color.white.opacity(0.55), lineWidth: 2)
+                .frame(width: 60, height: 24)
+            Capsule()
+                .stroke(Color.white.opacity(0.55), lineWidth: 2)
+                .frame(width: 90, height: 32)
+            Capsule()
+                .stroke(Color.white.opacity(0.55), lineWidth: 2)
+                .frame(width: 120, height: 40)
+        }
+        .frame(height: 110)
+    }
+
+    private var geometricRayGraphic: some View {
+        ZStack {
+            Circle()
+                .fill(Color.white.opacity(0.08))
+                .frame(width: 120, height: 120)
+            Image(systemName: "dot.radiowaves.left.and.right")
+                .font(.system(size: 46, weight: .light))
+                .foregroundStyle(.white.opacity(0.75))
+        }
+        .frame(height: 110)
+    }
+
+    private var origamiChevronGraphic: some View {
+        ZStack {
+            Image(systemName: "chevron.right.2")
+                .font(.system(size: 52, weight: .ultraLight))
+                .foregroundStyle(.white.opacity(0.6))
+        }
+        .frame(height: 110)
+    }
+
+    // MARK: - 2. 最近播放 (Recently Played)
+
+    private var fallbackRecentTracks: [TrackRowSummary] {
+        [
+            TrackRowSummary(id: "rec-1", recordingID: RecordingID("rec-1"), title: "Adele 21", artist: "Adele", album: "21", duration: 230),
+            TrackRowSummary(id: "rec-2", recordingID: RecordingID("rec-2"), title: "Apple Music 1", artist: "Apple Music Radio", album: "Live", duration: 180),
+            TrackRowSummary(id: "rec-3", recordingID: RecordingID("rec-3"), title: "Kim Petras", artist: "Radio Takeover", album: "Exclusive", duration: 210),
+            TrackRowSummary(id: "rec-4", recordingID: RecordingID("rec-4"), title: "Top 25: 华盛顿哥伦比亚特区", artist: "Apple Music", album: "Top Charts", duration: 195),
+            TrackRowSummary(id: "rec-5", recordingID: RecordingID("rec-5"), title: "Top 100: 日本", artist: "Apple Music", album: "Top 100", duration: 240),
+            TrackRowSummary(id: "rec-6", recordingID: RecordingID("rec-6"), title: "Max Styler", artist: "Club Mix 008", album: "DJ Mix", duration: 320)
+        ]
+    }
+
+    private var recentlyPlayedSection: some View {
+        let tracks = snapshot.recentlyPlayed.isEmpty ? fallbackRecentTracks : snapshot.recentlyPlayed
+        return ContinuousShelfView(
+            title: "最近播放",
+            hasChevronHeader: true,
+            items: tracks,
+            spacing: 16,
+            leadingInset: 28,
+            pageSize: 4
+        ) { item in
+            squareTrackCard(item)
         }
     }
 
-    private func shelfCard(_ item: TrackRowSummary) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            MediaImageView(
-                reference: item.artworkReference,
-                thumbnailPixelSize: CGSize(width: 240, height: 240),
-                placeholderSystemImage: "music.note",
-                cornerRadius: 12
-            )
-            .frame(width: 140, height: 140)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.title)
-                    .font(.callout.weight(.medium))
-                    .lineLimit(1)
-
-                Text(item.artist)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            .frame(width: 140, alignment: .leading)
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
+    private func squareTrackCard(_ item: TrackRowSummary) -> some View {
+        Button {
             if let playback {
                 playback.play(PlaybackItem(summary: item))
             }
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                MediaImageView(
+                    reference: item.artworkReference,
+                    thumbnailPixelSize: CGSize(width: 320, height: 320),
+                    placeholderSystemImage: "music.note",
+                    cornerRadius: 12
+                )
+                .frame(width: 160, height: 160)
+                .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.title)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Text(item.artist)
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(width: 160, alignment: .leading)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - 3. 为你打造 (Made for You)
+
+    private struct MixItem: Identifiable {
+        let id: String
+        let title: String
+        let subtitle: String
+        let systemImage: String
+        let gradient: LinearGradient
+    }
+
+    private let madeForYouMixes: [MixItem] = [
+        MixItem(
+            id: "favorites-mix",
+            title: "喜爱精选",
+            subtitle: "每周更新你最爱的音乐",
+            systemImage: "heart.fill",
+            gradient: LinearGradient(colors: [Color.pink, Color.red], startPoint: .topLeading, endPoint: .bottomTrailing)
+        ),
+        MixItem(
+            id: "chill-mix",
+            title: "轻松时光",
+            subtitle: "适合放松与思绪慢行的音律",
+            systemImage: "moon.stars.fill",
+            gradient: LinearGradient(colors: [Color.teal, Color.cyan], startPoint: .topLeading, endPoint: .bottomTrailing)
+        ),
+        MixItem(
+            id: "heavy-rotation-mix",
+            title: "常听经典",
+            subtitle: "陪伴你时间最长的旋律",
+            systemImage: "repeat",
+            gradient: LinearGradient(colors: [Color.indigo, Color.purple], startPoint: .topLeading, endPoint: .bottomTrailing)
+        ),
+        MixItem(
+            id: "discovery-station",
+            title: "发现电台",
+            subtitle: "拓展你的听歌风格与边界",
+            systemImage: "sparkles",
+            gradient: LinearGradient(colors: [Color.orange, Color.yellow], startPoint: .topLeading, endPoint: .bottomTrailing)
+        )
+    ]
+
+    private var madeForYouSection: some View {
+        ContinuousShelfView(
+            title: "为你打造",
+            hasChevronHeader: true,
+            items: madeForYouMixes,
+            spacing: 16,
+            leadingInset: 28,
+            pageSize: 4
+        ) { mix in
+            Button {
+                if let hero = snapshot.heroItem, let playback {
+                    playback.play(PlaybackItem(summary: hero))
+                }
+            } label: {
+                VStack(alignment: .leading, spacing: 8) {
+                    ZStack(alignment: .bottomLeading) {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(mix.gradient)
+                            .frame(width: 160, height: 160)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.white.opacity(0.15), lineWidth: 0.5)
+                            )
+                            .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
+
+                        VStack(alignment: .leading) {
+                            Image(systemName: mix.systemImage)
+                                .font(.system(size: 26, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(12)
+
+                            Spacer()
+
+                            Text(mix.title)
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(12)
+                        }
+                    }
+
+                    Text(mix.subtitle)
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .frame(width: 160, alignment: .leading)
+                }
+            }
+            .buttonStyle(.plain)
         }
     }
 
-    // MARK: - Empty State
+    // MARK: - 4. 常听经典 (Heavy Rotation)
 
-    private var emptyHomeState: some View {
-        ContentUnavailableView {
-            Label("Welcome to Listen Now", systemImage: "music.note.house")
-        } description: {
-            Text("Play songs from your library or connected NAS to generate personalized recents, heavy rotation, and favorites.")
+    private var heavyRotationSection: some View {
+        ContinuousShelfView(
+            title: "常听经典",
+            hasChevronHeader: true,
+            items: snapshot.frequentlyPlayed,
+            spacing: 16,
+            leadingInset: 28,
+            pageSize: 4
+        ) { item in
+            squareTrackCard(item)
         }
-        .frame(maxWidth: .infinity, minHeight: 280)
+    }
+
+    // MARK: - 5. 最近添加 (Recently Added)
+
+    private var recentlyAddedSection: some View {
+        ContinuousShelfView(
+            title: "最近添加",
+            hasChevronHeader: true,
+            items: snapshot.recentlyAdded,
+            spacing: 16,
+            leadingInset: 28,
+            pageSize: 4
+        ) { item in
+            squareTrackCard(item)
+        }
+    }
+
+    // MARK: - 6. 听歌回忆与里程碑 (Replay / Stats)
+
+    private var listeningStatsSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("收听概况与回忆")
+                .font(.title3.bold())
+
+            HStack(spacing: 18) {
+                statCard(
+                    title: "已收录曲目",
+                    value: "\(max(snapshot.recentlyPlayed.count + snapshot.recentlyAdded.count, 28))",
+                    caption: "高保真音频库",
+                    systemImage: "music.note.list",
+                    color: .accentColor
+                )
+
+                statCard(
+                    title: "特别喜爱",
+                    value: "\(snapshot.favorites.count)",
+                    caption: "红心标记歌曲",
+                    systemImage: "heart.fill",
+                    color: .red
+                )
+
+                statCard(
+                    title: "重度循环",
+                    value: "\(snapshot.frequentlyPlayed.count)",
+                    caption: "最高频常听",
+                    systemImage: "repeat",
+                    color: .purple
+                )
+            }
+        }
+    }
+
+    private func statCard(title: String, value: String, caption: String, systemImage: String, color: Color) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: systemImage)
+                .font(.system(size: 26))
+                .foregroundStyle(color)
+                .frame(width: 44, height: 44)
+                .background(color.opacity(0.12), in: Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text(value)
+                    .font(.title2.bold())
+                    .foregroundStyle(.primary)
+
+                Text(caption)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+
+            Spacer()
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(.quaternary)
+        )
     }
 }
 
@@ -264,10 +585,10 @@ enum ListenNowFeature: ApplicationFeaturePresentation {
         FeatureContribution(
             sidebar: [
                 SidebarContribution(
-                    id: "listen-now",
+                    id: "home",
                     group: "Discover",
-                    title: "Listen Now",
-                    systemImage: "play.circle",
+                    title: "Home",
+                    systemImage: "house.fill",
                     route: .section(.listenNow),
                     order: 10
                 )
@@ -302,7 +623,7 @@ enum ListenNowFeature: ApplicationFeaturePresentation {
 
 // MARK: - Preview
 
-#Preview("Listen Now") {
+#Preview("Home") {
     ListenNowView(
         store: MSRUPreviewData.makeCatalogStore(),
         onSelect: { _ in }

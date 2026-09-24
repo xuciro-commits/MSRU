@@ -19,6 +19,7 @@ struct LocalTrackTableView: View {
 
     var onRevealInFinder: ((URL) -> Void)? = nil
     var onDeleteTracks: ((Set<String>) -> Void)? = nil
+    var onEditMetadata: (([LocalTrack]) -> Void)? = nil
     var onTrackAppear: ((LocalTrack) -> Void)? = nil
     var onPlay: ((LocalTrack, [LocalTrack]) -> Void)? = nil
 
@@ -33,6 +34,7 @@ struct LocalTrackTableView: View {
         playback: PlaybackController,
         onRevealInFinder: ((URL) -> Void)? = nil,
         onDeleteTracks: ((Set<String>) -> Void)? = nil,
+        onEditMetadata: (([LocalTrack]) -> Void)? = nil,
         onTrackAppear: ((LocalTrack) -> Void)? = nil,
         onPlay: ((LocalTrack, [LocalTrack]) -> Void)? = nil
     ) {
@@ -52,6 +54,7 @@ struct LocalTrackTableView: View {
         self.playback = playback
         self.onRevealInFinder = onRevealInFinder
         self.onDeleteTracks = onDeleteTracks
+        self.onEditMetadata = onEditMetadata
         self.onTrackAppear = onTrackAppear
         self.onPlay = onPlay
     }
@@ -311,6 +314,17 @@ struct LocalTrackTableView: View {
             .buttonStyle(.bordered)
             .controlSize(.small)
 
+            if let onEditMetadata {
+                Button {
+                    let selected = tracks.filter { selectedTrackIDs.contains($0.id) }
+                    onEditMetadata(selected)
+                } label: {
+                    Label("Edit Info...", systemImage: "info.circle")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+
             if onDeleteTracks != nil {
                 Button(role: .destructive) {
                     isDeleteConfirmationPresented = true
@@ -393,6 +407,26 @@ struct LocalTrackTableView: View {
             } label: {
                 Label("Reveal in Finder", systemImage: "arrow.up.forward.square")
             }
+        }
+
+        if let onEditMetadata {
+            Divider()
+            Button {
+                if selectedTrackIDs.contains(track.id) && selectedTrackIDs.count > 1 {
+                    let selected = tracks.filter { selectedTrackIDs.contains($0.id) }
+                    onEditMetadata(selected)
+                } else {
+                    onEditMetadata([track])
+                }
+            } label: {
+                Label(
+                    selectedTrackIDs.contains(track.id) && selectedTrackIDs.count > 1
+                        ? "Get Info (\(selectedTrackIDs.count) Tracks)..."
+                        : "Get Info / Edit Metadata...",
+                    systemImage: "info.circle"
+                )
+            }
+            .keyboardShortcut("i", modifiers: .command)
         }
 
         if onDeleteTracks != nil {

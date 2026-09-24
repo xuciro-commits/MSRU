@@ -56,9 +56,19 @@ public struct WatchedFolder: Identifiable, Codable, Sendable, Equatable {
 
 // MARK: - Watched Folder Scanner & Reconciliation
 
+nonisolated public struct FolderMovedTrack: Sendable {
+    public let oldPath: String
+    public let newTrack: LocalTrack
+    nonisolated public init(oldPath: String, newTrack: LocalTrack) {
+        self.oldPath = oldPath
+        self.newTrack = newTrack
+    }
+}
+
 nonisolated public struct FolderReconciliationResult: Sendable {
     public let newTracks: [LocalTrack]
     public let modifiedTracks: [LocalTrack]
+    public let movedTracks: [FolderMovedTrack]
     public let deletedTrackPaths: [String]
     public let totalScannedCount: Int
     public let discoveredCount: Int
@@ -66,12 +76,14 @@ nonisolated public struct FolderReconciliationResult: Sendable {
     public init(
         newTracks: [LocalTrack],
         modifiedTracks: [LocalTrack] = [],
+        movedTracks: [FolderMovedTrack] = [],
         deletedTrackPaths: [String] = [],
         totalScannedCount: Int,
         discoveredCount: Int
     ) {
         self.newTracks = newTracks
         self.modifiedTracks = modifiedTracks
+        self.movedTracks = movedTracks
         self.deletedTrackPaths = deletedTrackPaths
         self.totalScannedCount = totalScannedCount
         self.discoveredCount = discoveredCount
@@ -155,6 +167,55 @@ public actor WatchedFolderScanner {
             }
         }
 
+        // Move detection: match missing tracks against new audio URLs by file size and extension
+        var movedTracks: [FolderMovedTrack] = []
+        if !deletedPaths.isEmpty && !newAudioURLs.isEmpty {
+            var remainingDeleted: [String] = []
+            var remainingNewURLs = newAudioURLs
+
+            for delPath in deletedPaths {
+                guard let oldTrack = existingMap[delPath] else {
+                    remainingDeleted.append(delPath)
+                    continue
+                }
+                let oldCanonical = URL(fileURLWithPath: delPath).resolvingSymlinksInPath().standardizedFileURL.path
+                let oldSize = signatures[oldCanonical]?.fileSize ?? assetCache[oldCanonical]?.fileSize
+
+                var matchedIdx: Int?
+                if let oldSize {
+                    matchedIdx = remainingNewURLs.firstIndex { candidateURL in
+                        guard candidateURL.pathExtension.lowercased() == oldTrack.fileURL.pathExtension.lowercased() else { return false }
+                        if let attrs = try? FileManager.default.attributesOfItem(atPath: candidateURL.path),
+                           let size = attrs[.size] as? Int64,
+                           size == oldSize {
+                            return true
+                        }
+                        return false
+                    }
+                }
+
+                if let matchedIdx {
+                    let matchedURL = remainingNewURLs.remove(at: matchedIdx)
+                    let movedTrack = LocalTrack(
+                        fileURL: matchedURL,
+                        title: oldTrack.title,
+                        artist: oldTrack.artist,
+                        album: oldTrack.album,
+                        duration: oldTrack.duration,
+                        artworkReference: oldTrack.artworkReference,
+                        artworkData: oldTrack.artworkData,
+                        trackNumber: oldTrack.trackNumber,
+                        year: oldTrack.year
+                    )
+                    movedTracks.append(FolderMovedTrack(oldPath: delPath, newTrack: movedTrack))
+                } else {
+                    remainingDeleted.append(delPath)
+                }
+            }
+            deletedPaths = remainingDeleted
+            newAudioURLs = remainingNewURLs
+        }
+
         // Parse metadata off @MainActor
         var newTracks: [LocalTrack] = []
         for url in newAudioURLs {
@@ -181,9 +242,10 @@ public actor WatchedFolderScanner {
         return FolderReconciliationResult(
             newTracks: newTracks,
             modifiedTracks: modifiedTracks,
+            movedTracks: movedTracks,
             deletedTrackPaths: deletedPaths,
             totalScannedCount: allAudioURLs.count,
-            discoveredCount: newTracks.count + modifiedTracks.count
+            discoveredCount: newTracks.count + modifiedTracks.count + movedTracks.count
         )
     }
 }

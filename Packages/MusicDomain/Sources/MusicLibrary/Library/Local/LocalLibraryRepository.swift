@@ -22,6 +22,7 @@ public protocol LocalLibraryRepository: Sendable {
     func saveTrackInPlace(_ track: LocalTrack) async throws
     func saveTracksInPlace(_ tracks: [LocalTrack]) async throws
     func batchUpsertTracks(_ tracks: [LocalTrack]) async throws
+    func moveTrack(from oldURL: URL, to newURL: URL) async throws
     func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws
     func readTrack(from url: URL) async throws -> LocalTrack
     func correct(_ track: LocalTrack, field: MetadataCorrections.Field, value: String?, expectedRevision: UInt32?) async throws -> UInt32
@@ -209,6 +210,7 @@ extension LocalLibraryRepository {
         return LocalImportResult(tracks: imported, failures: failures)
     }
     public func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws {}
+    public func moveTrack(from oldURL: URL, to newURL: URL) async throws {}
     public func readTrack(from url: URL) async throws -> LocalTrack {
         try await SQLiteLocalLibraryRepository.readTrack(from: url)
     }

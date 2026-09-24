@@ -457,7 +457,8 @@ public actor LibraryQueryEngine {
                 SELECT r.id as rec_id, r.title, COALESCE(art.name, 'Unknown Artist') as artist,
                        rel.title as album, r.duration, rt.track_position, rel.release_year,
                        rel.artwork_asset_id, COALESCE(le.is_favorite, 0) as is_fav,
-                       a.source_id, s.display_name as source_name, a.format
+                       a.source_id, s.display_name as source_name, a.format,
+                       a.relative_path, s.uri as source_uri
                 FROM recordings r
                 JOIN library_entries le ON le.recording_id = r.id
                 LEFT JOIN artist_credits ac ON ac.entity_id = r.id AND ac.entity_type = 'recording'
@@ -476,8 +477,18 @@ public actor LibraryQueryEngine {
                           let title: String = row["title"],
                           let artist: String = row["artist"] else { continue }
                     seen.insert(recIdStr)
+                    var trackId = recIdStr
+                    if let relPath: String = row["relative_path"] {
+                        if relPath.hasPrefix("/") {
+                            trackId = relPath
+                        } else if let sourceUri: String = row["source_uri"], let sourceURL = URL(string: sourceUri), sourceURL.isFileURL {
+                            trackId = sourceURL.appendingPathComponent(relPath).path
+                        } else {
+                            trackId = relPath
+                        }
+                    }
                     summaries.append(TrackRowSummary(
-                        id: recIdStr,
+                        id: trackId,
                         recordingID: RecordingID(recIdStr),
                         title: title,
                         artist: artist,
