@@ -246,30 +246,6 @@ nonisolated public struct MetadataClaim: Identifiable, Hashable, Codable, Sendab
     }
 }
 
-nonisolated public struct UserMetadataOverride: Identifiable, Hashable, Codable, Sendable {
-    public let id: String
-    public let entityType: String // "recording", "release", "artist"
-    public let entityID: String
-    public let field: String
-    public var overrideValue: String
-    public var updatedAt: Date
-
-    nonisolated public init(
-        entityType: String,
-        entityID: String,
-        field: String,
-        overrideValue: String,
-        updatedAt: Date = Date()
-    ) {
-        self.id = "\(entityType):\(entityID):\(field)"
-        self.entityType = entityType
-        self.entityID = entityID
-        self.field = field
-        self.overrideValue = overrideValue
-        self.updatedAt = updatedAt
-    }
-}
-
 // MARK: - Source & Capabilities
 
 public enum SourceType: String, Codable, Sendable, CaseIterable {

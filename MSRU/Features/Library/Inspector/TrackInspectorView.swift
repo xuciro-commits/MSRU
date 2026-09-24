@@ -118,6 +118,10 @@ struct TrackInspectorView: View {
 
                         Divider()
 
+                        TrackCorrectionsSection(track: track, store: localStore)
+
+                        Divider()
+
                         // Source (Read-only)
                         sourceSection(track)
                     }

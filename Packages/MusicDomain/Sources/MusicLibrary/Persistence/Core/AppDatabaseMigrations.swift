@@ -542,5 +542,47 @@ public nonisolated enum AppDatabaseMigrations {
                 )
             }
         }
+
+        // User decisions as kernel change records (contract v1alpha1, K4).
+        // Existing overrides become decisions of an unknown principal; the
+        // overrides table stays as the current-value projection.
+        migrator.registerMigration("v8_user_decisions") { db in
+            try db.create(table: "user_decisions") { t in
+                t.column("change_id", .text).primaryKey()
+                t.column("tenant_id", .text).notNull()
+                t.column("principal_id", .text).notNull()
+                t.column("authority", .text).notNull()
+                t.column("target_type", .text).notNull()
+                t.column("target_id", .text).notNull()
+                t.column("schema_name", .text).notNull()
+                t.column("schema_version", .integer).notNull()
+                t.column("valid_time", .datetime).notNull()
+                t.column("submitted_valid_time", .datetime)
+                t.column("recorded_time", .datetime).notNull()
+                t.column("causation_id", .text).notNull()
+                t.column("correlation_id", .text).notNull()
+                t.column("idempotency_key", .text).notNull()
+                t.column("payload", .blob).notNull()
+                t.uniqueKey(["tenant_id", "idempotency_key"])
+            }
+            try db.create(index: "idx_user_decisions_target", on: "user_decisions", columns: ["target_type", "target_id"])
+            let overrides = try Row.fetchAll(db, sql: """
+                SELECT id, entity_id, field, override_value, updated_at FROM user_metadata_overrides
+                WHERE entity_type = 'recording' AND field IN ('title', 'artist', 'album') ORDER BY updated_at
+                """)
+            for row in overrides {
+                var s = DecisionSubmission()
+                s.tenantId = UserDecisionLog.localTenant
+                s.principalId = "unknown"
+                s.authority = UserDecisionLog.deviceAuthority
+                s.target = DecisionTarget(type: "recording", id: row["entity_id"])
+                s.schema = MetadataCorrections.schema
+                s.idempotencyKey = "v8-backfill:" + (row["id"] as String)
+                s.payload = try JSONEncoder().encode(MetadataCorrections.Payload(
+                    field: MetadataCorrections.Field(rawValue: row["field"])!, value: row["override_value"]))
+                try UserDecisionLog.submit(s, knownSchemas: [MetadataCorrections.schema],
+                                           at: row["updated_at"] ?? Date(), in: db)
+            }
+        }
     }
 }

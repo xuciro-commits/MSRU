@@ -82,20 +82,4 @@ nonisolated public final class UserLibraryRepository: Sendable {
             try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM library_entries") ?? 0
         }
     }
-
-    public func setMetadataOverride(entityType: String, entityID: String, field: String, value: String) async throws {
-        let overrideID = "\(entityType):\(entityID):\(field)"
-        try await db.dbWriter.write { db in
-            try db.execute(
-                sql: """
-                INSERT INTO user_metadata_overrides (id, entity_type, entity_id, field, override_value, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET
-                    override_value = excluded.override_value,
-                    updated_at = excluded.updated_at
-                """,
-                arguments: [overrideID, entityType, entityID, field, value, Date()]
-            )
-        }
-    }
 }

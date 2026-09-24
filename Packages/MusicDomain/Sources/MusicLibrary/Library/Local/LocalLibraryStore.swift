@@ -99,6 +99,16 @@ public final class LocalLibraryStore {
         try await repository.fetchTracks(withIDs: [id]).first
     }
 
+    /// Records a user correction of a track's displayed metadata; `nil` restores the scanned value.
+    public func correct(_ track: LocalTrack, field: MetadataCorrections.Field, value: String?) async throws {
+        try await repository.correct(track, field: field, value: value)
+        updateCachedPresentations()
+    }
+
+    public func corrections(of track: LocalTrack) async throws -> [MetadataCorrections.Correction] {
+        try await repository.corrections(of: track)
+    }
+
     public func findUniqueTrack(title: String, artist: String?) async throws -> LocalTrack? {
         try await repository.findUniqueTrack(title: title, artist: artist)
     }

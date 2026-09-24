@@ -123,15 +123,19 @@ public actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
             let projection = """
                 WITH local_tracks AS (
                     SELECT a.id AS asset_id, a.relative_path, a.created_at,
-                           COALESCE(r.title, a.relative_path) AS track_title,
+                           \(MetadataCorrections.corrected(.title, recordingColumn: "r.id", fallback: "COALESCE(r.title, a.relative_path)")) AS track_title,
                            COALESCE(r.duration, a.duration, 0) AS duration,
-                           COALESCE((SELECT art.name FROM artist_credits ac
-                                     JOIN artists art ON art.id = ac.artist_id
-                                     WHERE ac.entity_id = r.id AND ac.entity_type = 'recording'
-                                     ORDER BY ac.position LIMIT 1), 'Unknown Artist') AS artist_name,
-                           (SELECT rel.title FROM release_tracks rt
-                            JOIN releases rel ON rel.id = rt.release_id
-                            WHERE rt.recording_id = r.id ORDER BY rt.id LIMIT 1) AS album_title,
+                           \(MetadataCorrections.corrected(.artist, recordingColumn: "r.id", fallback: """
+                               COALESCE((SELECT art.name FROM artist_credits ac
+                                         JOIN artists art ON art.id = ac.artist_id
+                                         WHERE ac.entity_id = r.id AND ac.entity_type = 'recording'
+                                         ORDER BY ac.position LIMIT 1), 'Unknown Artist')
+                               """)) AS artist_name,
+                           \(MetadataCorrections.corrected(.album, recordingColumn: "r.id", fallback: """
+                               (SELECT rel.title FROM release_tracks rt
+                                JOIN releases rel ON rel.id = rt.release_id
+                                WHERE rt.recording_id = r.id ORDER BY rt.id LIMIT 1)
+                               """)) AS album_title,
                            (SELECT rel.release_year FROM release_tracks rt
                             JOIN releases rel ON rel.id = rt.release_id
                             WHERE rt.recording_id = r.id ORDER BY rt.id LIMIT 1) AS release_year,
@@ -167,6 +171,27 @@ public actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
             }
             return LocalTrackPage(tracks: tracks, totalCount: totalCount, offset: request.offset)
         }
+    }
+
+    // MARK: - Corrections
+
+    /// Corrects a displayed field of the track's recording; `nil` restores the scanned value.
+    public func correct(_ track: LocalTrack, field: MetadataCorrections.Field, value: String?) async throws {
+        try await db.dbWriter.write { db in
+            guard let recordingID = try Self.recordingID(of: track, in: db) else { throw CocoaError(.fileNoSuchFile) }
+            try MetadataCorrections.correct(recordingID, field: field, value: value, in: db)
+        }
+    }
+
+    public func corrections(of track: LocalTrack) async throws -> [MetadataCorrections.Correction] {
+        try await db.reader.read { db in
+            try Self.recordingID(of: track, in: db).map { try MetadataCorrections.history($0, in: db) } ?? []
+        }
+    }
+
+    nonisolated private static func recordingID(of track: LocalTrack, in db: Database) throws -> RecordingID? {
+        try String.fetchOne(db, sql: "SELECT recording_id FROM assets WHERE relative_path = ? AND recording_id IS NOT NULL",
+                            arguments: [track.fileURL.standardizedFileURL.path]).map(RecordingID.init)
     }
 
     public func fetchTracks(withIDs ids: Set<String>) async throws -> [LocalTrack] {

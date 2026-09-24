@@ -44,29 +44,40 @@ struct LibraryTests {
     }
 
     @Test
-    func userLibraryRepositoryPersistsMetadataOverrides() async throws {
-        // Arrange
+    @MainActor
+    func correctionsAreDecisionsWithHistoryAndLeaveScannedValuesIntact() async throws {
         let appDb = try TestDatabase.makeEphemeral()
-        let userLibRepo = UserLibraryRepository(db: appDb)
-        let recID = RecordingID("rec_override_test")
-
-        // Act: Set manual user override
-        try await userLibRepo.setMetadataOverride(
-            entityType: "recording",
-            entityID: recID.rawValue,
-            field: "title",
-            value: "晴天 (2024 Remaster)"
-        )
-
-        // Assert: Override is stored in user_metadata_overrides table
-        let overrideVal: String? = try await appDb.reader.read { db in
-            try String.fetchOne(
-                db,
-                sql: "SELECT override_value FROM user_metadata_overrides WHERE entity_type = ? AND entity_id = ? AND field = ?",
-                arguments: ["recording", recID.rawValue, "title"]
-            )
+        let repository = SQLiteLocalLibraryRepository(db: appDb)
+        let track = LocalTrack(fileURL: URL(fileURLWithPath: "/tmp/msru-correction-test.flac"),
+                               title: "Qing Tian", artist: "Jay Chou", album: "Ye Hui Mei")
+        try await repository.saveTracksInPlace([track])
+        let page: () async throws -> LocalTrack? = {
+            try await repository.fetchPage(LocalTrackPageRequest(limit: 10)).tracks.first
         }
-        #expect(overrideVal == "晴天 (2024 Remaster)")
+
+        try await repository.correct(track, field: .title, value: "晴天")
+        try await repository.correct(track, field: .title, value: "晴天 (2024 Remaster)")
+        try await repository.correct(track, field: .album, value: "叶惠美")
+        #expect(try await page()?.title == "晴天 (2024 Remaster)")
+        #expect(try await page()?.album == "叶惠美")
+        #expect(try await page()?.artist == "Jay Chou")
+
+        try await repository.correct(track, field: .title, value: nil)
+        #expect(try await page()?.title == "Qing Tian")
+
+        let history = try await repository.corrections(of: track)
+        #expect(history.map(\.field) == [.title, .title, .album, .title])
+        #expect(history.map(\.value) == ["晴天", "晴天 (2024 Remaster)", "叶惠美", nil])
+        #expect(history.allSatisfy { $0.principal == UserDecisionLog.localPrincipal })
+
+        // Each title correction names the one it corrects; scanned values are untouched.
+        let (causations, rawTitle) = try await appDb.reader.read { db in
+            (try String.fetchAll(db, sql: "SELECT causation_id FROM user_decisions ORDER BY rowid"),
+             try String.fetchOne(db, sql: "SELECT title FROM recordings"))
+        }
+        let ids = try await appDb.reader.read { try String.fetchAll($0, sql: "SELECT change_id FROM user_decisions ORDER BY rowid") }
+        #expect(causations == ["", ids[0], "", ids[1]])
+        #expect(rawTitle == "Qing Tian")
     }
 
     @Test

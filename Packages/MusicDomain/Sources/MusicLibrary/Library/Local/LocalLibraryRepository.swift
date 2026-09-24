@@ -24,6 +24,8 @@ public protocol LocalLibraryRepository: Sendable {
     func batchUpsertTracks(_ tracks: [LocalTrack]) async throws
     func deleteTracks(withIDs ids: Set<String>, deletePhysicalFiles: Bool) async throws
     func readTrack(from url: URL) async throws -> LocalTrack
+    func correct(_ track: LocalTrack, field: MetadataCorrections.Field, value: String?) async throws
+    func corrections(of track: LocalTrack) async throws -> [MetadataCorrections.Correction]
 }
 
 public nonisolated struct LocalImportFailure: Sendable {
@@ -94,6 +96,13 @@ public nonisolated struct LocalMaintenancePage: Sendable {
 }
 
 extension LocalLibraryRepository {
+    /// Repositories without a decision log cannot record corrections.
+    public func correct(_ track: LocalTrack, field: MetadataCorrections.Field, value: String?) async throws {
+        throw CocoaError(.featureUnsupported)
+    }
+
+    public func corrections(of track: LocalTrack) async throws -> [MetadataCorrections.Correction] { [] }
+
     public func fetchTracks(withIDs ids: Set<String>) async throws -> [LocalTrack] {
         try await loadTracks().filter {
             ids.contains($0.id) || ids.contains($0.fileURL.path)

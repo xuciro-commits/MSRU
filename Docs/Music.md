@@ -49,9 +49,15 @@ Measured 2026-09-24 (Mac15,7, Debug, 50,000 tracks / 1,000 albums / 100 artists)
 
 Apple-decodable local files play through a PCM engine (`AVAudioPlayerNode` → 10-band `AVAudioUnitEQ` → main mixer) with gapless scheduling for same-format neighbours; other files use AVPlayer. NAS (Subsonic) album queues download to session-owned temporary files for continuity. On macOS the output device is selectable via CoreAudio HAL with optional sample-rate matching and hog mode. EBU R128 loudness is computed on explicit request and cached (file size + mtime signature). **Bit-perfect output, physical DAC rate switching, exclusivity and hot-plug are not proven** and must not be claimed; the PCM path is Float32 through the mixer.
 
+## User decisions
+
+User corrections of a track's title, artist or album are decisions in `user_decisions`, a K4 change log (contract `v1alpha1`) with principal, device authority, causation and idempotency. The personal library is one tenant (`local`) with one principal (`local-owner`). `user_metadata_overrides` is only the current-value projection; restoring a field is a new decision, never a deletion of history. Corrections never change file tags, scanned values or IDs, and never reach ID derivation: they are applied only when tracks are read for display (`fetchPage`), never in paths that save tracks. `MusicLibraryTests` runs the contract's K4 vectors (pinned copy in `Tests/MusicLibraryTests/Vectors`) against this log.
+
+**IDs.** Content-derived IDs are de-duplication keys at first import; once assigned an ID is opaque (K1) and corrections never re-derive it.
+
 ## Known gaps against the platform kernel
 
-- User overrides (`user_metadata_overrides`) are separate from claims and record no principal and no history (K2–K4). A shared library (drill E2) breaks this first.
-- Canonical IDs are deterministic hashes of normalized metadata (e.g. title + artist), so corrections and merges depend on redirects; kernel K1 expects opaque IDs once assigned. Decide in the Music retrofit slice whether content-derived IDs remain acceptable as *de-duplication keys* only.
+- A rescan derives the recording ID again from the file's title + artist, so retagging a file creates a new recording (favourites and corrections stay on the old one). Fix: reuse the recording already bound to the asset.
+- User corrections are not yet claims: resolution between tags, provider claims and corrections is a fixed priority, not a K2 claim set. Corrections apply to the Library track list and the inspector; album and artist views still show scanned values.
 - Routes are 11 static sections; no route addresses a specific entity yet.
-- Authority is implicit (local library device-authoritative, Subsonic externally authoritative) rather than declared (K5).
+- Authority is declared only for user decisions (device); Subsonic data is externally authoritative by convention, not by a K5 declaration.

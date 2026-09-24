@@ -173,4 +173,29 @@ struct MigrationTests {
             ["src_subsonic_cd34", "subsonic", "No user shape", "-"]
         ])
     }
+
+    @Test
+    func migrationV8TurnsOverridesIntoDecisionsOfAnUnknownPrincipal() throws {
+        let queue = try DatabaseQueue()
+        let appDb = AppDatabase(dbWriter: queue)
+        try appDb.migrator.migrate(queue, upTo: "v7_saved_web_tracks_into_index")
+        try queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO user_metadata_overrides (id, entity_type, entity_id, field, override_value, updated_at) VALUES
+                ('recording:rec_1:title', 'recording', 'rec_1', 'title', 'Corrected', '2026-01-01 10:00:00.000'),
+                ('release:rel_1:title', 'release', 'rel_1', 'title', 'Not a recording field', '2026-01-01 11:00:00.000')
+            """)
+        }
+
+        try appDb.migrator.migrate(queue)
+        try appDb.migrator.migrate(queue)
+
+        let (history, overrides) = try queue.read { db in
+            (try MetadataCorrections.history(RecordingID("rec_1"), in: db),
+             try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM user_metadata_overrides"))
+        }
+        #expect(history.map(\.value) == ["Corrected"])
+        #expect(history.map(\.principal) == ["unknown"])
+        #expect(overrides == 2)
+    }
 }
