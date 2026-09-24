@@ -24,6 +24,9 @@ struct NowPlayingCanvasView: View {
     @State private var isLyricsPresented: Bool = false
     @State private var isEqualizerPresented: Bool = false
     @State private var isLyricsSearchPresented: Bool = false
+    @State private var showCanvasVisualizer: Bool = false
+    @AppStorage("msru.visualizer.style") private var visualizerStyle: VisualizerStyle = .liquidWave
+    @AppStorage("msru.visualizer.theme") private var visualizerTheme: VisualizerColorTheme = .aurora
     @State private var lyricsStore = LyricsStore.shared
 
     var body: some View {
@@ -124,9 +127,44 @@ struct NowPlayingCanvasView: View {
 
     private var centerArtworkAndDetails: some View {
         VStack(spacing: 22) {
-            artworkCard
+            if showCanvasVisualizer {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(Color.white.opacity(0.06))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                        )
+
+                    UnifiedVisualizerView(
+                        style: visualizerStyle,
+                        theme: visualizerTheme,
+                        isPlaying: playback.isPlaying,
+                        volume: playback.effectiveVolume,
+                        sensitivity: 1.15
+                    )
+                    .padding(20)
+                }
                 .frame(width: 280, height: 280)
-                .shadow(color: .black.opacity(0.45), radius: 28, x: 0, y: 16)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        showCanvasVisualizer = false
+                    }
+                }
+                .help("Click to switch back to album artwork")
+            } else {
+                artworkCard
+                    .frame(width: 280, height: 280)
+                    .shadow(color: .black.opacity(0.45), radius: 28, x: 0, y: 16)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            showCanvasVisualizer = true
+                        }
+                    }
+                    .help("Click to view full audio visualizer")
+            }
 
             VStack(spacing: 8) {
                 Text(LocalizedStringKey(playback.unifiedTitle))

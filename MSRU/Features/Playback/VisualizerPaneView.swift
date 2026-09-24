@@ -11,6 +11,10 @@ struct VisualizerPaneView: View {
     let playback: PlaybackController
     var onExpandCanvas: (() -> Void)? = nil
 
+    @AppStorage("msru.visualizer.style") private var selectedStyle: VisualizerStyle = .liquidWave
+    @AppStorage("msru.visualizer.theme") private var selectedTheme: VisualizerColorTheme = .aurora
+    @State private var sensitivity: Double = 1.0
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -43,73 +47,8 @@ struct VisualizerPaneView: View {
                     AudioFormatBadgeView(info: formatInfo, style: .prominent)
                 }
 
-                // Waveform spectrum visualizer card
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
-                        Label("Real-time Visualizer", systemImage: "waveform")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        if playback.isPlaying {
-                            HStack(spacing: 5) {
-                                Circle()
-                                    .fill(Color.green)
-                                    .frame(width: 5, height: 5)
-                                Text("Running")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundStyle(.green)
-                            }
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(Color.green.opacity(0.12), in: Capsule())
-                        }
-                    }
-
-                    AudioVisualizerView(
-                        isPlaying: playback.isPlaying,
-                        volume: playback.effectiveVolume,
-                        barCount: 21,
-                        barWidth: 5,
-                        spacing: 4.5,
-                        maxHeight: 76,
-                        tintColor: .accentColor
-                    )
-                    .frame(height: 76)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color.primary.opacity(0.035))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
-                            )
-                    )
-
-                    // Frequency axis labels
-                    HStack {
-                        Text("32 Hz")
-                        Spacer()
-                        Text("500 Hz")
-                        Spacer()
-                        Text("2 kHz")
-                        Spacer()
-                        Text("16 kHz")
-                    }
-                    .font(.system(size: 9, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-                    .padding(.horizontal, 4)
-                }
-                .padding(14)
-                .background(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.primary.opacity(0.02))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .strokeBorder(Color.primary.opacity(0.04), lineWidth: 1)
-                        )
-                )
-                .padding(.horizontal, 16)
+                // Interactive Multi-Style Visualizer Card
+                visualizerSection
 
                 // Audio specs table
                 if let formatInfo = playback.audioFormatInfo {
@@ -154,6 +93,122 @@ struct VisualizerPaneView: View {
         .scrollIndicators(.hidden)
     }
 
+    private var visualizerSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header with Style Picker Menu & Running indicator
+            HStack {
+                Menu {
+                    Picker("Style", selection: $selectedStyle) {
+                        ForEach(VisualizerStyle.allCases) { style in
+                            Label(style.title, systemImage: style.icon)
+                                .tag(style)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: selectedStyle.icon)
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(selectedStyle.title)
+                            .font(.system(size: 12, weight: .medium))
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                }
+                .menuStyle(.borderlessButton)
+
+                Spacer()
+
+                // Theme color dots
+                HStack(spacing: 6) {
+                    ForEach(VisualizerColorTheme.allCases) { theme in
+                        Circle()
+                            .fill(theme.primaryColor)
+                            .frame(width: selectedTheme == theme ? 13 : 9, height: selectedTheme == theme ? 13 : 9)
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(Color.white, lineWidth: selectedTheme == theme ? 1.5 : 0)
+                            )
+                            .onTapGesture {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    selectedTheme = theme
+                                }
+                            }
+                            .help(theme.title)
+                    }
+                }
+            }
+
+            // Visualizer Canvas Frame
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.primary.opacity(0.035))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+                    )
+
+                UnifiedVisualizerView(
+                    style: selectedStyle,
+                    theme: selectedTheme,
+                    isPlaying: playback.isPlaying,
+                    volume: playback.effectiveVolume,
+                    sensitivity: sensitivity
+                )
+                .frame(height: 140)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 12)
+            }
+            .frame(height: 156)
+
+            // Frequency axis labels
+            HStack {
+                Text("32 Hz")
+                Spacer()
+                Text("250 Hz")
+                Spacer()
+                Text("1 kHz")
+                Spacer()
+                Text("4 kHz")
+                Spacer()
+                Text("16 kHz")
+            }
+            .font(.system(size: 9, weight: .medium, design: .monospaced))
+            .foregroundStyle(.tertiary)
+            .padding(.horizontal, 4)
+
+            // Sensitivity slider
+            HStack(spacing: 8) {
+                Image(systemName: "waveform.badge.magnifyingglass")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+
+                Slider(value: $sensitivity, in: 0.5...1.8)
+                    .controlSize(.mini)
+                    .tint(selectedTheme.primaryColor)
+
+                Text(String(format: "%.1fx", sensitivity))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, alignment: .trailing)
+            }
+            .padding(.top, 2)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.primary.opacity(0.02))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.04), lineWidth: 1)
+                )
+        )
+        .padding(.horizontal, 16)
+    }
+
     private func specRow(label: String, value: String) -> some View {
         HStack {
             Text(LocalizedStringKey(label))
@@ -181,12 +236,8 @@ struct AudioVisualizerView: View {
 
     @ViewBuilder
     var body: some View {
-        if isPlaying {
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
-                barsView(time: timeline.date.timeIntervalSinceReferenceDate)
-            }
-        } else {
-            barsView(time: 0.0)
+        TimelineView(.animation(minimumInterval: isPlaying ? 1.0 / 60.0 : 1.0 / 30.0)) { timeline in
+            barsView(time: timeline.date.timeIntervalSinceReferenceDate)
         }
     }
 
@@ -217,30 +268,16 @@ struct AudioVisualizerView: View {
     }
 
     private func barHeight(for index: Int, time: Double) -> CGFloat {
-        guard isPlaying else { return minHeight }
-
-        let normalizedIndex = Double(index) / Double(max(1, barCount - 1))
-
-        // Multi-frequency wave simulation:
-        // Bass (low frequencies): deep rhythm bounce
-        // Mids: melodic dynamics
-        // Treble: rapid shimmer
-        let bass = sin(time * 3.8 + normalizedIndex * 2.2) * 0.35
-        let mid = cos(time * 5.6 - normalizedIndex * 4.5) * 0.3
-        let treble = sin(time * 8.8 + Double(index) * 0.95) * 0.2
-        let shimmer = sin(time * 13.0 - Double(index) * 1.6) * 0.15
-
-        // Natural spectrum envelope (full bass and vibrant mids with gentle taper)
-        let centerDist = abs(normalizedIndex - 0.42)
-        let envelope = max(0.3, 1.0 - centerDist * 0.95)
-
-        let composite = (bass + mid + treble + shimmer + 1.0) * 0.5 * envelope
-        let dynamicScale = max(0.08, min(1.0, composite))
-        let effectiveVolume = CGFloat(max(0.25, min(1.0, volume)))
+        let energy = VisualizerEngine.computeBand(
+            index: index,
+            totalBands: barCount,
+            time: time,
+            isPlaying: isPlaying,
+            volume: volume,
+            sensitivity: 1.0
+        )
         let range = maxHeight - minHeight
-        let calculated = minHeight + range * CGFloat(dynamicScale) * effectiveVolume
-
-        return max(minHeight, min(maxHeight, calculated))
+        return minHeight + range * CGFloat(energy)
     }
 
     private func barOpacity(for index: Int) -> Double {
