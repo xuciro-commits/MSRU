@@ -122,13 +122,35 @@ extension LibraryFeature: ApplicationFeaturePresentation {
                         identity: WorkspaceIdentity(
                             title: "Songs",
                             systemImage: "music.note"
-                        )
+                        ),
+                        toolbar: libraryToolbar
                     ) { _ in
                         LibraryFeatureDestination(scene: scene)
                     }
                 }
             )
         ]
+    }
+
+    // MARK: - Workspace Toolbar
+
+    private static var libraryToolbar: ToolbarPresentation<SceneModel> {
+        ToolbarPresentation(
+            items: [
+                .search(
+                    ToolbarSearchPresentation(
+                        id: "library.search",
+                        prompt: String(localized: "Filter songs..."),
+                        text: { scene in
+                            scene.librarySearchQuery
+                        },
+                        update: { scene, value in
+                            scene.librarySearchQuery = value
+                        }
+                    )
+                )
+            ]
+        )
     }
 }
 
@@ -144,6 +166,7 @@ private struct LibraryFeatureDestination: View {
             localStore: scene.application.localLibrary,
             subsonicServers: scene.application.subsonicServers,
             playback: scene.application.playback,
+            searchQuery: $scene.librarySearchQuery,
             selectedLocalTrack: Binding(
                 get: { scene.selectedLocalTrack },
                 set: { scene.select(localTrack: $0) }

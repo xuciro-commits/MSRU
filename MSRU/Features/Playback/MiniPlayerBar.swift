@@ -58,14 +58,19 @@ struct MiniPlayerBar: View {
     // MARK: - Layouts
 
     private var standardPlayerContent: some View {
-        ZStack {
-            HStack(spacing: 0) {
-                transportControls
-                Spacer(minLength: 20)
-                trailingUtilities(compact: false)
-            }
+        HStack(spacing: 14) {
+            transportControls
+                .fixedSize(horizontal: true, vertical: false)
+
+            Spacer(minLength: 8)
+
             nowPlayingCenter
-                .frame(maxWidth: 420)
+                .frame(minWidth: 180, maxWidth: 420)
+
+            Spacer(minLength: 8)
+
+            trailingUtilities(compact: false)
+                .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.horizontal, 18)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -905,13 +910,18 @@ struct MiniPlayerAccessoryView: View {
     var onExpandNowPlaying: (() -> Void)? = nil
 
     var body: some View {
-        MiniPlayerBar(
-            playback: playback,
-            onToggleQueue: onToggleQueue,
-            onToggleVisualizer: onToggleVisualizer,
-            onToggleLyrics: onToggleLyrics,
-            onExpandNowPlaying: onExpandNowPlaying
-        )
+        HStack(spacing: 0) {
+            Spacer(minLength: 0)
+            MiniPlayerBar(
+                playback: playback,
+                onToggleQueue: onToggleQueue,
+                onToggleVisualizer: onToggleVisualizer,
+                onToggleLyrics: onToggleLyrics,
+                onExpandNowPlaying: onExpandNowPlaying
+            )
+            .frame(minWidth: 460, maxWidth: 860)
+            Spacer(minLength: 0)
+        }
         .padding(.horizontal, 20)
         .padding(.vertical, 8)
     }

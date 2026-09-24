@@ -29,7 +29,7 @@ struct PlaylistsView: View {
     var onSelectTrack: ((LocalTrack) -> Void)?
 
     @State private var availableSources: [SourceFilterItem] = []
-    @State private var searchQuery: String = ""
+    @Binding private var searchQuery: String
     @State private var sortField: PlaylistSortField = .title
     @State private var selectedPlaylistID: UUID?
     @State private var fallbackSelectedPlaylist: Playlist?
@@ -48,6 +48,7 @@ struct PlaylistsView: View {
         localStore: LocalLibraryStore,
         playback: PlaybackController,
         subsonicServers: SubsonicServerStore? = nil,
+        searchQuery: Binding<String> = .constant(""),
         selectedSourceID: Binding<String?> = .constant(nil),
         onSelectTrack: ((LocalTrack) -> Void)? = nil
     ) {
@@ -55,6 +56,7 @@ struct PlaylistsView: View {
         self.localStore = localStore
         self.playback = playback
         self.subsonicServers = subsonicServers
+        self._searchQuery = searchQuery
         self._selectedSourceID = selectedSourceID
         self.onSelectTrack = onSelectTrack
     }
@@ -199,26 +201,6 @@ struct PlaylistsView: View {
 
     private var headerBar: some View {
         HStack(spacing: 12) {
-            // Search
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField(LocalizedStringKey("Search Playlists"), text: $searchQuery)
-                    .textFieldStyle(.plain)
-                if !searchQuery.isEmpty {
-                    Button {
-                        searchQuery = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
-            .frame(maxWidth: 240)
 
             Spacer()
 
@@ -771,13 +753,18 @@ enum PlaylistsFeature: ApplicationFeaturePresentation {
                     identity: WorkspaceIdentity(
                         title: String(localized: "Playlists"),
                         systemImage: "music.note.list"
-                    )
+                    ),
+                    toolbar: playlistsToolbar
                 ) { _ in
                     PlaylistsView(
                         playlistStore: scene.application.playlistStore,
                         localStore: scene.application.localLibrary,
                         playback: scene.application.playback,
                         subsonicServers: scene.application.subsonicServers,
+                        searchQuery: Binding(
+                            get: { scene.playlistsSearchQuery },
+                            set: { scene.playlistsSearchQuery = $0 }
+                        ),
                         selectedSourceID: Binding(
                             get: { scene.selectedSourceFilter },
                             set: { scene.selectedSourceFilter = $0 }
@@ -789,6 +776,27 @@ enum PlaylistsFeature: ApplicationFeaturePresentation {
                 }
             }
         ]
+    }
+
+    // MARK: - Workspace Toolbar
+
+    private static var playlistsToolbar: ToolbarPresentation<SceneModel> {
+        ToolbarPresentation(
+            items: [
+                .search(
+                    ToolbarSearchPresentation(
+                        id: "playlists.search",
+                        prompt: String(localized: "Search Playlists"),
+                        text: { scene in
+                            scene.playlistsSearchQuery
+                        },
+                        update: { scene, value in
+                            scene.playlistsSearchQuery = value
+                        }
+                    )
+                )
+            ]
+        )
     }
 }
 

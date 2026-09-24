@@ -249,24 +249,29 @@ struct CompactApplicationShell: View {
     // MARK: - Floating Mini Player
 
     private var floatingMiniPlayer: some View {
-        MiniPlayerBar(
-            playback: scene.application.playback,
-            onToggleQueue: {
-                scene.activeContextPane = .queue
-                scene.isQueuePresented = true
-            },
-            onToggleVisualizer: {
-                scene.activeContextPane = .visualizer
-                scene.isQueuePresented = true
-            },
-            onToggleLyrics: {
-                scene.activeContextPane = .lyrics
-                scene.isQueuePresented = true
-            },
-            onExpandNowPlaying: {
-                scene.setNowPlaying(presented: true)
-            }
-        )
+        HStack(spacing: 0) {
+            Spacer(minLength: 0)
+            MiniPlayerBar(
+                playback: scene.application.playback,
+                onToggleQueue: {
+                    scene.activeContextPane = .queue
+                    scene.isQueuePresented = true
+                },
+                onToggleVisualizer: {
+                    scene.activeContextPane = .visualizer
+                    scene.isQueuePresented = true
+                },
+                onToggleLyrics: {
+                    scene.activeContextPane = .lyrics
+                    scene.isQueuePresented = true
+                },
+                onExpandNowPlaying: {
+                    scene.setNowPlaying(presented: true)
+                }
+            )
+            .frame(minWidth: 420, maxWidth: 860)
+            Spacer(minLength: 0)
+        }
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
     }

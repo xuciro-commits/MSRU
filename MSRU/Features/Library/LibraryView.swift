@@ -66,9 +66,9 @@ struct LibraryView:
     private var sortAscending:
         Bool = false
 
-    @State
-    private var searchQuery:
-        String = ""
+    @Binding
+    var searchQuery:
+        String
 
     @State private var debouncedLocalQuery = ""
     @State private var localPager: LocalTrackPager? = nil
@@ -104,6 +104,8 @@ struct LibraryView:
             SubsonicServerStore? = nil,
         playback:
             PlaybackController,
+        searchQuery:
+            Binding<String> = .constant(""),
         selectedLocalTrack:
             Binding<LocalTrack?>,
         selectedSourceID:
@@ -115,6 +117,7 @@ struct LibraryView:
         self.localStore = localStore
         self.subsonicServers = subsonicServers
         self.playback = playback
+        self._searchQuery = searchQuery
         self._selectedLocalTrack = selectedLocalTrack
         self._selectedSourceID = selectedSourceID
         self.onAddMusic = onAddMusic
@@ -360,6 +363,7 @@ struct LibraryView:
                 sortAscending: $sortAscending,
                 searchQuery: $searchQuery,
                 isSearching: isSearchingRemoteTracks,
+                showsSearch: false,
                 prompt: isRemoteSourceActive ? "搜索远程歌曲…" : "Filter songs…"
             )
 

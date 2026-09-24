@@ -43,7 +43,15 @@ public final class MacToolbarAdapter:
     private let semanticPrefix =
         "AppFoundation.SemanticToolbar."
 
+    public static let contextTrackingSeparator =
+        NSToolbarItem.Identifier("AppFoundation.Toolbar.contextTrackingSeparator")
+
     public weak var trackingSplitView: NSSplitView?
+
+    private var hasContextDivider: Bool {
+        guard let splitView = trackingSplitView else { return false }
+        return splitView.arrangedSubviews.count > 2
+    }
 
 
     public init(
@@ -143,6 +151,9 @@ public final class MacToolbarAdapter:
             result.append(contentsOf: searches)
             result.append(.flexibleSpace)
         }
+        if hasContextDivider {
+            result.append(Self.contextTrackingSeparator)
+        }
         result.append(contentsOf: actions)
         return result
     }
@@ -166,6 +177,7 @@ public final class MacToolbarAdapter:
             if searchItem.searchField.stringValue != search.text {
                 searchItem.searchField.stringValue = search.text
             }
+            applyGlassStyle(to: searchItem.searchField)
         }
     }
 
@@ -303,7 +315,7 @@ public final class MacToolbarAdapter:
         item.isEnabled =
             search.isEnabled
         item.searchField.isEnabled = search.isEnabled
-        item.preferredWidthForSearchField = 280
+        item.preferredWidthForSearchField = 350
 
 
         let field =
@@ -335,11 +347,40 @@ public final class MacToolbarAdapter:
                 )
             )
 
+        applyGlassStyle(to: field)
 
         return
             item
     }
 
+
+    private func applyGlassStyle(to field: NSSearchField) {
+        field.focusRingType = .none
+        field.font = .systemFont(ofSize: 13, weight: .regular)
+        field.drawsBackground = false
+        field.isBezeled = false
+        field.wantsLayer = true
+
+        let effectID = NSUserInterfaceItemIdentifier("AppFoundation.Search.GlassBackground")
+        if field.subviews.first(where: { $0.identifier == effectID }) == nil {
+            let effectView = NSVisualEffectView(frame: field.bounds)
+            effectView.identifier = effectID
+            effectView.autoresizingMask = [.width, .height]
+            effectView.material = .headerView
+            effectView.blendingMode = .withinWindow
+            effectView.state = .active
+            effectView.wantsLayer = true
+            effectView.layer?.cornerRadius = 9
+            effectView.layer?.masksToBounds = true
+            effectView.layer?.borderWidth = 0.5
+            effectView.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.25).cgColor
+            effectView.layer?.shadowColor = NSColor.black.withAlphaComponent(0.04).cgColor
+            effectView.layer?.shadowRadius = 4
+            effectView.layer?.shadowOpacity = 1
+            effectView.layer?.shadowOffset = CGSize(width: 0, height: -1)
+            field.addSubview(effectView, positioned: .below, relativeTo: nil)
+        }
+    }
 
     // MARK: - Actions
 
@@ -465,6 +506,7 @@ public final class MacToolbarAdapter:
         [
             .toggleSidebar,
             .sidebarTrackingSeparator,
+            Self.contextTrackingSeparator,
             .flexibleSpace
         ]
         +
@@ -532,6 +574,17 @@ public final class MacToolbarAdapter:
                 )
             }
             return NSToolbarItem(itemIdentifier: .sidebarTrackingSeparator)
+        }
+
+        if itemIdentifier == Self.contextTrackingSeparator {
+            if let splitView = trackingSplitView, splitView.arrangedSubviews.count > 2 {
+                return NSTrackingSeparatorToolbarItem(
+                    identifier: Self.contextTrackingSeparator,
+                    splitView: splitView,
+                    dividerIndex: 1
+                )
+            }
+            return NSToolbarItem(itemIdentifier: Self.contextTrackingSeparator)
         }
 
         guard

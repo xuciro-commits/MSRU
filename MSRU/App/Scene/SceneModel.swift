@@ -80,6 +80,13 @@ final class SceneModel: Identifiable, ApplicationSceneRuntime {
     var requestedAlbumID: String?
     var requestedArtistID: String?
 
+    // MARK: - Feature Search Queries
+
+    var librarySearchQuery: String = ""
+    var albumsSearchQuery: String = ""
+    var artistsSearchQuery: String = ""
+    var playlistsSearchQuery: String = ""
+
     func navigateToSource(sourceID: String?, target: SceneSection) {
         guard !isClosed else { return }
         self.selectedSourceFilter = sourceID

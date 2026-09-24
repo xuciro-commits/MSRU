@@ -34,7 +34,7 @@ struct AlbumsView: View {
         }
     }
 
-    @State private var searchQuery: String = ""
+    @Binding private var searchQuery: String
     @State private var sortField: AlbumSortField = .title
     @State private var localPager: LocalAlbumPager?
     @State private var selectedAlbum: AlbumPresentationModel?
@@ -60,6 +60,7 @@ struct AlbumsView: View {
         localStore: LocalLibraryStore,
         playback: PlaybackController,
         subsonicServers: SubsonicServerStore? = nil,
+        searchQuery: Binding<String> = .constant(""),
         selectedSourceID: Binding<String?> = .constant(nil),
         requestedAlbumID: Binding<String?> = .constant(nil),
         onSelectTrack: @escaping (LocalTrack) -> Void,
@@ -68,6 +69,7 @@ struct AlbumsView: View {
         self.localStore = localStore
         self.playback = playback
         self.subsonicServers = subsonicServers
+        self._searchQuery = searchQuery
         self._selectedSourceID = selectedSourceID
         self._requestedAlbumID = requestedAlbumID
         self.onSelectTrack = onSelectTrack
@@ -494,34 +496,6 @@ struct AlbumsView: View {
                     .controlSize(.small)
                 }
 
-                HStack(spacing: 10) {
-                    if isSearchingRemote {
-                        ProgressView()
-                            .scaleEffect(0.6)
-                            .frame(width: 14, height: 14)
-                    } else {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundStyle(.secondary)
-                    }
-
-                    TextField(isRemoteSourceActive ? "搜索远程专辑…" : "Filter albums…", text: $searchQuery)
-                        .textFieldStyle(.plain)
-
-                    if !searchQuery.isEmpty {
-                        Button {
-                            searchQuery = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-                .frame(width: 260)
-
                 HStack {
                     Spacer()
                     Picker("Sort", selection: $sortField) {
@@ -711,12 +685,17 @@ enum AlbumsFeature: ApplicationFeaturePresentation {
                     identity: WorkspaceIdentity(
                         title: String(localized: "Albums"),
                         systemImage: "square.stack"
-                    )
+                    ),
+                    toolbar: albumsToolbar
                 ) { _ in
                     AlbumsView(
                         localStore: scene.application.localLibrary,
                         playback: scene.application.playback,
                         subsonicServers: scene.application.subsonicServers,
+                        searchQuery: Binding(
+                            get: { scene.albumsSearchQuery },
+                            set: { scene.albumsSearchQuery = $0 }
+                        ),
                         selectedSourceID: Binding(
                             get: { scene.selectedSourceFilter },
                             set: { scene.selectedSourceFilter = $0 }
@@ -735,6 +714,27 @@ enum AlbumsFeature: ApplicationFeaturePresentation {
                 }
             }
         ]
+    }
+
+    // MARK: - Workspace Toolbar
+
+    private static var albumsToolbar: ToolbarPresentation<SceneModel> {
+        ToolbarPresentation(
+            items: [
+                .search(
+                    ToolbarSearchPresentation(
+                        id: "albums.search",
+                        prompt: String(localized: "Filter albums..."),
+                        text: { scene in
+                            scene.albumsSearchQuery
+                        },
+                        update: { scene, value in
+                            scene.albumsSearchQuery = value
+                        }
+                    )
+                )
+            ]
+        )
     }
 }
 

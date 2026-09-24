@@ -13,41 +13,52 @@ struct LibraryFilterBar: View {
     @Binding var sortAscending: Bool
     @Binding var searchQuery: String
     var isSearching: Bool = false
+    var showsSearch: Bool = true
     var prompt: LocalizedStringKey = "Filter songs…"
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            // Wide layout (single row with centered search input)
-            HStack(spacing: 12) {
-                HStack {
-                    // Balanced leading space
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                searchInput
-                    .frame(width: 280)
-
+        if showsSearch {
+            ViewThatFits(in: .horizontal) {
+                // Wide layout (single row with centered search input)
                 HStack(spacing: 12) {
-                    sortMenu
-                    viewModePicker
-                }
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            }
+                    HStack {
+                        // Balanced leading space
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Compact layout (adaptive two rows)
-            VStack(spacing: 8) {
-                searchInput
-                    .frame(maxWidth: .infinity)
+                    searchInput
+                        .frame(width: 280)
 
-                HStack {
-                    sortMenu
-                    Spacer()
-                    viewModePicker
+                    HStack(spacing: 12) {
+                        sortMenu
+                        viewModePicker
+                    }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+
+                // Compact layout (adaptive two rows)
+                VStack(spacing: 8) {
+                    searchInput
+                        .frame(maxWidth: .infinity)
+
+                    HStack {
+                        sortMenu
+                        Spacer()
+                        viewModePicker
+                    }
                 }
             }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+        } else {
+            HStack(spacing: 12) {
+                Spacer()
+                sortMenu
+                viewModePicker
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 8)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
     }
 
     // MARK: - Subviews

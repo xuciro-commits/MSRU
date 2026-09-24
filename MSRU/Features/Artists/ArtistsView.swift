@@ -20,7 +20,7 @@ struct ArtistsView: View {
     let onSelectTrack: (LocalTrack) -> Void
     var onAddMusic: (() -> Void)? = nil
 
-    @State private var searchQuery: String = ""
+    @Binding private var searchQuery: String
     @State private var localPager: LocalArtistPager?
     @State private var selectedArtist: ArtistPresentationModel?
     @State private var selectedAlbum: AlbumPresentationModel?
@@ -47,6 +47,7 @@ struct ArtistsView: View {
         localStore: LocalLibraryStore,
         playback: PlaybackController,
         subsonicServers: SubsonicServerStore? = nil,
+        searchQuery: Binding<String> = .constant(""),
         selectedSourceID: Binding<String?> = .constant(nil),
         requestedArtistID: Binding<String?> = .constant(nil),
         onSelectTrack: @escaping (LocalTrack) -> Void,
@@ -55,6 +56,7 @@ struct ArtistsView: View {
         self.localStore = localStore
         self.playback = playback
         self.subsonicServers = subsonicServers
+        self._searchQuery = searchQuery
         self._selectedSourceID = selectedSourceID
         self._requestedArtistID = requestedArtistID
         self.onSelectTrack = onSelectTrack
@@ -489,34 +491,6 @@ struct ArtistsView: View {
                     .controlSize(.small)
                 }
 
-                HStack(spacing: 10) {
-                    if isSearchingRemote {
-                        ProgressView()
-                            .scaleEffect(0.6)
-                            .frame(width: 14, height: 14)
-                    } else {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundStyle(.secondary)
-                    }
-
-                    TextField(isRemoteSourceActive ? "搜索远程艺术家…" : "Filter artists…", text: $searchQuery)
-                        .textFieldStyle(.plain)
-
-                    if !searchQuery.isEmpty {
-                        Button {
-                            searchQuery = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-                .frame(width: 260)
-
                 HStack {
                     Spacer()
                 }
@@ -693,12 +667,17 @@ enum ArtistsFeature: ApplicationFeaturePresentation {
                     identity: WorkspaceIdentity(
                         title: String(localized: "Artists"),
                         systemImage: "music.mic"
-                    )
+                    ),
+                    toolbar: artistsToolbar
                 ) { _ in
                     ArtistsView(
                         localStore: scene.application.localLibrary,
                         playback: scene.application.playback,
                         subsonicServers: scene.application.subsonicServers,
+                        searchQuery: Binding(
+                            get: { scene.artistsSearchQuery },
+                            set: { scene.artistsSearchQuery = $0 }
+                        ),
                         selectedSourceID: Binding(
                             get: { scene.selectedSourceFilter },
                             set: { scene.selectedSourceFilter = $0 }
@@ -717,6 +696,27 @@ enum ArtistsFeature: ApplicationFeaturePresentation {
                 }
             }
         ]
+    }
+
+    // MARK: - Workspace Toolbar
+
+    private static var artistsToolbar: ToolbarPresentation<SceneModel> {
+        ToolbarPresentation(
+            items: [
+                .search(
+                    ToolbarSearchPresentation(
+                        id: "artists.search",
+                        prompt: String(localized: "Filter artists..."),
+                        text: { scene in
+                            scene.artistsSearchQuery
+                        },
+                        update: { scene, value in
+                            scene.artistsSearchQuery = value
+                        }
+                    )
+                )
+            ]
+        )
     }
 }
 
