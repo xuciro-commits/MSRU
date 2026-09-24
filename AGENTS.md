@@ -6,7 +6,7 @@ Start here (Claude Code reaches this file through `CLAUDE.md`). This file is eno
 
 - **MSRU** — a real, shipping Apple-native music product (macOS first, iPadOS/iOS) whose original objective is professional music-library management, plus listening.
 - **AppFoundation** — a domain-neutral Apple client layer (Swift/SwiftUI toolkit) used by MSRU.
-- **The current home of the business-platform design** (`Docs/Platform.md`, `Docs/ADR/`). The platform itself — contracts, Go backend, Rust components — will live in a separate repository (ADR-0003). Hotel and manufacturing code never go here.
+- **A client of the business platform.** The platform — design, kernel contract, Go backend, reference-domain slices — lives in the platform repository (`~/Developer/platform`: `docs/Platform.md`, `docs/ADR/`, `contract/`) (ADR-0003 there). Hotel and manufacturing code never go here.
 
 ## What it is not
 
@@ -27,7 +27,6 @@ Start here (Claude Code reaches this file through `CLAUDE.md`). This file is eno
 | `Packages/MusicDomain` | Music domain package, layered `MusicPlayback` → `MusicLibrary` → `MusicDomain`, plus leaf `SubsonicKit`: types/toolkits, library + persistence (GRDB/SQLite + migrations), sources, identity, import, providers, radio, queries, playback, Subsonic client ([ADR-0004](Docs/ADR/0004-music-domain-packages.md)) |
 | `Packages/ChromaSwift`, `Packages/MSRUCodecFFmpeg` | Chromaprint wrapper (vendored `chromaprint/` source), FFmpeg micro XCFramework (vendored, built by script) |
 | `MSRUTests`, `MSRUUITests` | App unit/contract tests (Swift Testing), process-level UI tests |
-| `Contract/` | Kernel contract: Protobuf data contract, semantic specs, conformance vectors; Go reference and Swift implementations run the same vectors. Domain-neutral, depends on no product code; moves to the platform repository at the split (ADR-0003) |
 | `Scripts/` | `verify.sh`, `verify-architecture.py`, `verify-previews.py`, `repo-health.py` |
 | `Docs/` | Canonical documentation (below) |
 
@@ -37,7 +36,7 @@ Start here (Claude Code reaches this file through `CLAUDE.md`). This file is eno
 |---|---|
 | `Docs/Intent.md` | Always relevant: goals, quality bar, collaboration rules |
 | `Docs/WorkQueue.md` | Choosing or finishing work; the only active plan |
-| `Docs/Platform.md` | Any platform/kernel/boundary question |
+| Platform repository `docs/Platform.md` | Any platform/kernel/boundary question |
 | `Docs/AppleClient.md` | Working in AppFoundation or MSRU scenes, features, UI, concurrency |
 | `Docs/Music.md` | Working on the music domain: identity, metadata, storage, playback facts |
 | `Docs/ADR/` | Before changing a decision recorded there |
@@ -50,15 +49,15 @@ Conflicts: the owner's latest instruction decides requirements; code and fresh v
 2. Dependencies point from app → domain packages → AppFoundation; never the reverse.
 3. Native AppKit/UIKit code stays in `MSRU/Platform` and `AppFoundationUI/Platform`.
 4. State has one owner: scene state in the scene, shared services in the application; no convenience globals. Async work defines cancellation and stale-result behaviour.
-5. Platform kernel concepts (Platform.md §4) are hypotheses with promotion rules; a slice may not change the kernel — record friction in the work queue instead.
-6. The kernel is a language-neutral contract (ADR-0002); do not make any single language's package "the kernel".
+5. Platform kernel concepts (platform `docs/Platform.md` §4) are hypotheses with promotion rules; a slice may not change the kernel — record friction in the work queue instead.
+6. The kernel is a language-neutral contract (platform ADR-0002); MSRU conforms to it through pinned vector copies (`Packages/MusicDomain/Tests/MusicLibraryTests/Vectors`), never by redefining it.
 7. Do not claim unverified capabilities (e.g. bit-perfect audio, performance numbers not measured on the current tree).
 
 ## Where code belongs
 
 - Music-specific types, rules, storage and integrations → the `Packages/MusicDomain` targets, never AppFoundation or the app target.
 - Reusable, domain-neutral Apple client mechanisms → AppFoundation, only when at least two real uses share the same lifetime and failure semantics.
-- Kernel contract → `Contract/` (schema, specs, vectors first; implementations follow). Other platform/server code → the platform repository (until it exists: design only, in `Docs/Platform.md`).
+- Kernel contract and platform/server code → the platform repository.
 - Product UI → `MSRU/Features`; platform adapters → `MSRU/Platform`.
 
 ## Build, test, lint
@@ -69,7 +68,6 @@ Requirements: macOS 27 with Xcode 27 (deployment target 27.0, Swift 6 language m
 Scripts/verify.sh gates      # architecture + preview guardrails (seconds)
 Scripts/verify.sh packages   # gates + swift test for AppFoundation, MusicDomain
 Scripts/verify.sh app        # gates + macOS unit tests (scheme MSRU-UnitTests) + iOS Simulator build (scheme MSRU)
-Scripts/verify.sh contract   # gates + kernel contract (needs go, buf, protoc-gen-go: brew install go bufbuild/buf/buf)
 Scripts/verify.sh            # everything; logs in .build/verify/
 Scripts/repo-health.py [--since REF]   # size, hotspots, unreachable files, placeholder UI, sparse formatting
 ```

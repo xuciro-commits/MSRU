@@ -4,7 +4,7 @@ Durable statement of what the owner wants. The owner's latest explicit instructi
 
 ## What we are building
 
-1. **A business platform** with server and edge/client runtimes, multi-tenant, able to support personal local-first apps and organizational apps where a server is authoritative — eventually real operational businesses such as manufacturing plants. See [Platform.md](Platform.md).
+1. **A business platform** with server and edge/client runtimes, multi-tenant, able to support personal local-first apps and organizational apps where a server is authoritative — eventually real operational businesses such as manufacturing plants. See the platform repository's `docs/Platform.md`.
 2. **Music (MSRU)** as a real product for listeners and serious library managers, and as the long-term validation domain for local-first, personal, edge-side capabilities.
 
 The deepest goal is a platform that **supports change itself**. It must not encode an organization's or application's current shape as its permanent identity. Music may become a professional library manager, a shared library or a multi-media product; Hotel may become coworking or long-stay capacity management; a manufacturer may change products, processes, equipment, structure or operating model. Domains may be rewritten; the deeper contracts must stay coherent.
@@ -30,7 +30,7 @@ On Apple clients: modern Swift 6, SwiftUI first, AppKit/UIKit inside platform ad
 
 ## Documentation principles
 
-- Repository docs are **durable project knowledge**, not the reasoning that produced it. Keep a small set: AGENTS.md, this file, Platform.md, client/domain docs where a domain genuinely needs them, ADRs for decisions worth preserving, one work queue.
+- Repository docs are **durable project knowledge**, not the reasoning that produced it. Keep a small set: AGENTS.md, this file, the platform repository's docs, client/domain docs where a domain genuinely needs them, ADRs for decisions worth preserving, one work queue.
 - Consolidate instead of appending. Hypotheses, friction notes and investigations are temporary: fold conclusions into the canonical docs or an ADR, then delete them. Git history is the archive.
 - Documents describe targets; code states facts. When they disagree, record the gap.
 

@@ -1,6 +1,6 @@
 # Apple Client Layer (AppFoundation)
 
-`Packages/AppFoundation` is the **Apple client layer**: a domain-neutral Swift toolkit for building native Apple apps. It is a *capability* in the [platform](Platform.md) model, not the platform kernel. It must never contain domain vocabulary (tracks, albums, reservations…), storage engines or product packages — `Scripts/verify-architecture.py` enforces this. The package name is kept for now; renaming is cosmetic and can happen when the platform repository split happens ([ADR-0003](ADR/0003-repository-split.md)).
+`Packages/AppFoundation` is the **Apple client layer**: a domain-neutral Swift toolkit for building native Apple apps. It is a *capability* in the platform model (platform repository `docs/Platform.md`), not the platform kernel. It must never contain domain vocabulary (tracks, albums, reservations…), storage engines or product packages — `Scripts/verify-architecture.py` enforces this. The package name is kept for now; renaming is cosmetic and can happen when the platform repository split happens (platform ADR-0003).
 
 Targets: `AppFoundation` (no UI imports — composition, feature runtime, dependencies, routing, localization) and `AppFoundationUI` (presentation, shell resolver, native adaptation; AppKit/UIKit only under `AppFoundationUI/Platform`).
 

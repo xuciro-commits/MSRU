@@ -23,9 +23,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PRODUCTION = ["MSRU", "Packages/AppFoundation/Sources", "Packages/MusicDomain/Sources",
-              "Packages/MSRUCodecFFmpeg/Sources", "Contract/swift/Sources"]
+              "Packages/MSRUCodecFFmpeg/Sources"]
 TESTS = ["MSRUTests", "MSRUUITests", "Packages/AppFoundation/Tests",
-         "Packages/MusicDomain/Tests", "Packages/MSRUCodecFFmpeg/Tests", "Contract/swift/Tests"]
+         "Packages/MusicDomain/Tests", "Packages/MSRUCodecFFmpeg/Tests"]
 SKIP = {".build", ".swiftpm", "DerivedData", "Vendor", "chromaprint", "xcuserdata"}
 
 # Bands: (watch, high). Production size is judged against the current scope.

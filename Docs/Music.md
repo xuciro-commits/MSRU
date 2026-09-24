@@ -1,6 +1,6 @@
 # Music Domain (MSRU)
 
-MSRU is a real, shipping product and the platform's long-term validation domain for personal, local-first, edge-side capabilities. Its original objective is a **professional music-library management system**; listening features are valuable but must not crowd out that objective. Platform context: [Platform.md](Platform.md). Client-layer rules: [AppleClient.md](AppleClient.md).
+MSRU is a real, shipping product and the platform's long-term validation domain for personal, local-first, edge-side capabilities. Its original objective is a **professional music-library management system**; listening features are valuable but must not crowd out that objective. Platform context: the platform repository's `docs/Platform.md`. Client-layer rules: [AppleClient.md](AppleClient.md).
 
 ## Where the code lives
 
