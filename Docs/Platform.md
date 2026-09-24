@@ -137,6 +137,18 @@ Two tests for every abstraction: **cross-domain comparison** (does either domain
 
 Loop: kernel hypotheses → Hotel slice (may not change the kernel; records friction) + Music retrofit slice + manufacturing discovery → compare → revise kernel → refactor both apps → drills → repeat until drills stop touching the kernel. There is no numeric threshold; each kernel change must name the missing cross-domain capability.
 
+### Manufacturing discovery (#78)
+
+Desk study of three scenarios as they commonly run under MES / ISA-95 practice; no plant has confirmed them yet, so every finding is a **prediction** for the first manufacturing slice (#83) to confirm or refute.
+
+| Scenario and steps | Kernel mapping |
+|---|---|
+| **Work order**: plan → release → dispatch to a line → operators confirm good/scrap quantity per operation (often from terminals with poor connectivity) → complete → close; quantity changes after release; splitting an order; rework orders | Order = entity (K1); release/complete/close = decisions of the plant server (K4, K5 server authority); operation confirmations = submissions from an edge outbox, backdated `valid_time` allowed (K4 C7, K5 A5); machine counts = observations reconciled against confirmed quantities (K2); split = K1 split redirect plus the decisions creating the new orders |
+| **Quality nonconformance**: gauge measurement → inspection verdict → nonconformance report → containment (hold every lot made from the same material lot) → review board disposition (use as is / rework / scrap) with several signatures → corrective action; records kept 10+ years | Measurement = observation, supplier certificate = claim (K2); verdict, report, hold and disposition = decisions (K4) naming what they judge via `causation_id`; lot genealogy (consumed-into links) = domain decisions; recall scope = derived facts (K2) |
+| **Equipment state and downtime**: PLC states (running/idle/fault) sampled at 1–100 Hz via an edge gateway that buffers while offline → downtime intervals computed from states → operator assigns a reason code → OEE per shift | States = observations with source clock (K2, K3 P3); intervals and OEE = derived facts; the reason code = a decision about a derived interval; gateway = connector (K8) |
+
+Predicted friction, recorded in the work queue (F-5 to F-9): per-sample provenance for state streams (K3 falsification case); decisions that target derived facts which recomputation may replace (K2); multi-signature dispositions (K5 negotiated authority, or domain workflow over several decisions); electronic-signature meaning and re-authentication on regulated decisions (K4/K6); policy scoped by plant hierarchy (K6 falsification case); push subscriptions (OPC UA, MQTT) next to polled sources (K8 falsification case). Genealogy and scheduling look like domain and capability concerns, not kernel ones.
+
 **Friction** (exceptions, bypasses, duplication, awkward mappings, leaks, missing capabilities) is recorded briefly in the work queue while a slice is active and resolved at review into a domain change, a capability change, or a kernel change with an ADR. Resolved entries are deleted; lasting conclusions are folded into this document.
 
 ## 9. Standing risks
