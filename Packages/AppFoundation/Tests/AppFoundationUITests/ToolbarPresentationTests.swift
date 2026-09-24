@@ -109,18 +109,18 @@ struct ToolbarPresentationTests {
         adapter.install(on: window)
         adapter.reload()
         let toolbar = try #require(window.toolbar)
-        let search = try #require(toolbar.items.compactMap { $0 as? NSSearchToolbarItem }.first)
+        let search = try #require(toolbar.items.compactMap { $0 as? MacSearchToolbarItem }.first)
         let action = try #require(toolbar.items.first { $0.itemIdentifier.rawValue.hasSuffix(".save") })
-        #expect(search.searchField.stringValue == "first")
-        let originalField = search.searchField
+        #expect(search.state.text == "first")
+        let originalState = search.state
         text = "updated externally"
         enabled = false
         adapter.reload()
-        let updatedSearch = try #require(toolbar.items.compactMap { $0 as? NSSearchToolbarItem }.first)
+        let updatedSearch = try #require(toolbar.items.compactMap { $0 as? MacSearchToolbarItem }.first)
         #expect(updatedSearch === search)
-        #expect(updatedSearch.searchField === originalField)
-        #expect(updatedSearch.searchField.stringValue == text)
-        #expect(!updatedSearch.searchField.isEnabled)
+        #expect(updatedSearch.state === originalState)
+        #expect(updatedSearch.state.text == text)
+        #expect(!updatedSearch.state.isEnabled)
         #expect(!action.isEnabled)
         toolbar.validateVisibleItems()
         #expect(!action.isEnabled)

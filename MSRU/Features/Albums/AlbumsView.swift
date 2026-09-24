@@ -724,7 +724,7 @@ enum AlbumsFeature: ApplicationFeaturePresentation {
                 .search(
                     ToolbarSearchPresentation(
                         id: "albums.search",
-                        prompt: String(localized: "Filter albums..."),
+                        prompt: String(localized: "Filter albums…"),
                         text: { scene in
                             scene.albumsSearchQuery
                         },

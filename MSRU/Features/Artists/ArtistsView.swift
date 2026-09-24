@@ -706,7 +706,7 @@ enum ArtistsFeature: ApplicationFeaturePresentation {
                 .search(
                     ToolbarSearchPresentation(
                         id: "artists.search",
-                        prompt: String(localized: "Filter artists..."),
+                        prompt: String(localized: "Filter artists…"),
                         text: { scene in
                             scene.artistsSearchQuery
                         },

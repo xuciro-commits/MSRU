@@ -170,14 +170,9 @@ public final class MacToolbarAdapter:
                 .withSymbolConfiguration(symbolConfig)
             item.isEnabled = action.isEnabled
         case .search(let search):
-            guard let searchItem = item as? NSSearchToolbarItem else { return }
+            guard let searchItem = item as? MacSearchToolbarItem else { return }
             searchItem.isEnabled = search.isEnabled
-            searchItem.searchField.isEnabled = search.isEnabled
-            searchItem.searchField.placeholderString = search.prompt
-            if searchItem.searchField.stringValue != search.text {
-                searchItem.searchField.stringValue = search.text
-            }
-            applyGlassStyle(to: searchItem.searchField)
+            searchItem.state.update(from: search)
         }
     }
 
@@ -297,90 +292,12 @@ public final class MacToolbarAdapter:
         search:
             ResolvedToolbarSearch
     ) -> NSToolbarItem {
-
-        let item =
-            NSSearchToolbarItem(
-                itemIdentifier:
-                    identifier
-            )
-
-
-        item.label =
-            "Search"
-
-        item.paletteLabel =
-            "Search"
-
-        item.autovalidates = false
-        item.isEnabled =
-            search.isEnabled
-        item.searchField.isEnabled = search.isEnabled
-        item.preferredWidthForSearchField = 350
-
-
-        let field =
-            item.searchField
-
-
-        field.identifier =
-            NSUserInterfaceItemIdentifier(
-                identifier
-                    .rawValue
-            )
-
-        field.placeholderString =
-            search.prompt
-
-        field.stringValue =
-            search.text
-
-        field.sendsSearchStringImmediately =
-            true
-
-        field.target =
-            self
-
-        field.action =
-            #selector(
-                searchChanged(
-                    _:
-                )
-            )
-
-        applyGlassStyle(to: field)
-
-        return
-            item
+        MacSearchToolbarItem(
+            identifier: identifier,
+            search: search
+        )
     }
 
-
-    private func applyGlassStyle(to field: NSSearchField) {
-        field.focusRingType = .none
-        field.font = .systemFont(ofSize: 13, weight: .regular)
-        field.drawsBackground = false
-        field.isBezeled = false
-        field.wantsLayer = true
-
-        let effectID = NSUserInterfaceItemIdentifier("AppFoundation.Search.GlassBackground")
-        if field.subviews.first(where: { $0.identifier == effectID }) == nil {
-            let effectView = NSVisualEffectView(frame: field.bounds)
-            effectView.identifier = effectID
-            effectView.autoresizingMask = [.width, .height]
-            effectView.material = .headerView
-            effectView.blendingMode = .withinWindow
-            effectView.state = .active
-            effectView.wantsLayer = true
-            effectView.layer?.cornerRadius = 9
-            effectView.layer?.masksToBounds = true
-            effectView.layer?.borderWidth = 0.5
-            effectView.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.25).cgColor
-            effectView.layer?.shadowColor = NSColor.black.withAlphaComponent(0.04).cgColor
-            effectView.layer?.shadowRadius = 4
-            effectView.layer?.shadowOpacity = 1
-            effectView.layer?.shadowOffset = CGSize(width: 0, height: -1)
-            field.addSubview(effectView, positioned: .below, relativeTo: nil)
-        }
-    }
 
     // MARK: - Actions
 
@@ -422,57 +339,7 @@ public final class MacToolbarAdapter:
     }
 
 
-    @objc
-    private func searchChanged(
-        _ sender:
-            NSSearchField
-    ) {
 
-        guard
-            let rawIdentifier =
-                sender
-                    .identifier?
-                    .rawValue
-        else {
-
-            return
-        }
-
-
-        let identifier =
-            NSToolbarItem.Identifier(
-                rawIdentifier
-            )
-
-
-        guard
-            let id =
-                semanticID(
-                    from:
-                        identifier
-                ),
-            let item =
-                presentation()
-                    .item(
-                        id:
-                            id
-                    ),
-            case .search(
-                let search
-            ) =
-                item
-        else {
-
-            return
-        }
-
-
-        guard search.isEnabled else { return }
-        search.update(
-            sender
-                .stringValue
-        )
-    }
 
 
     public func validateToolbarItem(_ item: NSToolbarItem) -> Bool {

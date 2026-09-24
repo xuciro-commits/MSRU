@@ -140,7 +140,7 @@ extension LibraryFeature: ApplicationFeaturePresentation {
                 .search(
                     ToolbarSearchPresentation(
                         id: "library.search",
-                        prompt: String(localized: "Filter songs..."),
+                        prompt: String(localized: "Filter songs…"),
                         text: { scene in
                             scene.librarySearchQuery
                         },
