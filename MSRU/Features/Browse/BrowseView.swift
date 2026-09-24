@@ -111,17 +111,13 @@ struct BrowseView: View {
                     4
             ) {
 
-                Text(
-                    "Browse"
-                )
+                Text("Browse")
                 .font(
                     .largeTitle.bold()
                 )
 
 
-                Text(
-                    "Search open-licensed audio in connected catalogs."
-                )
+                Text("Search open-licensed audio in connected catalogs.")
                 .font(
                     .callout
                 )
@@ -134,8 +130,7 @@ struct BrowseView: View {
             Spacer()
 
 
-            Label(
-                "Openverse",
+            Label("Openverse",
                 systemImage:
                     "globe"
             )
@@ -180,17 +175,13 @@ struct BrowseView: View {
                     3
             ) {
 
-                Text(
-                    "Openverse"
-                )
+                Text("Openverse")
                 .font(
                     .headline
                 )
 
 
-                Text(
-                    "Catalog · Cover · License Metadata · Playback"
-                )
+                Text("Catalog · Cover · License Metadata · Playback")
                 .font(
                     .caption
                 )
@@ -203,9 +194,7 @@ struct BrowseView: View {
             Spacer()
 
 
-            Text(
-                "Catalog & Playback"
-            )
+            Text("Catalog & Playback")
             .font(
                 .caption2.weight(
                     .semibold
@@ -290,9 +279,7 @@ struct BrowseView: View {
                 systemImage:
                     "music.note",
                 description:
-                    Text(
-                        "Please try other Openverse search terms."
-                    )
+                    Text("Please try other Openverse search terms.")
             )
             .frame(
                 maxWidth:
@@ -321,9 +308,7 @@ struct BrowseView: View {
             ProgressView()
 
 
-            Text(
-                "Searching Openverse…"
-            )
+            Text("Searching Openverse…")
             .foregroundStyle(
                 .secondary
             )
@@ -346,8 +331,7 @@ struct BrowseView: View {
 
         ContentUnavailableView {
 
-            Label(
-                "Openverse is temporarily unavailable",
+            Label("Openverse is temporarily unavailable",
                 systemImage:
                     "wifi.exclamationmark"
             )
@@ -393,9 +377,7 @@ struct BrowseView: View {
 
             HStack {
 
-                Text(
-                    "Openverse Search Results"
-                )
+                Text("Openverse Search Results")
                 .font(
                     .title2.bold()
                 )
@@ -700,8 +682,7 @@ struct BrowseView: View {
 
             } label: {
 
-                Label(
-                    "Remove from Library",
+                Label("Remove from Library",
                     systemImage:
                         "minus.circle"
                 )
@@ -720,8 +701,7 @@ struct BrowseView: View {
 
             } label: {
 
-                Label(
-                    "Add to Library",
+                Label("Add to Library",
                     systemImage:
                         "plus.circle"
                 )

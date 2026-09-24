@@ -48,7 +48,7 @@ struct AddSubsonicServerSheet: View {
 
                 // Bottom Action Bar
                 HStack {
-                    Button("取消", role: .cancel) {
+                    Button("Cancel", role: .cancel) {
                         onDismiss()
                     }
                     .keyboardShortcut(.cancelAction)
@@ -76,7 +76,7 @@ struct AddSubsonicServerSheet: View {
                                 .controlSize(.small)
                                 .padding(.horizontal, 12)
                         } else {
-                            Text("添加")
+                            Text("Add")
                         }
                     }
                     .buttonStyle(.borderedProminent)
@@ -86,7 +86,7 @@ struct AddSubsonicServerSheet: View {
             }
             .padding(24)
             .frame(width: 520, height: 500)
-            .navigationTitle("添加媒体库来源")
+            .navigationTitle(String(localized: "添加媒体库来源"))
         }
     }
 
@@ -154,8 +154,12 @@ struct AddSubsonicServerSheet: View {
                 Text("服务地址")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextField("http://192.168.31.200:8025", text: $serverAddress)
-                    .textFieldStyle(.roundedBorder)
+                TextField(
+                    String(localized: "服务地址"),
+                    text: $serverAddress,
+                    prompt: Text(verbatim: "http://192.168.31.200:8025")
+                )
+                .textFieldStyle(.roundedBorder)
             }
 
             HStack(spacing: 14) {

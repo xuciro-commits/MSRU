@@ -353,9 +353,7 @@ struct SettingsView:
                 )
 
 
-                Text(
-                    "Interactive diagnostic controls will be added once frontend info architecture is stable."
-                )
+                Text("Interactive diagnostic controls will be added once frontend info architecture is stable.")
                 .font(
                     .callout
                 )

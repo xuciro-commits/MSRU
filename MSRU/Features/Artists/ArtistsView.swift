@@ -360,7 +360,7 @@ struct ArtistsView: View {
                         VStack {
                             ContentUnavailableView("无法加载艺术家", systemImage: "exclamationmark.triangle",
                                                    description: Text(error))
-                            Button("重试") { Task { await localPager?.retry() } }
+                            Button("Retry") { Task { await localPager?.retry() } }
                         }
                     } else {
                         emptyState
