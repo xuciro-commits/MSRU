@@ -243,7 +243,7 @@ struct AlbumsView: View {
                 self.requestedAlbumID = nil
             }
         }
-        .task(id: "\(selectedSourceID ?? "")|\(searchQuery)|\(sortField.rawValue)|\(localStore.revision)") {
+        .task(id: "\(selectedSourceID ?? "")|\(searchQuery)|\(sortField.rawValue)") {
             guard !isRemoteSourceActive else { return }
             let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
             if !query.isEmpty {
@@ -259,6 +259,13 @@ struct AlbumsView: View {
             case .year: sort = .year
             }
             await pager.reset(query: query, sort: sort)
+        }
+        .onChange(of: localStore.revision) { _, _ in
+            guard !isRemoteSourceActive else { return }
+            guard let pager = localPager else { return }
+            Task {
+                await pager.reload(preserveCount: true)
+            }
         }
         .task(id: "\(selectedSourceID ?? "")-\(sortField.rawValue)") {
             if isRemoteSourceActive, let sourceID = selectedSourceID {

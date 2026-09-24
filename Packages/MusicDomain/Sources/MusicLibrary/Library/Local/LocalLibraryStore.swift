@@ -548,8 +548,8 @@ public final class LocalLibraryStore {
     /// Re-reads physical tags, applies online enrichment via Apple Catalog,
     /// and overwrites library records in-place without creating duplicate assets.
     @discardableResult
-    public func refreshMetadata(for targetTracks: [LocalTrack]) async throws -> Int {
-        guard !targetTracks.isEmpty else { return 0 }
+    public func refreshMetadata(for targetTracks: [LocalTrack]) async throws -> [LocalTrack] {
+        guard !targetTracks.isEmpty else { return [] }
         await loadIfNeeded()
 
         var updatedTracks: [LocalTrack] = []
@@ -640,7 +640,7 @@ public final class LocalLibraryStore {
             try await saveTracksInPlace(updatedTracks)
         }
 
-        return updatedTracks.count
+        return updatedTracks
     }
 
     @discardableResult

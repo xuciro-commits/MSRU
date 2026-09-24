@@ -50,6 +50,25 @@ public final class LocalAlbumPager {
         errorMessage = nil
         await loadMore()
     }
+
+    /// Reloads currently loaded albums preserving the loaded count so views don't jump to the top.
+    public func reload(preserveCount: Bool = true) async {
+        guard !isLoading else { return }
+        let currentCount = preserveCount ? max(albums.count, 64) : 64
+        let currentGeneration = generation
+        isLoading = true
+        do {
+            let page = try await repository.albumPage(query: query, sort: sort, offset: 0, limit: currentCount)
+            guard currentGeneration == generation else { return }
+            albums = page.items
+            totalCount = page.totalCount
+            errorMessage = nil
+        } catch {
+            guard currentGeneration == generation else { return }
+            errorMessage = error.localizedDescription
+        }
+        if currentGeneration == generation { isLoading = false }
+    }
 }
 
 @MainActor @Observable
@@ -96,5 +115,24 @@ public final class LocalArtistPager {
     public func retry() async {
         errorMessage = nil
         await loadMore()
+    }
+
+    /// Reloads currently loaded artists preserving the loaded count so views don't jump to the top.
+    public func reload(preserveCount: Bool = true) async {
+        guard !isLoading else { return }
+        let currentCount = preserveCount ? max(artists.count, 64) : 64
+        let currentGeneration = generation
+        isLoading = true
+        do {
+            let page = try await repository.artistPage(query: query, offset: 0, limit: currentCount)
+            guard currentGeneration == generation else { return }
+            artists = page.items
+            totalCount = page.totalCount
+            errorMessage = nil
+        } catch {
+            guard currentGeneration == generation else { return }
+            errorMessage = error.localizedDescription
+        }
+        if currentGeneration == generation { isLoading = false }
     }
 }

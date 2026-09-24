@@ -216,7 +216,7 @@ struct LibraryView:
             }
             debouncedLocalQuery = trimmed
         }
-        .task(id: "\(selectedSourceID ?? "")|\(debouncedLocalQuery)|\(sortField.rawValue)|\(sortAscending)|\(localStore.revision)") {
+        .task(id: "\(selectedSourceID ?? "")|\(debouncedLocalQuery)|\(sortField.rawValue)|\(sortAscending)") {
             guard !isWebSourceActive, !isRemoteSourceActive else { return }
             let pager = localPager ?? localStore.makePager()
             localPager = pager
@@ -225,6 +225,13 @@ struct LibraryView:
                 sort: LocalTrackPageRequest.Sort(rawValue: sortField.rawValue) ?? .title,
                 ascending: sortAscending
             )
+        }
+        .onChange(of: localStore.revision) { _, _ in
+            guard !isWebSourceActive, !isRemoteSourceActive else { return }
+            guard let pager = localPager else { return }
+            Task {
+                await pager.reload(preserveCount: true)
+            }
         }
         .sheet(isPresented: Binding(
             get: { metadataEditTracks != nil },
@@ -622,7 +629,9 @@ struct LibraryView:
                                     Task {
                                         isRefreshingMetadata = true
                                         defer { isRefreshingMetadata = false }
-                                        _ = try? await localStore.refreshMetadata(for: selected)
+                                        if let updated = try? await localStore.refreshMetadata(for: selected) {
+                                            localPager?.updateTracksInPlace(updated)
+                                        }
                                     }
                                 } else {
                                     metadataEditTracks = [track]
@@ -693,7 +702,9 @@ struct LibraryView:
                     Task {
                         isRefreshingMetadata = true
                         defer { isRefreshingMetadata = false }
-                        _ = try? await localStore.refreshMetadata(for: selected)
+                        if let updated = try? await localStore.refreshMetadata(for: selected) {
+                            localPager?.updateTracksInPlace(updated)
+                        }
                     }
                 } label: {
                     if isRefreshingMetadata {
@@ -756,7 +767,9 @@ struct LibraryView:
                     metadataEditTracks = tracks
                 },
                 onRefreshMetadata: { tracks in
-                    _ = try? await localStore.refreshMetadata(for: tracks)
+                    if let updated = try? await localStore.refreshMetadata(for: tracks) {
+                        localPager?.updateTracksInPlace(updated)
+                    }
                 },
                 onTrackAppear: { track in
                     if isRemoteSourceActive && track.id == remoteTracks.last?.id && hasMoreRemoteTracks && !isLoadingMoreRemoteTracks && !isLoadingRemoteTracks && searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

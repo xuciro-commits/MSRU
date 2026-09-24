@@ -60,6 +60,43 @@ public final class LocalTrackPager {
         }
         if currentGeneration == generation { isLoading = false }
     }
+
+    /// Updates specific tracks in-place without altering the loaded count or scroll offset.
+    public func updateTracksInPlace(_ updatedTracks: [LocalTrack]) {
+        guard !updatedTracks.isEmpty else { return }
+        let map = Dictionary(uniqueKeysWithValues: updatedTracks.map { ($0.id, $0) })
+        for i in tracks.indices {
+            if let fresh = map[tracks[i].id] {
+                tracks[i] = fresh
+            }
+        }
+    }
+
+    /// Reloads currently loaded tracks preserving the loaded range count so the table doesn't collapse to page 1 or jump to the top.
+    public func reload(preserveCount: Bool = true) async {
+        guard !isLoading else { return }
+        let currentCount = preserveCount ? max(tracks.count, pageSize) : pageSize
+        let currentGeneration = generation
+        isLoading = true
+        let request = LocalTrackPageRequest(
+            query: query,
+            sort: sort,
+            ascending: ascending,
+            offset: 0,
+            limit: currentCount
+        )
+        do {
+            let page = try await repository.fetchPage(request)
+            guard currentGeneration == generation else { return }
+            tracks = page.tracks
+            totalCount = page.totalCount
+            errorMessage = nil
+        } catch {
+            guard currentGeneration == generation else { return }
+            errorMessage = error.localizedDescription
+        }
+        if currentGeneration == generation { isLoading = false }
+    }
 }
 
 @MainActor

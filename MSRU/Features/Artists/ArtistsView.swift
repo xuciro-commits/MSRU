@@ -258,7 +258,7 @@ struct ArtistsView: View {
                 await loadRemoteArtists(sourceID: sourceID, reset: true)
             }
         }
-        .task(id: "\(selectedSourceID ?? "")|\(searchQuery)|\(localStore.revision)") {
+        .task(id: "\(selectedSourceID ?? "")|\(searchQuery)") {
             guard !isRemoteSourceActive else { return }
             let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
             if !query.isEmpty {
@@ -268,6 +268,13 @@ struct ArtistsView: View {
             let pager = localPager ?? localStore.makeArtistPager()
             localPager = pager
             await pager.reset(query: query)
+        }
+        .onChange(of: localStore.revision) { _, _ in
+            guard !isRemoteSourceActive else { return }
+            guard let pager = localPager else { return }
+            Task {
+                await pager.reload(preserveCount: true)
+            }
         }
         .task(id: "\(selectedSourceID ?? "")-\(searchQuery)") {
             let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
