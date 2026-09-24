@@ -77,15 +77,17 @@ struct MiniPlayerBar: View {
     }
 
     private var midCompactPlayerContent: some View {
-        HStack(spacing: 12) {
-            artwork(size: 38)
+        HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .center, spacing: 10) {
+                artwork(size: 38)
 
-            VStack(alignment: .leading, spacing: 1) {
-                metadata
-                Spacer(minLength: 2)
-                scrubber
+                VStack(alignment: .leading, spacing: 3) {
+                    metadata
+                    scrubber
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 42)
 
             compactTransportControls
 
@@ -207,9 +209,8 @@ struct MiniPlayerBar: View {
         HStack(alignment: .center, spacing: 11) {
             artwork(size: 42)
 
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 3) {
                 metadata
-                Spacer(minLength: 2)
                 scrubber
             }
             .frame(maxWidth: .infinity, alignment: .leading)
