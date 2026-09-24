@@ -139,13 +139,75 @@ public nonisolated enum ExtendedAudioFormatSupport {
         "dff"
     ]
 
-
     public static func supports(
         _ url: URL
     ) -> Bool {
-        extensions.contains(
-            url.pathExtension.lowercased()
-        )
+        let ext = url.pathExtension.lowercased()
+        if extensions.contains(ext) {
+            return true
+        }
+        if ext == "wav" && isDTSWAV(url) {
+            return true
+        }
+        return false
+    }
+
+    public static func isDTSWAV(_ url: URL) -> Bool {
+        guard url.isFileURL else { return false }
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+
+        guard let headerData = try? handle.read(upToCount: 2048), headerData.count >= 44 else {
+            return false
+        }
+
+        return headerData.withUnsafeBytes { raw in
+            guard let ptr = raw.bindMemory(to: UInt8.self).baseAddress else { return false }
+            // Must start with RIFF .... WAVE
+            guard ptr[0] == 0x52 && ptr[1] == 0x49 && ptr[2] == 0x46 && ptr[3] == 0x46,
+                  ptr[8] == 0x57 && ptr[9] == 0x41 && ptr[10] == 0x56 && ptr[11] == 0x45 else {
+                return false
+            }
+
+            var offset = 12
+            let count = headerData.count
+            while offset + 8 <= count {
+                let c0 = ptr[offset]
+                let c1 = ptr[offset + 1]
+                let c2 = ptr[offset + 2]
+                let c3 = ptr[offset + 3]
+                let chunkSize = Int(UInt32(ptr[offset + 4]) | (UInt32(ptr[offset + 5]) << 8) | (UInt32(ptr[offset + 6]) << 16) | (UInt32(ptr[offset + 7]) << 24))
+                offset += 8
+
+                // fmt chunk: check format tag 0x2001 (WAVE_FORMAT_DTS)
+                if c0 == 0x66 && c1 == 0x6d && c2 == 0x74 && c3 == 0x20 {
+                    if offset + 2 <= count {
+                        let formatTag = UInt16(ptr[offset]) | (UInt16(ptr[offset + 1]) << 8)
+                        if formatTag == 0x2001 { return true }
+                    }
+                } else if c0 == 0x64 && c1 == 0x61 && c2 == 0x74 && c3 == 0x61 {
+                    // data chunk: check first 4 bytes for DTS sync word
+                    if offset + 4 <= count {
+                        let b0 = ptr[offset]
+                        let b1 = ptr[offset + 1]
+                        let b2 = ptr[offset + 2]
+                        let b3 = ptr[offset + 3]
+                        // 14-bit LE: FF 1F 00 E8
+                        if b0 == 0xFF && b1 == 0x1F && b2 == 0x00 && b3 == 0xE8 { return true }
+                        // 14-bit BE: 1F FE E8 00
+                        if b0 == 0x1F && b1 == 0xFE && b2 == 0xE8 && b3 == 0x00 { return true }
+                        // 16-bit LE: FE 7F 01 80
+                        if b0 == 0xFE && b1 == 0x7F && b2 == 0x01 && b3 == 0x80 { return true }
+                        // 16-bit BE: 7F FE 80 01
+                        if b0 == 0x7F && b1 == 0xFE && b2 == 0x80 && b3 == 0x01 { return true }
+                    }
+                    return false
+                }
+                offset += chunkSize
+                if chunkSize % 2 != 0 { offset += 1 }
+            }
+            return false
+        }
     }
 }
 

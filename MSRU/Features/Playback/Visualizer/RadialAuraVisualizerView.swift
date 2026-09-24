@@ -26,7 +26,7 @@ public struct RadialAuraVisualizerView: View {
     }
 
     public var body: some View {
-        TimelineView(.animation(minimumInterval: isPlaying ? 1.0 / 60.0 : 1.0 / 30.0)) { timeline in
+        TimelineView(.animation(minimumInterval: isPlaying ? 1.0 / 30.0 : 1.0 / 6.0)) { timeline in
             Canvas { context, size in
                 let time = timeline.date.timeIntervalSinceReferenceDate
                 drawRadial(context: &context, size: size, time: time)
@@ -71,19 +71,10 @@ public struct RadialAuraVisualizerView: View {
             with: .color(theme.secondaryColor.opacity(0.12))
         )
 
-        // Draw 60 radial frequency spikes around the perimeter
-        let spikeCount = 60
+        // Draw radial frequency spikes around the perimeter in a single batched path
+        let spikeCount = 48
         let angleStep = (2.0 * .pi) / Double(spikeCount)
-
-        let env = EnvironmentValues()
-        let pRes = theme.primaryColor.resolve(in: env)
-        let sRes = theme.secondaryColor.resolve(in: env)
-        let pr = Double(pRes.red)
-        let pg = Double(pRes.green)
-        let pb = Double(pRes.blue)
-        let sr = Double(sRes.red)
-        let sg = Double(sRes.green)
-        let sb = Double(sRes.blue)
+        var allSpikesPath = Path()
 
         for i in 0..<spikeCount {
             let angle = Double(i) * angleStep + (time * 0.15) // subtle continuous rotation
@@ -106,21 +97,16 @@ public struct RadialAuraVisualizerView: View {
             let endX = center.x + CGFloat(cosA) * (coreRadius + 3 + spikeLen)
             let endY = center.y + CGFloat(sinA) * (coreRadius + 3 + spikeLen)
 
-            var spikePath = Path()
-            spikePath.move(to: CGPoint(x: startX, y: startY))
-            spikePath.addLine(to: CGPoint(x: endX, y: endY))
-
-            let r = pr * energy + sr * (1.0 - energy)
-            let g = pg * energy + sg * (1.0 - energy)
-            let b = pb * energy + sb * (1.0 - energy)
-            let color = Color(red: r, green: g, blue: b).opacity(0.4 + energy * 0.55)
-
-            context.stroke(
-                spikePath,
-                with: .color(color),
-                style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
-            )
+            allSpikesPath.move(to: CGPoint(x: startX, y: startY))
+            allSpikesPath.addLine(to: CGPoint(x: endX, y: endY))
         }
+
+        // Render all spikes in 1 single GPU draw call
+        context.stroke(
+            allSpikesPath,
+            with: .color(theme.primaryColor),
+            style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
+        )
     }
 }
 

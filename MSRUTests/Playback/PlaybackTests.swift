@@ -235,4 +235,97 @@ struct PlaybackTests {
         #expect(controller.upcoming.isEmpty)
         #expect(controller.allItems.isEmpty)
     }
+
+    // MARK: - Extended DTS and Multichannel Support
+
+    @Test("ExtendedAudioFormatSupport identifies synthetic DTS-WAV files by sync word and format tag")
+    func dtsWAVDetection() throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        // 1. Regular PCM WAV
+        var pcmHeader = Data([
+            0x52, 0x49, 0x46, 0x46, // RIFF
+            0x24, 0x00, 0x00, 0x00, // Size
+            0x57, 0x41, 0x56, 0x45, // WAVE
+            0x66, 0x6d, 0x74, 0x20, // fmt
+            0x10, 0x00, 0x00, 0x00, // fmt size: 16
+            0x01, 0x00,             // format tag: 1 (PCM)
+            0x02, 0x00,             // channels: 2
+            0x44, 0xac, 0x00, 0x00, // 44100
+            0x10, 0xb1, 0x02, 0x00, // byte rate
+            0x04, 0x00,             // block align
+            0x10, 0x00,             // bits per sample: 16
+            0x64, 0x61, 0x74, 0x61, // data
+            0x04, 0x00, 0x00, 0x00, // data size: 4
+            0x00, 0x00, 0x00, 0x00  // silence samples
+        ])
+        let pcmURL = tempDir.appendingPathComponent("normal.wav")
+        try pcmHeader.write(to: pcmURL)
+        #expect(!ExtendedAudioFormatSupport.supports(pcmURL))
+
+        // 2. DTS-WAV with 14-bit LE sync word: FF 1F 00 E8
+        var dtsWavHeader = pcmHeader
+        dtsWavHeader[44] = 0xFF
+        dtsWavHeader[45] = 0x1F
+        dtsWavHeader[46] = 0x00
+        dtsWavHeader[47] = 0xE8
+        let dtsWavURL = tempDir.appendingPathComponent("dts_le14.wav")
+        try dtsWavHeader.write(to: dtsWavURL)
+        #expect(ExtendedAudioFormatSupport.supports(dtsWavURL))
+
+        // 3. DTS-WAV with 16-bit BE sync word: 7F FE 80 01
+        var dtsWav16Header = pcmHeader
+        dtsWav16Header[44] = 0x7F
+        dtsWav16Header[45] = 0xFE
+        dtsWav16Header[46] = 0x80
+        dtsWav16Header[47] = 0x01
+        let dtsWav16URL = tempDir.appendingPathComponent("dts_be16.wav")
+        try dtsWav16Header.write(to: dtsWav16URL)
+        #expect(ExtendedAudioFormatSupport.supports(dtsWav16URL))
+
+        // 4. DTS-WAV with formatTag 0x2001
+        var dtsTaggedHeader = pcmHeader
+        dtsTaggedHeader[20] = 0x01
+        dtsTaggedHeader[21] = 0x20
+        let dtsTaggedURL = tempDir.appendingPathComponent("dts_tagged.wav")
+        try dtsTaggedHeader.write(to: dtsTaggedURL)
+        #expect(ExtendedAudioFormatSupport.supports(dtsTaggedURL))
+    }
+
+    @Test("Multichannel PCM playback engine initializes for 5.1 and 6.1 streams")
+    func multichannelPCMEngineInitialization() async throws {
+        // Test 6-channel 5.1 stream
+        final class DummySession: PCMDecodeSession, @unchecked Sendable {
+            func read(maxFrames: Int) async throws -> PCMFrameBlock? { nil }
+            func seek(to seconds: TimeInterval) async throws {}
+            func close() async {}
+        }
+
+        let format51 = PCMStreamFormat(
+            sampleRate: 44100,
+            channels: 6,
+            duration: 120,
+            bitRate: 1411200,
+            formatHint: "DTS 5.1"
+        )
+        let resource51 = PCMPlaybackResource(format: format51, session: DummySession())
+        let engine51 = try await PCMPlaybackEngine(resource: resource51)
+        #expect(engine51.duration == 120)
+        await engine51.close()
+
+        // Test 7-channel 6.1 stream (DTS-ES)
+        let format61 = PCMStreamFormat(
+            sampleRate: 44100,
+            channels: 7,
+            duration: 256,
+            bitRate: 1411200,
+            formatHint: "DTS-ES 6.1"
+        )
+        let resource61 = PCMPlaybackResource(format: format61, session: DummySession())
+        let engine61 = try await PCMPlaybackEngine(resource: resource61)
+        #expect(engine61.duration == 256)
+        await engine61.close()
+    }
 }

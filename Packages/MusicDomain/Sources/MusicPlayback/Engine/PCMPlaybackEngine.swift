@@ -60,6 +60,7 @@ public final class PCMPlaybackEngine {
     private let decodeBlockFrames = 8192
     private var requestedVolume: Float = 1
     public private(set) var equalizerState = EqualizerState()
+    private let supportsEQ: Bool
     private var isStartingOutput = false
     private var isSeeking = false
 
@@ -76,37 +77,86 @@ public final class PCMPlaybackEngine {
         session = resource.session
         format = resource.format
         baseTime = max(0, initialTime)
-        guard let audioFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: resource.format.sampleRate,
-            channels: AVAudioChannelCount(resource.format.channels),
-            interleaved: false
-        ) else {
+        let channelCount = AVAudioChannelCount(resource.format.channels)
+        let resolvedFormat: AVAudioFormat?
+        if channelCount <= 2 {
+            resolvedFormat = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: resource.format.sampleRate,
+                channels: channelCount,
+                interleaved: false
+            )
+        } else {
+            let layoutTag: AudioChannelLayoutTag
+            switch channelCount {
+            case 3: layoutTag = kAudioChannelLayoutTag_MPEG_3_0_A
+            case 4: layoutTag = kAudioChannelLayoutTag_Quadraphonic
+            case 5: layoutTag = kAudioChannelLayoutTag_MPEG_5_0_A
+            case 6: layoutTag = kAudioChannelLayoutTag_AudioUnit_5_1
+            case 7: layoutTag = kAudioChannelLayoutTag_AudioUnit_6_1
+            case 8: layoutTag = kAudioChannelLayoutTag_AudioUnit_7_1
+            default: layoutTag = kAudioChannelLayoutTag_DiscreteInOrder | channelCount
+            }
+            if let layout = AVAudioChannelLayout(layoutTag: layoutTag) {
+                resolvedFormat = AVAudioFormat(
+                    commonFormat: .pcmFormatFloat32,
+                    sampleRate: resource.format.sampleRate,
+                    interleaved: false,
+                    channelLayout: layout
+                )
+            } else {
+                resolvedFormat = nil
+            }
+        }
+        guard let audioFormat = resolvedFormat else {
             throw PCMPlaybackEngineError.invalidAudioFormat
         }
         self.audioFormat = audioFormat
+        self.supportsEQ = channelCount <= 2
         audioEngine.attach(playerNode)
-        audioEngine.attach(equalizerNode)
-        audioEngine.attach(normalizationNode)
-        normalizationNode.bands[0].bypass = true
-        normalizationNode.globalGain = replayGainDB
-        for (index, frequency) in EqualizerState.frequencies.enumerated() {
-            let band = equalizerNode.bands[index]
-            band.filterType = .parametric
-            band.frequency = min(frequency, Float(resource.format.sampleRate * 0.45))
-            band.bandwidth = 1
-            band.bypass = false
-        }
-        if #available(macOS 27.0, iOS 27.0, tvOS 27.0, watchOS 27.0, *) {
-            try audioEngine.connectNode(playerNode, to: equalizerNode, format: audioFormat)
-            try audioEngine.connectNode(equalizerNode, to: normalizationNode, format: audioFormat)
-            try audioEngine.connectNode(normalizationNode, to: audioEngine.mainMixerNode, format: audioFormat)
+        if supportsEQ {
+            audioEngine.attach(equalizerNode)
+            audioEngine.attach(normalizationNode)
+            normalizationNode.bands[0].bypass = true
+            normalizationNode.globalGain = replayGainDB
+            for (index, frequency) in EqualizerState.frequencies.enumerated() {
+                let band = equalizerNode.bands[index]
+                band.filterType = .parametric
+                band.frequency = min(frequency, Float(resource.format.sampleRate * 0.45))
+                band.bandwidth = 1
+                band.bypass = false
+            }
+            if #available(macOS 27.0, iOS 27.0, tvOS 27.0, watchOS 27.0, *) {
+                try audioEngine.connectNode(playerNode, to: equalizerNode, format: audioFormat)
+                try audioEngine.connectNode(equalizerNode, to: normalizationNode, format: audioFormat)
+                try audioEngine.connectNode(normalizationNode, to: audioEngine.mainMixerNode, format: audioFormat)
+            } else {
+                audioEngine.connect(playerNode, to: equalizerNode, format: audioFormat)
+                audioEngine.connect(equalizerNode, to: normalizationNode, format: audioFormat)
+                audioEngine.connect(normalizationNode, to: audioEngine.mainMixerNode, format: audioFormat)
+            }
+            applyEqualizer(equalizer)
         } else {
-            audioEngine.connect(playerNode, to: equalizerNode, format: audioFormat)
-            audioEngine.connect(equalizerNode, to: normalizationNode, format: audioFormat)
-            audioEngine.connect(normalizationNode, to: audioEngine.mainMixerNode, format: audioFormat)
+            if #available(macOS 27.0, iOS 27.0, tvOS 27.0, watchOS 27.0, *) {
+                try audioEngine.connectNode(playerNode, to: audioEngine.mainMixerNode, format: audioFormat)
+            } else {
+                audioEngine.connect(playerNode, to: audioEngine.mainMixerNode, format: audioFormat)
+            }
         }
-        applyEqualizer(equalizer)
+
+        // Configure maximum frames per slice to avoid kAudioUnitErr_TooManyFramesToProcess during rate conversion
+        if supportsEQ {
+            Self.configureMaxFrames(node: equalizerNode)
+            Self.configureMaxFrames(node: normalizationNode)
+        }
+        Self.configureMaxFrames(node: audioEngine.mainMixerNode)
+        Self.configureMaxFrames(node: audioEngine.outputNode)
+
+        #if os(macOS)
+        if let outputDeviceID {
+            try? audioEngine.routeToMacOutput(deviceID: outputDeviceID)
+        }
+        #endif
         audioEngine.prepare()
         configurationObserver = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange, object: audioEngine, queue: nil
@@ -136,7 +186,7 @@ public final class PCMPlaybackEngine {
         isStartingOutput = true
         defer { isStartingOutput = false }
         var lastError: Error?
-        for attempt in 0..<3 {
+        for attempt in 0..<5 {
             try Task.checkCancellation()
             do {
                 if !audioEngine.isRunning {
@@ -146,7 +196,7 @@ public final class PCMPlaybackEngine {
                     try audioEngine.start()
                 }
                 // A routed output can report start success before its HAL format settles.
-                try await Task.sleep(for: .milliseconds(deviceID == nil ? 30 : 140))
+                try await Task.sleep(for: .milliseconds(deviceID == nil ? 30 : 100))
                 if audioEngine.isRunning { return }
                 lastError = PCMPlaybackEngineError.outputStopped
             } catch is CancellationError {
@@ -154,7 +204,7 @@ public final class PCMPlaybackEngine {
             } catch {
                 lastError = error
             }
-            if attempt < 2 { try await Task.sleep(for: .milliseconds(120)) }
+            if attempt < 4 { try await Task.sleep(for: .milliseconds(80 * (attempt + 1))) }
         }
         throw lastError ?? PCMPlaybackEngineError.outputStopped
     }
@@ -174,6 +224,10 @@ public final class PCMPlaybackEngine {
         var normalized = state
         normalized.sanitize()
         equalizerState = normalized
+        guard supportsEQ else {
+            playerNode.volume = requestedVolume
+            return
+        }
         equalizerNode.bypass = !normalized.isEnabled
         for (band, gain) in zip(equalizerNode.bands, normalized.gains) {
             band.gain = gain
@@ -182,6 +236,7 @@ public final class PCMPlaybackEngine {
     }
 
     public func setReplayGainDB(_ gain: Float) {
+        guard supportsEQ else { return }
         normalizationNode.globalGain = gain.isFinite ? min(max(gain, -30), 18) : 0
     }
 
@@ -420,6 +475,20 @@ public final class PCMPlaybackEngine {
         wantsToPlay = false
         baseTime = duration > 0 ? duration : currentTime
         onEnded?()
+    }
+
+    private static func configureMaxFrames(node: AVAudioNode, maxFrames: UInt32 = 4096) {
+        if #available(macOS 27.0, iOS 27.0, tvOS 27.0, watchOS 27.0, *) {
+            node.withAUAudioUnit { $0.maximumFramesToRender = maxFrames }
+            if let audioUnitNode = node as? AVAudioUnit {
+                var prop = maxFrames
+                _ = audioUnitNode.withAudioUnit { unit in
+                    AudioUnitSetProperty(unit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &prop, UInt32(MemoryLayout<UInt32>.size))
+                }
+            }
+        } else {
+            node.auAudioUnit.maximumFramesToRender = maxFrames
+        }
     }
 }
 

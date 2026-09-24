@@ -26,7 +26,7 @@ public struct LiquidWaveVisualizerView: View {
     }
 
     public var body: some View {
-        TimelineView(.animation(minimumInterval: isPlaying ? 1.0 / 60.0 : 1.0 / 30.0)) { timeline in
+        TimelineView(.animation(minimumInterval: isPlaying ? 1.0 / 30.0 : 1.0 / 6.0)) { timeline in
             Canvas { context, size in
                 let time = timeline.date.timeIntervalSinceReferenceDate
                 drawWaves(context: &context, size: size, time: time)
@@ -51,7 +51,7 @@ public struct LiquidWaveVisualizerView: View {
             var path = Path()
             path.move(to: CGPoint(x: 0, y: height))
 
-            let stepCount = 48
+            let stepCount = 28
             let dx = width / CGFloat(stepCount)
 
             var crestPoints: [CGPoint] = []

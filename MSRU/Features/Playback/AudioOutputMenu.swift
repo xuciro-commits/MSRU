@@ -32,12 +32,18 @@ struct AudioOutputMenu: View {
             if let note = playback.audioOutput.errorMessage { Text(note) }
             Text("Bit-perfect output is unverified")
         } label: {
-            Image(systemName: "hifispeaker")
-                .font(.system(size: 13))
-                .foregroundStyle(iconColor)
-                .frame(width: 20, height: 20)
+            HStack(spacing: 3) {
+                Image(systemName: "hifispeaker")
+                    .font(.system(size: 13))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+            }
+            .foregroundStyle(iconColor)
+            .frame(height: 20)
+            .contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
         .fixedSize()
         .help("Audio output: \(playback.audioOutput.displayName)")
     }

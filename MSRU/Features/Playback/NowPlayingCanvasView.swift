@@ -25,6 +25,7 @@ struct NowPlayingCanvasView: View {
     @State private var isEqualizerPresented: Bool = false
     @State private var isLyricsSearchPresented: Bool = false
     @State private var showCanvasVisualizer: Bool = false
+    @State private var isVisualizerFillMode: Bool = false
     @AppStorage("msru.visualizer.style") private var visualizerStyle: VisualizerStyle = .liquidWave
     @AppStorage("msru.visualizer.theme") private var visualizerTheme: VisualizerColorTheme = .aurora
     @State private var lyricsStore = LyricsStore.shared
@@ -61,7 +62,7 @@ struct NowPlayingCanvasView: View {
                     .padding(.horizontal, 36)
                     .padding(.bottom, 28)
             }
-            .frame(maxWidth: 820)
+            .frame(maxWidth: (showCanvasVisualizer && isVisualizerFillMode) ? 980 : 820)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             // Up Next Queue Slide-in Drawer
@@ -71,9 +72,11 @@ struct NowPlayingCanvasView: View {
             }
         }
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: isQueueDrawerPresented)
+        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: isVisualizerFillMode)
         .onChange(of: isLyricsPresented) { _, presented in
             if presented {
                 lyricsStore.sync(with: playback)
+                showCanvasVisualizer = false
             }
         }
         .sheet(isPresented: $isLyricsSearchPresented) {
@@ -126,33 +129,13 @@ struct NowPlayingCanvasView: View {
     // MARK: - Center Content
 
     private var centerArtworkAndDetails: some View {
-        VStack(spacing: 22) {
+        VStack(spacing: 20) {
             if showCanvasVisualizer {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(Color.white.opacity(0.06))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-                        )
-
-                    UnifiedVisualizerView(
-                        style: visualizerStyle,
-                        theme: visualizerTheme,
-                        isPlaying: playback.isPlaying,
-                        volume: playback.effectiveVolume,
-                        sensitivity: 1.15
-                    )
-                    .padding(20)
-                }
-                .frame(width: 280, height: 280)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        showCanvasVisualizer = false
-                    }
-                }
-                .help("Click to switch back to album artwork")
+                canvasVisualizerCard
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.95).combined(with: .opacity),
+                        removal: .scale(scale: 0.95).combined(with: .opacity)
+                    ))
             } else {
                 artworkCard
                     .frame(width: 280, height: 280)
@@ -163,7 +146,7 @@ struct NowPlayingCanvasView: View {
                             showCanvasVisualizer = true
                         }
                     }
-                    .help("Click to view full audio visualizer")
+                    .help("Click to view full audio visualizer (展开频谱)")
             }
 
             VStack(spacing: 8) {
@@ -194,14 +177,38 @@ struct NowPlayingCanvasView: View {
                     .padding(.top, 4)
                 }
 
-                AudioVisualizerView(
-                    isPlaying: playback.isPlaying,
-                    volume: playback.effectiveVolume,
-                    barCount: 9,
-                    barWidth: 3.5,
-                    maxHeight: 22,
-                    tintColor: .white
-                )
+                // Interactive mini visualizer pill / mode toggle under artist
+                Button {
+                    withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) {
+                        showCanvasVisualizer.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        AudioVisualizerView(
+                            isPlaying: (!showCanvasVisualizer) && playback.isPlaying,
+                            volume: playback.effectiveVolume,
+                            barCount: 13,
+                            barWidth: 3.5,
+                            spacing: 3,
+                            maxHeight: 18,
+                            minHeight: 3,
+                            tintColor: visualizerTheme.primaryColor
+                        )
+                        if showCanvasVisualizer {
+                            Text(visualizerStyle.title)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.85))
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.08), in: Capsule())
+                    .overlay(
+                        Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .help(showCanvasVisualizer ? "Collapse visualizer" : "Expand audio visualizer (展开频谱)")
                 .padding(.top, 4)
 
                 if let formatInfo = playback.audioFormatInfo {
@@ -211,6 +218,128 @@ struct NowPlayingCanvasView: View {
             }
             .padding(.horizontal, 20)
         }
+    }
+
+    private var canvasVisualizerCard: some View {
+        VStack(spacing: 12) {
+            // Visualizer Toolbar (Style Selector + Theme Dots + Enlarge/Restore + Artwork switch)
+            HStack(spacing: 10) {
+                // Style Selector Menu
+                Menu {
+                    Picker("Style", selection: $visualizerStyle) {
+                        ForEach(VisualizerStyle.allCases) { style in
+                            Label(style.title, systemImage: style.icon)
+                                .tag(style)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: visualizerStyle.icon)
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(visualizerStyle.title)
+                            .font(.system(size: 12, weight: .medium))
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+
+                Spacer()
+
+                // Theme color dots
+                HStack(spacing: 7) {
+                    ForEach(VisualizerColorTheme.allCases) { theme in
+                        Circle()
+                            .fill(theme.primaryColor)
+                            .frame(width: visualizerTheme == theme ? 14 : 10, height: visualizerTheme == theme ? 14 : 10)
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(Color.white, lineWidth: visualizerTheme == theme ? 1.5 : 0)
+                            )
+                            .onTapGesture {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    visualizerTheme = theme
+                                }
+                            }
+                            .help(theme.title)
+                    }
+                }
+
+                Spacer()
+
+                // "铺满" / Enlarge Toggle Button
+                Button {
+                    withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) {
+                        isVisualizerFillMode.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: isVisualizerFillMode ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(isVisualizerFillMode ? "Restore" : "Fill Canvas")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.12), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .help(isVisualizerFillMode ? "Restore standard size" : "Fill Canvas (铺满画布)")
+
+                // Switch back to album artwork button
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        showCanvasVisualizer = false
+                    }
+                } label: {
+                    Image(systemName: "photo")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .padding(5)
+                        .background(Color.white.opacity(0.12), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .help("Show album artwork")
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+
+            // Visualizer Canvas Frame
+            UnifiedVisualizerView(
+                style: visualizerStyle,
+                theme: visualizerTheme,
+                isPlaying: playback.isPlaying,
+                volume: playback.effectiveVolume,
+                sensitivity: 1.15
+            )
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+        }
+        .frame(maxWidth: isVisualizerFillMode ? .infinity : 580)
+        .frame(height: isVisualizerFillMode ? 350 : 270)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color.white.opacity(0.06))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.22), Color.white.opacity(0.06)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+        )
+        .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
     }
 
     private var artworkCard: some View {
@@ -305,15 +434,16 @@ struct NowPlayingCanvasView: View {
                 .help(playback.isMuted ? "Unmute" : "Mute")
 
                 // Volume slider
-                Slider(
-                    value: Binding(
-                        get: { Double(playback.volume) },
-                        set: { playback.setVolume(Float($0)) }
+                CanvasVolumeSlider(
+                    volume: Binding(
+                        get: { playback.volume },
+                        set: { playback.setVolume($0) }
                     ),
-                    in: 0...1
+                    onVolumeChanged: { newVol in
+                        playback.setVolume(newVol)
+                    }
                 )
-                .tint(.white)
-                .frame(maxWidth: 160)
+                .frame(width: 140)
 
                 Image(systemName: "speaker.wave.3.fill")
                     .font(.system(size: 13))
@@ -334,7 +464,7 @@ struct NowPlayingCanvasView: View {
                 }
 
                 #if os(macOS)
-                AudioOutputMenu(playback: playback, iconColor: .white.opacity(0.75))
+                AudioOutputMenu(playback: playback, iconColor: .white.opacity(0.85))
                 #endif
 
                 Spacer()
@@ -344,6 +474,9 @@ struct NowPlayingCanvasView: View {
                     Button {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                             isLyricsPresented.toggle()
+                            if isLyricsPresented {
+                                showCanvasVisualizer = false
+                            }
                         }
                     } label: {
                         HStack(spacing: 6) {
@@ -365,6 +498,34 @@ struct NowPlayingCanvasView: View {
                     .buttonStyle(.plain)
                     .help("Toggle Lyrics")
                 }
+
+                // Visualizer toggle
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        showCanvasVisualizer.toggle()
+                        if showCanvasVisualizer {
+                            isLyricsPresented = false
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: showCanvasVisualizer ? "waveform.path.ecg" : "waveform")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Visualizer")
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .foregroundStyle(showCanvasVisualizer ? Color.accentColor : Color.white.opacity(0.8))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        showCanvasVisualizer
+                            ? Color.white.opacity(0.22)
+                            : Color.white.opacity(0.1),
+                        in: Capsule()
+                    )
+                }
+                .buttonStyle(.plain)
+                .help("Toggle Visualizer (切换频谱)")
 
                 // Queue drawer toggle
                 Button {
@@ -774,6 +935,61 @@ struct NowPlayingCanvasView: View {
             .shadow(color: .black.opacity(0.5), radius: 24, x: -8, y: 0)
             .padding(16)
         }
+    }
+}
+
+// MARK: - Canvas Volume Slider
+
+/// Dedicated immersive canvas volume slider with high-contrast semi-translucent white track and draggable thumb.
+struct CanvasVolumeSlider: View {
+    @Binding var volume: Float
+    var onVolumeChanged: ((Float) -> Void)? = nil
+
+    var body: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            let clampedVolume = CGFloat(max(0, min(1, volume)))
+
+            ZStack(alignment: .leading) {
+                // Background Track - Translucent white capsule clearly visible against dark canvas
+                Capsule()
+                    .fill(Color.white.opacity(0.24))
+                    .frame(height: 4)
+
+                // Filled Volume Track - Bright solid white
+                Capsule()
+                    .fill(Color.white)
+                    .frame(width: max(0, width * clampedVolume), height: 4)
+
+                // Thumb Knob - Smooth white circle with subtle shadow
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 12, height: 12)
+                    .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
+                    .offset(x: max(0, min(max(0, width - 12), width * clampedVolume - 6)))
+            }
+            .frame(height: geo.size.height)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { gesture in
+                        let fraction = width > 0 ? (gesture.location.x / width) : 0
+                        let clamped = Float(max(0, min(1, fraction)))
+                        volume = clamped
+                        onVolumeChanged?(clamped)
+                    }
+            )
+        }
+        .frame(height: 20)
+    }
+}
+
+#Preview("Canvas Volume Slider") {
+    ZStack {
+        Color.black.ignoresSafeArea()
+        CanvasVolumeSlider(volume: .constant(0.65))
+            .frame(width: 140)
+            .padding()
     }
 }
 

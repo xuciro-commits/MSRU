@@ -33,7 +33,7 @@ public struct StudioBarsVisualizerView: View {
     }
 
     public var body: some View {
-        TimelineView(.animation(minimumInterval: isPlaying ? 1.0 / 60.0 : 1.0 / 30.0)) { timeline in
+        TimelineView(.animation(minimumInterval: isPlaying ? 1.0 / 30.0 : 1.0 / 6.0)) { timeline in
             Canvas { context, size in
                 let time = timeline.date.timeIntervalSinceReferenceDate
                 drawBars(context: &context, size: size, time: time)
@@ -61,6 +61,12 @@ public struct StudioBarsVisualizerView: View {
         let totalSegmentStep = segmentHeight + segmentGap
         let maxSegments = max(1, Int(maxHeight / totalSegmentStep))
 
+        var unlitPath = Path()
+        var primaryPath = Path()
+        var amberPath = Path()
+        var redPath = Path()
+        var peakPath = Path()
+
         for i in 0..<count {
             let energy = VisualizerEngine.computeBand(
                 index: i,
@@ -74,42 +80,37 @@ public struct StudioBarsVisualizerView: View {
             let x = CGFloat(i) * (barWidth + spacing)
             let activeSegments = Int(Double(maxSegments) * energy)
 
-            // Draw stacked LED segments
+            // Batch all segment rectangles into respective color paths
             for s in 0..<maxSegments {
                 let segY = size.height - CGFloat(s + 1) * totalSegmentStep
                 let segRect = CGRect(x: x, y: segY, width: barWidth, height: segmentHeight)
-                let segPath = Path(roundedRect: segRect, cornerRadius: 1.0)
-
-                let segNorm = Double(s) / Double(maxSegments)
-
-                let segColor: Color
-                if segNorm < 0.60 {
-                    segColor = theme.primaryColor
-                } else if segNorm < 0.85 {
-                    segColor = Color(red: 1.0, green: 0.78, blue: 0.20) // Amber
-                } else {
-                    segColor = Color(red: 1.0, green: 0.28, blue: 0.25) // Peak Red
-                }
 
                 if s < activeSegments {
-                    // Active lit LED
-                    context.fill(segPath, with: .color(segColor))
+                    let segNorm = Double(s) / Double(maxSegments)
+                    if segNorm < 0.60 {
+                        primaryPath.addRoundedRect(in: segRect, cornerSize: CGSize(width: 1, height: 1))
+                    } else if segNorm < 0.85 {
+                        amberPath.addRoundedRect(in: segRect, cornerSize: CGSize(width: 1, height: 1))
+                    } else {
+                        redPath.addRoundedRect(in: segRect, cornerSize: CGSize(width: 1, height: 1))
+                    }
                 } else {
-                    // Inactive dim unlit LED (gives authentic dark hardware rack grid look)
-                    context.fill(segPath, with: .color(Color.primary.opacity(0.04)))
+                    unlitPath.addRoundedRect(in: segRect, cornerSize: CGSize(width: 1, height: 1))
                 }
             }
 
             // Draw floating peak hold indicator
             let peakY = size.height - CGFloat(activeSegments + 1) * totalSegmentStep - 2
             let peakRect = CGRect(x: x, y: max(0, peakY), width: barWidth, height: 2.0)
-            let peakPath = Path(roundedRect: peakRect, cornerRadius: 0.8)
-            let peakColor = (Double(activeSegments) / Double(maxSegments) > 0.8)
-                ? Color(red: 1.0, green: 0.35, blue: 0.35)
-                : Color.white.opacity(0.85)
-
-            context.fill(peakPath, with: .color(peakColor))
+            peakPath.addRoundedRect(in: peakRect, cornerSize: CGSize(width: 0.8, height: 0.8))
         }
+
+        // Render thousands of segments in just 5 high-speed batched GPU draw passes
+        context.fill(unlitPath, with: .color(Color.primary.opacity(0.04)))
+        context.fill(primaryPath, with: .color(theme.primaryColor))
+        context.fill(amberPath, with: .color(Color(red: 1.0, green: 0.78, blue: 0.20)))
+        context.fill(redPath, with: .color(Color(red: 1.0, green: 0.28, blue: 0.25)))
+        context.fill(peakPath, with: .color(Color.white.opacity(0.9)))
     }
 }
 

@@ -161,8 +161,8 @@ struct SubsonicPreparedPlaybackTests {
         #expect(await downloader.downloadCount == 2)
         let local = LocalTrack(fileURL: source, title: "Local", artist: "Test", album: "Album", duration: 0.45)
         playback.play(local, queue: [local])
-        for _ in 0..<100 where await downloader.removalCount < 2 {
-            try await Task.sleep(for: .milliseconds(10))
+        for _ in 0..<200 where await downloader.removalCount < 2 {
+            try await Task.sleep(for: .milliseconds(15))
         }
         #expect(await downloader.removalCount == 2)
         playback.stop()

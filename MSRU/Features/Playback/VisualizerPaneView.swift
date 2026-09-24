@@ -234,58 +234,41 @@ struct AudioVisualizerView: View {
     var minHeight: CGFloat = 4
     var tintColor: Color = .accentColor
 
-    @ViewBuilder
+    private var totalWidth: CGFloat {
+        CGFloat(barCount) * barWidth + CGFloat(max(0, barCount - 1)) * spacing
+    }
+
     var body: some View {
-        TimelineView(.animation(minimumInterval: isPlaying ? 1.0 / 60.0 : 1.0 / 30.0)) { timeline in
-            barsView(time: timeline.date.timeIntervalSinceReferenceDate)
-        }
-    }
+        TimelineView(.animation(minimumInterval: isPlaying ? 1.0 / 30.0 : 1.0 / 5.0)) { timeline in
+            Canvas { context, size in
+                let time = timeline.date.timeIntervalSinceReferenceDate
+                let range = maxHeight - minHeight
+                let baselineY = size.height * 0.5
 
-    private func barsView(time: Double) -> some View {
-        HStack(alignment: .center, spacing: spacing) {
-            ForEach(0..<barCount, id: \.self) { index in
-                let height = barHeight(for: index, time: time)
-                let opacity = barOpacity(for: index)
+                var allBarsPath = Path()
 
-                Capsule(style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                tintColor.opacity(0.7),
-                                tintColor,
-                                tintColor.opacity(0.95)
-                            ],
-                            startPoint: .bottom,
-                            endPoint: .top
-                        )
+                for index in 0..<barCount {
+                    let energy = VisualizerEngine.computeBand(
+                        index: index,
+                        totalBands: barCount,
+                        time: time,
+                        isPlaying: isPlaying,
+                        volume: volume,
+                        sensitivity: 1.0
                     )
-                    .opacity(opacity)
-                    .frame(width: barWidth, height: height)
-                    .shadow(color: tintColor.opacity(isPlaying ? 0.35 : 0.0), radius: 3, y: 0)
+                    let height = minHeight + range * CGFloat(energy)
+                    let x = CGFloat(index) * (barWidth + spacing)
+                    let y = baselineY - height * 0.5
+
+                    let rect = CGRect(x: x, y: y, width: barWidth, height: height)
+                    allBarsPath.addRoundedRect(in: rect, cornerSize: CGSize(width: barWidth * 0.5, height: barWidth * 0.5))
+                }
+
+                // Render all bars in a single high-efficiency GPU draw call
+                context.fill(allBarsPath, with: .color(tintColor))
             }
+            .frame(width: totalWidth, height: maxHeight)
         }
-        .frame(height: maxHeight)
-    }
-
-    private func barHeight(for index: Int, time: Double) -> CGFloat {
-        let energy = VisualizerEngine.computeBand(
-            index: index,
-            totalBands: barCount,
-            time: time,
-            isPlaying: isPlaying,
-            volume: volume,
-            sensitivity: 1.0
-        )
-        let range = maxHeight - minHeight
-        return minHeight + range * CGFloat(energy)
-    }
-
-    private func barOpacity(for index: Int) -> Double {
-        if !isPlaying {
-            return 0.35
-        }
-        let normalized = Double(index) / Double(max(1, barCount - 1))
-        return 0.75 + 0.25 * (1.0 - abs(normalized - 0.5))
     }
 }
 
