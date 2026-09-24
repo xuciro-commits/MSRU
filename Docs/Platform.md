@@ -77,7 +77,7 @@ The kernel is defined by six parts, all in `Contract/` (the seed of the platform
 
 **Conformance.** An implementation conforms to a version for the concepts whose vectors it passes in full. Vector format: `{contract, concept, vectors: [{id, rules, given, steps: [{<operation>, expect}], expectLog?}]}`. Schema objects use Protobuf JSON names and are parsed strictly. Values assigned by the implementation are referenced indirectly (`"$step:N"` for the change ID produced by step N; `sameAs: N` for a replay of step N). The authority clock is given per step (`at`), so results are deterministic.
 
-**Current coverage.** K1 Identity, K2 Fact kinds with K3 Provenance, K4 Change record, K7 Schema evolution (`v1alpha1`). K4 C1 now also requires `authority`, the provenance of a decision (breaking, alpha).
+**Current coverage** (`v1alpha1`): K1 Identity, K2 Fact kinds with K3 Provenance, K4 Change record, K5 Authority and sync, K7 Schema evolution. Not yet specified: K6 (principals, policy), K8, K9. Open cases recorded in the specs: atomic groups of changes (K4), batched provenance for high-rate observations (K3), negotiated authority (K5).
 
 
 ### Fact kinds across domains
