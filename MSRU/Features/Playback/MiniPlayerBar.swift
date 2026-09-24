@@ -332,6 +332,7 @@ struct MiniPlayerBar: View {
             placeholderSystemImage: "music.note",
             cornerRadius: size > 36 ? 7 : 6
         )
+        .id(playback.unifiedArtworkReference)
     }
 
     private func artworkPlaceholder(size: CGFloat = 42) -> some View {

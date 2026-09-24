@@ -35,8 +35,12 @@ struct MSRUApp:
         #if os(macOS)
 
         Settings {
-
-            EmptyView()
+            SettingsView(
+                playback: appDelegate.playback,
+                providerManager: appDelegate.application.providerManager,
+                languageSettings: appDelegate.application.languageSettings
+            )
+            .frame(minWidth: 740, idealWidth: 840, minHeight: 480, idealHeight: 560)
         }
         .commands {
 

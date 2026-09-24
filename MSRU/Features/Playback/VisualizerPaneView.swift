@@ -44,35 +44,71 @@ struct VisualizerPaneView: View {
                 }
 
                 // Waveform spectrum visualizer card
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 14) {
                     HStack {
                         Label("Real-time Visualizer", systemImage: "waveform")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                         Spacer()
                         if playback.isPlaying {
-                            Text("Running")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(.green)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.green.opacity(0.12), in: Capsule())
+                            HStack(spacing: 5) {
+                                Circle()
+                                    .fill(Color.green)
+                                    .frame(width: 5, height: 5)
+                                Text("Running")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(.green)
+                            }
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(Color.green.opacity(0.12), in: Capsule())
                         }
                     }
 
                     AudioVisualizerView(
                         isPlaying: playback.isPlaying,
                         volume: playback.effectiveVolume,
-                        barCount: 15,
-                        barWidth: 6,
-                        maxHeight: 70,
+                        barCount: 21,
+                        barWidth: 5,
+                        spacing: 4.5,
+                        maxHeight: 76,
                         tintColor: .accentColor
                     )
-                    .frame(height: 70)
+                    .frame(height: 76)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.primary.opacity(0.035))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+                            )
+                    )
+
+                    // Frequency axis labels
+                    HStack {
+                        Text("32 Hz")
+                        Spacer()
+                        Text("500 Hz")
+                        Spacer()
+                        Text("2 kHz")
+                        Spacer()
+                        Text("16 kHz")
+                    }
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 4)
                 }
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.primary.opacity(0.02))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .strokeBorder(Color.primary.opacity(0.04), lineWidth: 1)
+                        )
+                )
                 .padding(.horizontal, 16)
 
                 // Audio specs table
@@ -132,76 +168,87 @@ struct VisualizerPaneView: View {
 
 // MARK: - Audio Visualizer View
 
-/// Dynamic multi-bar audio waveform visualizer.
+/// Dynamic multi-bar audio waveform visualizer driven by smooth continuous TimelineView.
 struct AudioVisualizerView: View {
     let isPlaying: Bool
     var volume: Float = 1.0
-    var barCount: Int = 7
-    var barWidth: CGFloat = 3.5
-    var spacing: CGFloat = 3
+    var barCount: Int = 19
+    var barWidth: CGFloat = 4.5
+    var spacing: CGFloat = 3.5
     var maxHeight: CGFloat = 28
     var minHeight: CGFloat = 4
     var tintColor: Color = .accentColor
 
-    @State private var phase: Double = 0.0
-
+    @ViewBuilder
     var body: some View {
+        if isPlaying {
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                barsView(time: timeline.date.timeIntervalSinceReferenceDate)
+            }
+        } else {
+            barsView(time: 0.0)
+        }
+    }
+
+    private func barsView(time: Double) -> some View {
         HStack(alignment: .center, spacing: spacing) {
             ForEach(0..<barCount, id: \.self) { index in
+                let height = barHeight(for: index, time: time)
+                let opacity = barOpacity(for: index)
+
                 Capsule(style: .continuous)
-                    .fill(tintColor.opacity(barOpacity(for: index)))
-                    .frame(
-                        width: barWidth,
-                        height: barHeight(for: index)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                tintColor.opacity(0.7),
+                                tintColor,
+                                tintColor.opacity(0.95)
+                            ],
+                            startPoint: .bottom,
+                            endPoint: .top
+                        )
                     )
+                    .opacity(opacity)
+                    .frame(width: barWidth, height: height)
+                    .shadow(color: tintColor.opacity(isPlaying ? 0.35 : 0.0), radius: 3, y: 0)
             }
         }
         .frame(height: maxHeight)
-        .onAppear {
-            if isPlaying {
-                startAnimation()
-            }
-        }
-        .onChange(of: isPlaying) { _, playing in
-            if playing {
-                startAnimation()
-            } else {
-                withAnimation(.easeOut(duration: 0.35)) {
-                    phase = 0.0
-                }
-            }
-        }
     }
 
-    private func startAnimation() {
-        withAnimation(
-            .easeInOut(duration: 0.65)
-            .repeatForever(autoreverses: true)
-        ) {
-            phase = 1.0
-        }
-    }
-
-    private func barHeight(for index: Int) -> CGFloat {
+    private func barHeight(for index: Int, time: Double) -> CGFloat {
         guard isPlaying else { return minHeight }
 
         let normalizedIndex = Double(index) / Double(max(1, barCount - 1))
-        let centerWeight = 1.0 - abs(normalizedIndex - 0.5) * 1.2
-        let harmonicFactor = sin((Double(index) * 0.9) + (phase * .pi))
 
-        let dynamicScale = (centerWeight * 0.55 + 0.45) * (0.35 + 0.65 * abs(harmonicFactor))
-        let effectiveVolume = CGFloat(max(0.15, min(1.0, volume)))
-        let targetHeight = minHeight + (maxHeight - minHeight) * CGFloat(dynamicScale) * effectiveVolume
+        // Multi-frequency wave simulation:
+        // Bass (low frequencies): deep rhythm bounce
+        // Mids: melodic dynamics
+        // Treble: rapid shimmer
+        let bass = sin(time * 3.8 + normalizedIndex * 2.2) * 0.35
+        let mid = cos(time * 5.6 - normalizedIndex * 4.5) * 0.3
+        let treble = sin(time * 8.8 + Double(index) * 0.95) * 0.2
+        let shimmer = sin(time * 13.0 - Double(index) * 1.6) * 0.15
 
-        return max(minHeight, min(maxHeight, targetHeight))
+        // Natural spectrum envelope (full bass and vibrant mids with gentle taper)
+        let centerDist = abs(normalizedIndex - 0.42)
+        let envelope = max(0.3, 1.0 - centerDist * 0.95)
+
+        let composite = (bass + mid + treble + shimmer + 1.0) * 0.5 * envelope
+        let dynamicScale = max(0.08, min(1.0, composite))
+        let effectiveVolume = CGFloat(max(0.25, min(1.0, volume)))
+        let range = maxHeight - minHeight
+        let calculated = minHeight + range * CGFloat(dynamicScale) * effectiveVolume
+
+        return max(minHeight, min(maxHeight, calculated))
     }
 
     private func barOpacity(for index: Int) -> Double {
         if !isPlaying {
-            return 0.4
+            return 0.35
         }
         let normalized = Double(index) / Double(max(1, barCount - 1))
-        return 0.65 + 0.35 * (1.0 - abs(normalized - 0.5))
+        return 0.75 + 0.25 * (1.0 - abs(normalized - 0.5))
     }
 }
 

@@ -142,20 +142,23 @@ public struct ArtworkThumbnailView: View {
 
     // MARK: - View Body
 
-    @ViewBuilder
     public var body: some View {
-        let base = baseThumbnailView
-
-        if let ref = mediaReference, loadedImage == nil {
-            base.task(id: ref) {
+        baseThumbnailView
+            .task(id: mediaReference) {
+                guard let ref = mediaReference else {
+                    loadedImage = nil
+                    return
+                }
+                if let cached = MediaImagePipeline.shared.cachedThumbnail(for: ref, targetSize: thumbnailPixelSize) {
+                    loadedImage = cached
+                    return
+                }
+                loadedImage = nil
                 let image = await MediaImagePipeline.shared.loadThumbnail(for: ref, targetSize: thumbnailPixelSize)
                 if !Task.isCancelled {
                     loadedImage = image
                 }
             }
-        } else {
-            base
-        }
     }
 
     private var baseThumbnailView: some View {

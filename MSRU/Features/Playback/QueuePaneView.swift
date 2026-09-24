@@ -8,33 +8,37 @@ struct QueuePaneView: View {
     @Bindable var playback: PlaybackController
 
     var body: some View {
-        if playback.playbackQueue.current == nil && playback.playbackQueue.upcoming.isEmpty {
-            ContentUnavailableView("Queue is empty", systemImage: "music.note.list",
-                description: Text("Please play a track from the library or browse page."))
-        } else {
-            List {
-                if let current = playback.playbackQueue.current {
-                    Section("Now Playing") { row(current, isCurrent: true) }
-                }
-                if !playback.playbackQueue.upcoming.isEmpty {
-                    Section("Up Next") {
-                        ForEach(playback.playbackQueue.upcoming) { item in
-                            row(item, isCurrent: false)
-                                .contextMenu {
-                                    Button("Remove from Queue", role: .destructive) {
-                                        playback.removeUpcoming(id: item.id)
+        Group {
+            if playback.playbackQueue.current == nil && playback.playbackQueue.upcoming.isEmpty {
+                ContentUnavailableView("Queue is empty", systemImage: "music.note.list",
+                    description: Text("Please play a track from the library or browse page."))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List {
+                    if let current = playback.playbackQueue.current {
+                        Section("Now Playing") { row(current, isCurrent: true) }
+                    }
+                    if !playback.playbackQueue.upcoming.isEmpty {
+                        Section("Up Next") {
+                            ForEach(playback.playbackQueue.upcoming) { item in
+                                row(item, isCurrent: false)
+                                    .contextMenu {
+                                        Button("Remove from Queue", role: .destructive) {
+                                            playback.removeUpcoming(id: item.id)
+                                        }
                                     }
-                                }
+                            }
+                            .onDelete { playback.removeUpcoming(at: $0) }
+                            .onMove { playback.moveUpcoming(fromOffsets: $0, toOffset: $1) }
                         }
-                        .onDelete { playback.removeUpcoming(at: $0) }
-                        .onMove { playback.moveUpcoming(fromOffsets: $0, toOffset: $1) }
                     }
                 }
+                .listStyle(.inset)
+                .scrollContentBackground(.hidden)
+                .hideScrollIndicatorsCompletely()
             }
-            .listStyle(.inset)
-            .scrollContentBackground(.hidden)
-            .hideScrollIndicatorsCompletely()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func row(_ queued: PlaybackQueueItem, isCurrent: Bool) -> some View {
