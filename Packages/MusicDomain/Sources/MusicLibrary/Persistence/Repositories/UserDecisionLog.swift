@@ -44,6 +44,8 @@ nonisolated public struct DecisionSubmission: Hashable, Codable, Sendable {
     public var payload = Data()
     /// Facts (here: metadata claims) the decision is based on (C11).
     public var evidenceFactIds: [String] = []
+    /// The target's revision the submitter saw; a different current revision is a conflict (C12).
+    public var expectedRevision: UInt32?
 
     public init() {}
 
@@ -61,6 +63,7 @@ nonisolated public struct DecisionSubmission: Hashable, Codable, Sendable {
         idempotencyKey = try c.decodeIfPresent(String.self, forKey: .idempotencyKey) ?? ""
         payload = try c.decodeIfPresent(Data.self, forKey: .payload) ?? Data()
         evidenceFactIds = try c.decodeIfPresent([String].self, forKey: .evidenceFactIds) ?? []
+        expectedRevision = try c.decodeIfPresent(UInt32.self, forKey: .expectedRevision)
     }
 }
 
@@ -69,6 +72,8 @@ nonisolated public struct DecisionRecord: Hashable, Sendable {
     public let submission: DecisionSubmission
     public let validTime: Date
     public let recordedTime: Date
+    /// The target's revision after this decision: accepted decisions about it so far (C12).
+    public let revision: UInt32
 }
 
 /// Contract error codes this log can return.
@@ -77,6 +82,7 @@ nonisolated public enum DecisionError: String, Error, Sendable {
     case invalidReference = "ERROR_CODE_INVALID_REFERENCE"
     case idempotencyConflict = "ERROR_CODE_IDEMPOTENCY_CONFLICT"
     case unknownSchema = "ERROR_CODE_UNKNOWN_SCHEMA"
+    case conflict = "ERROR_CODE_CONFLICT"
 }
 
 nonisolated public enum UserDecisionLog {
@@ -85,7 +91,7 @@ nonisolated public enum UserDecisionLog {
     public static let localPrincipal = "local-owner"
     public static let deviceAuthority = "device"
 
-    /// Accepts a submission or rejects it; a rejection writes nothing (C1–C11). `knownFact`
+    /// Accepts a submission or rejects it; a rejection writes nothing (C1–C12). `knownFact`
     /// overrides where evidence is looked up; by default the local tenant's metadata claims.
     @discardableResult
     public static func submit(_ s: DecisionSubmission, knownSchemas: Set<DecisionSchema>, at now: Date,
@@ -109,20 +115,25 @@ nonisolated public enum UserDecisionLog {
                 "SELECT EXISTS (SELECT 1 FROM metadata_claims WHERE id = ?)", arguments: [fact]) == true)
             guard known else { throw DecisionError.invalidReference }
         }
+        let current = try UInt32.fetchOne(db, sql: """
+            SELECT COUNT(*) FROM user_decisions WHERE tenant_id = ? AND target_type = ? AND target_id = ?
+            """, arguments: [s.tenantId, s.target.type, s.target.id]) ?? 0
+        if let expected = s.expectedRevision, expected != current { throw DecisionError.conflict }
         let last = try Date.fetchOne(db, sql: "SELECT MAX(recorded_time) FROM user_decisions WHERE tenant_id = ?",
                                      arguments: [s.tenantId])
         let recorded = max(now, last ?? now)
         let result = DecisionRecord(changeId: UUID().uuidString, submission: s,
-                                    validTime: s.validTime ?? recorded, recordedTime: recorded)
+                                    validTime: s.validTime ?? recorded, recordedTime: recorded, revision: current + 1)
         try db.execute(sql: """
             INSERT INTO user_decisions (change_id, tenant_id, principal_id, authority, target_type, target_id,
                 schema_name, schema_version, valid_time, submitted_valid_time, recorded_time, causation_id,
-                correlation_id, idempotency_key, payload, evidence_fact_ids)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                correlation_id, idempotency_key, payload, evidence_fact_ids, expected_revision, revision)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, arguments: [result.changeId, s.tenantId, s.principalId, s.authority, s.target.type, s.target.id,
                              s.schema.name, s.schema.version, result.validTime, s.validTime, recorded, s.causationId,
                              s.correlationId, s.idempotencyKey, s.payload,
-                             String(decoding: try JSONEncoder().encode(s.evidenceFactIds), as: UTF8.self)])
+                             String(decoding: try JSONEncoder().encode(s.evidenceFactIds), as: UTF8.self),
+                             s.expectedRevision, result.revision])
         return result
     }
 
@@ -147,7 +158,8 @@ nonisolated public enum UserDecisionLog {
         s.idempotencyKey = row["idempotency_key"]
         s.payload = row["payload"]
         s.evidenceFactIds = (try? JSONDecoder().decode([String].self, from: Data((row["evidence_fact_ids"] as String? ?? "[]").utf8))) ?? []
-        return DecisionRecord(changeId: row["change_id"], submission: s,
-                              validTime: row["valid_time"], recordedTime: row["recorded_time"])
+        s.expectedRevision = row["expected_revision"]
+        return DecisionRecord(changeId: row["change_id"], submission: s, validTime: row["valid_time"],
+                              recordedTime: row["recorded_time"], revision: row["revision"])
     }
 }

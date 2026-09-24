@@ -35,14 +35,28 @@ nonisolated public enum MetadataCorrections {
         }
     }
 
+    /// A recording's corrections, oldest first, and its revision: what a later
+    /// correction names as seen, so one made from a stale screen is refused (K4 C12).
+    public struct History: Hashable, Sendable {
+        public let corrections: [Correction]
+        public let revision: UInt32
+
+        nonisolated public init(corrections: [Correction] = [], revision: UInt32 = 0) {
+            self.corrections = corrections
+            self.revision = revision
+        }
+    }
+
     struct Payload: Codable {
         let field: Field
         let value: String?
     }
 
-    /// Records a correction and updates the projection in one transaction.
-    public static func correct(_ recordingID: RecordingID, field: Field, value: String?, at now: Date = Date(),
-                               in db: Database) throws {
+    /// Records a correction and updates the projection in one transaction; returns the
+    /// recording's new revision. `expectedRevision` is the revision the user saw.
+    @discardableResult
+    public static func correct(_ recordingID: RecordingID, field: Field, value: String?, expectedRevision: UInt32? = nil,
+                               at now: Date = Date(), in db: Database) throws -> UInt32 {
         let target = DecisionTarget(type: targetType, id: recordingID.rawValue)
         let previous = try UserDecisionLog.records(tenant: UserDecisionLog.localTenant, target: target, in: db)
             .last { (try? JSONDecoder().decode(Payload.self, from: $0.submission.payload))?.field == field }
@@ -55,7 +69,8 @@ nonisolated public enum MetadataCorrections {
         s.causationId = previous?.changeId ?? ""
         s.idempotencyKey = UUID().uuidString
         s.payload = try JSONEncoder().encode(Payload(field: field, value: value))
-        try UserDecisionLog.submit(s, knownSchemas: [schema], at: now, in: db)
+        s.expectedRevision = expectedRevision
+        let record = try UserDecisionLog.submit(s, knownSchemas: [schema], at: now, in: db)
         if let value {
             try db.execute(sql: """
                 INSERT INTO user_metadata_overrides (id, entity_type, entity_id, field, override_value, updated_at)
@@ -68,18 +83,19 @@ nonisolated public enum MetadataCorrections {
             try db.execute(sql: "DELETE FROM user_metadata_overrides WHERE entity_type = ? AND entity_id = ? AND field = ?",
                            arguments: [targetType, recordingID.rawValue, field.rawValue])
         }
+        return record.revision
     }
 
-    /// All corrections of a recording, oldest first.
-    public static func history(_ recordingID: RecordingID, in db: Database) throws -> [Correction] {
-        try UserDecisionLog.records(tenant: UserDecisionLog.localTenant,
-                                    target: DecisionTarget(type: targetType, id: recordingID.rawValue), in: db)
-            .compactMap { record in
+    /// All corrections of a recording, oldest first, with its revision.
+    public static func history(_ recordingID: RecordingID, in db: Database) throws -> History {
+        let records = try UserDecisionLog.records(tenant: UserDecisionLog.localTenant,
+                                                  target: DecisionTarget(type: targetType, id: recordingID.rawValue), in: db)
+        return History(corrections: records.compactMap { record in
                 guard record.submission.schema == schema,
                       let payload = try? JSONDecoder().decode(Payload.self, from: record.submission.payload) else { return nil }
                 return Correction(field: payload.field, value: payload.value,
                                   principal: record.submission.principalId, recordedTime: record.recordedTime)
-            }
+        }, revision: records.last?.revision ?? 0)
     }
 
     /// SQL for a corrected column: the correction if any, otherwise `fallback`.

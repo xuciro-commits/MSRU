@@ -25,6 +25,7 @@ struct UserDecisionLogConformanceTests {
                     let validTime: Date
                     let recordedTime: Date
                     let sameAs: Int?
+                    let revision: UInt32?
                 }
                 let accepted: Accepted?
                 let error: String?
@@ -65,6 +66,9 @@ struct UserDecisionLogConformanceTests {
                     let expected = try #require(step.expect.accepted, label)
                     #expect(record.validTime == expected.validTime, label)
                     #expect(record.recordedTime == expected.recordedTime, label)
+                    if let revision = expected.revision {
+                        #expect(record.revision == revision, label)
+                    }
                     if let original = expected.sameAs {
                         #expect(record.changeId == changeIDs[original], label)
                     }

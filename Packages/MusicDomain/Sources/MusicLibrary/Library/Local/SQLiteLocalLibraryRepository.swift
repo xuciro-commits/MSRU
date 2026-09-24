@@ -176,16 +176,16 @@ public actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
     // MARK: - Corrections
 
     /// Corrects a displayed field of the track's recording; `nil` restores the scanned value.
-    public func correct(_ track: LocalTrack, field: MetadataCorrections.Field, value: String?) async throws {
+    public func correct(_ track: LocalTrack, field: MetadataCorrections.Field, value: String?, expectedRevision: UInt32?) async throws -> UInt32 {
         try await db.dbWriter.write { db in
             guard let recordingID = try Self.recordingID(of: track, in: db) else { throw CocoaError(.fileNoSuchFile) }
-            try MetadataCorrections.correct(recordingID, field: field, value: value, in: db)
+            return try MetadataCorrections.correct(recordingID, field: field, value: value, expectedRevision: expectedRevision, in: db)
         }
     }
 
-    public func corrections(of track: LocalTrack) async throws -> [MetadataCorrections.Correction] {
+    public func corrections(of track: LocalTrack) async throws -> MetadataCorrections.History {
         try await db.reader.read { db in
-            try Self.recordingID(of: track, in: db).map { try MetadataCorrections.history($0, in: db) } ?? []
+            try Self.recordingID(of: track, in: db).map { try MetadataCorrections.history($0, in: db) } ?? .init()
         }
     }
 

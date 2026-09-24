@@ -194,8 +194,9 @@ struct MigrationTests {
             (try MetadataCorrections.history(RecordingID("rec_1"), in: db),
              try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM user_metadata_overrides"))
         }
-        #expect(history.map(\.value) == ["Corrected"])
-        #expect(history.map(\.principal) == ["unknown"])
+        #expect(history.corrections.map(\.value) == ["Corrected"])
+        #expect(history.corrections.map(\.principal) == ["unknown"])
+        #expect(history.revision == 1) // v10 numbers decisions made before revisions existed
         #expect(overrides == 2)
     }
 }

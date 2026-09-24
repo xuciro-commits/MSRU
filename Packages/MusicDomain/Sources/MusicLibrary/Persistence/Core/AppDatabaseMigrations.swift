@@ -590,5 +590,18 @@ public nonisolated enum AppDatabaseMigrations {
                 t.add(column: "evidence_fact_ids", .text).notNull().defaults(to: "[]")
             }
         }
+
+        // K4 C12: each decision carries its target's revision after it; existing
+        // decisions are numbered in log order per target.
+        migrator.registerMigration("v10_user_decision_revisions") { db in
+            try db.execute(sql: """
+                ALTER TABLE user_decisions ADD COLUMN expected_revision INTEGER;
+                ALTER TABLE user_decisions ADD COLUMN revision INTEGER NOT NULL DEFAULT 0;
+                UPDATE user_decisions SET revision = (
+                    SELECT COUNT(*) FROM user_decisions d
+                    WHERE d.tenant_id = user_decisions.tenant_id AND d.target_type = user_decisions.target_type
+                      AND d.target_id = user_decisions.target_id AND d.rowid <= user_decisions.rowid);
+                """)
+        }
     }
 }

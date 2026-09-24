@@ -55,17 +55,23 @@ struct LibraryTests {
             try await repository.fetchPage(LocalTrackPageRequest(limit: 10)).tracks.first
         }
 
-        try await repository.correct(track, field: .title, value: "晴天")
-        try await repository.correct(track, field: .title, value: "晴天 (2024 Remaster)")
-        try await repository.correct(track, field: .album, value: "叶惠美")
+        #expect(try await repository.correct(track, field: .title, value: "晴天", expectedRevision: 0) == 1)
+        try await repository.correct(track, field: .title, value: "晴天 (2024 Remaster)", expectedRevision: 1)
+        try await repository.correct(track, field: .album, value: "叶惠美", expectedRevision: nil)
+        // A correction from a screen that showed an older revision is refused (K4 C12).
+        await #expect(throws: DecisionError.conflict) {
+            try await repository.correct(track, field: .artist, value: "周杰伦", expectedRevision: 1)
+        }
         #expect(try await page()?.title == "晴天 (2024 Remaster)")
         #expect(try await page()?.album == "叶惠美")
         #expect(try await page()?.artist == "Jay Chou")
 
-        try await repository.correct(track, field: .title, value: nil)
+        try await repository.correct(track, field: .title, value: nil, expectedRevision: 3)
         #expect(try await page()?.title == "Qing Tian")
+        #expect(try await page()?.artist == "Jay Chou")
 
-        let history = try await repository.corrections(of: track)
+        let history = try await repository.corrections(of: track).corrections
+        #expect(try await repository.corrections(of: track).revision == 4)
         #expect(history.map(\.field) == [.title, .title, .album, .title])
         #expect(history.map(\.value) == ["晴天", "晴天 (2024 Remaster)", "叶惠美", nil])
         #expect(history.allSatisfy { $0.principal == UserDecisionLog.localPrincipal })

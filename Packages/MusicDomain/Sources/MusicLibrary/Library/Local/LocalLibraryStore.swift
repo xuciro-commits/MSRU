@@ -100,12 +100,15 @@ public final class LocalLibraryStore {
     }
 
     /// Records a user correction of a track's displayed metadata; `nil` restores the scanned value.
-    public func correct(_ track: LocalTrack, field: MetadataCorrections.Field, value: String?) async throws {
-        try await repository.correct(track, field: field, value: value)
+    /// `expectedRevision` is the revision shown with the corrections; returns the new one.
+    @discardableResult
+    public func correct(_ track: LocalTrack, field: MetadataCorrections.Field, value: String?, expectedRevision: UInt32?) async throws -> UInt32 {
+        let revision = try await repository.correct(track, field: field, value: value, expectedRevision: expectedRevision)
         updateCachedPresentations()
+        return revision
     }
 
-    public func corrections(of track: LocalTrack) async throws -> [MetadataCorrections.Correction] {
+    public func corrections(of track: LocalTrack) async throws -> MetadataCorrections.History {
         try await repository.corrections(of: track)
     }
 
