@@ -36,7 +36,6 @@ struct MSRUApp:
 
         Settings {
             SettingsView(
-                playback: appDelegate.playback,
                 providerManager: appDelegate.application.providerManager,
                 languageSettings: appDelegate.application.languageSettings
             )

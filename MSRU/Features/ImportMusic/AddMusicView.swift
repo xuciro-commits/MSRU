@@ -11,176 +11,95 @@ import AppFoundationUI
 import MusicLibrary
 import MusicPlayback
 
-
+/// Entry point for bringing music in. One-off file imports and Apple Music
+/// imports happen here; ongoing sources (watched folders, servers) are owned
+/// by the Sources page, so those cards navigate there.
 struct AddMusicView: View {
+    @Bindable var localStore: LocalLibraryStore
+    @Bindable var appleMusicStore: AppleMusicLibraryStore
+    var playlistStore: PlaylistStore? = nil
+    let onOpenLibrary: () -> Void
+    let onOpenSources: () -> Void
 
-    @Bindable var localStore:
-        LocalLibraryStore
-
-    @Bindable var appleMusicStore:
-        AppleMusicLibraryStore
-
-    var playlistStore:
-        PlaylistStore? = nil
-
-    let onOpenLibrary:
-        () -> Void
-
-
-    @State private var route:
-        Route = .root
-
-    @State private var isFileImporterPresented =
-        false
-
+    @State private var route: Route = .root
+    @State private var isFileImporterPresented = false
+    @State private var importErrorMessage: String?
 
     var body: some View {
-
         Group {
-
             switch route {
-
-            case .root:
-
-                rootContent
-
-            case .appleMusic:
-
-                appleMusicContent
+            case .root: rootContent
+            case .appleMusic: appleMusicContent
             }
         }
         .fileImporter(
-            isPresented:
-                $isFileImporterPresented,
-            allowedContentTypes:
-                LocalAudioFormatSupport
-                    .importContentTypes,
-            allowsMultipleSelection:
-                true
+            isPresented: $isFileImporterPresented,
+            allowedContentTypes: LocalAudioFormatSupport.importContentTypes,
+            allowsMultipleSelection: true
         ) { result in
-
             switch result {
-
-            case .success(
-                let urls
-            ):
-
+            case .success(let urls):
                 Task {
-
-                    await localStore
-                        .importFiles(
-                            urls
-                        )
-
+                    await localStore.importFiles(urls)
                     onOpenLibrary()
                 }
-
-
-            case .failure(
-                let error
-            ):
+            case .failure(let error):
                 if (error as? CocoaError)?.code != .userCancelled {
-                    print(
-                        "Add Music file importer failed:",
-                        error.localizedDescription
-                    )
+                    importErrorMessage = error.localizedDescription
                 }
             }
         }
+        .alert(
+            "Couldn't Import Files",
+            isPresented: Binding(
+                get: { importErrorMessage != nil },
+                set: { if !$0 { importErrorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(importErrorMessage ?? "")
+        }
     }
 
-
-    private var rootContent:
-        some View {
-
+    private var rootContent: some View {
         ScrollView {
-
-            VStack(
-                alignment: .leading,
-                spacing: 26
-            ) {
-
+            VStack(alignment: .leading, spacing: 26) {
                 header
 
-
                 LazyVGrid(
-                    columns: [
-                        GridItem(
-                            .adaptive(
-                                minimum: 280,
-                                maximum: 420
-                            ),
-                            spacing: 18
-                        )
-                    ],
+                    columns: [GridItem(.adaptive(minimum: 280, maximum: 420), spacing: 18)],
                     spacing: 18
                 ) {
-
                     actionCard(
-                        title:
-                            "Files",
-                        description:
-                            "Import audio files into MSRU Library.",
-                        systemImage:
-                            "doc.badge.plus",
-                        status:
-                            "Available",
-                        isEnabled:
-                            true
+                        title: "Files",
+                        description: "Import audio files into MSRU Library.",
+                        systemImage: "doc.badge.plus"
                     ) {
-
-                        isFileImporterPresented =
-                            true
+                        isFileImporterPresented = true
                     }
 
+                    actionCard(
+                        title: "Folders",
+                        description: "Watch folders so new music is added automatically.",
+                        systemImage: "folder.badge.plus",
+                        action: onOpenSources
+                    )
 
                     actionCard(
-                        title:
-                            "Folders",
-                        description:
-                            "Add folders to use as library sources.",
-                        systemImage:
-                            "folder.badge.plus",
-                        status:
-                            "Available",
-                        isEnabled:
-                            true
+                        title: "NAS or Subsonic Server",
+                        description: "Stream from a NAS, Navidrome, or any Subsonic-compatible server.",
+                        systemImage: "server.rack",
+                        action: onOpenSources
+                    )
+
+                    actionCard(
+                        title: "Apple Music",
+                        description: "Connect or import albums, artists, and songs via Apple Music.",
+                        systemImage: "apple.logo"
                     ) {
-                        isFileImporterPresented =
-                            true
+                        route = .appleMusic
                     }
-
-
-                    actionCard(
-                        title:
-                            "Apple Music",
-                        description:
-                            "Connect or import albums, artists, and songs via Apple Music.",
-                        systemImage:
-                            "apple.logo",
-                        status:
-                            "Official Integration",
-                        isEnabled:
-                            true
-                    ) {
-
-                        route =
-                            .appleMusic
-                    }
-
-
-                    actionCard(
-                        title:
-                            "Provider Library",
-                        description:
-                            "Import saved music from connected providers into the unified library.",
-                        systemImage:
-                            "rectangle.stack.badge.plus",
-                        status:
-                            "Requires Provider",
-                        isEnabled:
-                            false
-                    ) {}
                 }
             }
             .padding(28)
@@ -188,198 +107,84 @@ struct AddMusicView: View {
         .hideScrollIndicatorsCompletely()
     }
 
-
-    private var header:
-        some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 5
-        ) {
-
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 5) {
             Text("Add Music")
                 .font(.largeTitle.bold())
-
-            Text(
-                "Import local media, or import music from connected services."
-            )
-            .font(.callout)
-            .foregroundStyle(.secondary)
+            Text("Import local media, or import music from connected services.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
         }
     }
 
-
-    private var appleMusicContent:
-        some View {
-
-        VStack(
-            spacing: 0
-        ) {
-
+    private var appleMusicContent: some View {
+        VStack(spacing: 0) {
             HStack {
-
                 Button {
-
-                    route =
-                        .root
-
+                    route = .root
                 } label: {
-
-                    Label(
-                        "Add Music",
-                        systemImage:
-                            "chevron.left"
-                    )
+                    Label("Add Music", systemImage: "chevron.left")
                 }
                 .buttonStyle(.plain)
-
 
                 Spacer()
             }
             .padding(.horizontal, 28)
             .padding(.top, 18)
 
-
             AppleMusicImportView(
-                store:
-                    appleMusicStore,
-                localStore:
-                    localStore,
-                playlistStore:
-                    playlistStore,
-                onImportCompleted: {
-
-                    onOpenLibrary()
-                }
+                store: appleMusicStore,
+                localStore: localStore,
+                playlistStore: playlistStore,
+                onImportCompleted: onOpenLibrary
             )
         }
     }
 
-
     private func actionCard(
-        title: String,
-        description: String,
+        title: LocalizedStringKey,
+        description: LocalizedStringKey,
         systemImage: String,
-        status: String,
-        isEnabled: Bool,
         action: @escaping () -> Void
     ) -> some View {
-
-        Button {
-
-            action()
-
-        } label: {
-
-            VStack(
-                alignment: .leading,
-                spacing: 18
-            ) {
-
-                HStack {
-
-                    Image(
-                        systemName:
-                            systemImage
-                    )
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 18) {
+                Image(systemName: systemImage)
                     .font(.title2)
 
-
-                    Spacer()
-
-
-                    Text(
-                        LocalizedStringKey(
-                            status
-                        )
-                    )
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(
-                            .quaternary,
-                            in: Capsule()
-                        )
-                }
-
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 5
-                ) {
-
-                    Text(
-                        LocalizedStringKey(
-                            title
-                        )
-                    )
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
                         .font(.title3.bold())
-
-                    Text(
-                        LocalizedStringKey(
-                            description
-                        )
-                    )
+                    Text(description)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.leading)
                 }
 
+                Spacer(minLength: 0)
 
                 HStack {
-
-                    Text(
-                        LocalizedStringKey(
-                            isEnabled
-                            ? "Open"
-                            : "Unavailable"
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-
                     Spacer()
-
-
-                    Image(
-                        systemName:
-                            "chevron.right"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
                 }
             }
             .padding(18)
-            .frame(
-                maxWidth: .infinity,
-                minHeight: 180,
-                alignment: .topLeading
-            )
-            .background(
-                .quaternary,
-                in:
-                    RoundedRectangle(
-                        cornerRadius: 16,
-                        style: .continuous
-                    )
-            )
+            .frame(maxWidth: .infinity, minHeight: 180, alignment: .topLeading)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
-        .disabled(!isEnabled)
     }
 }
 
-
 private extension AddMusicView {
-
     enum Route {
         case root
         case appleMusic
     }
 }
-
 
 // MARK: - Feature
 
@@ -396,15 +201,15 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
                     title: "Add Music",
                     systemImage: "plus.circle",
                     route: .section(.addMusic),
-                    order: 200
+                    order: 210
                 ),
                 SidebarContribution(
                     id: "metadata-center",
-                    group: "Metadata",
+                    group: "Source & Import",
                     title: "Metadata Center",
                     systemImage: "sparkles.rectangle.stack",
                     route: .section(.importReview),
-                    order: 300
+                    order: 220
                 )
             ],
             routes: [
@@ -439,6 +244,9 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
                         playlistStore: scene.application.playlistStore,
                         onOpenLibrary: {
                             scene.send(.navigate(.section(.library)))
+                        },
+                        onOpenSources: {
+                            scene.send(.navigate(.section(.sources)))
                         }
                     )
                 }
@@ -472,7 +280,8 @@ enum AddMusicFeature: ApplicationFeaturePresentation {
     AddMusicView(
         localStore: MSRUPreviewData.makeLocalLibraryStore(),
         appleMusicStore: MSRUPreviewData.makeAppleMusicStore(),
-        onOpenLibrary: {}
+        onOpenLibrary: {},
+        onOpenSources: {}
     )
     .frame(width: 1000, height: 700)
 }

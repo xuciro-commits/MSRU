@@ -71,6 +71,482 @@
         }
       }
     },
+    "Add music from your folders, a NAS or Subsonic server, or Apple Music." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཡིག་སྣོད་དང་། NAS ཡང་ན་ Subsonic ཞབས་ཞུ་འཕྲུལ་ཆས། ཡང་ན་ Apple Music ནས་རོལ་དབྱངས་སྣོན།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add music from your folders, a NAS or Subsonic server, or Apple Music."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォルダ、NAS/Subsonicサーバ、またはApple Musicから音楽を追加できます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从本地文件夹、NAS / Subsonic 服务器或 Apple Music 添加音乐。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從本機檔案夾、NAS / Subsonic 伺服器或 Apple Music 加入音樂。"
+          }
+        }
+      }
+    },
+    "Apple Music" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music"
+          }
+        }
+      }
+    },
+    "Connect or import albums, artists, and songs via Apple Music." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music ལ་མཐུད་དེ་འཁོར་ལོ་དང་རོལ་མཁན། གླུ་དབྱངས་ནང་འདྲེན་བྱེད།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connect or import albums, artists, and songs via Apple Music."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music に接続して、アルバム・アーティスト・曲を読み込みます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接 Apple Music，导入专辑、艺人与歌曲。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連接 Apple Music，匯入專輯、藝人與歌曲。"
+          }
+        }
+      }
+    },
+    "Couldn't Import Files" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཡིག་ཆ་ནང་འདྲེན་བྱེད་མ་ཐུབ།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't Import Files"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイルを読み込めませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法导入文件"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法匯入檔案"
+          }
+        }
+      }
+    },
+    "Heavy Rotation" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "རྒྱུན་དུ་ཉན་པ།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heavy Rotation"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ヘビーローテーション"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "常听"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "常聽"
+          }
+        }
+      }
+    },
+    "In your library" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཁྱེད་ཀྱི་དཔེ་མཛོད་ནང་།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In your library"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブラリ内"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "资料库中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "資料庫中"
+          }
+        }
+      }
+    },
+    "Listening Overview" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཉན་པའི་སྤྱི་ཁོག"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listening Overview"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リスニングの概要"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收听概况"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收聽概況"
+          }
+        }
+      }
+    },
+    "Marked as favorite" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "དགའ་མོས་སུ་རྟགས་བཀོད་ཟིན།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marked as favorite"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入りに登録済み"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已标记收藏"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已標記喜好"
+          }
+        }
+      }
+    },
+    "Most played" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "མང་ཤོས་བཏང་བ།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Most played"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再生回数が多い曲"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "播放最多"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "播放最多"
+          }
+        }
+      }
+    },
+    "NAS or Subsonic Server" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NAS ཡང་ན་ Subsonic ཞབས་ཞུ་འཕྲུལ་ཆས།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NAS or Subsonic Server"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NAS または Subsonic サーバ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NAS 或 Subsonic 服务器"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NAS 或 Subsonic 伺服器"
+          }
+        }
+      }
+    },
+    "Recently Added" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཉེ་དུས་བསྣན་པ།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recently Added"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近追加した項目"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近添加"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近加入"
+          }
+        }
+      }
+    },
+    "Stream from a NAS, Navidrome, or any Subsonic-compatible server." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NAS དང་ Navidrome ཡང་ན་ Subsonic དང་མཐུན་པའི་ཞབས་ཞུ་འཕྲུལ་ཆས་གང་རུང་ནས་རྒྱུན་བཏང་།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stream from a NAS, Navidrome, or any Subsonic-compatible server."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NAS、Navidrome、または Subsonic 互換サーバからストリーミングします。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 NAS、Navidrome 或任何兼容 Subsonic 的服务器串流播放。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從 NAS、Navidrome 或任何相容 Subsonic 的伺服器串流播放。"
+          }
+        }
+      }
+    },
+    "Watch folders so new music is added automatically." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཡིག་སྣོད་ལ་ལྟ་རྟོག་བྱས་ཏེ་རོལ་དབྱངས་གསར་པ་རང་འགུལ་གྱིས་སྣོན།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Watch folders so new music is added automatically."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォルダを監視して、新しい音楽を自動的に追加します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "监视文件夹，新音乐将自动加入资料库。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "監視檔案夾，新音樂將自動加入資料庫。"
+          }
+        }
+      }
+    },
+    "Welcome to MSRU" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MSRU ལ་དགའ་བསུ་ཞུ།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Welcome to MSRU"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MSRUへようこそ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "欢迎来到 MSRU"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歡迎來到 MSRU"
+          }
+        }
+      }
+    },
     "—" : {
       "comment" : "A separator between the artist and album.",
       "isCommentAutoGenerated" : true
@@ -2914,41 +3390,6 @@
         }
       }
     },
-    "Base Layer Ready" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "རྨང་གཞིའི་རིམ་པ་གྲ་སྒྲིག་ཟིན་པ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Base Layer Ready"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ベースレイヤー準備完了"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "基础层已就绪"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "基礎層已就緒"
-          }
-        }
-      }
-    },
     "Batch Metadata & Tag Editor" : {
       "comment" : "The title of a sheet that allows the user to edit the metadata and tags of multiple songs.",
       "isCommentAutoGenerated" : true
@@ -3655,41 +4096,6 @@
         }
       }
     },
-    "Catalog Cache" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "དཀར་ཆག་གི་གནས་སྐབས་གསོག་འཇོག"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Catalog Cache"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "カタログキャッシュ"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "目录缓存"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "目錄緩存"
-          }
-        }
-      }
-    },
     "Catalog, metadata, and playback providers." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4358,41 +4764,6 @@
         }
       }
     },
-    "Core Provided" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ནང་སྙིང་གིས་མཁོ་སྤྲོད་བྱས་པ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Core Provided"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "コア提供済み"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "内核已提供"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "內核已提供"
-          }
-        }
-      }
-    },
     "Corrections" : {
       "comment" : "A heading displayed above a list of user-made corrections for a track.",
       "isCommentAutoGenerated" : true,
@@ -4602,41 +4973,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "創建第一個自訂歌單，整理你喜愛的歌曲。"
-          }
-        }
-      }
-    },
-    "Current Provider" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "མིག་སྔའི་ཞབས་ཞུ་མཁོ་སྤྲོད་པ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Current Provider"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "現在のプロバイダ"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "当前服务提供方"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "當前服務供應商"
           }
         }
       }
@@ -5669,76 +6005,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "基於音訊波形的確定性識別"
-          }
-        }
-      }
-    },
-    "Diagnostics" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ནད་བརྟག"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Diagnostics"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "診断"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "诊断"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "診斷"
-          }
-        }
-      }
-    },
-    "Diagnostics, status, and developer tools." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ནད་བརྟག་དང་། གནས་སྟངས། གསར་སྤེལ་ལག་ཆ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Diagnostics, status, and developer tools."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "診断、ステータス、開発者ツール。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "诊断、状态和开发工具。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "診斷、狀態和開發工具。"
           }
         }
       }
@@ -8866,41 +9132,6 @@
         }
       }
     },
-    "Interactive diagnostic controls will be added once frontend info architecture is stable." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "མདུན་སྣེའི་ཆ་འཕྲིན་སྒྲིག་བཀོད་བརྟན་པོ་ཆགས་རྗེས། ཕན་ཚུན་འབྲེལ་བའི་ནད་བརྟག་ཚོད་འཛིན་ལ་སྦྲེལ་རྒྱུ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Interactive diagnostic controls will be added once frontend info architecture is stable."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "フロントエンドの情報アーキテクチャが安定した後、インタラクティブな診断コントロールが追加されます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "前端信息架构稳定后，将接入可交互的诊断控制。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "前端信息架構穩定後，將接入可交互的診斷控制。"
-          }
-        }
-      }
-    },
     "Internet Radio" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10462,76 +10693,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "名稱"
-          }
-        }
-      }
-    },
-    "Native Apple Scene Layout" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple ཡི་རྣམ་པའི་བཀོད་པ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Native Apple Scene Layout"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ネイティブAppleシーンレイアウト"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "原生 Apple 场景布局"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "原生 Apple 場景佈局"
-          }
-        }
-      }
-    },
-    "Native macOS Split View" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "macOS ཡི་བགོས་པའི་མཐོང་རིས།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Native macOS Split View"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ネイティブmacOSスプリットビュー"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "原生 macOS 分栏视图"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "原生 macOS 分欄視圖"
           }
         }
       }
@@ -12614,10 +12775,6 @@
         }
       }
     },
-    "Personal Mix" : {
-      "comment" : "The name of the artist to display in the \"Followed Artist\" section of the \"Top Picks\" section.",
-      "isCommentAutoGenerated" : true
-    },
     "Place a .lrc file in the same folder as the audio, and it will be loaded automatically." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13083,41 +13240,6 @@
         }
       }
     },
-    "Playback Diagnostics" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "རྩེད་འདོན་ནད་བརྟག"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Playback Diagnostics"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "再生診断"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "播放诊断"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "播放診斷"
-          }
-        }
-      }
-    },
     "Playback Priority" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13149,41 +13271,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "播放優先級"
-          }
-        }
-      }
-    },
-    "Playback quality and resolution behavior." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "རྩེད་འདོན་སྒྲ་སྤུས་དང་དབྱེ་ཞིབ་ཀྱི་སྤྱོད་ཚུལ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Playback quality and resolution behavior."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "再生品質と解像度の動作。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "播放音质与解析行为。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "播放音質與解析行為。"
           }
         }
       }
@@ -13608,41 +13695,6 @@
         }
       }
     },
-    "Preferred Quality" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "སྔོན་འདེམས་སྒྲ་སྤུས།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Preferred Quality"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "優先音質"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "首选音质"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "首選音質"
-          }
-        }
-      }
-    },
     "Preparing review panel…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13960,41 +14012,6 @@
         }
       }
     },
-    "Provider Core v1" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཞབས་ཞུ་མཁོ་སྤྲོད་པའི་ནང་སྙིང་ v1"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Provider Core v1"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "プロバイダコア v1"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "服务提供方内核 v1"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "服務供應商內核 v1"
-          }
-        }
-      }
-    },
     "Provider or Manifest URL" : {
       "comment" : "A label for the provider or manifest URL field.",
       "isCommentAutoGenerated" : true,
@@ -14063,41 +14080,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "服務供應商已移除"
-          }
-        }
-      }
-    },
-    "Provider Status" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཞབས་ཞུ་མཁོ་སྤྲོད་པའི་གནས་སྟངས།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Provider Status"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "プロバイダステータス"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "服务提供方状态"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "服務供應商狀態"
           }
         }
       }
@@ -19756,10 +19738,6 @@
         }
       }
     },
-    "在这里探索你的音乐世界。你可以从本地目录、极空间 NAS 或 Apple Music 导入曲库。" : {
-      "comment" : "A description of the functionality of the Music Sharing Radio (MSRU) app.",
-      "isCommentAutoGenerated" : true
-    },
     "如：我的极空间" : {
       "comment" : "A placeholder text for the server name field.",
       "isCommentAutoGenerated" : true,
@@ -20135,10 +20113,6 @@
           }
         }
       }
-    },
-    "收听概况与回忆" : {
-      "comment" : "A heading for the listening stats section.",
-      "isCommentAutoGenerated" : true
     },
     "无法加载专辑" : {
       "localizations" : {
@@ -20637,10 +20611,6 @@
           }
         }
       }
-    },
-    "欢迎来到 MSRU" : {
-      "comment" : "A welcome message for the user.",
-      "isCommentAutoGenerated" : true
     },
     "正在从远程媒体服务加载…" : {
       "localizations" : {

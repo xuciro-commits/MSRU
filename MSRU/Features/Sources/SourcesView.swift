@@ -374,11 +374,11 @@ enum SourcesFeature: ApplicationFeaturePresentation {
             sidebar: [
                 SidebarContribution(
                     id: "sources",
-                    group: "Library",
+                    group: "Source & Import",
                     title: "Sources",
                     systemImage: "server.rack",
                     route: .section(.sources),
-                    order: 140
+                    order: 200
                 )
             ],
             routes: [
