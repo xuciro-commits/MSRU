@@ -13,25 +13,12 @@ struct SidebarBottomAccessoryView: View {
     let onOpenSettings: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 9) {
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.secondary)
-                Text("许强")
-                    .font(.system(size: 13, weight: .medium))
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 12)
-
+        HStack {
             Button(action: onOpenSettings) {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 14, weight: .medium))
-                    .frame(width: 24, height: 24)
+                Label("Settings", systemImage: "gearshape")
             }
-            .buttonStyle(.plain)
-            .help("Settings")
+            .buttonStyle(.borderless)
+            Spacer()
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

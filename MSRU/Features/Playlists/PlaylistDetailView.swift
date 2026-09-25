@@ -98,7 +98,7 @@ struct PlaylistDetailView: View {
 
                         HStack(spacing: 6) {
                             if isLoadingRemoteTracks && resolvedTracks.isEmpty {
-                                Text("正在从远程媒体服务加载…")
+                                Text("Loading from the server…")
                             } else {
                                 Text("\(resolvedTracks.count) songs")
                                 if !resolvedTracks.isEmpty {
@@ -158,7 +158,7 @@ struct PlaylistDetailView: View {
                     HStack(spacing: 8) {
                         ProgressView()
                             .controlSize(.small)
-                        Text("正在从远程服务加载歌单曲目...")
+                        Text("Loading playlist tracks from the server…")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }

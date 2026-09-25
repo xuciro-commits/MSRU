@@ -332,7 +332,13 @@ struct AlbumsView: View {
             VStack(spacing: 0) {
                 header
                 Divider()
-                ProgressView(isSearchingRemote ? "正在远程检索专辑..." : (isLoadingRemote ? "正在从远程媒体服务加载专辑..." : ""))
+                ProgressView {
+                    if isSearchingRemote {
+                        Text("Searching the server for albums…")
+                    } else if isLoadingRemote {
+                        Text("Loading albums from the server…")
+                    }
+                }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         } else if filteredAlbums.isEmpty {
@@ -340,18 +346,27 @@ struct AlbumsView: View {
                 header
                 Divider()
                 if isRemoteSourceActive {
-                    ContentUnavailableView(
-                        searchQuery.isEmpty ? "未发现远程专辑" : "未找到匹配的远程专辑",
-                        systemImage: "opticaldisc",
-                        description: Text(searchQuery.isEmpty ? (remoteLoadError ?? "远程媒体库中暂未发现专辑，或请检查服务器连接状态。") : "在远程媒体库中未找到与 \"\(searchQuery)\" 相关的专辑。")
-                    )
+                    ContentUnavailableView {
+                        Label(
+                            searchQuery.isEmpty ? LocalizedStringKey("No Albums on the Server") : LocalizedStringKey("No Matching Albums"),
+                            systemImage: "opticaldisc"
+                        )
+                    } description: {
+                        if !searchQuery.isEmpty {
+                            Text("No albums on the server match “\(searchQuery)”.")
+                        } else if let remoteLoadError {
+                            Text(remoteLoadError)
+                        } else {
+                            Text("No albums were found on the server. Check that it's online.")
+                        }
+                    }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     if let error = localPager?.errorMessage {
                         VStack {
-                            ContentUnavailableView("无法加载专辑", systemImage: "exclamationmark.triangle",
+                            ContentUnavailableView("Couldn't Load Albums", systemImage: "exclamationmark.triangle",
                                                    description: Text(error))
-                            Button("重试") { Task { await localPager?.retry() } }
+                            Button("Retry") { Task { await localPager?.retry() } }
                         }
                     } else {
                         emptyState
@@ -438,7 +453,7 @@ struct AlbumsView: View {
                             Spacer()
                             ProgressView()
                                 .scaleEffect(0.8)
-                            Text("正在加载更多专辑...")
+                            Text("Loading more albums…")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -448,7 +463,7 @@ struct AlbumsView: View {
                     if !isRemoteSourceActive, let error = localPager?.errorMessage {
                         HStack {
                             Text(error).foregroundStyle(.secondary)
-                            Button("重试") { Task { await localPager?.retry() } }
+                            Button("Retry") { Task { await localPager?.retry() } }
                         }
                     }
                 }
@@ -512,19 +527,19 @@ struct AlbumsView: View {
     private var albumsSubtitle: String {
         if isRemoteSourceActive {
             if isLoadingRemote && remoteAlbums.isEmpty {
-                return String(localized: "正在从远程媒体服务加载…")
+                return String(localized: "Loading from the server…")
             }
             if isSearchingRemote {
-                return String(localized: "正在检索远程专辑…")
+                return String(localized: "Searching the server for albums…")
             }
             let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
             if !query.isEmpty {
-                return "搜索结果：\(filteredAlbums.count) 张专辑"
+                return String(localized: "\(filteredAlbums.count) albums found")
             }
-            let serverName = availableSources.first(where: { $0.sourceID == selectedSourceID })?.displayName ?? "远程媒体服务"
-            return "\(serverName) • 按需在线浏览"
+            let serverName = availableSources.first(where: { $0.sourceID == selectedSourceID })?.displayName ?? String(localized: "Server")
+            return String(localized: "\(serverName) · Browsing online")
         } else {
-            return "\(localPager?.totalCount ?? filteredAlbums.count) 张专辑"
+            return String(localized: "\(localPager?.totalCount ?? filteredAlbums.count) albums")
         }
     }
 

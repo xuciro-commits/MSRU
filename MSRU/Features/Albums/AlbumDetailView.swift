@@ -99,7 +99,7 @@ struct AlbumDetailView: View {
                                 Text("•")
                             }
                             if isLoadingRemoteTracks && effectiveTrackCount == 0 {
-                                Text("正在从远程媒体服务加载…")
+                                Text("Loading from the server…")
                             } else {
                                 Text("\(effectiveTrackCount) songs, \(effectiveDurationString)")
                             }
@@ -172,7 +172,7 @@ struct AlbumDetailView: View {
                     HStack(spacing: 8) {
                         ProgressView()
                             .controlSize(.small)
-                        Text("正在从远程服务加载曲目列表...")
+                        Text("Loading tracks from the server…")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }

@@ -266,7 +266,7 @@ struct LibraryView:
                             Spacer()
                             ProgressView()
                                 .scaleEffect(0.8)
-                            Text("正在加载更多曲目...")
+                            Text("Loading more songs…")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -303,7 +303,7 @@ struct LibraryView:
                         Spacer()
                         ProgressView()
                             .scaleEffect(0.7)
-                        Text("正在加载更多曲目...")
+                        Text("Loading more songs…")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -354,22 +354,22 @@ struct LibraryView:
     private var librarySubtitle: String {
         if isRemoteSourceActive {
             if isLoadingRemoteTracks && remoteTracks.isEmpty {
-                return String(localized: "正在从远程媒体服务加载…")
+                return String(localized: "Loading from the server…")
             }
             if isSearchingRemoteTracks {
-                return String(localized: "正在检索远程歌曲…")
+                return String(localized: "Searching the server for songs…")
             }
             let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
             if !query.isEmpty {
-                return "搜索结果：\(filteredLocalTracks.count) 首歌曲"
+                return String(localized: "\(filteredLocalTracks.count) songs found")
             }
-            let serverName = availableSources.first(where: { $0.sourceID == selectedSourceID })?.displayName ?? "远程媒体服务"
-            return "\(serverName) • 按需在线浏览"
+            let serverName = availableSources.first(where: { $0.sourceID == selectedSourceID })?.displayName ?? String(localized: "Server")
+            return String(localized: "\(serverName) · Browsing online")
         }
         if isWebSourceActive {
-            return "\(webTracks.count) 首网络歌曲"
+            return String(localized: "\(webTracks.count) web songs")
         }
-        return "\(localPager?.totalCount ?? 0) 首歌曲"
+        return String(localized: "\(localPager?.totalCount ?? 0) songs")
     }
 
     // MARK: - Filter Bar
@@ -383,7 +383,7 @@ struct LibraryView:
                 searchQuery: $searchQuery,
                 isSearching: isSearchingRemoteTracks,
                 showsSearch: false,
-                prompt: isRemoteSourceActive ? "搜索远程歌曲…" : "Filter songs…",
+                prompt: isRemoteSourceActive ? LocalizedStringKey("Search the server…") : LocalizedStringKey("Filter songs…"),
                 onOpenCleanup: onOpenCleanup
             )
 
@@ -779,11 +779,15 @@ struct LibraryView:
     private var remoteEmptyView: some View {
         ContentUnavailableView {
             Label(
-                searchQuery.isEmpty ? "未发现远程歌曲" : "未找到匹配曲目",
+                searchQuery.isEmpty ? LocalizedStringKey("No Songs on the Server") : LocalizedStringKey("No Matching Songs"),
                 systemImage: searchQuery.isEmpty ? "externaldrive.connected.to.line.below" : "magnifyingglass"
             )
         } description: {
-            Text(searchQuery.isEmpty ? "远程媒体服务已连接，当前暂未发现歌曲，或可尝试在上方的搜索框中搜索曲目。" : "未在远程服务器中找到与 \"\(searchQuery)\" 匹配的歌曲。")
+            if searchQuery.isEmpty {
+                Text("The server is connected but returned no songs. Try searching above.")
+            } else {
+                Text("No songs on the server match “\(searchQuery)”.")
+            }
         }
         .frame(maxWidth: .infinity, minHeight: 280)
     }
@@ -822,8 +826,16 @@ struct LibraryView:
     private var loadingView: some View {
         VStack(spacing: 12) {
             ProgressView()
-            Text(isSearchingRemoteTracks ? "正在远程检索歌曲..." : (isRemoteSourceActive ? "正在从远程媒体服务加载歌曲..." : "Loading library…"))
-                .foregroundStyle(.secondary)
+            Group {
+                if isSearchingRemoteTracks {
+                    Text("Searching the server for songs…")
+                } else if isRemoteSourceActive {
+                    Text("Loading songs from the server…")
+                } else {
+                    Text("Loading library…")
+                }
+            }
+            .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, minHeight: 280)
     }

@@ -69,6 +69,224 @@
         }
       }
     },
+    "%@ · Browsing online" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · དྲ་ཐོག་ལྟ་བ།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Browsing online"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · オンラインで閲覧"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 在线浏览"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 線上瀏覽"
+          }
+        }
+      }
+    },
+    "%lld albums" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "འཁོར་ལོ་ %lld"
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld album"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld albums"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 枚のアルバム"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 张专辑"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 張專輯"
+          }
+        }
+      }
+    },
+    "%lld albums found" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "འཁོར་ལོ་ %lld རྙེད།"
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld album found"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld albums found"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 件のアルバム"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找到 %lld 张专辑"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找到 %lld 張專輯"
+          }
+        }
+      }
+    },
+    "%lld artists" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "རོལ་མཁན་ %lld"
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld artist"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld artists"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 人のアーティスト"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 位艺人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 位藝人"
+          }
+        }
+      }
+    },
+    "%lld artists found" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "རོལ་མཁན་ %lld རྙེད།"
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld artist found"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld artists found"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 人のアーティスト"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找到 %lld 位艺人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找到 %lld 位藝人"
+          }
+        }
+      }
+    },
     "%lld extra copies. Review them before anything is moved to the Trash." : {
       "localizations" : {
         "bo" : {
@@ -133,6 +351,144 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已檢查 %lld 首歌曲"
+          }
+        }
+      }
+    },
+    "%lld songs found" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "གླུ་དབྱངས་ %lld རྙེད།"
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld song found"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld songs found"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 曲"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找到 %lld 首歌曲"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找到 %lld 首歌曲"
+          }
+        }
+      }
+    },
+    "%lld tracks" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "གླུ་དབྱངས་ %lld"
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld track"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tracks"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 曲"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 首"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 首"
+          }
+        }
+      }
+    },
+    "%lld web songs" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "དྲ་རྒྱའི་གླུ་དབྱངས་ %lld"
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld web song"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld web songs"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Web の曲 %lld 曲"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 首网络歌曲"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 首網路歌曲"
           }
         }
       }
@@ -445,6 +801,40 @@
         }
       }
     },
+    "Can't Reach Openverse" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Openverse ལ་མཐུད་མ་ཐུབ།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't Reach Openverse"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Openverse に接続できません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法连接 Openverse"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法連線 Openverse"
+          }
+        }
+      }
+    },
     "Checks the local files in your library. Fixes change the library, never your audio files." : {
       "localizations" : {
         "bo" : {
@@ -645,6 +1035,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法匯入檔案"
+          }
+        }
+      }
+    },
+    "Couldn't Load Albums" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "འཁོར་ལོ་འཇུག་མ་ཐུབ།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't Load Albums"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アルバムを読み込めませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法加载专辑"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法載入專輯"
+          }
+        }
+      }
+    },
+    "Couldn't Load Artists" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "རོལ་མཁན་འཇུག་མ་ཐུབ།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't Load Artists"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アーティストを読み込めませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法加载艺人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法載入藝人"
           }
         }
       }
@@ -917,6 +1375,108 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "檔案夾規則"
+          }
+        }
+      }
+    },
+    "Folk" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "དམངས་གླུ།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folk"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォーク"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "民谣"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "民謠"
+          }
+        }
+      }
+    },
+    "From Openverse" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Openverse ནས།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From Openverse"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Openverse から"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自 Openverse"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "來自 Openverse"
+          }
+        }
+      }
+    },
+    "Genres" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "རིགས།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Genres"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ジャンル"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "流派"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "曲風"
           }
         }
       }
@@ -1499,6 +2059,380 @@
         }
       }
     },
+    "Loading albums from the server…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ནས་འཁོར་ལོ་འཇུག་བཞིན།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading albums from the server…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバからアルバムを読み込み中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从服务器加载专辑…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在從伺服器載入專輯…"
+          }
+        }
+      }
+    },
+    "Loading artists from the server…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ནས་རོལ་མཁན་འཇུག་བཞིན།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading artists from the server…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバからアーティストを読み込み中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从服务器加载艺人…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在從伺服器載入藝人…"
+          }
+        }
+      }
+    },
+    "Loading from the server…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ནས་འཇུག་བཞིན།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading from the server…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバから読み込み中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从服务器加载…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在從伺服器載入…"
+          }
+        }
+      }
+    },
+    "Loading more albums…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "འཁོར་ལོ་མང་བ་འཇུག་བཞིན།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading more albums…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "さらにアルバムを読み込み中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载更多专辑…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在載入更多專輯…"
+          }
+        }
+      }
+    },
+    "Loading more artists…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "རོལ་མཁན་མང་བ་འཇུག་བཞིན།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading more artists…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "さらにアーティストを読み込み中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载更多艺人…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在載入更多藝人…"
+          }
+        }
+      }
+    },
+    "Loading more songs…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "གླུ་དབྱངས་མང་བ་འཇུག་བཞིན།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading more songs…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "さらに曲を読み込み中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载更多歌曲…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在載入更多歌曲…"
+          }
+        }
+      }
+    },
+    "Loading playlist tracks from the server…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ནས་གླུ་ཐོའི་གླུ་དབྱངས་འཇུག་བཞིན།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading playlist tracks from the server…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバからプレイリストの曲を読み込み中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从服务器加载歌单曲目…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在從伺服器載入播放列表曲目…"
+          }
+        }
+      }
+    },
+    "Loading playlists from the server…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ནས་གླུ་ཐོ་འཇུག་བཞིན།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading playlists from the server…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバからプレイリストを読み込み中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从服务器加载歌单…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在從伺服器載入播放列表…"
+          }
+        }
+      }
+    },
+    "Loading songs from the server…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ནས་གླུ་དབྱངས་འཇུག་བཞིན།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading songs from the server…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバから曲を読み込み中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从服务器加载歌曲…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在從伺服器載入歌曲…"
+          }
+        }
+      }
+    },
+    "Loading tracks from the server…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ནས་གླུ་དབྱངས་འཇུག་བཞིན།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading tracks from the server…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバから曲を読み込み中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从服务器加载曲目…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在從伺服器載入曲目…"
+          }
+        }
+      }
+    },
+    "Local Playlists" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ས་གནས་གླུ་ཐོ།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Playlists"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカルのプレイリスト"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地歌单"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本機播放列表"
+          }
+        }
+      }
+    },
     "Looks for cover art in the folder, then in the music catalogue." : {
       "localizations" : {
         "bo" : {
@@ -1771,6 +2705,210 @@
         }
       }
     },
+    "No Albums on the Server" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ནང་འཁོར་ལོ་མེད།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Albums on the Server"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバにアルバムがありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器上没有专辑"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伺服器上沒有專輯"
+          }
+        }
+      }
+    },
+    "No albums on the server match “%@”." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” དང་མཐུན་པའི་འཁོར་ལོ་ཞབས་ཞུ་འཕྲུལ་ཆས་ནང་མེད།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No albums on the server match “%@”."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” に一致するアルバムはサーバにありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器上没有与“%@”匹配的专辑。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伺服器上沒有與「%@」符合的專輯。"
+          }
+        }
+      }
+    },
+    "No albums were found on the server. Check that it's online." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ནང་འཁོར་ལོ་མ་རྙེད། དེ་དྲ་ཐོག་ཡོད་མེད་ཞིབ་བཤེར་བྱོས།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No albums were found on the server. Check that it's online."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバにアルバムが見つかりません。サーバがオンラインか確認してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器上未找到专辑。请检查服务器是否在线。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伺服器上未找到專輯。請檢查伺服器是否在線。"
+          }
+        }
+      }
+    },
+    "No Artists on the Server" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ནང་རོལ་མཁན་མེད།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Artists on the Server"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバにアーティストがいません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器上没有艺人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伺服器上沒有藝人"
+          }
+        }
+      }
+    },
+    "No artists on the server match “%@”." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” དང་མཐུན་པའི་རོལ་མཁན་ཞབས་ཞུ་འཕྲུལ་ཆས་ནང་མེད།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No artists on the server match “%@”."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” に一致するアーティストはサーバにいません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器上没有与“%@”匹配的艺人。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伺服器上沒有與「%@」符合的藝人。"
+          }
+        }
+      }
+    },
+    "No artists were found on the server. Check that it's online." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ནང་རོལ་མཁན་མ་རྙེད། དེ་དྲ་ཐོག་ཡོད་མེད་ཞིབ་བཤེར་བྱོས།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No artists were found on the server. Check that it's online."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバにアーティストが見つかりません。サーバがオンラインか確認してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器上未找到艺人。请检查服务器是否在线。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伺服器上未找到藝人。請檢查伺服器是否在線。"
+          }
+        }
+      }
+    },
     "No fingerprints learned yet. They are saved when songs are identified during import." : {
       "localizations" : {
         "bo" : {
@@ -1907,6 +3045,108 @@
         }
       }
     },
+    "No Matching Albums" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "མཐུན་པའི་འཁོར་ལོ་མེད།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Matching Albums"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一致するアルバムはありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有匹配的专辑"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有符合的專輯"
+          }
+        }
+      }
+    },
+    "No Matching Artists" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "མཐུན་པའི་རོལ་མཁན་མེད།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Matching Artists"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一致するアーティストはいません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有匹配的艺人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有符合的藝人"
+          }
+        }
+      }
+    },
+    "No Matching Songs" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "མཐུན་པའི་གླུ་དབྱངས་མེད།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Matching Songs"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一致する曲はありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有匹配的歌曲"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有符合的歌曲"
+          }
+        }
+      }
+    },
     "No orphaned fingerprints." : {
       "localizations" : {
         "bo" : {
@@ -1937,6 +3177,108 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "沒有孤立的聲紋。"
+          }
+        }
+      }
+    },
+    "No Songs on the Server" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ནང་གླུ་དབྱངས་མེད།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Songs on the Server"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバに曲がありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器上没有歌曲"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伺服器上沒有歌曲"
+          }
+        }
+      }
+    },
+    "No songs on the server match “%@”." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” དང་མཐུན་པའི་གླུ་དབྱངས་ཞབས་ཞུ་འཕྲུལ་ཆས་ནང་མེད།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No songs on the server match “%@”."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” に一致する曲はサーバにありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器上没有与“%@”匹配的歌曲。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伺服器上沒有與「%@」符合的歌曲。"
+          }
+        }
+      }
+    },
+    "No Tracks" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "གླུ་དབྱངས་མེད།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Tracks"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "曲がありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有曲目"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有曲目"
           }
         }
       }
@@ -2039,6 +3381,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "離線"
+          }
+        }
+      }
+    },
+    "Openly licensed audio with its license details. Stream a track or save it to your library." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཆོག་མཆན་ཆ་འཕྲིན་ལྡན་པའི་སྒྲ། རྒྱུན་བཏང་ངམ་དཔེ་མཛོད་དུ་ཉར་ཆོག"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Openly licensed audio with its license details. Stream a track or save it to your library."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライセンス情報付きのオープンライセンス音源。ストリーミング再生やライブラリへの保存ができます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "附带授权信息的开放授权音频。可以串流播放，或保存到资料库。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "附帶授權資訊的開放授權音訊。可以串流播放，或儲存到資料庫。"
+          }
+        }
+      }
+    },
+    "Openly licensed music from Openverse." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Openverse ནས་ཡོང་བའི་ཆོག་མཆན་སྒོ་ཕྱེ་བའི་རོལ་དབྱངས།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Openly licensed music from Openverse."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Openverse のオープンライセンス音楽。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自 Openverse 的开放授权音乐。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "來自 Openverse 的開放授權音樂。"
           }
         }
       }
@@ -2213,6 +3623,40 @@
         }
       }
     },
+    "Pick a genre above or search for something else." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "གོང་གི་རིགས་ཤིག་འདེམས་སམ་གཞན་ཞིག་འཚོལ།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick a genre above or search for something else."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上のジャンルを選ぶか、別の言葉で検索してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择上方的流派，或搜索其他内容。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇上方的曲風，或搜尋其他內容。"
+          }
+        }
+      }
+    },
     "Placeholder titles: %lld · Unknown artists: %lld · Missing albums: %lld" : {
       "localizations" : {
         "bo" : {
@@ -2277,6 +3721,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "可能的重複"
+          }
+        }
+      }
+    },
+    "Powered by Openverse" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Openverse ཡིས་མཁོ་སྤྲོད།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Powered by Openverse"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Openverse 提供"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 Openverse 提供"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 Openverse 提供"
           }
         }
       }
@@ -2961,6 +4439,176 @@
         }
       }
     },
+    "Search the server…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་འཚོལ།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search the server…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバを検索…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索服务器…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜尋伺服器…"
+          }
+        }
+      }
+    },
+    "Searching the server for albums…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ནང་འཁོར་ལོ་འཚོལ་བཞིན།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Searching the server for albums…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバでアルバムを検索中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在服务器上搜索专辑…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在伺服器上搜尋專輯…"
+          }
+        }
+      }
+    },
+    "Searching the server for artists…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ནང་རོལ་མཁན་འཚོལ་བཞིན།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Searching the server for artists…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバでアーティストを検索中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在服务器上搜索艺人…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在伺服器上搜尋藝人…"
+          }
+        }
+      }
+    },
+    "Searching the server for songs…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ནང་གླུ་དབྱངས་འཚོལ་བཞིན།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Searching the server for songs…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバで曲を検索中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在服务器上搜索歌曲…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在伺服器上搜尋歌曲…"
+          }
+        }
+      }
+    },
+    "Server" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Server"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伺服器"
+          }
+        }
+      }
+    },
     "Server Address" : {
       "localizations" : {
         "bo" : {
@@ -3097,6 +4745,40 @@
         }
       }
     },
+    "Soundtrack" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "བརྙན་འཕྲིན་གླུ་དབྱངས།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soundtrack"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サウンドトラック"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "影视原声"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "影視原聲"
+          }
+        }
+      }
+    },
     "Stop" : {
       "localizations" : {
         "bo" : {
@@ -3229,6 +4911,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "伺服器位址無效。"
+          }
+        }
+      }
+    },
+    "The server is connected but returned no songs. Try searching above." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་མཐུད་ཟིན་ཀྱང་གླུ་དབྱངས་མ་བྱུང་། གོང་དུ་འཚོལ་ཞིབ་བྱོས།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The server is connected but returned no songs. Try searching above."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバには接続していますが、曲が返されませんでした。上で検索してみてください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器已连接，但没有返回歌曲。请尝试在上方搜索。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伺服器已連線，但沒有傳回歌曲。請嘗試在上方搜尋。"
           }
         }
       }
@@ -4360,112 +6076,6 @@
           }
         }
       }
-    },
-    "%lld 个歌单" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "གླུ་ཐོ %lld"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld Playlists"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 件のプレイリスト"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 个歌单"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 個歌單"
-          }
-        }
-      }
-    },
-    "%lld 张专辑" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཆེད་བསྒྲིགས %lld"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld Albums"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 枚のアルバム"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 张专辑"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 張專輯"
-          }
-        }
-      }
-    },
-    "%lld 首歌曲" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "གླུ་གཞས %lld"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld Songs"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 曲"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 首歌曲"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 首歌曲"
-          }
-        }
-      }
-    },
-    "%lld 首音频" : {
-      "comment" : "A label displaying the number of audio results in the browse view. The argument is the count of results.",
-      "isCommentAutoGenerated" : true
     },
     "%lld%% completed" : {
       "comment" : "A label showing the percentage of the scanning process that has been completed. The argument is a percentage value between 0 and 100.",
@@ -14299,18 +15909,6 @@
         }
       }
     },
-    "Openverse 全球音频库" : {
-      "comment" : "The name of the Openverse library.",
-      "isCommentAutoGenerated" : true
-    },
-    "Openverse 音频精选" : {
-      "comment" : "A heading for the Openverse audio results section.",
-      "isCommentAutoGenerated" : true
-    },
-    "Openverse 驱动" : {
-      "comment" : "A label that indicates the use of Openverse for the browsing experience.",
-      "isCommentAutoGenerated" : true
-    },
     "Optional notes or tagline" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -20706,1576 +22304,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "→ %@ · 已使用 %lld 次"
-          }
-        }
-      }
-    },
-    "从资料库中移除" : {
-      "comment" : "A button that removes an item from the user's library.",
-      "isCommentAutoGenerated" : true
-    },
-    "最近连接: %@" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཉེ་དུས་སྦྲེལ་མཐུད: %@"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Last connected: %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "前回の接続：%@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最近连接：%@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最近連線：%@"
-          }
-        }
-      }
-    },
-    "如：我的极空间" : {
-      "comment" : "A placeholder text for the server name field.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "དཔེར་ན། ངའི་གནས་དབྱིངས།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "e.g. My Zspace"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "例：マイスペース"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "如：我的极空间"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "例如：我的極空間"
-          }
-        }
-      }
-    },
-    "密码" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "གསང་གྲངས།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Password"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "パスワード"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "密码"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "密碼"
-          }
-        }
-      }
-    },
-    "已在资料库中" : {
-      "comment" : "A label that indicates an item is saved in the user's library.",
-      "isCommentAutoGenerated" : true
-    },
-    "已识别 OpenSubsonic 标准扩展 (%@)" : {
-      "comment" : "A note indicating that the server supports OpenSubsonic extensions. The value inside the parentheses is a comma-separated list of the extensions that the server supports.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OpenSubsonic ཚད་ལྡན་རྒྱ་བསྐྱེད་ངོས་འཛིན་བྱུང་བ (%@)"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recognized OpenSubsonic standard extension (%@)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OpenSubsonic標準拡張を認識しました (%@)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已识别 OpenSubsonic 标准扩展 (%@)"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已識別 OpenSubsonic 標準擴充 (%@)"
-          }
-        }
-      }
-    },
-    "开放版权 · 封面抓取 · 授权元数据 · 在线试听与无损入库" : {
-      "comment" : "A description of the features of the Openverse audio library.",
-      "isCommentAutoGenerated" : true
-    },
-    "探索全球潮流企划、现场录音室与开放版权音频。" : {
-      "comment" : "A description of the content of the browse view.",
-      "isCommentAutoGenerated" : true
-    },
-    "探索流派与分类" : {
-      "comment" : "A heading for the genre and category discovery section.",
-      "isCommentAutoGenerated" : true
-    },
-    "插播到下一首" : {
-      "comment" : "A button that inserts the current item into the queue and plays the next item.",
-      "isCommentAutoGenerated" : true
-    },
-    "搜索远程专辑…" : {
-      "comment" : "A placeholder text for a search bar in the albums view.",
-      "extractionState" : "stale",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་ཆེད་བསྒྲིགས་འཚོལ་བཤེར…"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Search remote albums…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートアルバムを検索…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "搜索远程专辑…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "搜尋遠程專輯…"
-          }
-        }
-      }
-    },
-    "搜索远程歌曲…" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་གླུ་གཞས་འཚོལ་བཤེར…"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Search remote songs…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモート楽曲を検索…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "搜索远程歌曲…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "搜尋遠程歌曲…"
-          }
-        }
-      }
-    },
-    "搜索远程艺术家…" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་སྒྱུ་རྩལ་པ་འཚོལ་བཤེར…"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Search remote artists…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートアーティストを検索…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "搜索远程艺术家…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "搜尋遠程藝人…"
-          }
-        }
-      }
-    },
-    "播放" : {
-      "comment" : "A button that plays audio.",
-      "isCommentAutoGenerated" : true
-    },
-    "无法加载专辑" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཆེད་བསྒྲིགས་འདྲེན་མི་ཐུབ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unable to load albums"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "アルバムを読み込めません"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法加载专辑"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "無法載入專輯"
-          }
-        }
-      }
-    },
-    "无法加载艺术家" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "སྒྱུ་རྩལ་པ་འདྲེན་མི་ཐུབ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unable to load artists"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "アーティストを読み込めません"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法加载艺术家"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "無法載入藝人"
-          }
-        }
-      }
-    },
-    "暂停" : {
-      "comment" : "A button that pauses playback.",
-      "isCommentAutoGenerated" : true
-    },
-    "暂无音频" : {
-      "comment" : "A title that appears when there are no results for the \"Openverse 音频精选\" section.",
-      "isCommentAutoGenerated" : true
-    },
-    "暂时无法连接 Openverse" : {
-      "comment" : "A title for a view that indicates that the app is unable to connect to the Openverse API.",
-      "isCommentAutoGenerated" : true
-    },
-    "服务器类型" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཞབས་ཞུ་ཆས་ཀྱི་རིགས།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Server Type"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "サーバーの種類"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "服务器类型"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "伺服器類型"
-          }
-        }
-      }
-    },
-    "服务地址" : {
-      "comment" : "A label for the server address field in the Add Subsonic Server sheet.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཞབས་ཞུའི་གནས་ཡུལ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Server Address"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "サーバーアドレス"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "服务地址"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "伺服器位址"
-          }
-        }
-      }
-    },
-    "未发现远程专辑" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་ཆེད་བསྒྲིགས་མ་རྙེད།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No remote albums found"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートアルバムが見つかりません"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未发现远程专辑"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未發現遠程專輯"
-          }
-        }
-      }
-    },
-    "未发现远程歌曲" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་གླུ་གཞས་མ་རྙེད།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No remote songs found"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモート楽曲が見つかりません"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未发现远程歌曲"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未發現遠程歌曲"
-          }
-        }
-      }
-    },
-    "未发现远程艺术家" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་སྒྱུ་རྩལ་པ་མ་རྙེད།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No remote artists found"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートアーティストが見つかりません"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未发现远程艺术家"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未發現遠程藝人"
-          }
-        }
-      }
-    },
-    "未在远程服务器中找到与 \"%@\" 匹配的歌曲。" : {
-      "comment" : "A description of the empty view when no tracks are found in the remote source. The argument is the string “”.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་ཞབས་ཞུ་ཆས་ནང “%@” དང་མཐུན་པའི་གླུ་གཞས་མ་རྙེད།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No songs matching \"%@\" found on the remote server."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートサーバー上で「%@」に一致する曲は見つかりませんでした。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未在远程服务器中找到与“%@”匹配的歌曲。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未在遠程伺服器中找到與「%@」相符的歌曲。"
-          }
-        }
-      }
-    },
-    "未找到匹配曲目" : {
-      "comment" : "A label for when no tracks match the search query.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "མཐུན་པའི་གླུ་གཞས་མ་རྙེད།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No matching tracks found"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "一致するトラックが見つかりません"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未找到匹配曲目"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未找到符合曲目"
-          }
-        }
-      }
-    },
-    "未找到匹配的远程专辑" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "མཐུན་པའི་ཐག་རིང་ཆེད་བསྒྲིགས་མ་རྙེད།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No matching remote albums found"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "一致するリモートアルバムが見つかりません"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未找到匹配的远程专辑"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未找到符合的遠程專輯"
-          }
-        }
-      }
-    },
-    "未找到匹配的远程艺术家" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "མཐུན་པའི་ཐག་རིང་སྒྱུ་རྩལ་པ་མ་རྙེད།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No matching remote artists found"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "一致するリモートアーティストが見つかりません"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未找到匹配的远程艺术家"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未找到符合的遠程藝人"
-          }
-        }
-      }
-    },
-    "来源名称" : {
-      "comment" : "A label for the name of the server.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "འབྱུང་ཁུངས་ཀྱི་མིང་།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Source Name"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ソース名"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "来源名称"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "來源名稱"
-          }
-        }
-      }
-    },
-    "正在从远程媒体服务加载…" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་སྨྱན་སྦྱོར་ཞབས་ཞུ་ནས་འདྲེན་བཞིན་པ…"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading from remote media service…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートメディアサービスから読み込み中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在从远程媒体服务加载…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在從遠程媒體服務載入…"
-          }
-        }
-      }
-    },
-    "正在从远程媒体服务加载专辑..." : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་སྨྱན་སྦྱོར་ཞབས་ཞུ་ནས་ཆེད་བསྒྲིགས་འདྲེན་བཞིན་པ..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading albums from remote media service…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートメディアサービスからアルバムを読み込み中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在从远程媒体服务加载专辑..."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在從遠程媒體服務載入專輯..."
-          }
-        }
-      }
-    },
-    "正在从远程媒体服务加载歌单..." : {
-      "comment" : "A loading message displayed when the user is loading playlists from a remote media server.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་སྨྱན་སྦྱོར་ཞབས་ཞུ་ནས་གླུ་ཐོ་འདྲེན་བཞིན་པ..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading playlists from remote media service…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートメディアサービスからプレイリストを読み込み中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在从远程媒体服务加载歌单..."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在從遠程媒體服務載入歌單..."
-          }
-        }
-      }
-    },
-    "正在从远程媒体服务加载歌曲..." : {
-      "comment" : "A loading message displayed when the user is loading the library from a remote source.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་སྨྱན་སྦྱོར་ཞབས་ཞུ་ནས་གླུ་གཞས་འདྲེན་བཞིན་པ..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading songs from remote media service…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートメディアサービスから曲を読み込み中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在从远程媒体服务加载歌曲..."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在從遠程媒體服務載入歌曲..."
-          }
-        }
-      }
-    },
-    "正在从远程媒体服务加载艺术家..." : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་སྨྱན་སྦྱོར་ཞབས་ཞུ་ནས་སྒྱུ་རྩལ་པ་འདྲེན་བཞིན་པ..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading artists from remote media service…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートメディアサービスからアーティストを読み込み中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在从远程媒体服务加载艺术家..."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在從遠程媒體服務載入藝人..."
-          }
-        }
-      }
-    },
-    "正在从远程服务加载曲目列表..." : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་ཞབས་ཞུ་ནས་གླུ་གཞས་ཐོ་གཞུང་འདྲེན་བཞིན་པ..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading tracklist from remote service…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートサービスからトラック一覧を読み込み中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在从远程服务加载曲目列表..."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在從遠程服務載入曲目列表..."
-          }
-        }
-      }
-    },
-    "正在从远程服务加载歌单曲目..." : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་ཞབས་ཞུ་ནས་གླུ་ཐོའི་གླུ་གཞས་འདྲེན་བཞིན་པ..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading playlist tracks from remote service…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートサービスからプレイリストの曲を読み込み中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在从远程服务加载歌单曲目..."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在從遠程服務載入歌單曲目..."
-          }
-        }
-      }
-    },
-    "正在加载更多专辑..." : {
-      "comment" : "A loading message displayed when the user scrolls to the bottom of the list and more albums are being loaded.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཆེད་བསྒྲིགས་དེ་ལས་མང་བ་འདྲེན་བཞིན་པ..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading more albums…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "さらにアルバムを読み込み中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在加载更多专辑..."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在載入更多專輯..."
-          }
-        }
-      }
-    },
-    "正在加载更多曲目..." : {
-      "comment" : "A loading indicator that appears when the app is loading more tracks.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "གླུ་གཞས་དེ་ལས་མང་བ་འདྲེན་བཞིན་པ..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading more tracks…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "さらにトラックを読み込み中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在加载更多曲目..."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在載入更多曲目..."
-          }
-        }
-      }
-    },
-    "正在加载更多艺术家..." : {
-      "comment" : "A loading message displayed when the user is loading more artists.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "སྒྱུ་རྩལ་པ་དེ་ལས་མང་བ་འདྲེན་བཞིན་པ..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading more artists…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "さらにアーティストを読み込み中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在加载更多艺术家..."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在載入更多藝人..."
-          }
-        }
-      }
-    },
-    "正在检索远程专辑…" : {
-      "comment" : "A description of the album search process when using a remote media source.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་ཆེད་བསྒྲིགས་འཚོལ་བཞིན་པ…"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Searching remote albums…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートアルバムを検索中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在检索远程专辑…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在檢索遠程專輯…"
-          }
-        }
-      }
-    },
-    "正在检索远程歌曲…" : {
-      "comment" : "A description of the state when the user is searching for remote tracks.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་གླུ་གཞས་འཚོལ་བཞིན་པ…"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Searching remote songs…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモート楽曲を検索中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在检索远程歌曲…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在檢索遠程歌曲…"
-          }
-        }
-      }
-    },
-    "正在检索远程艺术家…" : {
-      "comment" : "A description of the search process for remote artists.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་སྒྱུ་རྩལ་པ་འཚོལ་བཞིན་པ…"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Searching remote artists…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートアーティストを検索中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在检索远程艺术家…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在檢索遠程藝人…"
-          }
-        }
-      }
-    },
-    "正在远程检索专辑..." : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་ནས་ཆེད་བསྒྲིགས་འཚོལ་བཞིན་པ..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Searching albums remotely…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートでアルバムを検索中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在远程检索专辑..."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在遠程檢索專輯..."
-          }
-        }
-      }
-    },
-    "正在远程检索歌曲..." : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་ནས་གླུ་གཞས་འཚོལ་བཞིན་པ..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Searching songs remotely…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートで楽曲を検索中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在远程检索歌曲..."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在遠程檢索歌曲..."
-          }
-        }
-      }
-    },
-    "正在远程检索艺术家..." : {
-      "comment" : "A loading message displayed when searching for artists remotely.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་ནས་སྒྱུ་རྩལ་པ་འཚོལ་བཞིན་པ..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Searching artists remotely…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートでアーティストを検索中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在远程检索艺术家..."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在遠程檢索藝人..."
-          }
-        }
-      }
-    },
-    "正在连接 Openverse 检索全球音频…" : {
-      "comment" : "A loading message indicating that the app is connecting to the Openverse API.",
-      "isCommentAutoGenerated" : true
-    },
-    "流媒体与入库" : {
-      "comment" : "A label describing the streaming and database features of the app.",
-      "isCommentAutoGenerated" : true
-    },
-    "测试连接" : {
-      "comment" : "A button label that translates to \"Test Connection\".",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "སྦྲེལ་མཐུད་ཚོད་ལྟ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Test Connection"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "接続テスト"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "测试连接"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "測試連線"
-          }
-        }
-      }
-    },
-    "添加到播放队列" : {
-      "comment" : "A button that adds an item to the user's playback queue.",
-      "isCommentAutoGenerated" : true
-    },
-    "添加到资料库" : {
-      "comment" : "A button that adds an item to the user's library.",
-      "isCommentAutoGenerated" : true
-    },
-    "添加媒体库来源" : {
-      "comment" : "The title of the sheet that allows users to add a new media library source.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "སྨྱན་སྦྱོར་མཛོད་ཀྱི་འབྱུང་ཁུངས་སྣོན་པ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add Media Library Source"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "メディアライブラリソースを追加"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加媒体库来源"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "新增媒體庫來源"
-          }
-        }
-      }
-    },
-    "用户名" : {
-      "comment" : "A field for entering a username.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "སྤྱོད་མིའི་མིང་།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Username"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ユーザー名"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用户名"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用者名稱"
-          }
-        }
-      }
-    },
-    "移除 %@" : {
-      "comment" : "A button that removes the selected source.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ སུབ་པ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ を削除"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除 %@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除 %@"
-          }
-        }
-      }
-    },
-    "许强" : {
-      "comment" : "用户的姓名。",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "许强"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "许强"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "许强"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "许强"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "許強"
-          }
-        }
-      }
-    },
-    "请尝试点击上方流派磁贴或搜索其他关键词。" : {
-      "comment" : "A description of the error state when the user has not searched for anything.",
-      "isCommentAutoGenerated" : true
-    },
-    "远程媒体服务已连接，当前暂未发现歌曲，或可尝试在上方的搜索框中搜索曲目。" : {
-      "comment" : "A description for the empty view when no remote tracks are found.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཐག་རིང་སྨྱན་སྦྱོར་ཞབས་ཞུ་སྦྲེལ་མཐུད་བྱུང་ཡང་གླུ་གཞས་མ་རྙེད། སྟེང་གི་འཚོལ་བཤེར་སྒྲོམ་ནས་འཚོལ་བཤེར་བྱེད་རོགས།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Connected to remote media service, but no songs found. Try searching using the search bar above."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リモートメディアサービスに接続されましたが、曲は見つかりません。上の検索バーで曲を検索してみてください。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "远程媒体服务已连接，当前暂未发现歌曲，或可尝试在上方的搜索框中搜索曲目。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "遠程媒體服務已連接，當前暫未發現歌曲，或可嘗試在上方的搜尋框中搜尋曲目。"
-          }
-        }
-      }
-    },
-    "连接成功！协议版本 %@" : {
-      "comment" : "A success message indicating that the server was successfully connected to, along with the version of the Subsonic API and whether it supports OpenSubsonic extensions.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "སྦྲེལ་མཐུད་བྱུང་སོང་། གྲོས་མཐུན་པར་གཞི %@"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Connection successful! Protocol version %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "接続に成功しました！プロトコルバージョン %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "连接成功！协议版本 %@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "連線成功！協定版本 %@"
-          }
-        }
-      }
-    },
-    "重试" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "བསྐྱར་དུ་ཚོད་ལྟ་བྱ་རྒྱུ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Retry"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "再試行"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重试"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重試"
           }
         }
       }

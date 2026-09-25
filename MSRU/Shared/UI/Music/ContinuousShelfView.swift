@@ -259,7 +259,7 @@ private struct ShelfPreviewItem: Identifiable {
     ]
 
     ContinuousShelfView(
-        title: "最近播放",
+        title: "Recently Played",
         hasChevronHeader: true,
         items: items
     ) { item in

@@ -251,7 +251,7 @@ struct PlaylistsView: View {
             if isLoadingRemotePlaylists && remotePlaylists.isEmpty {
                 VStack(spacing: 12) {
                     ProgressView()
-                    Text("正在从远程媒体服务加载歌单...")
+                    Text("Loading playlists from the server…")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -298,12 +298,12 @@ struct PlaylistsView: View {
             var items = [
                 SourceFilterItem(
                     id: nil,
-                    displayName: "全部",
+                    displayName: String(localized: "All"),
                     count: remoteServers.isEmpty ? (localCount + appleCount) : nil
                 ),
                 SourceFilterItem(
                     id: SourceID.defaultLocal.rawValue,
-                    displayName: "本地歌单",
+                    displayName: String(localized: "Local Playlists"),
                     count: localCount
                 )
             ]

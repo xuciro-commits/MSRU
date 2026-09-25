@@ -94,7 +94,7 @@ public struct SourceFilterBarView: View {
         SourceFilterItem(id: nil, displayName: "All", count: nil),
         SourceFilterItem(id: "local", displayName: "Local Files", count: 96),
         SourceFilterItem(id: "src_apple_music", displayName: "Apple Music", count: 120),
-        SourceFilterItem(id: "src_subsonic_1", displayName: "极空间 NAS (msru)", count: nil)
+        SourceFilterItem(id: "src_subsonic_1", displayName: "Home NAS", count: nil)
     ]
 
     VStack(alignment: .leading, spacing: 20) {

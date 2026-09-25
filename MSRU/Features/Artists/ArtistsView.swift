@@ -340,7 +340,13 @@ struct ArtistsView: View {
             VStack(spacing: 0) {
                 header
                 Divider()
-                ProgressView(isSearchingRemote ? "正在远程检索艺术家..." : (isLoadingRemote ? "正在从远程媒体服务加载艺术家..." : ""))
+                ProgressView {
+                    if isSearchingRemote {
+                        Text("Searching the server for artists…")
+                    } else if isLoadingRemote {
+                        Text("Loading artists from the server…")
+                    }
+                }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         } else if filteredArtists.isEmpty {
@@ -348,16 +354,25 @@ struct ArtistsView: View {
                 header
                 Divider()
                 if isRemoteSourceActive {
-                    ContentUnavailableView(
-                        searchQuery.isEmpty ? "未发现远程艺术家" : "未找到匹配的远程艺术家",
-                        systemImage: "music.mic",
-                        description: Text(searchQuery.isEmpty ? (remoteLoadError ?? "远程媒体库中暂未发现艺术家，或请检查服务器连接状态。") : "在远程媒体库中未找到与 \"\(searchQuery)\" 相关的艺术家。")
-                    )
+                    ContentUnavailableView {
+                        Label(
+                            searchQuery.isEmpty ? LocalizedStringKey("No Artists on the Server") : LocalizedStringKey("No Matching Artists"),
+                            systemImage: "music.mic"
+                        )
+                    } description: {
+                        if !searchQuery.isEmpty {
+                            Text("No artists on the server match “\(searchQuery)”.")
+                        } else if let remoteLoadError {
+                            Text(remoteLoadError)
+                        } else {
+                            Text("No artists were found on the server. Check that it's online.")
+                        }
+                    }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     if let error = localPager?.errorMessage {
                         VStack {
-                            ContentUnavailableView("无法加载艺术家", systemImage: "exclamationmark.triangle",
+                            ContentUnavailableView("Couldn't Load Artists", systemImage: "exclamationmark.triangle",
                                                    description: Text(error))
                             Button("Retry") { Task { await localPager?.retry() } }
                         }
@@ -437,7 +452,7 @@ struct ArtistsView: View {
                             Spacer()
                             ProgressView()
                                 .scaleEffect(0.8)
-                            Text("正在加载更多艺术家...")
+                            Text("Loading more artists…")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -447,7 +462,7 @@ struct ArtistsView: View {
                     if !isRemoteSourceActive, let error = localPager?.errorMessage {
                         HStack {
                             Text(error).foregroundStyle(.secondary)
-                            Button("重试") { Task { await localPager?.retry() } }
+                            Button("Retry") { Task { await localPager?.retry() } }
                         }
                     }
                 }
@@ -505,19 +520,19 @@ struct ArtistsView: View {
     private var artistsSubtitle: String {
         if isRemoteSourceActive {
             if isLoadingRemote && remoteArtists.isEmpty {
-                return String(localized: "正在从远程媒体服务加载…")
+                return String(localized: "Loading from the server…")
             }
             if isSearchingRemote {
-                return String(localized: "正在检索远程艺术家…")
+                return String(localized: "Searching the server for artists…")
             }
             let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
             if !query.isEmpty {
-                return "搜索结果：\(filteredArtists.count) 位艺术家"
+                return String(localized: "\(filteredArtists.count) artists found")
             }
-            let serverName = availableSources.first(where: { $0.sourceID == selectedSourceID })?.displayName ?? "远程媒体服务"
-            return "\(serverName) • 按需在线浏览"
+            let serverName = availableSources.first(where: { $0.sourceID == selectedSourceID })?.displayName ?? String(localized: "Server")
+            return String(localized: "\(serverName) · Browsing online")
         } else {
-            return "\(localPager?.totalCount ?? filteredArtists.count) 位艺术家"
+            return String(localized: "\(localPager?.totalCount ?? filteredArtists.count) artists")
         }
     }
 
