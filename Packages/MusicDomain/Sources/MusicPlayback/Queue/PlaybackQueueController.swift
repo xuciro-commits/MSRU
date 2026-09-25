@@ -26,172 +26,54 @@ public struct PlaybackQueueItem: Identifiable {
 @Observable
 public final class PlaybackQueueController {
 
-
-    public private(set) var history:
-        [PlaybackQueueItem] = []
-
-    public private(set) var current:
-        PlaybackQueueItem?
-
-    public private(set) var upcoming:
-        [PlaybackQueueItem] = []
+    public private(set) var history: [PlaybackQueueItem] = []
+    public private(set) var current: PlaybackQueueItem?
+    public private(set) var upcoming: [PlaybackQueueItem] = []
 
     public init() {}
 
-
     // MARK: - State
 
-    public var canPrevious:
-        Bool {
-
+    public var canPrevious: Bool {
         !history.isEmpty
     }
 
-
-    public var canNext:
-        Bool {
-
+    public var canNext: Bool {
         !upcoming.isEmpty
     }
 
-
-    public var allItems:
-        [PlaybackQueueItem] {
-
-        var result =
-            history
-
-
+    public var allItems: [PlaybackQueueItem] {
+        var result = history
         if let current {
-
-            result.append(
-                current
-            )
+            result.append(current)
         }
-
-
-        result.append(
-            contentsOf:
-                upcoming
-        )
-
-
+        result.append(contentsOf: upcoming)
         return result
     }
 
-
     // MARK: - Start
 
-    public func start(
-        _ item:
-            PlaybackItem,
-        context:
-            [PlaybackItem]? = nil
-    ) {
-
-        /*
-         有完整播放上下文。
-
-         例如：
-
-         Album
-         Library
-         Search Results
-
-         直接建立：
-
-         history
-         current
-         upcoming
-         */
-        if let context,
-           let index =
-                context.firstIndex(
-                    where: {
-                        $0.id == item.id
-                    }
-                ) {
-
-            let queueItems:
-                [PlaybackQueueItem] =
-                context.map {
-                    PlaybackQueueItem(
-                        item:
-                            $0
-                    )
-                }
-
-
-            history =
-                Array(
-                    queueItems[
-                        ..<index
-                    ]
-                )
-
-
-            current =
-                queueItems[
-                    index
-                ]
-
-
-            let nextIndex =
-                index + 1
-
-
-            if nextIndex
-                < queueItems.count {
-
-                upcoming =
-                    Array(
-                        queueItems[
-                            nextIndex...
-                        ]
-                    )
-
+    public func start(_ item: PlaybackItem, context: [PlaybackItem]? = nil) {
+        if let context, let index = context.firstIndex(where: { $0.id == item.id }) {
+            let queueItems = context.map { PlaybackQueueItem(item: $0) }
+            history = Array(queueItems[..<index])
+            current = queueItems[index]
+            let nextIndex = index + 1
+            if nextIndex < queueItems.count {
+                upcoming = Array(queueItems[nextIndex...])
             } else {
-
-                upcoming =
-                    []
+                upcoming = []
             }
-
-
             return
         }
 
-
-        /*
-         Play Now。
-
-         如果是另一首歌曲：
-
-         old current -> history
-         new item    -> current
-
-         原来的 upcoming 保留。
-         */
-        if current?
-            .item
-            .id
-            != item.id {
-
+        if current?.item.id != item.id {
             if let current {
-
-                history.append(
-                    current
-                )
+                history.append(current)
             }
-
-
-            current =
-                PlaybackQueueItem(
-                    item:
-                        item
-                )
+            current = PlaybackQueueItem(item: item)
         }
     }
-
 
     /// Select a queue occurrence, not a media ID (the same song may appear twice).
     @discardableResult
@@ -207,64 +89,25 @@ public final class PlaybackQueueController {
     // MARK: - Next
 
     @discardableResult
-    public func advanceNext()
-        -> PlaybackQueueItem? {
-
-        guard
-            !upcoming.isEmpty
-        else {
-            return nil
-        }
-
-
+    public func advanceNext() -> PlaybackQueueItem? {
+        guard !upcoming.isEmpty else { return nil }
         if let current {
-
-            history.append(
-                current
-            )
+            history.append(current)
         }
-
-
-        let next =
-            upcoming.removeFirst()
-
-
-        current =
-            next
-
-
+        let next = upcoming.removeFirst()
+        current = next
         return next
     }
-
 
     // MARK: - Previous
 
     @discardableResult
-    public func movePrevious()
-        -> PlaybackQueueItem? {
-
-        guard
-            let previous =
-                history.popLast()
-        else {
-            return nil
-        }
-
-
+    public func movePrevious() -> PlaybackQueueItem? {
+        guard let previous = history.popLast() else { return nil }
         if let current {
-
-            upcoming.insert(
-                current,
-                at:
-                    0
-            )
+            upcoming.insert(current, at: 0)
         }
-
-
-        current =
-            previous
-
-
+        current = previous
         return previous
     }
 
@@ -273,99 +116,29 @@ public final class PlaybackQueueController {
         if excess > 0 { history.removeFirst(excess) }
     }
 
-
     // MARK: - Play Next
 
-    public func playNext(
-        _ item:
-            PlaybackItem
-    ) {
-
-        /*
-         同一歌曲如果已经位于 upcoming，
-         先移除，再插到首位。
-         */
-        upcoming.removeAll {
-            queueItem in
-
-            queueItem.item.id
-                == item.id
-        }
-
-
-        upcoming.insert(
-            PlaybackQueueItem(
-                item:
-                    item
-            ),
-            at:
-                0
-        )
+    public func playNext(_ item: PlaybackItem) {
+        upcoming.removeAll { $0.item.id == item.id }
+        upcoming.insert(PlaybackQueueItem(item: item), at: 0)
     }
-
 
     // MARK: - Add To Queue
 
-    public func addToQueue(
-        _ item:
-            PlaybackItem
-    ) {
-
-        upcoming.append(
-            PlaybackQueueItem(
-                item:
-                    item
-            )
-        )
+    public func addToQueue(_ item: PlaybackItem) {
+        upcoming.append(PlaybackQueueItem(item: item))
     }
-
 
     // MARK: - Remove
 
-    public func removeUpcoming(
-        id:
-            UUID
-    ) {
-
-        upcoming.removeAll {
-            queueItem in
-
-            queueItem.id
-                == id
-        }
+    public func removeUpcoming(id: UUID) {
+        upcoming.removeAll { $0.id == id }
     }
 
-
-    public func removeUpcoming(
-        at offsets:
-            IndexSet
-    ) {
-
-        /*
-         倒序删除，
-         防止删除前面的元素后 index 发生移动。
-         */
-        let indexes =
-            offsets
-                .filter {
-                    upcoming.indices
-                        .contains(
-                            $0
-                        )
-                }
-                .sorted(
-                    by:
-                        >
-                )
-
-
-        for index
-            in indexes {
-
-            upcoming.remove(
-                at:
-                    index
-            )
+    public func removeUpcoming(at offsets: IndexSet) {
+        let indexes = offsets.filter { upcoming.indices.contains($0) }.sorted(by: >)
+        for index in indexes {
+            upcoming.remove(at: index)
         }
     }
 
@@ -381,130 +154,41 @@ public final class PlaybackQueueController {
         return false
     }
 
-
     // MARK: - Reorder
 
-    public func moveUpcoming(
-        fromOffsets source:
-            IndexSet,
-        toOffset destination:
-            Int
-    ) {
+    public func moveUpcoming(fromOffsets source: IndexSet, toOffset destination: Int) {
+        let indexes = source.filter { upcoming.indices.contains($0) }.sorted()
+        guard !indexes.isEmpty else { return }
 
-        /*
-         SwiftUI List 的 move：
-
-         1. 提取合法 index
-         2. 保存待移动元素
-         3. 从后往前删除
-         4. 修正 destination
-         5. 插入
-
-         不使用 compactMap，
-         避免 Swift 6.x 在这里出现
-         ElementOfResult 推断失败。
-         */
-        let indexes:
-            [Int] =
-            source
-                .filter {
-                    upcoming.indices
-                        .contains(
-                            $0
-                        )
-                }
-                .sorted()
-
-
-        guard
-            !indexes.isEmpty
-        else {
-            return
+        let movingItems = indexes.map { upcoming[$0] }
+        for index in indexes.reversed() {
+            upcoming.remove(at: index)
         }
 
+        let removedBeforeDestination = indexes.filter { $0 < destination }.count
+        let adjustedDestination = destination - removedBeforeDestination
+        let safeDestination = max(0, min(upcoming.count, adjustedDestination))
 
-        let movingItems:
-            [PlaybackQueueItem] =
-            indexes.map {
-                index in
-
-                upcoming[
-                    index
-                ]
-            }
-
-
-        for index
-            in indexes.reversed() {
-
-            upcoming.remove(
-                at:
-                    index
-            )
-        }
-
-
-        let removedBeforeDestination =
-            indexes
-                .filter {
-                    $0 < destination
-                }
-                .count
-
-
-        let adjustedDestination =
-            destination
-            - removedBeforeDestination
-
-
-        let safeDestination =
-            max(
-                0,
-                min(
-                    upcoming.count,
-                    adjustedDestination
-                )
-            )
-
-
-        upcoming.insert(
-            contentsOf:
-                movingItems,
-            at:
-                safeDestination
-        )
+        upcoming.insert(contentsOf: movingItems, at: safeDestination)
     }
-
 
     // MARK: - Clear Upcoming
 
     public func clearUpcoming() {
-
-        upcoming =
-            []
+        upcoming = []
     }
-
 
     // MARK: - Clear History
 
     public func clearHistory() {
-
-        history =
-            []
+        history = []
     }
-
 
     // MARK: - Clear All
 
     public func clearAll() {
-
-        history =
-            []
-
-        current =
-            nil
-
-        upcoming =
-            []
+        history = []
+        current = nil
+        upcoming = []
     }
 }

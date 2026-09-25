@@ -224,6 +224,16 @@ final class SystemNowPlayingCoordinator: NSObject, PlaybackSessionObserving, Sys
             return
         }
 
+        // Apple Music manages its own system MediaRemote playback session via MusicKit's
+        // ApplicationMusicPlayer. Clearing MPNowPlayingInfoCenter avoids duplicate/conflicting
+        // playback cards in macOS Control Center and lock screen.
+        if playback.currentItem?.source == .appleMusic {
+            nowPlayingCenter.nowPlayingInfo = nil
+            currentNowPlayingInfo = nil
+            updateCommandsEnabled()
+            return
+        }
+
         var info: [String: Any] = [:]
         info[MPMediaItemPropertyTitle] = playback.unifiedTitle
         info[MPMediaItemPropertyArtist] = playback.unifiedSubtitle
@@ -283,6 +293,7 @@ final class SystemNowPlayingCoordinator: NSObject, PlaybackSessionObserving, Sys
 
     func playbackDidUpdateState(_ controller: PlaybackController) {
         guard isActive else { return }
+        if controller.currentItem?.source == .appleMusic { return }
         guard var info = nowPlayingCenter.nowPlayingInfo ?? currentNowPlayingInfo else {
             updateNowPlayingInfo()
             return
@@ -300,6 +311,7 @@ final class SystemNowPlayingCoordinator: NSObject, PlaybackSessionObserving, Sys
 
     func playbackDidSeek(_ controller: PlaybackController, to time: TimeInterval) {
         guard isActive else { return }
+        if controller.currentItem?.source == .appleMusic { return }
         guard var info = nowPlayingCenter.nowPlayingInfo ?? currentNowPlayingInfo else {
             updateNowPlayingInfo()
             return

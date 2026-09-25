@@ -51,7 +51,7 @@ public actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
             LEFT JOIN releases rel ON rel.id = rt.release_id
             LEFT JOIN artist_credits ac ON ac.entity_id = rec.id AND ac.entity_type = 'recording'
             LEFT JOIN artists art ON art.id = ac.artist_id
-            WHERE s.source_type IN ('local_folder', 'localFolder')
+            WHERE s.source_type IN ('local_folder', 'localFolder', 'apple_music')
             ORDER BY rec.sort_title ASC, a.relative_path ASC
             """
 
@@ -142,11 +142,11 @@ public actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
                            (SELECT rel.artwork_asset_id FROM release_tracks rt
                             JOIN releases rel ON rel.id = rt.release_id
                             WHERE rt.recording_id = r.id ORDER BY rt.id LIMIT 1) AS artwork_asset_id,
-                           (SELECT rt.track_number FROM release_tracks rt
-                            WHERE rt.recording_id = r.id ORDER BY rt.id LIMIT 1) AS track_number
+                            (SELECT rt.track_number FROM release_tracks rt
+                             WHERE rt.recording_id = r.id ORDER BY rt.id LIMIT 1) AS track_number
                     FROM assets a JOIN sources s ON s.id = a.source_id
                     LEFT JOIN recordings r ON r.id = a.recording_id
-                    WHERE s.source_type IN ('local_folder', 'localFolder')
+                    WHERE \(Self.sourcePredicate(for: request.sourceFilter))
                 )
                 """
             let filter = query.isEmpty ? "" : " WHERE instr(lower(track_title), lower(?)) > 0 OR instr(lower(artist_name), lower(?)) > 0 OR instr(lower(COALESCE(album_title, '')), lower(?)) > 0"
@@ -170,6 +170,19 @@ public actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
                                   trackNumber: number, year: row["release_year"])
             }
             return LocalTrackPage(tracks: tracks, totalCount: totalCount, offset: request.offset)
+        }
+    }
+
+    nonisolated private static func sourcePredicate(for sourceFilter: String?) -> String {
+        guard let sourceFilter else {
+            return "s.source_type IN ('local_folder', 'localFolder', 'apple_music')"
+        }
+        if SourceID.isLocalSourceID(sourceFilter) {
+            return "s.source_type IN ('local_folder', 'localFolder')"
+        } else if SourceID.isAppleMusicSourceID(sourceFilter) {
+            return "(s.source_type = 'apple_music' OR s.id = 'src_apple_music')"
+        } else {
+            return "s.id = '\(sourceFilter.replacingOccurrences(of: "'", with: "''"))'"
         }
     }
 
@@ -386,7 +399,7 @@ public actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
                         WHERE rt.recording_id = r.id ORDER BY rt.id LIMIT 1) AS track_number
                 FROM assets a JOIN sources s ON s.id = a.source_id
                 LEFT JOIN recordings r ON r.id = a.recording_id
-                WHERE s.source_type IN ('local_folder', 'localFolder') AND (\(predicate))
+                WHERE s.source_type IN ('local_folder', 'localFolder', 'apple_music') AND (\(predicate))
                 ORDER BY \(orderBy)\(limitSQL)
                 """, arguments: StatementArguments(arguments))
             return rows.compactMap { row -> LocalTrack? in
@@ -417,6 +430,7 @@ public actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
         let identityRepo = IdentityRepository(db: db)
         let assetRepo = AssetRepository(db: db)
         let sourceID = SourceID("src_local_default")
+        let appleMusicSourceID = SourceID.appleMusic
 
         let defaultSource = Source(
             id: sourceID,
@@ -427,6 +441,21 @@ public actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
             isEnabled: true
         )
         try await sourceRepo.insertOrUpdate(defaultSource)
+
+        let hasAppleMusicTracks = tracks.contains {
+            $0.fileURL.path.hasPrefix("/AppleMusic/") || $0.fileURL.absoluteString.hasPrefix("file:///AppleMusic/")
+        }
+        if hasAppleMusicTracks {
+            let appleMusicSource = Source(
+                id: appleMusicSourceID,
+                sourceType: .appleMusic,
+                uri: "applemusic://library",
+                displayName: "Apple Music",
+                capabilities: SourceCapabilities([.supportsStreaming, .supportsArtwork, .supportsStableExternalID]),
+                isEnabled: true
+            )
+            try await sourceRepo.insertOrUpdate(appleMusicSource)
+        }
 
         // Group tracks by album title to derive stable primary albumArtist (prevent duet fragmentation)
         var tracksByAlbum: [String: [LocalTrack]] = [:]
@@ -458,7 +487,12 @@ public actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
 
         let relativePaths = tracks.map { $0.fileURL.standardizedFileURL.path }
         let existingBindings = try await db.reader.read { db in
-            try AssetRepository.existingAssetBindings(forSourceID: sourceID, relativePaths: relativePaths, in: db)
+            var bindings = try AssetRepository.existingAssetBindings(forSourceID: sourceID, relativePaths: relativePaths, in: db)
+            if hasAppleMusicTracks {
+                let appleBindings = try AssetRepository.existingAssetBindings(forSourceID: appleMusicSourceID, relativePaths: relativePaths, in: db)
+                bindings.merge(appleBindings) { _, new in new }
+            }
+            return bindings
         }
 
         for track in tracks {
@@ -467,9 +501,11 @@ public actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
                 : "Unknown Album"
             let albumArtist = primaryArtistByAlbum[relTitle] ?? track.artist
             let relativePath = track.fileURL.standardizedFileURL.path
+            let isApple = track.fileURL.path.hasPrefix("/AppleMusic/") || track.fileURL.absoluteString.hasPrefix("file:///AppleMusic/")
+            let effectiveSourceID = isApple ? appleMusicSourceID : sourceID
             let existing = existingBindings[relativePath]
             let recID = existing?.recordingID ?? DeterministicID.recording(title: track.title, artist: track.artist)
-            let astID = existing?.assetID ?? DeterministicID.asset(sourceID: sourceID, relativePath: relativePath)
+            let astID = existing?.assetID ?? DeterministicID.asset(sourceID: effectiveSourceID, relativePath: relativePath)
             let albumArtID = DeterministicID.artist(name: albumArtist)
             let trackArtID = DeterministicID.artist(name: track.artist)
             let rgID = DeterministicID.releaseGroup(artist: albumArtist, title: relTitle)
@@ -495,7 +531,7 @@ public actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
 
             assets.append(PersistedAssetRecord(
                 id: astID,
-                sourceID: sourceID,
+                sourceID: effectiveSourceID,
                 relativePath: relativePath,
                 fileSize: 0,
                 mtime: Date().timeIntervalSince1970,
@@ -610,7 +646,7 @@ public actor SQLiteLocalLibraryRepository: LocalLibraryRepository {
                 let rows = try Row.fetchAll(db, sql: """
                     SELECT a.id, a.relative_path FROM assets a
                     JOIN sources s ON s.id = a.source_id
-                    WHERE s.source_type IN ('local_folder', 'localFolder') AND a.relative_path IN (\(placeholders))
+                    WHERE s.source_type IN ('local_folder', 'localFolder', 'apple_music') AND a.relative_path IN (\(placeholders))
                     """, arguments: StatementArguments(batch))
                 for row in rows {
                     if let raw: String = row["id"] { ids.insert(AssetID(raw)) }

@@ -8,127 +8,55 @@ import AppFoundation
 import AppFoundationUI
 import CoreSpotlight
 
-
 @MainActor
-struct SwiftUISceneRootView:
-    View {
+struct SwiftUISceneRootView: View {
 
     // MARK: - Application
-
-    let application:
-        ApplicationModel
-
+    let application: ApplicationModel
 
     // MARK: - External Command Source
-
-    private let externalURLSource =
-        SceneRouteURLCommandSource(
-            scheme:
-                "msru"
-        )
-
+    private let externalURLSource = SceneRouteURLCommandSource(scheme: "msru")
 
     // MARK: - Command Runtime
-
-    @State
-    private var commandRuntime:
-        SingleSceneApplicationCommandRuntime
-
+    @State private var commandRuntime: SingleSceneApplicationCommandRuntime
 
     // MARK: - Lifecycle Runtime
-
-    @State
-    private var lifecycleRuntime:
-        ApplicationLifecycleRuntime
-
+    @State private var lifecycleRuntime: ApplicationLifecycleRuntime
 
     // MARK: - Platform Restoration
-
-    @SceneStorage(
-        "MSRU.Scene.RestorationSnapshot"
-    )
-    private var restorationJSON:
-        String?
-
+    @SceneStorage("MSRU.Scene.RestorationSnapshot")
+    private var restorationJSON: String?
 
     // MARK: - Scene Runtime
-
-    @State
-    private var scene:
-        SceneModel?
-
-
+    @State private var scene: SceneModel?
     @State private var shellSession: MSRUApplicationShellSession?
     @State private var pendingSpotlightIdentifier: String?
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     // MARK: - Init
-
-    init(
-        application:
-            ApplicationModel
-    ) {
-
-        self.application =
-            application
-
-
-        let commandRuntime =
-            SingleSceneApplicationCommandRuntime()
-
-
-        _commandRuntime =
-            State(
-                initialValue:
-                    commandRuntime
-            )
-
-
-        _lifecycleRuntime =
-            State(
-                initialValue:
-                    ApplicationLifecycleRuntime(
-                        commandRuntime:
-                            commandRuntime
-                    )
-            )
+    init(application: ApplicationModel) {
+        self.application = application
+        let commandRuntime = SingleSceneApplicationCommandRuntime()
+        _commandRuntime = State(initialValue: commandRuntime)
+        _lifecycleRuntime = State(initialValue: ApplicationLifecycleRuntime(commandRuntime: commandRuntime))
     }
 
-
     // MARK: - Body
-
-    var body:
-        some View {
-
+    var body: some View {
         Group {
-
             if let scene {
-
-                sceneContent(
-                    scene
-                )
-
+                sceneContent(scene)
             } else {
-
                 ProgressView()
             }
         }
-        .applyLocaleOverride(
-            application
-                .languageSettings
-                .resolvedLocale
-        )
+        .applyLocaleOverride(application.languageSettings.resolvedLocale)
         .task {
-
             bootstrapIfNeeded()
         }
-        .onOpenURL {
-            url in
-
-            handleExternalURL(
-                url
-            )
+        .onOpenURL { url in
+            handleExternalURL(url)
         }
         .onContinueUserActivity(CSSearchableItemActionType) { activity in
             guard let identifier = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
@@ -141,14 +69,8 @@ struct SwiftUISceneRootView:
         }
     }
 
-
     // MARK: - Content
-
-    private func sceneContent(
-        _ scene:
-            SceneModel
-    ) -> some View {
-
+    private func sceneContent(_ scene: SceneModel) -> some View {
         Group {
             if let shellSession {
                 if horizontalSizeClass == .compact {
@@ -164,26 +86,11 @@ struct SwiftUISceneRootView:
                 }
             }
         }
-        .onChange(
-            of:
-                scene
-                    .navigation
-                    .section
-        ) {
-
-            persist(
-                scene
-            )
+        .onChange(of: scene.navigation.section) {
+            persist(scene)
         }
-        .onChange(
-            of:
-                scene
-                    .isQueuePresented
-        ) {
-
-            persist(
-                scene
-            )
+        .onChange(of: scene.isQueuePresented) {
+            persist(scene)
         }
     }
 
@@ -211,68 +118,21 @@ struct SwiftUISceneRootView:
         .animation(.easeInOut(duration: 0.3), value: scene.isNowPlayingPresented)
     }
 
-
     // MARK: - External URL
-
-    private func handleExternalURL(
-        _ url:
-            URL
-    ) {
-
-        guard
-            let command =
-                externalURLSource
-                    .command(
-                        from:
-                            url
-                    )
-        else {
-
-            return
-        }
-
-
-        commandRuntime
-            .send(
-                command
-            )
+    private func handleExternalURL(_ url: URL) {
+        guard let command = externalURLSource.command(from: url) else { return }
+        commandRuntime.send(command)
     }
 
-
     // MARK: - Bootstrap
-
     private func bootstrapIfNeeded() {
+        guard lifecycleRuntime.phase == .initialized else { return }
 
-        guard
-            lifecycleRuntime.phase
-            ==
-            .initialized
-        else {
+        lifecycleRuntime.beginBootstrap()
+        application.start()
 
-            return
-        }
-
-
-        lifecycleRuntime
-            .beginBootstrap()
-
-
-        /*
-         Application Scope startup。
-
-         idempotency 属于 ApplicationModel。
-         */
-
-        application
-            .start()
-
-
-        let resolvedScene =
-            restoreOrCreateScene()
-
-
-        scene =
-            resolvedScene
+        let resolvedScene = restoreOrCreateScene()
+        scene = resolvedScene
 
         if let pendingSpotlightIdentifier {
             self.pendingSpotlightIdentifier = nil
@@ -285,109 +145,29 @@ struct SwiftUISceneRootView:
         }
         shellSession = session
 
-
-        /*
-         Wiring。
-         不自动 activate。
-         */
-
-        commandRuntime
-            .attach(
-                resolvedScene
-            )
-
-
-        /*
-         Platform runtime 现在真正 ready。
-         */
-
-        lifecycleRuntime
-            .markReady()
-
-
-        /*
-         markReady() 可能 flush
-         bootstrap 前到达的 commands。
-
-         所以 snapshot 必须在 flush 后保存。
-         */
-
-        persist(
-            resolvedScene
-        )
+        commandRuntime.attach(resolvedScene)
+        lifecycleRuntime.markReady()
+        persist(resolvedScene)
     }
-
 
     // MARK: - Restore / Create
-
-    private func restoreOrCreateScene()
-        -> SceneModel {
-
+    private func restoreOrCreateScene() -> SceneModel {
         if let restorationJSON,
-           let data =
-            restorationJSON
-                .data(
-                    using:
-                        .utf8
-                ),
-           let snapshot =
-            try? JSONDecoder()
-                .decode(
-                    SceneRestorationSnapshot
-                        .self,
-                    from:
-                        data
-                ),
-           let restoredScene =
-            SceneModel(
-                application:
-                    application,
-                restoration:
-                    snapshot
-            ) {
-
-            return
-                restoredScene
+           let data = restorationJSON.data(using: .utf8),
+           let snapshot = try? JSONDecoder().decode(SceneRestorationSnapshot.self, from: data),
+           let restoredScene = SceneModel(application: application, restoration: snapshot) {
+            return restoredScene
         }
-
-
-        return
-            SceneModel(
-                application:
-                    application
-            )
+        return SceneModel(application: application)
     }
 
-
     // MARK: - Persist
-
-    private func persist(
-        _ scene:
-            SceneModel
-    ) {
-
-        guard
-            let data =
-                try? JSONEncoder()
-                    .encode(
-                        scene
-                            .restorationSnapshot()
-                    ),
-            let json =
-                String(
-                    data:
-                        data,
-                    encoding:
-                        .utf8
-                )
-        else {
-
+    private func persist(_ scene: SceneModel) {
+        guard let data = try? JSONEncoder().encode(scene.restorationSnapshot()),
+              let json = String(data: data, encoding: .utf8) else {
             return
         }
-
-
-        restorationJSON =
-            json
+        restorationJSON = json
     }
 }
 

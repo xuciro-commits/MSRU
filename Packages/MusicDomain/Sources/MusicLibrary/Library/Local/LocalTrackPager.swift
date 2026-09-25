@@ -10,6 +10,7 @@ public final class LocalTrackPager {
     private var query = ""
     private var sort: LocalTrackPageRequest.Sort = .title
     private var ascending = true
+    private var sourceFilter: String? = nil
 
     public private(set) var tracks: [LocalTrack] = []
     public private(set) var totalCount = 0
@@ -30,11 +31,12 @@ public final class LocalTrackPager {
         )
     }
 
-    public func reset(query: String, sort: LocalTrackPageRequest.Sort, ascending: Bool) async {
+    public func reset(query: String, sort: LocalTrackPageRequest.Sort, ascending: Bool, sourceFilter: String? = nil) async {
         generation &+= 1
         self.query = query
         self.sort = sort
         self.ascending = ascending
+        self.sourceFilter = sourceFilter
         tracks = []
         totalCount = 0
         errorMessage = nil
@@ -47,7 +49,7 @@ public final class LocalTrackPager {
         isLoading = true
         let currentGeneration = generation
         let request = LocalTrackPageRequest(query: query, sort: sort, ascending: ascending,
-                                            offset: tracks.count, limit: pageSize)
+                                            offset: tracks.count, limit: pageSize, sourceFilter: sourceFilter)
         do {
             let page = try await repository.fetchPage(request)
             guard currentGeneration == generation else { return }
@@ -83,7 +85,8 @@ public final class LocalTrackPager {
             sort: sort,
             ascending: ascending,
             offset: 0,
-            limit: currentCount
+            limit: currentCount,
+            sourceFilter: sourceFilter
         )
         do {
             let page = try await repository.fetchPage(request)

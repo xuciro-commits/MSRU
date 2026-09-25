@@ -128,6 +128,9 @@ public final class PlaybackProviderKernel: Sendable {
         // Extended codecs first
         registry.register(ExtendedAudioPlaybackProvider())
 
+        // Apple Music (MusicKit-based playback)
+        registry.register(AppleMusicPlaybackProvider())
+
         // Apple-native local media
         registry.register(LocalPlaybackProvider())
 

@@ -106,7 +106,7 @@ struct SubsonicPreparedPlaybackTests {
         let registry = ProviderRegistry()
         registry.register(RemoteSubsonicPlaybackProvider(downloadStore: downloader))
         registry.register(LocalPlaybackProvider())
-        let playback = PlaybackController(providerKernel: PlaybackProviderKernel(registry: registry))
+        let playback = PlaybackController(providerKernel: PlaybackProviderKernel(registry: registry), isHistoryTrackingEnabled: false)
         let first = PlaybackItem.subsonic(
             itemID: "nas-a",
             title: "NAS A",
@@ -141,7 +141,7 @@ struct SubsonicPreparedPlaybackTests {
         let registry = ProviderRegistry()
         registry.register(RemoteSubsonicPlaybackProvider(downloadStore: downloader))
         registry.register(LocalPlaybackProvider())
-        let playback = PlaybackController(providerKernel: PlaybackProviderKernel(registry: registry))
+        let playback = PlaybackController(providerKernel: PlaybackProviderKernel(registry: registry), isHistoryTrackingEnabled: false)
         let first = PlaybackItem.subsonic(
             itemID: "nas-a", title: "First", artist: "Test", album: "Album",
             duration: 0.45, streamURL: URL(string: "https://nas.example/stream/a")

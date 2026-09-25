@@ -43,6 +43,12 @@ public struct SourceFilterBarView: View {
                             } else if SourceID.isLocalSourceID(item.sourceID) {
                                 Image(systemName: "internaldrive")
                                     .font(.caption2)
+                            } else if SourceID.isAppleMusicSourceID(item.sourceID) {
+                                Image(systemName: "apple.logo")
+                                    .font(.caption2)
+                            } else if item.sourceID == "openverse" || item.sourceID == "src_openverse" {
+                                Image(systemName: "globe")
+                                    .font(.caption2)
                             } else {
                                 Image(systemName: "server.rack")
                                     .font(.caption2)
@@ -87,6 +93,7 @@ public struct SourceFilterBarView: View {
     let items = [
         SourceFilterItem(id: nil, displayName: "All", count: nil),
         SourceFilterItem(id: "local", displayName: "Local Files", count: 96),
+        SourceFilterItem(id: "src_apple_music", displayName: "Apple Music", count: 120),
         SourceFilterItem(id: "src_subsonic_1", displayName: "极空间 NAS (msru)", count: nil)
     ]
 

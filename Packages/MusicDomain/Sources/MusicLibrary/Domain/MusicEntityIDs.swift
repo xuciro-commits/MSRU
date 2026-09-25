@@ -30,14 +30,33 @@ nonisolated public struct SourceID: MusicEntityID {
     nonisolated public init(_ value: String) { self.rawValue = value }
     nonisolated public static func generate() -> SourceID { SourceID("src_\(UUID().uuidString.lowercased())") }
     nonisolated public static let defaultLocal = SourceID("src_local_default")
+    nonisolated public static let appleMusic = SourceID("src_apple_music")
 
     nonisolated public static func isLocalSourceID(_ id: String?) -> Bool {
         guard let id else { return false }
-        return id == "local" || id == "src_local_default" || id.hasPrefix("src_local")
+        return id == "local" || id == "src_local_default" || (id.hasPrefix("src_local") && !id.contains("apple"))
+    }
+
+    nonisolated public static func isAppleMusicSourceID(_ id: String?) -> Bool {
+        guard let id else { return false }
+        return id == "apple_music" || id == "src_apple_music" || id.contains("apple_music")
+    }
+
+    nonisolated public static func isSubsonicSourceID(_ id: String?) -> Bool {
+        guard let id else { return false }
+        return id.hasPrefix("src_subsonic") || id.hasPrefix("subsonic:")
     }
 
     nonisolated public var isLocal: Bool {
         Self.isLocalSourceID(rawValue)
+    }
+
+    nonisolated public var isAppleMusic: Bool {
+        Self.isAppleMusicSourceID(rawValue)
+    }
+
+    nonisolated public var isSubsonic: Bool {
+        Self.isSubsonicSourceID(rawValue)
     }
 }
 
@@ -253,6 +272,7 @@ public enum SourceType: String, Codable, Sendable, CaseIterable {
     case networkFolder = "network_folder"
     case futureProvider = "future_provider"
     case subsonic = "subsonic"
+    case appleMusic = "apple_music"
 }
 
 nonisolated public struct SourceCapabilities: OptionSet, Codable, Sendable, Hashable {

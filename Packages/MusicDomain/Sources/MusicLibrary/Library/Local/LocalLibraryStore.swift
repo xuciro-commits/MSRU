@@ -183,6 +183,7 @@ public final class LocalLibraryStore {
             lookup[track.id] = track
             lookup[track.fileURL.path] = track
             lookup[track.fileURL.standardizedFileURL.path] = track
+            lookup[track.fileURL.absoluteString] = track
         }
         let legacyNames = playlist.trackIDs.filter { !$0.contains("/") && !$0.contains(":") }
         if !legacyNames.isEmpty {
@@ -190,6 +191,24 @@ public final class LocalLibraryStore {
             for track in matches {
                 lookup[track.fileURL.lastPathComponent] = track
             }
+        }
+        var newlyResolved: [LocalTrack] = []
+        for id in playlist.trackIDs where lookup[id] == nil {
+            if id.contains("/AppleMusic/Tracks/") {
+                let catalogID = URL(string: id)?.deletingPathExtension().lastPathComponent
+                    ?? URL(fileURLWithPath: id).deletingPathExtension().lastPathComponent
+                if let track = await AppleMusicService.lookupTrack(catalogID: catalogID) {
+                    lookup[id] = track
+                    lookup[track.id] = track
+                    lookup[track.fileURL.path] = track
+                    lookup[track.fileURL.standardizedFileURL.path] = track
+                    lookup[track.fileURL.absoluteString] = track
+                    newlyResolved.append(track)
+                }
+            }
+        }
+        if !newlyResolved.isEmpty {
+            try? await addTracks(newlyResolved)
         }
         return playlist.trackIDs.compactMap { lookup[$0] }
     }

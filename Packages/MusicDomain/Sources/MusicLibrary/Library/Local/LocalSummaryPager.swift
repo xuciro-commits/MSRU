@@ -9,6 +9,7 @@ public final class LocalAlbumPager {
     private var generation = 0
     private var query = ""
     private var sort: LocalSummaryRepository.AlbumSort = .title
+    private var sourceFilter: String? = nil
 
     public private(set) var albums: [AlbumPresentationModel] = []
     public private(set) var totalCount = 0
@@ -18,10 +19,11 @@ public final class LocalAlbumPager {
     public init(repository: LocalSummaryRepository) { self.repository = repository }
     public var hasMore: Bool { albums.count < totalCount }
 
-    public func reset(query: String, sort: LocalSummaryRepository.AlbumSort) async {
+    public func reset(query: String, sort: LocalSummaryRepository.AlbumSort, sourceFilter: String? = nil) async {
         generation &+= 1
         self.query = query
         self.sort = sort
+        self.sourceFilter = sourceFilter
         albums = []
         totalCount = 0
         errorMessage = nil
@@ -34,7 +36,7 @@ public final class LocalAlbumPager {
         isLoading = true
         let currentGeneration = generation
         do {
-            let page = try await repository.albumPage(query: query, sort: sort, offset: albums.count)
+            let page = try await repository.albumPage(query: query, sort: sort, offset: albums.count, sourceFilter: sourceFilter)
             guard currentGeneration == generation else { return }
             albums.append(contentsOf: page.items)
             totalCount = page.totalCount
@@ -58,7 +60,7 @@ public final class LocalAlbumPager {
         let currentGeneration = generation
         isLoading = true
         do {
-            let page = try await repository.albumPage(query: query, sort: sort, offset: 0, limit: currentCount)
+            let page = try await repository.albumPage(query: query, sort: sort, offset: 0, limit: currentCount, sourceFilter: sourceFilter)
             guard currentGeneration == generation else { return }
             albums = page.items
             totalCount = page.totalCount
@@ -76,6 +78,7 @@ public final class LocalArtistPager {
     private let repository: LocalSummaryRepository
     private var generation = 0
     private var query = ""
+    private var sourceFilter: String? = nil
 
     public private(set) var artists: [ArtistPresentationModel] = []
     public private(set) var totalCount = 0
@@ -85,9 +88,10 @@ public final class LocalArtistPager {
     public init(repository: LocalSummaryRepository) { self.repository = repository }
     public var hasMore: Bool { artists.count < totalCount }
 
-    public func reset(query: String) async {
+    public func reset(query: String, sourceFilter: String? = nil) async {
         generation &+= 1
         self.query = query
+        self.sourceFilter = sourceFilter
         artists = []
         totalCount = 0
         errorMessage = nil
@@ -100,7 +104,7 @@ public final class LocalArtistPager {
         isLoading = true
         let currentGeneration = generation
         do {
-            let page = try await repository.artistPage(query: query, offset: artists.count)
+            let page = try await repository.artistPage(query: query, offset: artists.count, sourceFilter: sourceFilter)
             guard currentGeneration == generation else { return }
             artists.append(contentsOf: page.items)
             totalCount = page.totalCount
@@ -124,7 +128,7 @@ public final class LocalArtistPager {
         let currentGeneration = generation
         isLoading = true
         do {
-            let page = try await repository.artistPage(query: query, offset: 0, limit: currentCount)
+            let page = try await repository.artistPage(query: query, offset: 0, limit: currentCount, sourceFilter: sourceFilter)
             guard currentGeneration == generation else { return }
             artists = page.items
             totalCount = page.totalCount

@@ -63,7 +63,7 @@ struct PlaylistsView: View {
 
     private var isRemoteSourceActive: Bool {
         guard let selectedSourceID else { return false }
-        return !SourceID.isLocalSourceID(selectedSourceID)
+        return SourceID.isSubsonicSourceID(selectedSourceID)
     }
 
     private var allPlaylists: [Playlist] {
@@ -71,6 +71,11 @@ struct PlaylistsView: View {
             return remotePlaylists
         }
         return playlistStore.playlists
+    }
+
+    private func isAppleMusicPlaylist(_ playlist: Playlist) -> Bool {
+        if playlist.description?.contains("Apple Music") == true { return true }
+        return playlist.trackIDs.contains { $0.hasPrefix("/AppleMusic/") || $0.hasPrefix("file:///AppleMusic/") }
     }
 
     private var filteredPlaylists: [Playlist] {
@@ -85,7 +90,11 @@ struct PlaylistsView: View {
         if let selectedSourceID, !isRemoteSourceActive {
             matching = matching.filter { playlist in
                 if SourceID.isLocalSourceID(selectedSourceID) {
-                    return playlist.description?.contains("Subsonic") != true && playlist.description?.contains("极空间") != true
+                    return playlist.description?.contains("Subsonic") != true
+                        && playlist.description?.contains("极空间") != true
+                        && !isAppleMusicPlaylist(playlist)
+                } else if SourceID.isAppleMusicSourceID(selectedSourceID) {
+                    return isAppleMusicPlaylist(playlist)
                 } else {
                     return playlist.description?.contains("Subsonic") == true || playlist.description?.contains("极空间") == true
                 }
@@ -279,23 +288,35 @@ struct PlaylistsView: View {
             }
         }
         .task {
-            let localCount = playlistStore.playlists.filter { $0.description?.contains("Subsonic") != true && $0.description?.contains("极空间") != true }.count
+            let appleCount = playlistStore.playlists.filter { isAppleMusicPlaylist($0) }.count
+            let localCount = playlistStore.playlists.filter {
+                $0.description?.contains("Subsonic") != true &&
+                $0.description?.contains("极空间") != true &&
+                !isAppleMusicPlaylist($0)
+            }.count
             let remoteServers = subsonicServers?.servers ?? []
 
             var items = [
                 SourceFilterItem(
                     id: nil,
                     displayName: "全部",
-                    count: remoteServers.isEmpty ? localCount : nil
-                )
-            ]
-            items.append(
+                    count: remoteServers.isEmpty ? (localCount + appleCount) : nil
+                ),
                 SourceFilterItem(
                     id: SourceID.defaultLocal.rawValue,
                     displayName: "本地歌单",
                     count: localCount
                 )
-            )
+            ]
+            if appleCount > 0 {
+                items.append(
+                    SourceFilterItem(
+                        id: SourceID.appleMusic.rawValue,
+                        displayName: "Apple Music",
+                        count: appleCount
+                    )
+                )
+            }
             for server in remoteServers {
                 items.append(
                     SourceFilterItem(

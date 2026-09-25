@@ -179,19 +179,28 @@ private struct WeakSessionObserver {
     private var pcmShutdownSerial = 0
     private var pcmRecoveryAttempts: [Date] = []
 
+    // MARK: - Apple Music Transport
+
+    private var appleMusicTransport: AppleMusicTransport?
+
     private let makePlayer: (URL) -> AVPlayer
 
     #if os(macOS)
     public let audioOutput: MacAudioOutputController
     #endif
 
+    // MARK: - History Tracking
+
+    public var isHistoryTrackingEnabled: Bool
+
     // MARK: - Init
 
     public init(
         providerKernel: PlaybackProviderKernel? = nil,
+        isHistoryTrackingEnabled: Bool = !AppDatabase.isRunningTests,
         makePlayer: @escaping (URL) -> AVPlayer = { AVPlayer(url: $0) }
     ) {
-
+        self.isHistoryTrackingEnabled = isHistoryTrackingEnabled
         self.makePlayer = makePlayer
 
         self.providerKernel = providerKernel ?? PlaybackProviderKernel.standard()
@@ -217,7 +226,7 @@ private struct WeakSessionObserver {
             audioOutput.select(uid)
             return
         }
-        let resumeAt = pcmEngine?.currentTime ?? (isResolving ? resolvingResumeTime : currentTime)
+        let resumeAt = pcmEngine?.currentTime ?? appleMusicTransport?.currentTime ?? (isResolving ? resolvingResumeTime : currentTime)
         let autoPlay = isResolving ? resolvingAutoPlay : isPlaying
         resolveAndStart(currentItem, resumeAt: resumeAt, autoPlay: autoPlay) { [weak self] in
             self?.audioOutput.select(uid)
@@ -230,7 +239,7 @@ private struct WeakSessionObserver {
             audioOutput.setExclusive(enabled)
             return
         }
-        let resumeAt = pcmEngine?.currentTime ?? (isResolving ? resolvingResumeTime : currentTime)
+        let resumeAt = pcmEngine?.currentTime ?? appleMusicTransport?.currentTime ?? (isResolving ? resolvingResumeTime : currentTime)
         let autoPlay = isResolving ? resolvingAutoPlay : isPlaying
         resolveAndStart(currentItem, resumeAt: resumeAt, autoPlay: autoPlay) { [weak self] in
             self?.audioOutput.setExclusive(enabled)
@@ -378,6 +387,16 @@ private struct WeakSessionObserver {
         guard let item = displayItem else { return nil }
 
         switch item.payload {
+        case .appleMusic:
+            return AudioFormatInfo(
+                codec: "AAC",
+                sampleRate: "44.1 kHz",
+                bitDepth: "16-bit",
+                bitrate: "256 kbps",
+                isLossless: false,
+                isHiRes: false
+            )
+
         case .local(let track):
             let ext = track.fileURL.pathExtension.uppercased()
             let codec = ext.isEmpty ? "AUDIO" : ext
@@ -918,6 +937,8 @@ private struct WeakSessionObserver {
 
         pcmEngine?.pause()
 
+        appleMusicTransport?.pause()
+
         isPlaying = false
     }
 
@@ -956,6 +977,12 @@ private struct WeakSessionObserver {
 
             player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
 
+            return
+        }
+
+        // Apple Music transport
+        if let appleMusicTransport {
+            appleMusicTransport.seek(to: clamped)
             return
         }
 
@@ -1199,6 +1226,12 @@ private struct WeakSessionObserver {
                     print("PCM Stop Seek △", error.localizedDescription)
                 }
             }
+        }
+
+        if let appleMusicTransport {
+
+            appleMusicTransport.pause()
+            appleMusicTransport.seek(to: 0)
         }
 
         currentTime = 0
@@ -1497,11 +1530,45 @@ private struct WeakSessionObserver {
 
             refreshPCMNext()
 
-        // MARK: Future Provider-native Transport
+        // MARK: Apple Music / Provider-native Transport
 
         case .providerNative(let providerID, _):
 
-            throw PlaybackControllerError.nativeTransportNotSupported(providerID: providerID)
+            guard providerID == .appleMusic else {
+                throw PlaybackControllerError.nativeTransportNotSupported(providerID: providerID)
+            }
+
+            activeLoudness = nil
+
+            let transport = AppleMusicTransport()
+
+            transport.onTimeUpdated = { [weak self, weak transport] time in
+                guard let self, self.appleMusicTransport === transport else { return }
+                self.currentTime = time
+            }
+
+            transport.onEnded = { [weak self, weak transport] in
+                guard let self, self.appleMusicTransport === transport else { return }
+                self.handlePlaybackEnded()
+            }
+
+            appleMusicTransport = transport
+
+            currentResource = resource
+
+            currentProviderID = resource.providerID
+
+            currentTime = resumeAt
+
+            duration = resource.duration ?? item.duration ?? 0
+
+            try await transport.start(duration: duration, autoPlay: autoPlay)
+
+            if resumeAt > 0 {
+                transport.seek(to: resumeAt)
+            }
+
+            isPlaying = autoPlay
         }
 
         print("Playback ▶︎", "[\(resource.providerID.rawValue)]", item.title)
@@ -1510,6 +1577,7 @@ private struct WeakSessionObserver {
     }
 
     private func recordPlaybackHistory(for item: PlaybackItem) {
+        guard isHistoryTrackingEnabled, !AppDatabase.isRunningTests else { return }
         let title = item.title
         let artist = item.subtitle
         let album = item.album
@@ -1543,7 +1611,7 @@ private struct WeakSessionObserver {
 
     private var hasActiveTransport: Bool {
 
-        player != nil || pcmEngine != nil
+        player != nil || pcmEngine != nil || appleMusicTransport != nil
     }
 
     private func resumeActiveTransport() {
@@ -1551,9 +1619,15 @@ private struct WeakSessionObserver {
         player?.play()
 
         pcmEngine?.play()
+
+        appleMusicTransport?.play()
     }
 
     private func tearDownActiveTransport() {
+
+        // Apple Music
+        appleMusicTransport?.stop()
+        appleMusicTransport = nil
 
         pcmNextResolutionTask?.cancel()
         pcmNextResolutionTask = nil

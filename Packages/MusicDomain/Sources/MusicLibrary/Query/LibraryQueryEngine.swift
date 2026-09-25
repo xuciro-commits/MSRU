@@ -97,6 +97,8 @@ public actor LibraryQueryEngine {
 
             var localCount: Int = 0
             var foundLocalSource: Bool = false
+            var appleMusicCount: Int = 0
+            var foundAppleMusicSource: Bool = false
             var remoteItems: [SourceFilterItem] = []
 
             for row in sourceRows {
@@ -104,10 +106,19 @@ public actor LibraryQueryEngine {
                 let rawType: String? = row["source_type"]
                 let isLocal = SourceID.isLocalSourceID(sID)
                     || rawType == SourceType.localFolder.rawValue || rawType == "localFolder"
+                let isApple = SourceID.isAppleMusicSourceID(sID)
+                    || rawType == SourceType.appleMusic.rawValue || rawType == "apple_music"
+
                 if isLocal {
                     foundLocalSource = true
                     let c: Int = row["item_count"] ?? 0
                     localCount += c
+                } else if isApple {
+                    let c: Int = row["item_count"] ?? 0
+                    if c > 0 {
+                        foundAppleMusicSource = true
+                        appleMusicCount += c
+                    }
                 } else {
                     // For remote sources (Subsonic, NAS, etc.), DO NOT display count! (Live on-demand iceberg)
                     remoteItems.append(SourceFilterItem(id: sID, displayName: name, count: nil))
@@ -118,11 +129,11 @@ public actor LibraryQueryEngine {
             if !foundLocalSource {
                 let fallbackCount: Int
                 if normalizedType == "recording" {
-                    fallbackCount = try Int.fetchOne(db, sql: "SELECT COUNT(DISTINCT a.recording_id) FROM assets a") ?? 0
+                    fallbackCount = try Int.fetchOne(db, sql: "SELECT COUNT(DISTINCT a.recording_id) FROM assets a WHERE a.source_id IN ('src_local_default', 'local')") ?? 0
                 } else if normalizedType == "artist" {
-                    fallbackCount = try Int.fetchOne(db, sql: "SELECT COUNT(DISTINCT ac.artist_id) FROM artist_credits ac JOIN assets a ON a.recording_id = ac.entity_id") ?? 0
+                    fallbackCount = try Int.fetchOne(db, sql: "SELECT COUNT(DISTINCT ac.artist_id) FROM artist_credits ac JOIN assets a ON a.recording_id = ac.entity_id WHERE a.source_id IN ('src_local_default', 'local')") ?? 0
                 } else {
-                    fallbackCount = try Int.fetchOne(db, sql: "SELECT COUNT(DISTINCT rt.release_id) FROM release_tracks rt JOIN assets a ON a.recording_id = rt.recording_id") ?? 0
+                    fallbackCount = try Int.fetchOne(db, sql: "SELECT COUNT(DISTINCT rt.release_id) FROM release_tracks rt JOIN assets a ON a.recording_id = rt.recording_id WHERE a.source_id IN ('src_local_default', 'local')") ?? 0
                 }
                 localCount = fallbackCount
             }
@@ -135,11 +146,18 @@ public actor LibraryQueryEngine {
             )
 
             // When remote sources are connected, "All" does not have a finite fixed count; omit badge
-            let allCount: Int? = remoteItems.isEmpty ? localCount : nil
+            let allCount: Int? = remoteItems.isEmpty ? (localCount + appleMusicCount) : nil
             var items: [SourceFilterItem] = [
                 SourceFilterItem(id: nil, displayName: "All", count: allCount),
                 localItem
             ]
+            if foundAppleMusicSource && appleMusicCount > 0 {
+                items.append(SourceFilterItem(
+                    id: SourceID.appleMusic.rawValue,
+                    displayName: "Apple Music",
+                    count: appleMusicCount
+                ))
+            }
             items.append(contentsOf: remoteItems)
 
             return items
@@ -361,6 +379,7 @@ public actor LibraryQueryEngine {
                 case .dateAdded: sortCol = "le.date_added"
                 }
                 let direction = spec.ascending ? "ASC" : "DESC"
+                let (srcClause, srcArgs) = Self.sourceFilterClause(for: spec.sourceFilter)
 
                 sql = """
                     SELECT r.id as rec_id, r.title, COALESCE(art.name, 'Unknown Artist') as artist,
@@ -375,14 +394,14 @@ public actor LibraryQueryEngine {
                     LEFT JOIN library_entries le ON le.recording_id = r.id
                     LEFT JOIN assets a ON a.recording_id = r.id
                     LEFT JOIN sources s ON s.id = a.source_id
-                    WHERE (? IS NULL OR a.source_id = ?)
+                    WHERE \(srcClause)
                     ORDER BY \(sortCol) \(direction)
                 """
-                args.append(spec.sourceFilter as Any)
-                args.append(spec.sourceFilter as Any)
+                args.append(contentsOf: srcArgs)
             } else {
                 // FTS5 accelerated multi-lingual search
                 let queryPattern = SearchTokenNormalizer.prepareFTSQuery(spec.query)
+                let (srcClause, srcArgs) = Self.sourceFilterClause(for: spec.sourceFilter)
                 sql = """
                     SELECT r.id as rec_id, r.title, COALESCE(art.name, 'Unknown Artist') as artist,
                            rel.title as album, r.duration, rt.track_position, rel.release_year,
@@ -398,12 +417,11 @@ public actor LibraryQueryEngine {
                     LEFT JOIN assets a ON a.recording_id = r.id
                     LEFT JOIN sources s ON s.id = a.source_id
                     WHERE library_fts MATCH ?
-                      AND (? IS NULL OR a.source_id = ?)
+                      AND \(srcClause)
                     ORDER BY rank
                 """
                 args.append(queryPattern)
-                args.append(spec.sourceFilter as Any)
-                args.append(spec.sourceFilter as Any)
+                args.append(contentsOf: srcArgs)
             }
 
             if let limit = spec.limit {
@@ -518,9 +536,11 @@ public actor LibraryQueryEngine {
             let favRows = try Row.fetchAll(db, sql: "\(baseSelect) WHERE le.is_favorite = 1 ORDER BY le.date_added DESC LIMIT 12")
             let favorites = mapRows(favRows)
 
+            let totalTracks = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM library_entries") ?? 0
             let hero = recentlyPlayed.first ?? favorites.first ?? recentlyAdded.first
 
             return ListenNowBehaviorSnapshot(
+                totalTrackCount: totalTracks,
                 heroItem: hero,
                 recentlyPlayed: recentlyPlayed,
                 recentlyAdded: recentlyAdded,
@@ -529,9 +549,21 @@ public actor LibraryQueryEngine {
             )
         }
     }
+
+    nonisolated private static func sourceFilterClause(for filter: String?) -> (clause: String, args: [Any]) {
+        guard let filter else { return ("1=1", []) }
+        if SourceID.isLocalSourceID(filter) {
+            return ("(a.source_id IN ('local', 'src_local_default') OR s.source_type IN ('local_folder', 'localFolder'))", [])
+        } else if SourceID.isAppleMusicSourceID(filter) {
+            return ("(a.source_id IN ('apple_music', 'src_apple_music') OR s.source_type = 'apple_music')", [])
+        } else {
+            return ("a.source_id = ?", [filter])
+        }
+    }
 }
 
 nonisolated public struct ListenNowBehaviorSnapshot: Sendable {
+    public let totalTrackCount: Int
     public let heroItem: TrackRowSummary?
     public let recentlyPlayed: [TrackRowSummary]
     public let recentlyAdded: [TrackRowSummary]
@@ -539,12 +571,14 @@ nonisolated public struct ListenNowBehaviorSnapshot: Sendable {
     public let favorites: [TrackRowSummary]
 
     nonisolated public init(
+        totalTrackCount: Int = 0,
         heroItem: TrackRowSummary? = nil,
         recentlyPlayed: [TrackRowSummary] = [],
         recentlyAdded: [TrackRowSummary] = [],
         frequentlyPlayed: [TrackRowSummary] = [],
         favorites: [TrackRowSummary] = []
     ) {
+        self.totalTrackCount = totalTrackCount
         self.heroItem = heroItem
         self.recentlyPlayed = recentlyPlayed
         self.recentlyAdded = recentlyAdded

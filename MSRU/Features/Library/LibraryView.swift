@@ -223,7 +223,8 @@ struct LibraryView:
             await pager.reset(
                 query: debouncedLocalQuery,
                 sort: LocalTrackPageRequest.Sort(rawValue: sortField.rawValue) ?? .title,
-                ascending: sortAscending
+                ascending: sortAscending,
+                sourceFilter: selectedSourceID
             )
         }
         .onChange(of: localStore.revision) { _, _ in
@@ -474,7 +475,7 @@ struct LibraryView:
 
     private var isRemoteSourceActive: Bool {
         guard let id = selectedSourceID, id != Self.webSourceID else { return false }
-        return !SourceID.isLocalSourceID(id)
+        return SourceID.isSubsonicSourceID(id)
     }
 
     private func loadRemoteTracks(sourceID: String, query: String = "", reset: Bool = true) async {

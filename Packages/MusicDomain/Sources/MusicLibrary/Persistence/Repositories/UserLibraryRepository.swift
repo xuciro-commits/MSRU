@@ -132,7 +132,7 @@ nonisolated public final class UserLibraryRepository: Sendable {
             )
 
             // 3. Ensure Artist Credit
-            let creditID = UUID().uuidString
+            let creditID = "ac_\(artistID.rawValue)_\(recID.rawValue)"
             try db.execute(
                 sql: """
                 INSERT OR IGNORE INTO artist_credits (id, artist_id, entity_type, entity_id)
@@ -163,7 +163,17 @@ nonisolated public final class UserLibraryRepository: Sendable {
             }
 
             // 5. If fileURL given and no asset exists yet, link asset to local source if available
-            if let fileURL, matchedRecID == nil {
+            // Guard: never index temporary test fixtures or temp directory files as permanent library assets
+            let isTempFile = fileURL.map { url in
+                let path = url.path
+                return path.hasPrefix(NSTemporaryDirectory())
+                    || path.contains("/var/folders/")
+                    || path.hasPrefix("/tmp/")
+                    || path.hasPrefix("/private/tmp/")
+                    || path.contains("fixture_")
+            } ?? false
+
+            if let fileURL, !isTempFile, matchedRecID == nil {
                 var sourceID: String? = try Row.fetchOne(db, sql: "SELECT id FROM sources WHERE source_type = 'local' OR source_type = 'folder' LIMIT 1")?["id"]
                 if sourceID == nil {
                     let defaultSourceID = "src_local_default"

@@ -12,9 +12,27 @@ import MusicDomain
 
 nonisolated public final class AppDatabase: Sendable {
 
+    /// Whether the current process is running in an automated test harness (XCTest or Swift Testing).
+    nonisolated public static var isRunningTests: Bool {
+        let env = ProcessInfo.processInfo.environment
+        if env["XCTestConfigurationFilePath"] != nil
+            || env["XCTestBundlePath"] != nil
+            || env["XCTestSessionIdentifier"] != nil {
+            return true
+        }
+        if NSClassFromString("XCTestCase") != nil {
+            return true
+        }
+        let args = ProcessInfo.processInfo.arguments
+        return args.contains { $0.contains("xctest") || $0.contains("Testing") }
+    }
+
     /// Shared application database instance.
     nonisolated public static let shared: AppDatabase = {
         do {
+            if isRunningTests {
+                return try AppDatabase.makeEphemeral()
+            }
             let fileManager = FileManager.default
             let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
                 ?? fileManager.temporaryDirectory

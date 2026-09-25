@@ -10,26 +10,21 @@ import AppIntents
 import MusicLibrary
 import MusicPlayback
 
-
 // MARK: - Application Scope
 
 /*
  ApplicationModel 的生命周期等于整个 App。
-
  这里保存的是：
-
  - application-scoped stores
  - application-scoped services
  - dependency composition root
  - application lifecycle work
 
  它不保存：
-
  - 当前 Sidebar selection
  - 当前页面 selection
  - Window / Scene presentation
  - Feature-local runtime state
-
  那些全部属于 SceneModel。
  */
 
@@ -37,348 +32,144 @@ import MusicPlayback
 @Observable
 final class ApplicationModel {
 
-    // MARK: - Catalog
-
-    let musicCatalog:
-        MusicCatalogStore
-
-
     // MARK: - Local Library
-
-    let localLibrary:
-        LocalLibraryStore
-
+    let localLibrary: LocalLibraryStore
     private let spotlightIndexer = SpotlightIndexingService()
 
-
     // MARK: - Library
-
-    let webLibrary:
-        WebLibraryStore
-
+    let webLibrary: WebLibraryStore
 
     // MARK: - Apple Music
-
-    let musicLibrary:
-        AppleMusicLibraryStore
-
+    let musicLibrary: AppleMusicLibraryStore
 
     // MARK: - Playback
-
-    let playback:
-        PlaybackController
-
+    let playback: PlaybackController
 
     // MARK: - Providers
-
-    let providerManager:
-        ProviderManagerStore
-
+    let providerManager: ProviderManagerStore
 
     // MARK: - Radio
-
-    let radioStore:
-        RadioStore
-
+    let radioStore: RadioStore
 
     // MARK: - Playlists
-
-    let playlistStore:
-        PlaylistStore
-
+    let playlistStore: PlaylistStore
 
     // MARK: - Watched Folders
-
-    let watchedFolders:
-        WatchedFolderStore
-
+    let watchedFolders: WatchedFolderStore
 
     // MARK: - Subsonic Servers & Coordinator
-
-    let subsonicServers:
-        SubsonicServerStore
-
+    let subsonicServers: SubsonicServerStore
 
     // MARK: - Language
-
-    let languageSettings:
-        LanguageSettings
-
+    let languageSettings: LanguageSettings
 
     // MARK: - Dependencies
-
-    /*
-     Application dependency snapshot。
-
-     Scene / Feature runtime 从这里继承依赖，
-     但不重新创建 application-scoped service。
-     */
-
-    let dependencies:
-        DependencyValues
-
+    let dependencies: DependencyValues
 
     // MARK: - Lifecycle
-
-    private(set) var hasStarted =
-        false
-
-    private(set) var startupTask:
-        Task<Void, Never>?
-
-    private(set) var isTerminated =
-        false
-
-    private(set) var systemNowPlayingCoordinator:
-        SystemNowPlayingCoordinator?
-
+    private(set) var hasStarted = false
+    private(set) var startupTask: Task<Void, Never>?
+    private(set) var isTerminated = false
+    private(set) var systemNowPlayingCoordinator: SystemNowPlayingCoordinator?
 
     // MARK: - Live Init
-
-    /*
-     Live composition root。
-
-     所有 @MainActor dependency
-     都在 ApplicationModel 自己的 MainActor
-     initializer body 内创建。
-
-     不使用 default argument expressions，
-     避免 Swift 6 actor-isolation 泄漏。
-     */
-
     convenience init() {
-
         self.init(
-            musicCatalog:
-                MusicCatalogStore(),
-            localLibrary:
-                LocalLibraryStore(),
-            webLibrary:
-                WebLibraryStore(),
-            musicLibrary:
-                AppleMusicLibraryStore(),
-            playback:
-                PlaybackController(),
-            providerManager:
-                ProviderManagerStore(),
-            openverseSearch:
-                OpenverseSearchClient.live,
-            radioStore:
-                RadioStore(),
-            playlistStore:
-                PlaylistStore(),
-            languageSettings:
-                LanguageSettings()
+            localLibrary: LocalLibraryStore(),
+            webLibrary: WebLibraryStore(),
+            musicLibrary: AppleMusicLibraryStore(),
+            playback: PlaybackController(),
+            providerManager: ProviderManagerStore(),
+            openverseSearch: OpenverseSearchClient.live,
+            radioStore: RadioStore(),
+            playlistStore: PlaylistStore(),
+            languageSettings: LanguageSettings()
         )
     }
 
-
     // MARK: - Injected Init
-
-    /*
-     Preview / Test / future composition root
-     可以显式注入整套 Application Scope。
-
-     这里故意没有默认值。
-
-     原因：
-     default argument 本身并不继承
-     initializer 的 MainActor isolation。
-     */
-
     init(
-        musicCatalog:
-            MusicCatalogStore,
-        localLibrary:
-            LocalLibraryStore,
-        webLibrary:
-            WebLibraryStore,
-        musicLibrary:
-            AppleMusicLibraryStore,
-        playback:
-            PlaybackController,
-        providerManager:
-            ProviderManagerStore,
-        openverseSearch:
-            OpenverseSearchClient,
-        radioStore:
-            RadioStore? = nil,
-        playlistStore:
-            PlaylistStore? = nil,
-        languageSettings:
-            LanguageSettings? = nil,
-        watchedFolders:
-            WatchedFolderStore? = nil,
-        subsonicServers:
-            SubsonicServerStore? = nil
+        localLibrary: LocalLibraryStore,
+        webLibrary: WebLibraryStore,
+        musicLibrary: AppleMusicLibraryStore,
+        playback: PlaybackController,
+        providerManager: ProviderManagerStore,
+        openverseSearch: OpenverseSearchClient,
+        radioStore: RadioStore? = nil,
+        playlistStore: PlaylistStore? = nil,
+        languageSettings: LanguageSettings? = nil,
+        watchedFolders: WatchedFolderStore? = nil,
+        subsonicServers: SubsonicServerStore? = nil
     ) {
+        self.localLibrary = localLibrary
+        self.webLibrary = webLibrary
+        self.musicLibrary = musicLibrary
+        self.playback = playback
+        self.providerManager = providerManager
 
-        self.musicCatalog =
-            musicCatalog
+        let resolvedRadioStore = radioStore ?? RadioStore()
+        self.radioStore = resolvedRadioStore
 
+        let resolvedPlaylistStore = playlistStore ?? PlaylistStore()
+        self.playlistStore = resolvedPlaylistStore
 
-        self.localLibrary =
-            localLibrary
+        self.languageSettings = languageSettings ?? LanguageSettings()
+        self.watchedFolders = watchedFolders ?? WatchedFolderStore(localStore: localLibrary)
 
-
-        self.webLibrary =
-            webLibrary
-
-
-        self.musicLibrary =
-            musicLibrary
-
-
-        self.playback =
-            playback
-
-
-        self.providerManager =
-            providerManager
-
-
-        let resolvedRadioStore =
-            radioStore ?? RadioStore()
-
-        self.radioStore =
-            resolvedRadioStore
-
-
-        let resolvedPlaylistStore =
-            playlistStore ?? PlaylistStore()
-
-        self.playlistStore =
-            resolvedPlaylistStore
-
-
-        self.languageSettings =
-            languageSettings ?? LanguageSettings()
-
-        self.watchedFolders =
-            watchedFolders ?? WatchedFolderStore(localStore: localLibrary)
-
-        let resolvedSubsonicServers =
-            subsonicServers ?? SubsonicServerStore()
-        self.subsonicServers =
-            resolvedSubsonicServers
+        let resolvedSubsonicServers = subsonicServers ?? SubsonicServerStore()
+        self.subsonicServers = resolvedSubsonicServers
 
         self.localLibrary.attachCascadeCollaborators(
             playlistStore: resolvedPlaylistStore,
             playbackController: playback
         )
 
-
         // MARK: Dependency Composition
-
-        var dependencies =
-            DependencyValues
-                .live
-
-
-        dependencies.webLibrary =
-            webLibrary
-
-
-        dependencies.playback =
-            playback
-
-
-        dependencies.openverseSearch =
-            openverseSearch
-
-
-        dependencies.radioStore =
-            resolvedRadioStore
-
-
-        dependencies.playlistStore =
-            resolvedPlaylistStore
-
-
-        self.dependencies =
-            dependencies
+        var dependencies = DependencyValues.live
+        dependencies.webLibrary = webLibrary
+        dependencies.playback = playback
+        dependencies.openverseSearch = openverseSearch
+        dependencies.radioStore = resolvedRadioStore
+        dependencies.playlistStore = resolvedPlaylistStore
+        self.dependencies = dependencies
 
         AppDependencyManager.shared.add(dependency: self)
     }
 
-
     // MARK: - Start
-
-    /*
-     Application startup 必须 idempotent。
-
-     macOS AppDelegate 与未来 iPad Scene
-     都可以安全调用 start()，
-     但 application-scoped restore 只执行一次。
-     */
-
     func start() {
+        guard !hasStarted, !isTerminated else { return }
 
-        guard
-            !hasStarted,
-            !isTerminated
-        else {
-
-            return
-        }
-
-
-        hasStarted =
-            true
-
+        hasStarted = true
         MusicAppShortcuts.updateAppShortcutParameters()
         localLibrary.attachSpotlightIndexer(spotlightIndexer)
 
+        let webLibrary = webLibrary
+        let playlistStore = playlistStore
 
-        let webLibrary =
-            webLibrary
-
-        let playlistStore =
-            playlistStore
-
-        let coordinator =
-            SystemNowPlayingCoordinator(playback: playback)
+        let coordinator = SystemNowPlayingCoordinator(playback: playback)
         coordinator.activate()
         self.systemNowPlayingCoordinator = coordinator
 
-        let localLibrary =
-            localLibrary
+        let localLibrary = localLibrary
 
         startupTask = Task {
-
-            await localLibrary
-                .loadIfNeeded()
-            await webLibrary
-                .load()
-            await playlistStore
-                .load()
-            watchedFolders
-                .startMonitoring()
+            await localLibrary.loadIfNeeded()
+            await webLibrary.load()
+            await playlistStore.load()
+            watchedFolders.startMonitoring()
         }
     }
 
-
     // MARK: - Terminate
-
     func terminate() {
+        guard !isTerminated else { return }
 
-        guard
-            !isTerminated
-        else {
-
-            return
-        }
-
-
-        isTerminated =
-            true
-
+        isTerminated = true
         systemNowPlayingCoordinator?.deactivate()
         systemNowPlayingCoordinator = nil
         watchedFolders.stopMonitoring()
         spotlightIndexer.cancel()
-
-        startupTask?
-            .cancel()
+        startupTask?.cancel()
     }
 }

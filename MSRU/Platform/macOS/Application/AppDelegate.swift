@@ -11,47 +11,22 @@ import AppKit
 import AppFoundation
 import CoreSpotlight
 
-
 @MainActor
-final class AppDelegate:
-    NSObject,
-    NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Platform Scene Runtime
-
-    private let sceneCoordinator:
-        MacSceneCoordinator
-
+    private let sceneCoordinator: MacSceneCoordinator
 
     // MARK: - Command Runtime
-
-    private let commandRuntime:
-        MultiSceneApplicationCommandRuntime
-
+    private let commandRuntime: MultiSceneApplicationCommandRuntime
 
     // MARK: - Lifecycle Runtime
-
-    /*
-     Platform delegate 只负责把
-     platform lifecycle event
-     映射到 Foundation lifecycle semantic。
-     */
-
-    private let lifecycleRuntime:
-        ApplicationLifecycleRuntime
-
+    private let lifecycleRuntime: ApplicationLifecycleRuntime
 
     // MARK: - External Command Source
-
-    private let externalURLSource =
-        SceneRouteURLCommandSource(
-            scheme:
-                "msru"
-        )
-
+    private let externalURLSource = SceneRouteURLCommandSource(scheme: "msru")
 
     // MARK: - Init
-
     override convenience init() {
         #if DEBUG
         if let suite = ProcessInfo.processInfo.environment["MSRU_UI_TEST_SUITE"],
@@ -68,38 +43,17 @@ final class AppDelegate:
     }
 
     init(sceneCoordinator: MacSceneCoordinator) {
-        let commandRuntime =
-            MultiSceneApplicationCommandRuntime(
-                runtime:
-                    sceneCoordinator
-            )
+        let commandRuntime = MultiSceneApplicationCommandRuntime(runtime: sceneCoordinator)
+        let lifecycleRuntime = ApplicationLifecycleRuntime(commandRuntime: commandRuntime)
 
-
-        let lifecycleRuntime =
-            ApplicationLifecycleRuntime(
-                commandRuntime:
-                    commandRuntime
-            )
-
-
-        self.sceneCoordinator =
-            sceneCoordinator
-
-
-        self.commandRuntime =
-            commandRuntime
-
-
-        self.lifecycleRuntime =
-            lifecycleRuntime
-
+        self.sceneCoordinator = sceneCoordinator
+        self.commandRuntime = commandRuntime
+        self.lifecycleRuntime = lifecycleRuntime
 
         super.init()
     }
 
-
     // MARK: - Playback & Application Access
-
     var application: ApplicationModel {
         sceneCoordinator.application
     }
@@ -108,97 +62,32 @@ final class AppDelegate:
         sceneCoordinator.application.playback
     }
 
-
     // MARK: - Window Activation
-
     func activateApp() {
         NSApp.activate(ignoringOtherApps: true)
         sceneCoordinator.reopen()
     }
 
-
     // MARK: - Command Entry
-
     @discardableResult
-    func send(
-        _ command:
-            ApplicationCommand
-    ) -> ApplicationCommandResult {
-
-        commandRuntime
-            .send(
-                command
-            )
+    func send(_ command: ApplicationCommand) -> ApplicationCommandResult {
+        commandRuntime.send(command)
     }
-
 
     // MARK: - Launch
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        guard !isRunningForPreviews else { return }
 
-    func applicationDidFinishLaunching(
-        _ notification:
-            Notification
-    ) {
-
-        guard
-            !isRunningForPreviews
-        else {
-
-            return
-        }
-
-
-        lifecycleRuntime
-            .beginBootstrap()
-
-
-        /*
-         真正的 platform bootstrap。
-
-         Foundation lifecycle
-         不知道里面发生了什么。
-         */
-
-        sceneCoordinator
-            .start()
-
-
-        lifecycleRuntime
-            .markReady()
+        lifecycleRuntime.beginBootstrap()
+        sceneCoordinator.start()
+        lifecycleRuntime.markReady()
     }
 
-
     // MARK: - External URL
-
-    func application(
-        _ application:
-            NSApplication,
-        open urls:
-            [URL]
-    ) {
-
-        guard
-            !isRunningForPreviews
-        else {
-
-            return
-        }
-
-
-        let commands =
-            urls
-                .compactMap {
-                    externalURLSource
-                        .command(
-                            from:
-                                $0
-                        )
-                }
-
-
-        commandRuntime
-            .send(
-                commands
-            )
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard !isRunningForPreviews else { return }
+        let commands = urls.compactMap { externalURLSource.command(from: $0) }
+        commandRuntime.send(commands)
     }
 
     func application(
@@ -213,139 +102,36 @@ final class AppDelegate:
         return true
     }
 
-
     // MARK: - Reopen
-
-    func applicationShouldHandleReopen(
-        _ sender:
-            NSApplication,
-        hasVisibleWindows flag:
-            Bool
-    ) -> Bool {
-
-        guard
-            !isRunningForPreviews
-        else {
-
-            return false
-        }
-
-
-        guard
-            !flag
-        else {
-
-            return true
-        }
-
-
-        sceneCoordinator
-            .reopen()
-
-
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        guard !isRunningForPreviews else { return false }
+        guard !flag else { return true }
+        sceneCoordinator.reopen()
         return true
     }
 
-
     // MARK: - Termination
-
-    func applicationShouldTerminate(
-        _ sender:
-            NSApplication
-    ) -> NSApplication.TerminateReply {
-
-        guard
-            !isRunningForPreviews
-        else {
-
-            return
-                .terminateNow
-        }
-
-
-        /*
-         This callback occurs before AppKit begins normal
-         application Window teardown.
-
-         Mark termination here so windowWillClose is not interpreted
-         as an explicit Scene deletion.
-         */
-
-        sceneCoordinator
-            .prepareForTermination()
-
-
-        return
-            .terminateNow
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !isRunningForPreviews else { return .terminateNow }
+        sceneCoordinator.prepareForTermination()
+        return .terminateNow
     }
 
-
-    func applicationWillTerminate(
-        _ notification:
-            Notification
-    ) {
-
-        guard
-            !isRunningForPreviews
-        else {
-
-            return
-        }
-
-
-        /*
-         Idempotent fallback for termination paths where AppKit
-         did not consult applicationShouldTerminate(_:).
-         */
-
-        sceneCoordinator
-            .prepareForTermination()
-
-
-        lifecycleRuntime
-            .terminate()
+    func applicationWillTerminate(_ notification: Notification) {
+        guard !isRunningForPreviews else { return }
+        sceneCoordinator.prepareForTermination()
+        lifecycleRuntime.terminate()
     }
 
-
-    func applicationShouldTerminateAfterLastWindowClosed(
-        _ sender:
-            NSApplication
-    ) -> Bool {
-
-        guard
-            !isRunningForPreviews
-        else {
-
-            return
-                false
-        }
-
-
-        return
-            sceneCoordinator
-                .terminatesAfterLastWindowClosed
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        guard !isRunningForPreviews else { return false }
+        return sceneCoordinator.terminatesAfterLastWindowClosed
     }
-
 
     // MARK: - Preview
-
-    private var isRunningForPreviews:
-        Bool {
-
-        let environment =
-            ProcessInfo
-                .processInfo
-                .environment
-
-
-        return
-            environment[
-                "XCODE_RUNNING_FOR_PREVIEWS"
-            ] == "1"
-            ||
-            environment[
-                "XCODE_RUNNING_FOR_PLAYGROUNDS"
-            ] == "1"
+    private var isRunningForPreviews: Bool {
+        let env = ProcessInfo.processInfo.environment
+        return env["XCODE_RUNNING_FOR_PREVIEWS"] == "1" || env["XCODE_RUNNING_FOR_PLAYGROUNDS"] == "1"
     }
 }
 

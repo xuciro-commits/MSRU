@@ -10,6 +10,7 @@ import MusicLibrary
 // MARK: - Playback Provider ID & Protocol
 
 public enum PlaybackProviderID: String, CaseIterable, Hashable, Sendable {
+    case appleMusic
     case extendedAudio
     case local
     case openverse
@@ -38,6 +39,7 @@ public enum PlaybackQuality: String, Sendable {
 public struct PlaybackRequest: Sendable {
 
     public enum Source: String, Sendable {
+        case appleMusic
         case local
         case openverse
         case radio

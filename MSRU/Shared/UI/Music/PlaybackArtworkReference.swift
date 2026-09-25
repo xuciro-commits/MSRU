@@ -12,6 +12,8 @@ import MusicLibrary
 extension PlaybackItem {
     public var artworkImageReference: MediaImageReference? {
         switch payload {
+        case .appleMusic(_, _, _, _, _, let artworkReference):
+            return artworkReference.flatMap { MediaImageReference(string: $0) }
         case .local(let track):
             return track.artworkReference.map { MediaImageReference(relativePath: $0) }
         case .openverse(let track):

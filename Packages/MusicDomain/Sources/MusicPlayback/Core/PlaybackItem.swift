@@ -13,6 +13,7 @@ public enum PlaybackItemSource:
     String,
     Sendable {
 
+    case appleMusic
     case local
     case openverse
     case radio
@@ -24,6 +25,15 @@ public struct PlaybackItem:
     Identifiable {
 
     public enum Payload {
+
+        case appleMusic(
+            catalogID: String,
+            title: String,
+            artist: String,
+            album: String?,
+            duration: TimeInterval,
+            artworkReference: String?
+        )
 
         case local(
             LocalTrack
@@ -59,21 +69,67 @@ public struct PlaybackItem:
     public let subsonicServerID: String?
 
 
+    private init(
+        id: String,
+        payload: Payload,
+        subsonicServerID: String? = nil
+    ) {
+        self.id = id
+        self.payload = payload
+        self.subsonicServerID = subsonicServerID
+    }
+
+
+    // MARK: - Apple Music
+
+    public init(
+        appleMusic catalogID: String,
+        title: String,
+        artist: String,
+        album: String? = nil,
+        duration: TimeInterval = 0,
+        artworkReference: String? = nil
+    ) {
+        self.init(
+            id: "appleMusic:\(catalogID)",
+            payload: .appleMusic(
+                catalogID: catalogID,
+                title: title,
+                artist: artist,
+                album: album,
+                duration: duration,
+                artworkReference: artworkReference
+            ),
+            subsonicServerID: nil
+        )
+    }
+
+
     // MARK: - Local
 
     public init(
         local track:
             LocalTrack
     ) {
-
-        self.id =
-            "local:\(track.id)"
-
-        self.payload =
-            .local(
-                track
+        let appleMusicPrefix = "/AppleMusic/Tracks/"
+        let appleMusicURLPrefix = "file:///AppleMusic/Tracks/"
+        if track.fileURL.path.hasPrefix(appleMusicPrefix) || track.fileURL.absoluteString.hasPrefix(appleMusicURLPrefix) {
+            let catalogID = track.fileURL.deletingPathExtension().lastPathComponent
+            self.init(
+                appleMusic: catalogID,
+                title: track.title,
+                artist: track.artist,
+                album: track.album,
+                duration: track.duration,
+                artworkReference: track.artworkReference
             )
-        self.subsonicServerID = nil
+        } else {
+            self.init(
+                id: "local:\(track.id)",
+                payload: .local(track),
+                subsonicServerID: nil
+            )
+        }
     }
 
 
@@ -170,6 +226,7 @@ public struct PlaybackItem:
     /// Album name from any payload type.
     public var album: String? {
         switch payload {
+        case .appleMusic(_, _, _, let album, _, _): return album
         case .local(let track): return track.album
         case .subsonic(_, _, _, let album, _, _, _): return album
         case .openverse, .radio: return nil
@@ -188,7 +245,23 @@ public struct PlaybackItem:
     // MARK: - TrackRowSummary
 
     public init(summary: TrackRowSummary) {
-        if summary.sourceID == "local" || summary.sourceID == nil {
+        // Apple Music tracks use synthetic paths: /AppleMusic/Tracks/{catalogID}.m4a or file:///AppleMusic/Tracks/{catalogID}.m4a
+        let appleMusicPrefix = "file:///AppleMusic/Tracks/"
+        let appleMusicPathPrefix = "/AppleMusic/Tracks/"
+        if summary.id.hasPrefix(appleMusicPrefix) || summary.id.hasPrefix(appleMusicPathPrefix) {
+            let path = summary.id.hasPrefix(appleMusicPrefix)
+                ? String(summary.id.dropFirst(appleMusicPrefix.count))
+                : String(summary.id.dropFirst(appleMusicPathPrefix.count))
+            let catalogID = path.replacingOccurrences(of: ".m4a", with: "")
+            self.init(
+                appleMusic: catalogID,
+                title: summary.title,
+                artist: summary.artist,
+                album: summary.album,
+                duration: summary.duration,
+                artworkReference: summary.artworkReference
+            )
+        } else if summary.sourceID == "local" || summary.sourceID == nil {
             self.init(
                 local: LocalTrack(
                     fileURL: URL(fileURLWithPath: summary.id),
@@ -222,6 +295,9 @@ public struct PlaybackItem:
 
         switch payload {
 
+        case .appleMusic:
+            return .appleMusic
+
         case .local:
             return .local
 
@@ -243,6 +319,9 @@ public struct PlaybackItem:
         String {
 
         switch payload {
+
+        case .appleMusic(_, let title, _, _, _, _):
+            return title
 
         case .local(
             let track
@@ -275,6 +354,9 @@ public struct PlaybackItem:
 
         switch payload {
 
+        case .appleMusic(_, _, let artist, _, _, _):
+            return artist
+
         case .local(
             let track
         ):
@@ -306,6 +388,9 @@ public struct PlaybackItem:
 
         switch payload {
 
+        case .appleMusic:
+            return "APPLE MUSIC"
+
         case .local:
             return "LOCAL"
 
@@ -335,7 +420,7 @@ public struct PlaybackItem:
             return track.artworkData
 
 
-        case .openverse, .radio, .subsonic:
+        case .appleMusic, .openverse, .radio, .subsonic:
             return nil
         }
     }
@@ -345,6 +430,12 @@ public struct PlaybackItem:
         URL? {
 
         switch payload {
+
+        case .appleMusic(_, _, _, _, _, let artworkReference):
+            if let artworkReference, let url = URL(string: artworkReference), url.scheme?.hasPrefix("http") == true {
+                return url
+            }
+            return nil
 
         case .local:
             return nil
@@ -372,6 +463,8 @@ public struct PlaybackItem:
 
     public var artworkReference: String? {
         switch payload {
+        case .appleMusic(_, _, _, _, _, let ref):
+            return ref
         case .local(let track):
             return track.artworkReference
         case .subsonic(_, _, _, _, _, let ref, _):
@@ -389,6 +482,9 @@ public struct PlaybackItem:
         TimeInterval? {
 
         switch payload {
+
+        case .appleMusic(_, _, _, _, let duration, _):
+            return duration > 0 ? duration : nil
 
         case .local(
             let track
@@ -494,6 +590,14 @@ public struct PlaybackItem:
         PlaybackRequest {
 
         switch payload {
+
+        case .appleMusic(let catalogID, _, _, _, _, _):
+            return PlaybackRequest(
+                itemID: catalogID,
+                source: .appleMusic,
+                preferredQuality: .automatic,
+                providerHint: .appleMusic
+            )
 
         case .local(
             let track

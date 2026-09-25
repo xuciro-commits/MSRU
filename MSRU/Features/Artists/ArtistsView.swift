@@ -65,7 +65,7 @@ struct ArtistsView: View {
 
     private var isRemoteSourceActive: Bool {
         guard let selectedSourceID else { return false }
-        return !SourceID.isLocalSourceID(selectedSourceID)
+        return SourceID.isSubsonicSourceID(selectedSourceID)
     }
 
     private var filteredArtists: [ArtistPresentationModel] {
@@ -267,7 +267,7 @@ struct ArtistsView: View {
             }
             let pager = localPager ?? localStore.makeArtistPager()
             localPager = pager
-            await pager.reset(query: query)
+            await pager.reset(query: query, sourceFilter: selectedSourceID)
         }
         .onChange(of: localStore.revision) { _, _ in
             guard !isRemoteSourceActive else { return }

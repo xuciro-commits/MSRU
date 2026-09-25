@@ -64,23 +64,115 @@ public struct AppleMusicService: AppleMusicLibraryServing {
         var offset = 0
         var result: [Item] = []
 
-        while true {
-            var request = MusicLibraryRequest<Item>()
-            request.limit = pageSize
-            request.offset = offset
+        var request = MusicLibraryRequest<Item>()
+        request.limit = pageSize
+        request.offset = offset
 
-            let response = try await request.response()
-            let page = Array(response.items)
-            result.append(contentsOf: page)
+        let response = try await request.response()
+        var currentBatch = response.items
+        result.append(contentsOf: Array(currentBatch))
 
-            guard page.count == pageSize else { break }
-            offset += page.count
+        while currentBatch.hasNextBatch {
+            guard let next = try await currentBatch.nextBatch(limit: pageSize) else { break }
+            result.append(contentsOf: Array(next))
+            currentBatch = next
+        }
+
+        // If pagination is driven by offset instead of nextBatch
+        if result.count == pageSize && !currentBatch.hasNextBatch {
+            offset += pageSize
+            while true {
+                var nextRequest = MusicLibraryRequest<Item>()
+                nextRequest.limit = pageSize
+                nextRequest.offset = offset
+                let nextResp = try await nextRequest.response()
+                let page = Array(nextResp.items)
+                if page.isEmpty { break }
+                result.append(contentsOf: page)
+                if page.count < pageSize { break }
+                offset += page.count
+            }
         }
 
         return result
     }
 
     nonisolated public init() {}
+
+    // MARK: - Conversion & Lookup
+
+    public static func convert(song: Song) -> LocalTrack {
+        let rawID = song.id.rawValue
+        let fileURL = URL(fileURLWithPath: "/AppleMusic/Tracks/\(rawID).m4a")
+        let artworkURLString = song.artwork?.url(width: 1400, height: 1400)?.absoluteString
+        let year = song.releaseDate.map { Calendar.current.component(.year, from: $0) }
+        return LocalTrack(
+            fileURL: fileURL,
+            title: song.title,
+            artist: song.artistName,
+            album: song.albumTitle,
+            duration: song.duration ?? 0,
+            artworkReference: artworkURLString,
+            artworkData: nil,
+            trackNumber: song.trackNumber,
+            year: year
+        )
+    }
+
+    public static func convert(
+        track: Track,
+        albumTitle: String? = nil,
+        albumArtist: String? = nil,
+        year: Int? = nil,
+        trackNumber: Int? = nil
+    ) -> LocalTrack {
+        if case .song(let song) = track {
+            let base = convert(song: song)
+            let finalAlbum = (base.album == nil || base.album?.isEmpty == true) ? albumTitle : base.album
+            let finalArtist = (base.artist.isEmpty || base.artist == "Unknown Artist") ? (albumArtist ?? base.artist) : base.artist
+            return LocalTrack(
+                fileURL: base.fileURL,
+                title: base.title,
+                artist: finalArtist,
+                album: finalAlbum,
+                duration: base.duration,
+                artworkReference: base.artworkReference,
+                artworkData: nil,
+                trackNumber: base.trackNumber ?? trackNumber,
+                year: base.year ?? year
+            )
+        }
+        let rawID = track.id.rawValue
+        let fileURL = URL(fileURLWithPath: "/AppleMusic/Tracks/\(rawID).m4a")
+        let artworkURLString = track.artwork?.url(width: 1400, height: 1400)?.absoluteString
+        let artistName = track.artistName.isEmpty ? (albumArtist ?? "Unknown Artist") : track.artistName
+        return LocalTrack(
+            fileURL: fileURL,
+            title: track.title,
+            artist: artistName,
+            album: albumTitle,
+            duration: track.duration ?? 0,
+            artworkReference: artworkURLString,
+            artworkData: nil,
+            trackNumber: trackNumber,
+            year: year
+        )
+    }
+
+    public static func lookupTrack(catalogID: String) async -> LocalTrack? {
+        // 1. Try library
+        var libraryRequest = MusicLibraryRequest<Song>()
+        libraryRequest.filter(matching: \.id, equalTo: MusicItemID(catalogID))
+        if let match = try? await libraryRequest.response().items.first {
+            return convert(song: match)
+        }
+        // 2. Try catalog
+        let catalogRequest = MusicCatalogResourceRequest<Song>(matching: \.id, equalTo: MusicItemID(catalogID))
+        if let match = try? await catalogRequest.response().items.first {
+            return convert(song: match)
+        }
+        return nil
+    }
 }
 
 // MARK: - Apple Music Library Store
@@ -140,6 +232,24 @@ public final class AppleMusicLibraryStore {
     }
 
     // MARK: - Conversion
+    public static func convert(song: Song) -> LocalTrack { AppleMusicService.convert(song: song) }
+    public static func convert(
+        track: Track,
+        albumTitle: String? = nil,
+        albumArtist: String? = nil,
+        year: Int? = nil,
+        trackNumber: Int? = nil
+    ) -> LocalTrack {
+        AppleMusicService.convert(
+            track: track,
+            albumTitle: albumTitle,
+            albumArtist: albumArtist,
+            year: year,
+            trackNumber: trackNumber
+        )
+    }
+    public static func lookupTrack(catalogID: String) async -> LocalTrack? { await AppleMusicService.lookupTrack(catalogID: catalogID) }
+
     public func convertSongsToTracks(_ songs: [Song]) -> [LocalTrack] {
         var tracks: [LocalTrack] = []
         var seenIDs = Set<String>()
@@ -147,29 +257,7 @@ public final class AppleMusicLibraryStore {
         for song in songs {
             let rawID = song.id.rawValue
             guard seenIDs.insert(rawID).inserted else { continue }
-
-            let fileURL = URL(fileURLWithPath: "/AppleMusic/Tracks/\(rawID).m4a")
-            let artworkURLString = song.artwork?.url(width: 1400, height: 1400)?.absoluteString
-
-            let year: Int?
-            if let releaseDate = song.releaseDate {
-                year = Calendar.current.component(.year, from: releaseDate)
-            } else {
-                year = nil
-            }
-
-            let track = LocalTrack(
-                fileURL: fileURL,
-                title: song.title,
-                artist: song.artistName,
-                album: song.albumTitle,
-                duration: song.duration ?? 0,
-                artworkReference: artworkURLString,
-                artworkData: nil,
-                trackNumber: song.trackNumber,
-                year: year
-            )
-            tracks.append(track)
+            tracks.append(Self.convert(song: song))
         }
         return tracks
     }
@@ -199,27 +287,63 @@ public final class AppleMusicLibraryStore {
         }
 
         do {
-            var songsToIngest: [Song] = []
+            var allTracksToIngest: [LocalTrack] = []
+            var seenTrackIDs = Set<String>()
+
+            func addTrack(_ track: LocalTrack) {
+                let key = track.fileURL.standardizedFileURL.path
+                if seenTrackIDs.insert(key).inserted {
+                    allTracksToIngest.append(track)
+                }
+            }
 
             // 1. Fetch songs if requested
             if options.importsSongs {
-                importProgress = 0.20
+                importProgress = 0.15
                 importStatusText = String(localized: "Scanning songs from Apple Music…")
                 let fetchedSongs = try await service.fetchSongs()
                 songs = fetchedSongs
-                songsToIngest = fetchedSongs
+                for song in fetchedSongs {
+                    addTrack(Self.convert(song: song))
+                }
             }
 
             // 2. Fetch albums if requested
             if options.importsAlbums {
-                importProgress = 0.45
+                importProgress = 0.35
                 importStatusText = String(localized: "Scanning albums from Apple Music…")
-                albums = try await service.fetchAlbums()
+                let fetchedAlbums = try await service.fetchAlbums()
+                albums = fetchedAlbums
+
+                let total = fetchedAlbums.count
+                for (idx, album) in fetchedAlbums.enumerated() {
+                    if idx % 5 == 0 && total > 0 {
+                        importProgress = 0.35 + (0.30 * Double(idx) / Double(total))
+                        importStatusText = String(localized: "Reading album tracks (\(idx)/\(total))…")
+                    }
+                    let albumYear = album.releaseDate.map { Calendar.current.component(.year, from: $0) }
+                    if let detailed = try? await album.with([.tracks]), let aTracks = detailed.tracks {
+                        for (tIdx, t) in aTracks.enumerated() {
+                            let tNum: Int? = {
+                                if case .song(let s) = t { return s.trackNumber }
+                                return tIdx + 1
+                            }()
+                            let converted = Self.convert(
+                                track: t,
+                                albumTitle: album.title,
+                                albumArtist: album.artistName,
+                                year: albumYear,
+                                trackNumber: tNum
+                            )
+                            addTrack(converted)
+                        }
+                    }
+                }
             }
 
             // 3. Fetch artists if requested
             if options.importsArtists {
-                importProgress = 0.65
+                importProgress = 0.70
                 importStatusText = String(localized: "Scanning artists from Apple Music…")
                 artists = try await service.fetchArtists()
             }
@@ -230,23 +354,7 @@ public final class AppleMusicLibraryStore {
                 importStatusText = String(localized: "Scanning playlists from Apple Music…")
                 let fetchedPlaylists = try await service.fetchPlaylists()
                 playlists = fetchedPlaylists
-            }
 
-            // 5. Ingest into localStore
-            if let localStore {
-                importProgress = 0.88
-                importStatusText = String(localized: "Ingesting tracks into MSRU library…")
-                let converted = convertSongsToTracks(songsToIngest)
-                if !converted.isEmpty {
-                    try await localStore.addTracks(converted)
-                    importedTrackCount = converted.count
-                }
-            }
-
-            // 6. Ingest playlists into playlistStore if available
-            if let playlistStore, options.importsPlaylists, !playlists.isEmpty {
-                importProgress = 0.95
-                importStatusText = String(localized: "Creating playlists…")
                 for playlist in playlists {
                     let name = playlist.name
                     guard !name.isEmpty else { continue }
@@ -255,14 +363,26 @@ public final class AppleMusicLibraryStore {
                         for t in pTracks {
                             let trackURL = URL(fileURLWithPath: "/AppleMusic/Tracks/\(t.id.rawValue).m4a")
                             trackIDs.append(trackURL.absoluteString)
+                            let converted = Self.convert(track: t)
+                            addTrack(converted)
                         }
                     }
-                    _ = await playlistStore.createPlaylist(
-                        title: name,
-                        description: playlist.description,
-                        initialTrackIDs: trackIDs
-                    )
+                    if let playlistStore {
+                        _ = await playlistStore.createPlaylist(
+                            title: name,
+                            description: playlist.curatorName ?? "Apple Music",
+                            initialTrackIDs: trackIDs
+                        )
+                    }
                 }
+            }
+
+            // 5. Ingest into localStore
+            if let localStore, !allTracksToIngest.isEmpty {
+                importProgress = 0.92
+                importStatusText = String(localized: "Ingesting tracks into MSRU library…")
+                try await localStore.addTracks(allTracksToIngest)
+                importedTrackCount = allTracksToIngest.count
             }
 
             importProgress = 1.0

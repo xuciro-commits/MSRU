@@ -58,14 +58,16 @@ public nonisolated struct LocalTrackPageRequest: Sendable {
     public let ascending: Bool
     public let offset: Int
     public let limit: Int
+    public let sourceFilter: String?
 
     public init(query: String = "", sort: Sort = .title, ascending: Bool = true,
-         offset: Int = 0, limit: Int = 128) {
+         offset: Int = 0, limit: Int = 128, sourceFilter: String? = nil) {
         self.query = query
         self.sort = sort
         self.ascending = ascending
         self.offset = max(0, offset)
         self.limit = min(max(1, limit), 512)
+        self.sourceFilter = sourceFilter
     }
 }
 

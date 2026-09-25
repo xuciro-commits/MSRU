@@ -38,7 +38,13 @@ struct PlaylistDetailView: View {
             return playlistStore.resolveTracks(for: currentPlaylist, from: tracks)
         }
         return currentPlaylist.trackIDs.compactMap { id in
-            tracks.first { $0.id == id || $0.fileURL.lastPathComponent == id || $0.fileURL.absoluteString.contains(id) }
+            tracks.first {
+                $0.id == id ||
+                $0.fileURL.lastPathComponent == id ||
+                $0.fileURL.absoluteString == id ||
+                $0.fileURL.path == id ||
+                $0.fileURL.absoluteString.contains(id)
+            }
         }
     }
 

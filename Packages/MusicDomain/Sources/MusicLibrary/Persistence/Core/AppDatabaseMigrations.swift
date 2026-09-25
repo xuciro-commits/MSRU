@@ -603,5 +603,32 @@ public nonisolated enum AppDatabaseMigrations {
                       AND d.target_id = user_decisions.target_id AND d.rowid <= user_decisions.rowid);
                 """)
         }
+
+        // v11: Purge test fixture pollution from real user libraries
+        migrator.registerMigration("v11_purge_test_fixture_pollution") { db in
+            try db.execute(sql: """
+                DELETE FROM assets WHERE relative_path LIKE '%/fixture_%.wav' OR (relative_path LIKE '%/var/folders/%' AND relative_path LIKE '%.wav');
+                DELETE FROM library_entries WHERE recording_id IN (SELECT id FROM recordings WHERE title IN ('First', 'Second') AND duration <= 1.0);
+                DELETE FROM release_tracks WHERE recording_id IN (SELECT id FROM recordings WHERE title IN ('First', 'Second') AND duration <= 1.0);
+                DELETE FROM artist_credits WHERE entity_id IN (SELECT id FROM recordings WHERE title IN ('First', 'Second') AND duration <= 1.0);
+                DELETE FROM recordings WHERE title IN ('First', 'Second') AND duration <= 1.0 AND NOT EXISTS (SELECT 1 FROM assets WHERE recording_id = recordings.id);
+                DELETE FROM releases WHERE title = 'Album' AND NOT EXISTS (SELECT 1 FROM release_tracks WHERE release_id = releases.id);
+                DELETE FROM artists WHERE name = 'Test' AND NOT EXISTS (SELECT 1 FROM artist_credits WHERE artist_id = artists.id);
+                """)
+        }
+
+        // v12: Register Apple Music source and associate existing Apple Music tracks
+        migrator.registerMigration("v12_apple_music_source") { db in
+            let now = Date()
+            try db.execute(sql: """
+                INSERT OR IGNORE INTO sources (id, source_type, uri, display_name, capabilities, is_enabled, last_reconciled_at, created_at, updated_at)
+                SELECT 'src_apple_music', 'apple_music', 'applemusic://library', 'Apple Music', 392, 1, ?, ?, ?
+                WHERE EXISTS (SELECT 1 FROM assets WHERE relative_path LIKE '/AppleMusic/%' OR relative_path LIKE '%/AppleMusic/%')
+                """, arguments: [now, now, now])
+            try db.execute(sql: """
+                UPDATE assets SET source_id = 'src_apple_music'
+                WHERE relative_path LIKE '/AppleMusic/%' OR relative_path LIKE '%/AppleMusic/%'
+                """)
+        }
     }
 }

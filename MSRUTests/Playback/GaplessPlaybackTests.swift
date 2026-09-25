@@ -131,7 +131,7 @@ struct GaplessPlaybackTests {
         }
         let first = LocalTrack(fileURL: firstURL, title: "First", artist: "Test", album: "Album", duration: 0.4)
         let second = LocalTrack(fileURL: secondURL, title: "Second", artist: "Test", album: "Album", duration: 0.4)
-        let playback = PlaybackController()
+        let playback = PlaybackController(isHistoryTrackingEnabled: false)
         playback.play(first, queue: [first, second])
         for _ in 0..<120 where playback.currentTrack?.id != second.id {
             try await Task.sleep(for: .milliseconds(25))

@@ -86,6 +86,75 @@ struct PlaybackTests {
         #expect(radioItem.playbackRequest.remoteURL == URL(string: "https://live.kexp.org/kexp128.mp3"))
     }
 
+    @Test("PlaybackItem Apple Music properties and request mapping")
+    func playbackItemAppleMusicProperties() {
+        let item = PlaybackItem(
+            appleMusic: "1440857781",
+            title: "God's Plan",
+            artist: "Drake",
+            album: "Scorpion",
+            duration: 198.9,
+            artworkReference: "https://example.com/artwork.jpg"
+        )
+
+        #expect(item.id == "appleMusic:1440857781")
+        #expect(item.source == .appleMusic)
+        #expect(item.title == "God's Plan")
+        #expect(item.subtitle == "Drake")
+        #expect(item.album == "Scorpion")
+        #expect(item.duration == 198.9)
+        #expect(item.providerLabel == "APPLE MUSIC")
+        #expect(item.artworkURL == URL(string: "https://example.com/artwork.jpg"))
+
+        let req = item.playbackRequest
+        #expect(req.source == .appleMusic)
+        #expect(req.itemID == "1440857781")
+        #expect(req.providerHint == .appleMusic)
+    }
+
+    @Test("PlaybackItem automatically routes synthetic Apple Music LocalTrack to .appleMusic")
+    func playbackItemAppleMusicFromLocalTrack() {
+        let local = LocalTrack(
+            fileURL: URL(fileURLWithPath: "/AppleMusic/Tracks/99887766.m4a"),
+            title: "Anti-Hero",
+            artist: "Taylor Swift",
+            album: "Midnights",
+            duration: 200.0,
+            artworkReference: "https://example.com/taylor.jpg"
+        )
+
+        let item = PlaybackItem(local: local)
+
+        #expect(item.source == .appleMusic)
+        #expect(item.id == "appleMusic:99887766")
+        #expect(item.title == "Anti-Hero")
+        #expect(item.subtitle == "Taylor Swift")
+        #expect(item.album == "Midnights")
+        #expect(item.duration == 200.0)
+        #expect(item.playbackRequest.source == .appleMusic)
+        #expect(item.playbackRequest.itemID == "99887766")
+    }
+
+    @Test("PlaybackItem automatically routes synthetic Apple Music TrackRowSummary to .appleMusic")
+    func playbackItemAppleMusicFromSummary() {
+        let summary = TrackRowSummary(
+            id: "/AppleMusic/Tracks/55443322.m4a",
+            recordingID: RecordingID("rec-apple-1"),
+            title: "Cruel Summer",
+            artist: "Taylor Swift",
+            album: "Lover",
+            duration: 178.0
+        )
+
+        let item = PlaybackItem(summary: summary)
+
+        #expect(item.source == .appleMusic)
+        #expect(item.id == "appleMusic:55443322")
+        #expect(item.title == "Cruel Summer")
+        #expect(item.playbackRequest.source == .appleMusic)
+        #expect(item.playbackRequest.itemID == "55443322")
+    }
+
     // MARK: - PlaybackQueueController Invariants
 
     private func makeItem(_ id: String, title: String) -> PlaybackItem {
@@ -245,7 +314,7 @@ struct PlaybackTests {
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
         // 1. Regular PCM WAV
-        var pcmHeader = Data([
+        let pcmHeader = Data([
             0x52, 0x49, 0x46, 0x46, // RIFF
             0x24, 0x00, 0x00, 0x00, // Size
             0x57, 0x41, 0x56, 0x45, // WAVE

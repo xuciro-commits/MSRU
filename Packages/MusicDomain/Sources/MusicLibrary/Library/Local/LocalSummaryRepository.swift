@@ -28,8 +28,13 @@ public actor LocalSummaryRepository {
 
     public init(db: AppDatabase = .shared) { self.db = db }
 
-    public func albumPage(query: String = "", sort: AlbumSort = .title,
-                   offset: Int = 0, limit: Int = 64) async throws -> LocalSummaryPage<AlbumPresentationModel> {
+    public func albumPage(
+        query: String = "",
+        sort: AlbumSort = .title,
+        offset: Int = 0,
+        limit: Int = 64,
+        sourceFilter: String? = nil
+    ) async throws -> LocalSummaryPage<AlbumPresentationModel> {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let boundedOffset = max(0, offset)
         let boundedLimit = min(max(1, limit), 256)
@@ -41,26 +46,32 @@ public actor LocalSummaryRepository {
         case .artist: order = "artist_name ASC, rel.sort_title ASC, rel.id ASC"
         case .year: order = "rel.release_year DESC, rel.sort_title ASC, rel.id ASC"
         }
+        let predicate = Self.albumPredicate(sourceFilter: sourceFilter)
         return try await db.reader.read { db in
-            let count = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM releases rel WHERE \(Self.localAlbumPredicate)\(filter)", arguments: args) ?? 0
+            let count = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM releases rel WHERE \(predicate)\(filter)", arguments: args) ?? 0
             let rows = try Row.fetchAll(db, sql: Self.albumSelect +
-                " WHERE \(Self.localAlbumPredicate)\(filter) ORDER BY \(order) LIMIT ? OFFSET ?",
+                " WHERE \(predicate)\(filter) ORDER BY \(order) LIMIT ? OFFSET ?",
                 arguments: args + [boundedLimit, boundedOffset])
             return LocalSummaryPage(items: rows.map(Self.album), totalCount: count, offset: boundedOffset)
         }
     }
 
-    public func artistPage(query: String = "", offset: Int = 0,
-                    limit: Int = 64) async throws -> LocalSummaryPage<ArtistPresentationModel> {
+    public func artistPage(
+        query: String = "",
+        offset: Int = 0,
+        limit: Int = 64,
+        sourceFilter: String? = nil
+    ) async throws -> LocalSummaryPage<ArtistPresentationModel> {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let boundedOffset = max(0, offset)
         let boundedLimit = min(max(1, limit), 256)
         let filter = needle.isEmpty ? "" : " AND instr(lower(art.name), lower(?)) > 0"
         let args: StatementArguments = needle.isEmpty ? [] : [needle]
+        let predicate = Self.artistPredicate(sourceFilter: sourceFilter)
         return try await db.reader.read { db in
-            let count = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM artists art WHERE \(Self.localArtistPredicate)\(filter)", arguments: args) ?? 0
+            let count = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM artists art WHERE \(predicate)\(filter)", arguments: args) ?? 0
             let rows = try Row.fetchAll(db, sql: Self.artistSelect +
-                " WHERE \(Self.localArtistPredicate)\(filter) ORDER BY art.sort_name ASC, art.id ASC LIMIT ? OFFSET ?",
+                " WHERE \(predicate)\(filter) ORDER BY art.sort_name ASC, art.id ASC LIMIT ? OFFSET ?",
                 arguments: args + [boundedLimit, boundedOffset])
             return LocalSummaryPage(items: rows.map(Self.artist), totalCount: count, offset: boundedOffset)
         }
@@ -68,27 +79,73 @@ public actor LocalSummaryRepository {
 
     public func album(id: String) async throws -> AlbumPresentationModel? {
         try await db.reader.read { db in
-            try Row.fetchOne(db, sql: Self.albumSelect + " WHERE rel.id = ? AND \(Self.localAlbumPredicate)", arguments: [id]).map(Self.album)
+            try Row.fetchOne(db, sql: Self.albumSelect + " WHERE rel.id = ? AND \(Self.albumPredicate(sourceFilter: nil))", arguments: [id]).map(Self.album)
         }
     }
 
     public func artist(id: String) async throws -> ArtistPresentationModel? {
         try await db.reader.read { db in
-            try Row.fetchOne(db, sql: Self.artistSelect + " WHERE art.id = ? AND \(Self.localArtistPredicate)", arguments: [id]).map(Self.artist)
+            try Row.fetchOne(db, sql: Self.artistSelect + " WHERE art.id = ? AND \(Self.artistPredicate(sourceFilter: nil))", arguments: [id]).map(Self.artist)
         }
     }
 
-    nonisolated private static let localAlbumPredicate = """
-        EXISTS (SELECT 1 FROM release_tracks rt JOIN assets ast ON ast.recording_id = rt.recording_id
-                JOIN sources src ON src.id = ast.source_id WHERE rt.release_id = rel.id
-                AND src.source_type IN ('local_folder', 'localFolder'))
-        """
+    nonisolated private static func albumPredicate(sourceFilter: String?) -> String {
+        guard let sourceFilter else {
+            return """
+                EXISTS (SELECT 1 FROM release_tracks rt JOIN assets ast ON ast.recording_id = rt.recording_id
+                        JOIN sources src ON src.id = ast.source_id WHERE rt.release_id = rel.id
+                        AND src.source_type IN ('local_folder', 'localFolder', 'apple_music'))
+                """
+        }
+        if SourceID.isLocalSourceID(sourceFilter) {
+            return """
+                EXISTS (SELECT 1 FROM release_tracks rt JOIN assets ast ON ast.recording_id = rt.recording_id
+                        JOIN sources src ON src.id = ast.source_id WHERE rt.release_id = rel.id
+                        AND src.source_type IN ('local_folder', 'localFolder'))
+                """
+        } else if SourceID.isAppleMusicSourceID(sourceFilter) {
+            return """
+                EXISTS (SELECT 1 FROM release_tracks rt JOIN assets ast ON ast.recording_id = rt.recording_id
+                        JOIN sources src ON src.id = ast.source_id WHERE rt.release_id = rel.id
+                        AND (src.source_type = 'apple_music' OR src.id = 'src_apple_music'))
+                """
+        } else {
+            return """
+                EXISTS (SELECT 1 FROM release_tracks rt JOIN assets ast ON ast.recording_id = rt.recording_id
+                        JOIN sources src ON src.id = ast.source_id WHERE rt.release_id = rel.id
+                        AND src.id = '\(sourceFilter.replacingOccurrences(of: "'", with: "''"))')
+                """
+        }
+    }
 
-    nonisolated private static let localArtistPredicate = """
-        EXISTS (SELECT 1 FROM artist_credits ac JOIN assets ast ON ast.recording_id = ac.entity_id
-                JOIN sources src ON src.id = ast.source_id WHERE ac.artist_id = art.id
-                AND ac.entity_type = 'recording' AND src.source_type IN ('local_folder', 'localFolder'))
-        """
+    nonisolated private static func artistPredicate(sourceFilter: String?) -> String {
+        guard let sourceFilter else {
+            return """
+                EXISTS (SELECT 1 FROM artist_credits ac JOIN assets ast ON ast.recording_id = ac.entity_id
+                        JOIN sources src ON src.id = ast.source_id WHERE ac.artist_id = art.id
+                        AND ac.entity_type = 'recording' AND src.source_type IN ('local_folder', 'localFolder', 'apple_music'))
+                """
+        }
+        if SourceID.isLocalSourceID(sourceFilter) {
+            return """
+                EXISTS (SELECT 1 FROM artist_credits ac JOIN assets ast ON ast.recording_id = ac.entity_id
+                        JOIN sources src ON src.id = ast.source_id WHERE ac.artist_id = art.id
+                        AND ac.entity_type = 'recording' AND src.source_type IN ('local_folder', 'localFolder'))
+                """
+        } else if SourceID.isAppleMusicSourceID(sourceFilter) {
+            return """
+                EXISTS (SELECT 1 FROM artist_credits ac JOIN assets ast ON ast.recording_id = ac.entity_id
+                        JOIN sources src ON src.id = ast.source_id WHERE ac.artist_id = art.id
+                        AND ac.entity_type = 'recording' AND (src.source_type = 'apple_music' OR src.id = 'src_apple_music'))
+                """
+        } else {
+            return """
+                EXISTS (SELECT 1 FROM artist_credits ac JOIN assets ast ON ast.recording_id = ac.entity_id
+                        JOIN sources src ON src.id = ast.source_id WHERE ac.artist_id = art.id
+                        AND ac.entity_type = 'recording' AND src.id = '\(sourceFilter.replacingOccurrences(of: "'", with: "''"))')
+                """
+        }
+    }
 
     nonisolated private static let albumSelect = """
         SELECT rel.id, rel.title, rel.release_year, rel.artwork_asset_id,
@@ -98,18 +155,18 @@ public actor LocalSummaryRepository {
                (SELECT COUNT(DISTINCT rt.recording_id) FROM release_tracks rt
                 JOIN assets ast ON ast.recording_id = rt.recording_id
                 JOIN sources src ON src.id = ast.source_id WHERE rt.release_id = rel.id
-                AND src.source_type IN ('local_folder', 'localFolder')) AS track_count,
+                AND src.source_type IN ('local_folder', 'localFolder', 'apple_music')) AS track_count,
                (SELECT COALESCE(SUM(COALESCE(rec.duration, 0)), 0) FROM release_tracks rt
                 JOIN recordings rec ON rec.id = rt.recording_id WHERE rt.release_id = rel.id
                 AND EXISTS (SELECT 1 FROM assets ast JOIN sources src ON src.id = ast.source_id
                             WHERE ast.recording_id = rt.recording_id
-                            AND src.source_type IN ('local_folder', 'localFolder'))) AS total_duration,
+                            AND src.source_type IN ('local_folder', 'localFolder', 'apple_music'))) AS total_duration,
                (SELECT src.display_name FROM release_tracks rt JOIN assets ast ON ast.recording_id = rt.recording_id
                 JOIN sources src ON src.id = ast.source_id WHERE rt.release_id = rel.id
-                AND src.source_type IN ('local_folder', 'localFolder') LIMIT 1) AS source_badge,
+                AND src.source_type IN ('local_folder', 'localFolder', 'apple_music') LIMIT 1) AS source_badge,
                (SELECT COUNT(DISTINCT ast.source_id) FROM release_tracks rt
                 JOIN assets ast ON ast.recording_id = rt.recording_id JOIN sources src ON src.id = ast.source_id
-                WHERE rt.release_id = rel.id AND src.source_type IN ('local_folder', 'localFolder')) AS version_count
+                WHERE rt.release_id = rel.id AND src.source_type IN ('local_folder', 'localFolder', 'apple_music')) AS version_count
         FROM releases rel
         """
 
@@ -118,12 +175,12 @@ public actor LocalSummaryRepository {
                (SELECT COUNT(DISTINCT ac.entity_id) FROM artist_credits ac
                 JOIN assets ast ON ast.recording_id = ac.entity_id JOIN sources src ON src.id = ast.source_id
                 WHERE ac.artist_id = art.id AND ac.entity_type = 'recording'
-                AND src.source_type IN ('local_folder', 'localFolder')) AS track_count,
+                AND src.source_type IN ('local_folder', 'localFolder', 'apple_music')) AS track_count,
                (SELECT COUNT(DISTINCT ac.entity_id) FROM artist_credits ac
                 JOIN release_tracks rt ON rt.release_id = ac.entity_id
                 JOIN assets ast ON ast.recording_id = rt.recording_id JOIN sources src ON src.id = ast.source_id
                 WHERE ac.artist_id = art.id AND ac.entity_type = 'release'
-                AND src.source_type IN ('local_folder', 'localFolder')) AS album_count,
+                AND src.source_type IN ('local_folder', 'localFolder', 'apple_music')) AS album_count,
                (SELECT rel.artwork_asset_id FROM releases rel JOIN artist_credits ac ON ac.entity_id = rel.id
                 WHERE ac.artist_id = art.id AND ac.entity_type = 'release'
                 AND rel.artwork_asset_id IS NOT NULL LIMIT 1) AS artwork_ref

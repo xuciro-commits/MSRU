@@ -22,7 +22,6 @@ typealias HomeFeature = ListenNowFeature
 // MARK: - Home View
 
 struct ListenNowView: View {
-    @Bindable var store: MusicCatalogStore
     var playback: PlaybackController? = nil
     let onSelect: (MusicContent) -> Void
 
@@ -33,11 +32,9 @@ struct ListenNowView: View {
     private var workspaceSafeArea
 
     init(
-        store: MusicCatalogStore,
         playback: PlaybackController? = nil,
         onSelect: @escaping (MusicContent) -> Void
     ) {
-        self.store = store
         self.playback = playback
         self.onSelect = onSelect
     }
@@ -52,6 +49,8 @@ struct ListenNowView: View {
                 if isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity, minHeight: 200)
+                } else if snapshot.totalTrackCount == 0 && snapshot.recentlyPlayed.isEmpty {
+                    emptyLibraryWelcome
                 } else {
                     // 1. 专属精选推荐 (Top Picks)
                     topPicksSection
@@ -111,6 +110,30 @@ struct ListenNowView: View {
         isLoading = false
     }
 
+    // MARK: - Empty Library Welcome
+
+    private var emptyLibraryWelcome: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "music.note.house")
+                .font(.system(size: 48))
+                .foregroundStyle(.secondary)
+            Text("欢迎来到 MSRU")
+                .font(.title2.bold())
+            Text("在这里探索你的音乐世界。你可以从本地目录、极空间 NAS 或 Apple Music 导入曲库。")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 420)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.quaternary.opacity(0.5))
+        )
+        .padding(.horizontal, 28)
+    }
+
     // MARK: - Header
 
     private var header: some View {
@@ -138,7 +161,7 @@ struct ListenNowView: View {
     }
 
     private var topPickItems: [TopPickItem] {
-        let heroArtist = snapshot.heroItem?.artist ?? "许强精选"
+        let heroArtist = snapshot.heroItem?.artist ?? String(localized: "Personal Mix")
         return [
             TopPickItem(
                 id: "artist-focus",
@@ -198,8 +221,40 @@ struct ListenNowView: View {
 
     private func topPickCard(_ item: TopPickItem) -> some View {
         Button {
-            if let hero = snapshot.heroItem, let playback {
-                playback.play(PlaybackItem(summary: hero))
+            guard let playback else { return }
+            switch item.id {
+            case "artist-focus":
+                if let hero = snapshot.heroItem {
+                    let artistTracks = (snapshot.recentlyPlayed + snapshot.frequentlyPlayed + snapshot.favorites + snapshot.recentlyAdded)
+                        .filter { $0.artist.localizedCaseInsensitiveCompare(hero.artist) == .orderedSame }
+                    let uniqueTracks = Array(NSOrderedSet(array: artistTracks)).compactMap { $0 as? TrackRowSummary }
+                    let items = (uniqueTracks.isEmpty ? [hero] : uniqueTracks).map { PlaybackItem(summary: $0) }
+                    playback.play(items[0], context: items)
+                }
+            case "discovery-station":
+                let tracks = snapshot.recentlyAdded.shuffled()
+                if let first = tracks.first {
+                    let items = tracks.map { PlaybackItem(summary: $0) }
+                    playback.play(items[0], context: items)
+                }
+            case "chill-mix":
+                let tracks = snapshot.recentlyPlayed
+                if let first = tracks.first {
+                    let items = tracks.map { PlaybackItem(summary: $0) }
+                    playback.play(items[0], context: items)
+                }
+            case "personal-station":
+                let tracks = (snapshot.frequentlyPlayed + snapshot.favorites)
+                if let first = tracks.first {
+                    let items = tracks.map { PlaybackItem(summary: $0) }
+                    playback.play(items[0], context: items)
+                } else if let hero = snapshot.heroItem {
+                    playback.play(PlaybackItem(summary: hero))
+                }
+            default:
+                if let hero = snapshot.heroItem {
+                    playback.play(PlaybackItem(summary: hero))
+                }
             }
         } label: {
             ZStack(alignment: .bottomLeading) {
@@ -272,7 +327,7 @@ struct ListenNowView: View {
         .buttonStyle(.plain)
     }
 
-    // Artistic graphics matching Apple Music Screenshot 1
+    // Artistic graphics
     private var artistCollageView: some View {
         ZStack {
             Circle()
@@ -328,28 +383,19 @@ struct ListenNowView: View {
 
     // MARK: - 2. 最近播放 (Recently Played)
 
-    private var fallbackRecentTracks: [TrackRowSummary] {
-        [
-            TrackRowSummary(id: "rec-1", recordingID: RecordingID("rec-1"), title: "Adele 21", artist: "Adele", album: "21", duration: 230),
-            TrackRowSummary(id: "rec-2", recordingID: RecordingID("rec-2"), title: "Apple Music 1", artist: "Apple Music Radio", album: "Live", duration: 180),
-            TrackRowSummary(id: "rec-3", recordingID: RecordingID("rec-3"), title: "Kim Petras", artist: "Radio Takeover", album: "Exclusive", duration: 210),
-            TrackRowSummary(id: "rec-4", recordingID: RecordingID("rec-4"), title: "Top 25: 华盛顿哥伦比亚特区", artist: "Apple Music", album: "Top Charts", duration: 195),
-            TrackRowSummary(id: "rec-5", recordingID: RecordingID("rec-5"), title: "Top 100: 日本", artist: "Apple Music", album: "Top 100", duration: 240),
-            TrackRowSummary(id: "rec-6", recordingID: RecordingID("rec-6"), title: "Max Styler", artist: "Club Mix 008", album: "DJ Mix", duration: 320)
-        ]
-    }
-
+    @ViewBuilder
     private var recentlyPlayedSection: some View {
-        let tracks = snapshot.recentlyPlayed.isEmpty ? fallbackRecentTracks : snapshot.recentlyPlayed
-        return ContinuousShelfView(
-            title: "最近播放",
-            hasChevronHeader: true,
-            items: tracks,
-            spacing: 16,
-            leadingInset: 28,
-            pageSize: 4
-        ) { item in
-            squareTrackCard(item)
+        if !snapshot.recentlyPlayed.isEmpty {
+            ContinuousShelfView(
+                title: "最近播放",
+                hasChevronHeader: true,
+                items: snapshot.recentlyPlayed,
+                spacing: 16,
+                leadingInset: 28,
+                pageSize: 4
+            ) { item in
+                squareTrackCard(item)
+            }
         }
     }
 
@@ -427,6 +473,22 @@ struct ListenNowView: View {
         )
     ]
 
+    private func playMix(_ mix: MixItem) {
+        guard let playback else { return }
+        let queue: [TrackRowSummary] = switch mix.id {
+        case "favorites-mix": snapshot.favorites
+        case "heavy-rotation-mix": snapshot.frequentlyPlayed
+        case "chill-mix": snapshot.recentlyPlayed
+        default: snapshot.recentlyAdded
+        }
+        if let first = queue.first {
+            let items = queue.map { PlaybackItem(summary: $0) }
+            playback.play(items[0], context: items)
+        } else if let hero = snapshot.heroItem {
+            playback.play(PlaybackItem(summary: hero))
+        }
+    }
+
     private var madeForYouSection: some View {
         ContinuousShelfView(
             title: "为你打造",
@@ -437,9 +499,7 @@ struct ListenNowView: View {
             pageSize: 4
         ) { mix in
             Button {
-                if let hero = snapshot.heroItem, let playback {
-                    playback.play(PlaybackItem(summary: hero))
-                }
+                playMix(mix)
             } label: {
                 VStack(alignment: .leading, spacing: 8) {
                     ZStack(alignment: .bottomLeading) {
@@ -518,8 +578,8 @@ struct ListenNowView: View {
             HStack(spacing: 18) {
                 statCard(
                     title: "已收录曲目",
-                    value: "\(max(snapshot.recentlyPlayed.count + snapshot.recentlyAdded.count, 28))",
-                    caption: "高保真音频库",
+                    value: "\(snapshot.totalTrackCount)",
+                    caption: "本地曲库",
                     systemImage: "music.note.list",
                     color: .accentColor
                 )
@@ -610,7 +670,6 @@ enum ListenNowFeature: ApplicationFeaturePresentation {
                 route: .section(.listenNow)
             ) { scene in
                 ListenNowView(
-                    store: scene.application.musicCatalog,
                     playback: scene.application.playback,
                     onSelect: { item in
                         scene.selectedMusicContent = item
@@ -625,7 +684,6 @@ enum ListenNowFeature: ApplicationFeaturePresentation {
 
 #Preview("Home") {
     ListenNowView(
-        store: MSRUPreviewData.makeCatalogStore(),
         onSelect: { _ in }
     )
     .frame(width: 1100, height: 800)
