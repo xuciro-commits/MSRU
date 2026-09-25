@@ -272,7 +272,7 @@ private struct SourceCard: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
-                        Text(source.displayName)
+                        title
                             .font(.headline)
                         if kind == .server {
                             statusPill
@@ -355,6 +355,12 @@ private struct SourceCard: View {
         .task(id: source.lastReconciledAt) {
             await loadStats()
         }
+    }
+
+    /// The default local source's stored name is written by the library in
+    /// English; show it localized. Other sources show the name the user chose.
+    private var title: Text {
+        source.id == .defaultLocal ? Text("Local Files") : Text(verbatim: source.displayName)
     }
 
     @ViewBuilder

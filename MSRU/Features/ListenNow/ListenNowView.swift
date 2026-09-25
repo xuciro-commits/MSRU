@@ -23,7 +23,7 @@ typealias HomeFeature = ListenNowFeature
 
 struct ListenNowView: View {
     var playback: PlaybackController? = nil
-    let onSelect: (MusicContent) -> Void
+    let queries: LibraryQueryEngine
 
     @State private var snapshot = ListenNowBehaviorSnapshot()
     @State private var isLoading = true
@@ -31,12 +31,9 @@ struct ListenNowView: View {
     @Environment(\.workspaceSafeAreaInsets)
     private var workspaceSafeArea
 
-    init(
-        playback: PlaybackController? = nil,
-        onSelect: @escaping (MusicContent) -> Void
-    ) {
+    init(playback: PlaybackController? = nil, queries: LibraryQueryEngine) {
         self.playback = playback
-        self.onSelect = onSelect
+        self.queries = queries
     }
 
     var body: some View {
@@ -97,7 +94,7 @@ struct ListenNowView: View {
             isLoading = true
         }
         do {
-            snapshot = try await LibraryQueryEngine.shared.fetchBehaviorSnapshot()
+            snapshot = try await queries.fetchBehaviorSnapshot()
         } catch {
             print("[HomeView] Failed to fetch behavior snapshot: \(error)")
         }
@@ -319,9 +316,7 @@ enum ListenNowFeature: ApplicationFeaturePresentation {
             ) { scene in
                 ListenNowView(
                     playback: scene.application.playback,
-                    onSelect: { item in
-                        scene.selectedMusicContent = item
-                    }
+                    queries: scene.application.services.queries
                 )
             }
         ]
@@ -331,8 +326,6 @@ enum ListenNowFeature: ApplicationFeaturePresentation {
 // MARK: - Preview
 
 #Preview("Home") {
-    ListenNowView(
-        onSelect: { _ in }
-    )
+    ListenNowView(queries: MSRUPreviewData.makeApplication().services.queries)
     .frame(width: 1100, height: 800)
 }

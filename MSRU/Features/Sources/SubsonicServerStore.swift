@@ -33,7 +33,7 @@ struct SubsonicServer: Identifiable, Hashable {
 final class SubsonicServerStore {
     let coordinator: SourceRuntimeCoordinator
 
-    init(coordinator: SourceRuntimeCoordinator = .shared) {
+    init(coordinator: SourceRuntimeCoordinator) {
         self.coordinator = coordinator
         Task { await coordinator.loadRemoteSources() }
     }

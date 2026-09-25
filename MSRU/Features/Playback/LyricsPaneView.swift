@@ -8,13 +8,15 @@
 import SwiftUI
 import AppFoundation
 import MusicDomain
+import MusicLibrary
 import MusicPlayback
 
 struct LyricsPaneView: View {
     let playback: PlaybackController
+    let lyricsStore: LyricsStore
+    let lyricsSearch: LyricsService
     var onExpandCanvas: (() -> Void)? = nil
 
-    @State private var lyricsStore = LyricsStore.shared
     @State private var isSearchPresented: Bool = false
 
     var body: some View {
@@ -87,7 +89,7 @@ struct LyricsPaneView: View {
             lyricsStore.sync(with: playback)
         }
         .sheet(isPresented: $isSearchPresented) {
-            LyricsSourcePickerSheet(playback: playback)
+            LyricsSourcePickerSheet(playback: playback, lyricsStore: lyricsStore, lyricsSearch: lyricsSearch)
         }
     }
 
@@ -350,9 +352,11 @@ struct LyricsPaneView: View {
 }
 
 #Preview("Lyrics Pane") {
-    let playback = MSRUPreviewData.makePlaybackController()
+    let services = MSRUPreviewData.makeApplication().services
     LyricsPaneView(
-        playback: playback,
+        playback: MSRUPreviewData.makePlaybackController(),
+        lyricsStore: services.lyrics,
+        lyricsSearch: services.lyricsSearch,
         onExpandCanvas: {}
     )
     .frame(width: 320, height: 600)

@@ -51,6 +51,9 @@ struct LibraryView:
     let onAddMusic:
         () -> Void
 
+    let onOpenCleanup:
+        () -> Void
+
 
     // MARK: - Local UI State
 
@@ -87,9 +90,6 @@ struct LibraryView:
     private var metadataEditTracks: [LocalTrack]? = nil
 
     @State
-    private var isDeduplicationSheetPresented: Bool = false
-
-    @State
     private var isRefreshingMetadata: Bool = false
 
     @Binding var selectedSourceID: String?
@@ -120,7 +120,9 @@ struct LibraryView:
         selectedSourceID:
             Binding<String?> = .constant(nil),
         onAddMusic:
-            @escaping () -> Void
+            @escaping () -> Void,
+        onOpenCleanup:
+            @escaping () -> Void = {}
     ) {
         self.feature = feature
         self.localStore = localStore
@@ -130,6 +132,7 @@ struct LibraryView:
         self._selectedLocalTrack = selectedLocalTrack
         self._selectedSourceID = selectedSourceID
         self.onAddMusic = onAddMusic
+        self.onOpenCleanup = onOpenCleanup
     }
 
 
@@ -180,7 +183,7 @@ struct LibraryView:
         }
         .task {
             let servers = subsonicServers?.servers.map { ($0.id.rawValue, $0.name) } ?? []
-            availableSources = (try? await LibraryQueryEngine.shared.fetchAvailableSources(for: "recording", additionalRemoteServers: servers)) ?? []
+            availableSources = (try? await localStore.availableSources(for: "recording", additionalRemoteServers: servers)) ?? []
         }
         .task(id: selectedSourceID) {
             if isRemoteSourceActive, let sourceID = selectedSourceID {
@@ -232,13 +235,6 @@ struct LibraryView:
                     onDismiss: { metadataEditTracks = nil }
                 )
             }
-        }
-        .sheet(isPresented: $isDeduplicationSheetPresented) {
-            DeduplicationManagerSheet(
-                localStore: localStore,
-                playback: playback,
-                onDismiss: { isDeduplicationSheetPresented = false }
-            )
         }
     }
 
@@ -388,7 +384,7 @@ struct LibraryView:
                 isSearching: isSearchingRemoteTracks,
                 showsSearch: false,
                 prompt: isRemoteSourceActive ? "搜索远程歌曲…" : "Filter songs…",
-                onOpenDeduplication: { isDeduplicationSheetPresented = true }
+                onOpenCleanup: onOpenCleanup
             )
 
             if sourceFilterItems.count > 1 {

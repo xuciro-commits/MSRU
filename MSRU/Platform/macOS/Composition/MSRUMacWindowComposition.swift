@@ -458,7 +458,9 @@ final class MSRUMacWindowComposition {
                     playback: scene.application.playback,
                     onClose: { [weak self] in
                         self?.scene.setNowPlaying(presented: false)
-                    }
+                    },
+                    lyricsStore: scene.application.services.lyrics,
+                    lyricsSearch: scene.application.services.lyricsSearch
                 )
                 .applyLocaleOverride(
                     scene

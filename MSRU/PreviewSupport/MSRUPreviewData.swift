@@ -96,13 +96,6 @@ enum MSRUPreviewData {
         return scene.radioFeature
     }
 
-    @MainActor
-    static func makeProviderStore() -> ProviderManagerStore {
-        ProviderManagerStore(defaults: nil) { request in
-            HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-        }
-    }
-
     static let localTracks = [
         LocalTrack(
             fileURL: URL(fileURLWithPath: "/preview/Northern Lights.m4a"),
@@ -161,7 +154,7 @@ enum MSRUPreviewData {
             webLibrary: WebLibraryStore(db: try! AppDatabase.makeEphemeral()),
             musicLibrary: makeAppleMusicStore(),
             playback: makePlaybackController(),
-            providerManager: makeProviderStore(),
+            services: .isolated(),
             openverseSearch: .preview(results: openverseResults),
             playlistStore: makePlaylistStore(),
             subsonicServers: SubsonicServerStore(coordinator: .preview())

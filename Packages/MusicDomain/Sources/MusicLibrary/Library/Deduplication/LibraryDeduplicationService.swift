@@ -147,12 +147,22 @@ public actor LibraryDeduplicationService {
             return DeduplicationReport(clusters: [], totalScannedTracks: 0)
         }
 
-        let total = tracks.count
+        // Group by cleaned (artist, title) first, so file specs are read only for
+        // tracks that have a possible duplicate, not for the whole library.
+        var grouping: [String: [LocalTrack]] = [:]
+        for track in tracks {
+            let cleanArtist = LrcLibClient.cleanArtistName(track.artist).lowercased()
+            let cleanTitle = LrcLibClient.cleanTrackTitle(track.title).lowercased()
+            let key = "\(cleanArtist)::\(cleanTitle)"
+            grouping[key, default: []].append(track)
+        }
+
+        let candidates = grouping.values.filter { $0.count > 1 }.flatMap { $0 }
+        let total = candidates.count
         var parsedSpecs: [String: AudioTechnicalSpecs] = [:]
         let tagReader = AudioTagReader()
 
-        // Batch inspect specs with cancellation check
-        for (idx, track) in tracks.enumerated() {
+        for (idx, track) in candidates.enumerated() {
             if Task.isCancelled { break }
             let details = await tagReader.readDetails(from: track.fileURL)
             parsedSpecs[track.id] = details.specs
@@ -161,15 +171,6 @@ public actor LibraryDeduplicationService {
                 progress?(Double(idx + 1) / Double(total))
                 await Task.yield()
             }
-        }
-
-        // Group tracks by cleaned (artist, title)
-        var grouping: [String: [LocalTrack]] = [:]
-        for track in tracks {
-            let cleanArtist = LrcLibClient.cleanArtistName(track.artist).lowercased()
-            let cleanTitle = LrcLibClient.cleanTrackTitle(track.title).lowercased()
-            let key = "\(cleanArtist)::\(cleanTitle)"
-            grouping[key, default: []].append(track)
         }
 
         var clusters: [DuplicateCluster] = []

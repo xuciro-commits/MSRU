@@ -45,8 +45,9 @@ final class ApplicationModel {
     // MARK: - Playback
     let playback: PlaybackController
 
-    // MARK: - Providers
-    let providerManager: ProviderManagerStore
+    // MARK: - Library Services & Cleanup
+    let services: LibraryServices
+    let cleanup: LibraryCleanupModel
 
     // MARK: - Radio
     let radioStore: RadioStore
@@ -79,7 +80,7 @@ final class ApplicationModel {
             webLibrary: WebLibraryStore(),
             musicLibrary: AppleMusicLibraryStore(),
             playback: PlaybackController(),
-            providerManager: ProviderManagerStore(),
+            services: .live(),
             openverseSearch: OpenverseSearchClient.live,
             radioStore: RadioStore(),
             playlistStore: PlaylistStore(),
@@ -93,7 +94,7 @@ final class ApplicationModel {
         webLibrary: WebLibraryStore,
         musicLibrary: AppleMusicLibraryStore,
         playback: PlaybackController,
-        providerManager: ProviderManagerStore,
+        services: LibraryServices,
         openverseSearch: OpenverseSearchClient,
         radioStore: RadioStore? = nil,
         playlistStore: PlaylistStore? = nil,
@@ -105,7 +106,8 @@ final class ApplicationModel {
         self.webLibrary = webLibrary
         self.musicLibrary = musicLibrary
         self.playback = playback
-        self.providerManager = providerManager
+        self.services = services
+        self.cleanup = LibraryCleanupModel(library: localLibrary)
 
         let resolvedRadioStore = radioStore ?? RadioStore()
         self.radioStore = resolvedRadioStore
@@ -116,7 +118,7 @@ final class ApplicationModel {
         self.languageSettings = languageSettings ?? LanguageSettings()
         self.watchedFolders = watchedFolders ?? WatchedFolderStore(localStore: localLibrary)
 
-        let resolvedSubsonicServers = subsonicServers ?? SubsonicServerStore()
+        let resolvedSubsonicServers = subsonicServers ?? SubsonicServerStore(coordinator: .shared)
         self.subsonicServers = resolvedSubsonicServers
 
         self.localLibrary.attachCascadeCollaborators(
@@ -169,6 +171,7 @@ final class ApplicationModel {
         systemNowPlayingCoordinator?.deactivate()
         systemNowPlayingCoordinator = nil
         watchedFolders.stopMonitoring()
+        cleanup.stop()
         spotlightIndexer.cancel()
         startupTask?.cancel()
     }

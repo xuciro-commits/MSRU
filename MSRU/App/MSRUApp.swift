@@ -35,11 +35,8 @@ struct MSRUApp:
         #if os(macOS)
 
         Settings {
-            SettingsView(
-                providerManager: appDelegate.application.providerManager,
-                languageSettings: appDelegate.application.languageSettings
-            )
-            .frame(minWidth: 740, idealWidth: 840, minHeight: 480, idealHeight: 560)
+            SettingsView(languageSettings: appDelegate.application.languageSettings)
+                .frame(minWidth: 480, idealWidth: 520, minHeight: 240, idealHeight: 280)
         }
         .commands {
 

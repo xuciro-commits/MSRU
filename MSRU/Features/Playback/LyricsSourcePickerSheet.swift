@@ -13,9 +13,10 @@ import MusicLibrary
 
 struct LyricsSourcePickerSheet: View {
     let playback: PlaybackController
+    let lyricsStore: LyricsStore
+    let lyricsSearch: LyricsService
     @Environment(\.dismiss) private var dismiss
 
-    @State private var lyricsStore = LyricsStore.shared
     @State private var searchQuery: String = ""
     @State private var candidates: [LrcLibResponse] = []
     @State private var isLoading: Bool = false
@@ -271,7 +272,7 @@ struct LyricsSourcePickerSheet: View {
         hasSearched = true
 
         searchTask = Task {
-            let results = await LyricsService.shared.searchCandidates(query: clean)
+            let results = await lyricsSearch.searchCandidates(query: clean)
             if !Task.isCancelled {
                 // Sort results: synced candidates first, then closest duration
                 let target = playback.duration
@@ -318,6 +319,10 @@ struct LyricsSourcePickerSheet: View {
 }
 
 #Preview("Lyrics Source Picker Sheet") {
-    let playback = MSRUPreviewData.makePlaybackController()
-    LyricsSourcePickerSheet(playback: playback)
+    let services = MSRUPreviewData.makeApplication().services
+    LyricsSourcePickerSheet(
+        playback: MSRUPreviewData.makePlaybackController(),
+        lyricsStore: services.lyrics,
+        lyricsSearch: services.lyricsSearch
+    )
 }

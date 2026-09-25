@@ -177,6 +177,9 @@ private struct LibraryFeatureDestination: View {
             ),
             onAddMusic: {
                 scene.send(.navigate(.section(.sources)))
+            },
+            onOpenCleanup: {
+                scene.send(.navigate(.section(.importReview)))
             }
         )
     }

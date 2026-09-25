@@ -20,6 +20,8 @@ struct ArtistDetailView: View {
     let onSelectTrack: (LocalTrack) -> Void
     let onSelectAlbum: (AlbumPresentationModel) -> Void
     var onDeleteArtist: (() -> Void)? = nil
+    /// Source of artist biographies; previews pass none and stay offline.
+    var biographies: ArtistBiographyService? = nil
 
     @State private var isDeleteConfirmationPresented: Bool = false
     @State private var biographyRecord: ArtistBiographyRecord? = nil
@@ -228,8 +230,8 @@ struct ArtistDetailView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: selectedTrackIDs.count)
         .task {
-            if biographyRecord == nil {
-                biographyRecord = await ArtistBiographyService.shared.fetchBiography(artistName: artist.name)
+            if biographyRecord == nil, let biographies {
+                biographyRecord = await biographies.fetchBiography(artistName: artist.name)
             }
         }
         .task(id: artist.id) {

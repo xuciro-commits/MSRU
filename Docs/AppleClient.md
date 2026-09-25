@@ -22,10 +22,11 @@ Composition: features declare routes, sidebar entries and commands (`FeatureCont
 
 ## Ownership and concurrency rules
 
-- Every mutable state, task and persistent resource has an owner and a stop condition. Scene-local state (selection, navigation) belongs to the scene; application-wide services (playback, library) to the application. Nothing becomes global because it is convenient.
+- Every mutable state, task and persistent resource has an owner and a stop condition. Scene-local state (selection, navigation) belongs to the scene; application-wide services (playback, library) to the application. Nothing becomes global because it is convenient. Views get library services from `ApplicationModel.services` (live) or `LibraryServices.isolated()` (previews, tests). The one exception is process-wide caches of derived, immutable data — decoded artwork (`MediaImagePipeline`) and content-addressed artwork files — which hold no user state.
 - Cancellation and stale-result invalidation are two duties. `FeatureHost` tasks carry a token; after cancel/replace/stop an operation can no longer send actions. Test ordering with controllable continuations, never sleeps.
 - Committed work (a persisted library change) is not reverted when the scene or feature that started it closes; the feature only loses the right to update its UI.
 - UI, Observation and feature state transitions run on the MainActor. CPU/IO-heavy work (decoding, fingerprinting, scanning) runs on dedicated actors with in-flight de-duplication. Cross-isolation values are `Sendable`; no blanket `@unchecked Sendable`.
+- `async` is not "off the main thread". The app target, `MusicLibrary` and `MusicPlayback` default to MainActor isolation with `NonisolatedNonsendingByDefault`: an unannotated type is main-actor isolated, and a `nonisolated async` function runs on its caller's executor. File, decode, fingerprint and hashing work goes in an `actor`, a `@concurrent` function or a detached task (e.g. `ChromaprintFingerprintExtractor`, `LibraryHealthScanner`). Work over the whole library is paged and never loads every track or opens every file.
 - Callbacks from players/engines check that their source is still current before mutating state.
 - Restoration stores only scene ID, stable route/entity IDs and minimal layout — never application state, tasks or caches. Records are versioned and decoded one by one; unknown or corrupt records are preserved (quarantined), never overwritten with empty state. Crash recovery restores the last successful write.
 - Closing a scene stops its tasks; Cmd+Q keeps records of still-open scenes; closing a single window deletes its record.
@@ -42,7 +43,7 @@ The native platform layer owns real window/split/safe-area geometry (`\.workspac
 - Selection is not opening details; switching list/grid keeps the selection. First load, empty, no results, partial failure and refresh-over-existing-content are distinct states and keep usable content.
 - Accessibility: keyboard, pointer and touch; dynamic type, long text, Reduce Motion, Increase Contrast; state is never conveyed by color alone.
 - Every View/Representable has a `#Preview` in the same file using deterministic fixtures (`MSRUPreviewData`), never live constructors — enforced by `Scripts/verify-previews.py`. Complex views cover content and empty states at least.
-- Localization: the layer provides `LanguageSettings`/`SupportedLanguage`; apps own their String Catalog (MSRU: English, Simplified Chinese, Tibetan) and the in-app language switch.
+- Localization: the layer provides `LanguageSettings`/`SupportedLanguage`; apps own their String Catalog (MSRU: English source; Simplified and Traditional Chinese, Japanese, Tibetan) and the in-app language switch.
 - UI design sketches, when needed, are plain-text box diagrams inside the relevant task or doc; they describe structure and behaviour, not visuals.
 
 ## Entry points

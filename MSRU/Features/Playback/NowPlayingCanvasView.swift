@@ -17,13 +17,14 @@ import MusicPlayback
 struct NowPlayingCanvasView: View {
     @Bindable var playback: PlaybackController
     let onClose: () -> Void
+    let lyricsStore: LyricsStore
+    let lyricsSearch: LyricsService
 
     @State private var scrubbingProgress: Double? = nil
     @State private var isQueueDrawerPresented: Bool = false
     @State private var isLyricsPresented: Bool = false
     @State private var isEqualizerPresented: Bool = false
     @State private var isLyricsSearchPresented: Bool = false
-    @State private var lyricsStore = LyricsStore.shared
 
     var body: some View {
         ZStack {
@@ -73,7 +74,7 @@ struct NowPlayingCanvasView: View {
             }
         }
         .sheet(isPresented: $isLyricsSearchPresented) {
-            LyricsSourcePickerSheet(playback: playback)
+            LyricsSourcePickerSheet(playback: playback, lyricsStore: lyricsStore, lyricsSearch: lyricsSearch)
         }
         .preferredColorScheme(.dark)
     }
@@ -785,9 +786,12 @@ struct CanvasVolumeSlider: View {
 }
 
 #Preview("Now Playing Canvas") {
+    let services = MSRUPreviewData.makeApplication().services
     NowPlayingCanvasView(
         playback: MSRUPreviewData.makePlaybackController(),
-        onClose: {}
+        onClose: {},
+        lyricsStore: services.lyrics,
+        lyricsSearch: services.lyricsSearch
     )
     .frame(width: 800, height: 600)
 }

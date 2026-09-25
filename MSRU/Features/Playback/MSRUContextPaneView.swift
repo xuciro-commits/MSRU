@@ -63,6 +63,8 @@ struct MSRUContextPaneView: View {
             case .lyrics:
                 LyricsPaneView(
                     playback: scene.application.playback,
+                    lyricsStore: scene.application.services.lyrics,
+                    lyricsSearch: scene.application.services.lyricsSearch,
                     onExpandCanvas: {
                         scene.setNowPlaying(presented: true)
                     }

@@ -294,9 +294,9 @@ struct LibraryTests {
         #expect(store.tracks.map { $0.id } == [track.id])
     }
 
-    @Test("Explicit metadata repair streams pages without loading the whole library")
+    @Test("Fingerprint cleanup references stream pages without loading the whole library")
     @MainActor
-    func metadataRepairUsesMaintenancePages() async throws {
+    func fingerprintReferencesUseMaintenancePages() async throws {
         let tracks = (0..<3).map { index in
             LocalTrack(fileURL: URL(fileURLWithPath: "/not-present/\(index).wav"),
                        title: "Song \(index)", artist: "Artist", album: "Artist",
@@ -308,13 +308,7 @@ struct LibraryTests {
         let active = try await store.fingerprintCleanupReferences()
         #expect(active.keys.count == 3)
         #expect(active.paths.count == 3)
-        let result = await store.remediateLibraryMetadataAndArtwork()
-
-        #expect(result.repairedCount == 3)
-        #expect(result.artworkAddedCount == 0)
         #expect(!store.isFullyLoaded)
-        #expect(repository.saved.count == 3)
-        #expect(repository.saved.allSatisfy { $0.album == nil })
     }
 
     @Test("Batch import reports individual failures and retries without duplicating successful files")
@@ -361,7 +355,6 @@ private final class FailingLocalMutationRepository: LocalLibraryRepository {
 @MainActor
 private final class PagedMaintenanceRepository: LocalLibraryRepository {
     let source: [LocalTrack]
-    var saved: [LocalTrack] = []
 
     init(tracks: [LocalTrack]) { source = tracks }
     func loadTracks() async throws -> [LocalTrack] { throw CocoaError(.fileReadTooLarge) }
@@ -376,5 +369,5 @@ private final class PagedMaintenanceRepository: LocalLibraryRepository {
         return LocalMaintenancePage(tracks: tracks, nextPath: tracks.last?.fileURL.path)
     }
     func importTrack(from url: URL) async throws -> LocalTrack? { nil }
-    func saveTracksInPlace(_ tracks: [LocalTrack]) async throws { saved.append(contentsOf: tracks) }
+    func saveTracksInPlace(_ tracks: [LocalTrack]) async throws {}
 }

@@ -322,7 +322,7 @@ struct AlbumsView: View {
         }
         .task {
             let servers = subsonicServers?.servers.map { ($0.id.rawValue, $0.name) } ?? []
-            availableSources = (try? await LibraryQueryEngine.shared.fetchAvailableSources(for: "release", additionalRemoteServers: servers)) ?? []
+            availableSources = (try? await localStore.availableSources(for: "release", additionalRemoteServers: servers)) ?? []
         }
     }
 

@@ -19,6 +19,7 @@ struct ArtistsView: View {
     @Binding var requestedArtistID: String?
     let onSelectTrack: (LocalTrack) -> Void
     var onAddMusic: (() -> Void)? = nil
+    var biographies: ArtistBiographyService? = nil
 
     @Binding private var searchQuery: String
     @State private var localPager: LocalArtistPager?
@@ -51,7 +52,8 @@ struct ArtistsView: View {
         selectedSourceID: Binding<String?> = .constant(nil),
         requestedArtistID: Binding<String?> = .constant(nil),
         onSelectTrack: @escaping (LocalTrack) -> Void,
-        onAddMusic: (() -> Void)? = nil
+        onAddMusic: (() -> Void)? = nil,
+        biographies: ArtistBiographyService? = nil
     ) {
         self.localStore = localStore
         self.playback = playback
@@ -61,6 +63,7 @@ struct ArtistsView: View {
         self._requestedArtistID = requestedArtistID
         self.onSelectTrack = onSelectTrack
         self.onAddMusic = onAddMusic
+        self.biographies = biographies
     }
 
     private var isRemoteSourceActive: Bool {
@@ -221,7 +224,8 @@ struct ArtistsView: View {
                     onDeleteArtist: artist.id.hasPrefix("subsonic:") ? nil : {
                         artistPendingDelete = artist
                         isDeleteConfirmationPresented = true
-                    }
+                    },
+                    biographies: biographies
                 )
             } else {
                 mainArtistsGrid
@@ -289,7 +293,7 @@ struct ArtistsView: View {
         }
         .task {
             let servers = subsonicServers?.servers.map { ($0.id.rawValue, $0.name) } ?? []
-            availableSources = (try? await LibraryQueryEngine.shared.fetchAvailableSources(for: "artist", additionalRemoteServers: servers)) ?? []
+            availableSources = (try? await localStore.availableSources(for: "artist", additionalRemoteServers: servers)) ?? []
         }
         .confirmationDialog(
             "Delete artist \"\(artistPendingDelete?.name ?? "")\"?",
@@ -684,7 +688,8 @@ enum ArtistsFeature: ApplicationFeaturePresentation {
                         },
                         onAddMusic: {
                             scene.send(.navigate(.section(.sources)))
-                        }
+                        },
+                        biographies: scene.application.services.biographies
                     )
                 }
             }

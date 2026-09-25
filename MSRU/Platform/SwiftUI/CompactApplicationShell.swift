@@ -102,7 +102,9 @@ struct CompactApplicationShell: View {
                     playback: scene.application.playback,
                     onClose: {
                         scene.setNowPlaying(presented: false)
-                    }
+                    },
+                    lyricsStore: scene.application.services.lyrics,
+                    lyricsSearch: scene.application.services.lyricsSearch
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }

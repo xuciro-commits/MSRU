@@ -16,15 +16,20 @@ public struct DeduplicationManagerSheet: View {
 
     public let localStore: LocalLibraryStore
     @Bindable public var playback: PlaybackController
+    /// Paths the library health scan found as possible duplicates; only these
+    /// files are inspected, never the whole library.
+    public let candidatePaths: [String]
     public var onDismiss: () -> Void
 
     public init(
         localStore: LocalLibraryStore,
         playback: PlaybackController,
+        candidatePaths: [String],
         onDismiss: @escaping () -> Void
     ) {
         self.localStore = localStore
         self.playback = playback
+        self.candidatePaths = candidatePaths
         self.onDismiss = onDismiss
     }
 
@@ -582,7 +587,7 @@ public struct DeduplicationManagerSheet: View {
         isScanning = true
         scanProgress = 0
 
-        let tracks = (try? await localStore.loadAllTracks()) ?? []
+        let tracks = (try? await localStore.tracks(withIDs: Set(candidatePaths))) ?? []
         let service = LibraryDeduplicationService()
 
         let result = await service.analyze(tracks: tracks) { progress in
@@ -595,14 +600,32 @@ public struct DeduplicationManagerSheet: View {
         self.isScanning = false
     }
 
+    /// Moves tracks to the Trash and drops them from the report; files that
+    /// could not be removed stay listed.
+    private func trash(_ ids: Set<String>) async {
+        guard !ids.isEmpty else { return }
+        let removed = await localStore.deleteTracks(withIDs: ids, deletePhysical: true)
+        guard removed, let report else { return }
+        let remaining = report.clusters.compactMap { cluster -> DuplicateCluster? in
+            let items = cluster.items.filter { !ids.contains($0.id) }
+            guard items.count > 1 else { return nil }
+            guard items.count < cluster.items.count else { return cluster }
+            let primaryID = (items.first(where: \.isPrimary) ?? items.first)?.id
+            let recoverable = cluster.isRedundantFileDuplicate
+                ? items.filter { $0.id != primaryID }.reduce(Int64(0)) { $0 + $1.fileSize }
+                : 0
+            return DuplicateCluster(
+                id: cluster.id, title: cluster.title, artist: cluster.artist,
+                category: cluster.category, items: items, recoverableBytes: recoverable
+            )
+        }
+        self.report = DeduplicationReport(clusters: remaining, totalScannedTracks: report.totalScannedTracks)
+    }
+
     private func cleanCluster(_ cluster: DuplicateCluster) async {
         isProcessingAction = true
-        actionStatusText = "Moving duplicates to Trash..."
-
-        let redundantIDs = Set(cluster.redundantItems.map(\.id))
-        _ = await localStore.deleteTracks(withIDs: redundantIDs, deletePhysical: true)
-
-        await startScan()
+        actionStatusText = String(localized: "Moving duplicates to the Trash…")
+        await trash(Set(cluster.redundantItems.map(\.id)))
         isProcessingAction = false
         clusterPendingDeletion = nil
     }
@@ -610,26 +633,18 @@ public struct DeduplicationManagerSheet: View {
     private func cleanAllExactDuplicates() async {
         guard let report else { return }
         isProcessingAction = true
-        actionStatusText = "Cleaning all exact duplicates..."
-
-        var allRedundantIDs: Set<String> = []
-        for cluster in report.clusters where cluster.isRedundantFileDuplicate {
-            allRedundantIDs.formUnion(cluster.redundantItems.map(\.id))
-        }
-
-        if !allRedundantIDs.isEmpty {
-            _ = await localStore.deleteTracks(withIDs: allRedundantIDs, deletePhysical: true)
-        }
-
-        await startScan()
+        actionStatusText = String(localized: "Moving duplicates to the Trash…")
+        let redundant = report.clusters
+            .filter(\.isRedundantFileDuplicate)
+            .flatMap { $0.redundantItems.map(\.id) }
+        await trash(Set(redundant))
         isProcessingAction = false
     }
 
     private func deleteSingleTrack(_ track: LocalTrack) async {
         isProcessingAction = true
-        actionStatusText = "Moving track to Trash..."
-        _ = await localStore.deleteTracks(withIDs: [track.id], deletePhysical: true)
-        await startScan()
+        actionStatusText = String(localized: "Moving the song to the Trash…")
+        await trash([track.id])
         isProcessingAction = false
     }
 }
@@ -641,6 +656,7 @@ public struct DeduplicationManagerSheet: View {
     DeduplicationManagerSheet(
         localStore: application.localLibrary,
         playback: application.playback,
+        candidatePaths: [],
         onDismiss: {}
     )
 }

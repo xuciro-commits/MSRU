@@ -23,7 +23,7 @@ enum MSRUApplication {
         builder.add(PlaylistsFeature.self)
         builder.add(SourcesFeature.self)
         builder.add(RadioFeature.self)
-        builder.add(MetadataCenterFeature.self)
+        builder.add(LibraryCleanupFeature.self)
         builder.add(SettingsFeature.self)
 
         let definition = builder.build()

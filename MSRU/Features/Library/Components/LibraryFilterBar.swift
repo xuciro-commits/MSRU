@@ -15,7 +15,7 @@ struct LibraryFilterBar: View {
     var isSearching: Bool = false
     var showsSearch: Bool = true
     var prompt: LocalizedStringKey = "Filter songs…"
-    var onOpenDeduplication: (() -> Void)? = nil
+    var onOpenCleanup: (() -> Void)? = nil
 
     var body: some View {
         if showsSearch {
@@ -23,15 +23,13 @@ struct LibraryFilterBar: View {
                 // Wide layout (single row with centered search input)
                 HStack(spacing: 12) {
                     HStack {
-                        if let onOpenDeduplication {
-                            Button {
-                                onOpenDeduplication()
-                            } label: {
-                                Label("Deduplicate", systemImage: "square.stack.3d.up.badge.automatic")
+                        if let onOpenCleanup {
+                            Button(action: onOpenCleanup) {
+                                Label("Clean Up", systemImage: "wand.and.stars")
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
-                            .help("Scan library for duplicate files and quality versions")
+                            .help("Find duplicates, incomplete info and missing artwork")
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -52,15 +50,13 @@ struct LibraryFilterBar: View {
                         .frame(maxWidth: .infinity)
 
                     HStack {
-                        if let onOpenDeduplication {
-                            Button {
-                                onOpenDeduplication()
-                            } label: {
-                                Label("Deduplicate", systemImage: "square.stack.3d.up.badge.automatic")
+                        if let onOpenCleanup {
+                            Button(action: onOpenCleanup) {
+                                Label("Clean Up", systemImage: "wand.and.stars")
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
-                            .help("Scan library for duplicate files and quality versions")
+                            .help("Find duplicates, incomplete info and missing artwork")
                         }
                         Spacer()
                         sortMenu
@@ -72,15 +68,13 @@ struct LibraryFilterBar: View {
             .padding(.vertical, 10)
         } else {
             HStack(spacing: 12) {
-                if let onOpenDeduplication {
-                    Button {
-                        onOpenDeduplication()
-                    } label: {
-                        Label("Deduplicate", systemImage: "square.stack.3d.up.badge.automatic")
+                if let onOpenCleanup {
+                    Button(action: onOpenCleanup) {
+                        Label("Clean Up", systemImage: "wand.and.stars")
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    .help("Scan library for duplicate files and quality versions")
+                    .help("Find duplicates, incomplete info and missing artwork")
                 }
                 Spacer()
                 sortMenu

@@ -99,8 +99,23 @@ public final class LocalLibraryStore {
         try await repository.fetchTracks(withIDs: [id]).first
     }
 
-    public func loadAllTracks() async throws -> [LocalTrack] {
-        try await repository.loadTracks()
+    /// Tracks for track IDs or stored paths, fetched in batches.
+    public func tracks(withIDs ids: Set<String>) async throws -> [LocalTrack] {
+        try await repository.fetchTracks(withIDs: ids)
+    }
+
+    /// Sources with their entity counts, for the source filter bars.
+    public func availableSources(
+        for entityType: String,
+        additionalRemoteServers: [(id: String, name: String)] = []
+    ) async throws -> [SourceFilterItem] {
+        try await LibraryQueryEngine(db: db).fetchAvailableSources(for: entityType, additionalRemoteServers: additionalRemoteServers)
+    }
+
+    /// Scans local files for possible duplicates, incomplete metadata and missing
+    /// artwork. Reads the index only; runs off the main actor.
+    public func scanHealth(progress: (@Sendable (LibraryHealthProgress) -> Void)? = nil) async throws -> LibraryHealthReport {
+        try await LibraryHealthScanner(db: db).scan(progress: progress)
     }
 
     /// Records a user correction of a track's displayed metadata; `nil` restores the scanned value.
@@ -618,9 +633,7 @@ public final class LocalLibraryStore {
 
             var companionArtworkRef: String?
             if officialArtworkRef == nil {
-                if let folderArtData = LocalArtworkExtractor.extractFromDirectory(folderURL: folder) {
-                    companionArtworkRef = LocalArtworkStorage.shared.storeArtwork(folderArtData)
-                }
+                companionArtworkRef = await Self.storeFolderArtwork(in: folder)
             }
 
             for track in reReadTracks {
@@ -634,7 +647,7 @@ public final class LocalLibraryStore {
 
                 if finalArtworkRef == nil {
                     if let remote = await LocalArtworkExtractor.resolveRemoteArtwork(artist: finalArtist, album: finalAlbum, title: finalTitle) {
-                        finalArtworkRef = LocalArtworkStorage.shared.storeArtwork(remote.data)
+                        finalArtworkRef = await Self.storeArtwork(remote.data)
                         if finalAlbum == nil, let can = remote.canonicalAlbum {
                             finalAlbum = can
                         }
@@ -666,184 +679,23 @@ public final class LocalLibraryStore {
         return updatedTracks
     }
 
-    @discardableResult
-    public func remediateLibraryMetadataAndArtwork(progress: ((Int, Int) -> Void)? = nil) async -> (repairedCount: Int, artworkAddedCount: Int) {
-        await loadIfNeeded()
-        guard didLoad else { return (0, 0) }
-        var repaired = 0
-        var artworkAdded = 0
-        var anyUpdates = false
-        var afterPath: String?
-        var processed = 0
-        let total = totalTrackCount
-        while true {
-            let page: LocalMaintenancePage
-            do {
-                page = try await repository.fetchMaintenancePage(afterPath: afterPath, limit: 128)
-            } catch {
-                errorMessage = error.localizedDescription
-                return (repaired, artworkAdded)
-            }
-            guard !page.tracks.isEmpty else { break }
-            afterPath = page.nextPath
-            var updatedTracks: [LocalTrack] = []
-            var pageArtworkAdded = 0
+    // MARK: - Artwork I/O
 
-            for currentTrack in page.tracks {
-                processed += 1
-                progress?(processed, total)
-
-            var modified = false
-            var newTitle = currentTrack.title
-            var newArtist = currentTrack.artist
-            var newAlbum = currentTrack.album
-            var newYear = currentTrack.year
-            var newTrackNo = currentTrack.trackNumber
-            var newArtRef = currentTrack.artworkReference
-
-            // 1. Re-read tags from file if accessible
-            let fileExists = FileManager.default.fileExists(atPath: currentTrack.fileURL.path)
-            if fileExists {
-                if let fresh = try? await FileLocalLibraryRepository.readTrack(from: currentTrack.fileURL) {
-                    if fresh.title != newTitle {
-                        newTitle = fresh.title
-                        modified = true
-                    }
-                    if fresh.artist != newArtist {
-                        newArtist = fresh.artist
-                        modified = true
-                    }
-                    if let freshAlbum = fresh.album, freshAlbum != newAlbum {
-                        newAlbum = freshAlbum
-                        modified = true
-                    }
-                    if let freshYear = fresh.year, freshYear != newYear {
-                        newYear = freshYear
-                        modified = true
-                    }
-                    if let freshNo = fresh.trackNumber, freshNo != newTrackNo {
-                        newTrackNo = freshNo
-                        modified = true
-                    }
-                    if let freshArt = fresh.artworkReference, newArtRef == nil {
-                        newArtRef = freshArt
-                        pageArtworkAdded += 1
-                        modified = true
-                    }
-                }
+    /// Reads a folder's cover image and stores it. File and hashing work runs in a
+    /// detached task: this type is main-actor isolated.
+    private static func storeFolderArtwork(in folder: URL) async -> String? {
+        await Task.detached(priority: .utility) {
+            LocalArtworkExtractor.extractFromDirectory(folderURL: folder).flatMap {
+                LocalArtworkStorage.shared.storeArtwork($0)
             }
+        }.value
+    }
 
-            // 2. Disambiguate album == artist
-            if let alb = newAlbum, alb.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == newArtist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-                newAlbum = nil
-                modified = true
-            }
-
-            // 3. Fallback to companion artwork file in same folder
-            if newArtRef == nil {
-                let folder = currentTrack.fileURL.deletingLastPathComponent()
-                if let folderArtData = LocalArtworkExtractor.extractFromDirectory(folderURL: folder) {
-                    let artRef = LocalArtworkStorage.shared.storeArtwork(folderArtData)
-                    newArtRef = artRef
-                    pageArtworkAdded += 1
-                    modified = true
-                }
-            }
-
-            // 4. Remote artwork resolution fallback (Apple Music prioritized + MusicBrainz)
-            if fileExists && newArtRef == nil {
-                if let remoteResult = await LocalArtworkExtractor.resolveRemoteArtwork(
-                    artist: newArtist,
-                    album: newAlbum,
-                    title: newTitle
-                ) {
-                    let artRef = LocalArtworkStorage.shared.storeArtwork(remoteResult.data)
-                    newArtRef = artRef
-                    if let canonical = remoteResult.canonicalAlbum, !canonical.isEmpty,
-                       newAlbum == nil || newAlbum?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == newArtist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-                        newAlbum = canonical
-                    }
-                    pageArtworkAdded += 1
-                    modified = true
-                }
-            }
-
-            // 5. Apple Music Catalog Alignment for anomalous tracks or missing albums
-            if fileExists && (MetadataSanitizer.isAnomalousTitle(newTitle) || (newAlbum == nil && currentTrack.album != currentTrack.artist)) {
-                let folderName = currentTrack.fileURL.deletingLastPathComponent().lastPathComponent
-                let albumHint = newAlbum ?? MetadataSanitizer.cleanAlbumTitle(folderName, artist: newArtist)
-                if let (alignedTracks, canonicalAlb, art) = await AppleCatalogService.shared.alignAlbum(
-                    artistHint: newArtist,
-                    albumHint: albumHint,
-                    localTracks: [LocalTrack(
-                        fileURL: currentTrack.fileURL,
-                        title: newTitle,
-                        artist: newArtist,
-                        album: newAlbum,
-                        duration: currentTrack.duration,
-                        artworkReference: newArtRef,
-                        trackNumber: newTrackNo,
-                        year: newYear
-                    )]
-                ), let aligned = alignedTracks.first {
-                    if aligned.title != newTitle {
-                        newTitle = aligned.title
-                        modified = true
-                    }
-                    if let a = canonicalAlb, a != newAlbum {
-                        newAlbum = a
-                        modified = true
-                    }
-                    if let tNo = aligned.trackNumber, tNo != newTrackNo {
-                        newTrackNo = tNo
-                        modified = true
-                    }
-                    if newArtRef == nil, let artRef = art ?? aligned.artworkReference {
-                        newArtRef = artRef
-                        pageArtworkAdded += 1
-                        modified = true
-                    }
-                }
-            }
-
-            if modified {
-                let updated = LocalTrack(
-                    fileURL: currentTrack.fileURL,
-                    title: newTitle,
-                    artist: newArtist,
-                    album: newAlbum,
-                    duration: currentTrack.duration,
-                    artworkReference: newArtRef,
-                    trackNumber: newTrackNo,
-                    year: newYear
-                )
-                updatedTracks.append(updated)
-            }
-            }
-            if !updatedTracks.isEmpty {
-                do {
-                    try await repository.saveTracksInPlace(updatedTracks)
-                } catch {
-                    errorMessage = error.localizedDescription
-                    return (repaired, artworkAdded)
-                }
-                repaired += updatedTracks.count
-                artworkAdded += pageArtworkAdded
-                anyUpdates = true
-                let updatedByID = Dictionary(uniqueKeysWithValues: updatedTracks.map { ($0.id, $0) })
-                for index in tracks.indices {
-                    if let updated = updatedByID[tracks[index].id] {
-                        tracks[index] = updated
-                    }
-                }
-            }
-        }
-        if anyUpdates {
-            updateCachedPresentations()
-            scheduleSpotlightRefresh()
-        }
-
-        return (repaired, artworkAdded)
+    /// Stores downloaded artwork off the main actor.
+    private static func storeArtwork(_ data: Data) async -> String? {
+        await Task.detached(priority: .utility) {
+            LocalArtworkStorage.shared.storeArtwork(data)
+        }.value
     }
 
     public func importFiles(_ urls: [URL]) async {
