@@ -12,8 +12,6 @@ struct MiniPlayerBar: View {
     let onToggleQueue:
         () -> Void
 
-    var onToggleVisualizer: (() -> Void)? = nil
-
     var onToggleLyrics: (() -> Void)? = nil
 
     var onExpandNowPlaying: (() -> Void)? = nil
@@ -372,21 +370,6 @@ struct MiniPlayerBar: View {
         .fixedSize()
     }
 
-    private var visualizerButton: some View {
-        Button {
-            onToggleVisualizer?()
-        } label: {
-            Image(systemName: "waveform")
-                .font(.system(size: 14, weight: .medium))
-                .frame(width: 22, height: 28)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(Color.secondary)
-        .help("Visualizer")
-        .fixedSize()
-    }
-
     private var queueButton: some View {
         Button(action: onToggleQueue) {
             Image(systemName: "list.bullet")
@@ -436,10 +419,6 @@ struct MiniPlayerBar: View {
 
             if onToggleLyrics != nil {
                 lyricsButton
-            }
-
-            if onToggleVisualizer != nil {
-                visualizerButton
             }
 
             queueButton
@@ -906,7 +885,6 @@ struct MiniPlayerAccessoryView: View {
 
     @Bindable var playback: PlaybackController
     let onToggleQueue: () -> Void
-    var onToggleVisualizer: (() -> Void)? = nil
     var onToggleLyrics: (() -> Void)? = nil
     var onExpandNowPlaying: (() -> Void)? = nil
 
@@ -916,7 +894,6 @@ struct MiniPlayerAccessoryView: View {
             MiniPlayerBar(
                 playback: playback,
                 onToggleQueue: onToggleQueue,
-                onToggleVisualizer: onToggleVisualizer,
                 onToggleLyrics: onToggleLyrics,
                 onExpandNowPlaying: onExpandNowPlaying
             )

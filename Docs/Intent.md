@@ -23,6 +23,7 @@ On Apple clients: modern Swift 6, SwiftUI first, AppKit/UIKit inside platform ad
 
 ## Product quality bar
 
+- MSRU is a serious, professional music-management tool. Every surface shows real data and does what it says; a few real, reliable shelves beat any number of decorative cards. No placeholder features, fake recommendations, synthetic visualizations or claims the code does not back. When a feature cannot be made real, delete it.
 - Main flows have complete start, progress, completion, failure and recovery behaviour.
 - Every view has a deterministic `#Preview`; previews and tests never touch live accounts, network or personal data.
 - Refactors change directories, responsibilities and dependencies, not just names. Migrations are closed: no two long-lived paths for one responsibility. Delete old code once it is confirmed unused, and protect existing valid work.

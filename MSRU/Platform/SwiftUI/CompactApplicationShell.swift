@@ -259,10 +259,6 @@ struct CompactApplicationShell: View {
                     scene.activeContextPane = .queue
                     scene.isQueuePresented = true
                 },
-                onToggleVisualizer: {
-                    scene.activeContextPane = .visualizer
-                    scene.isQueuePresented = true
-                },
                 onToggleLyrics: {
                     scene.activeContextPane = .lyrics
                     scene.isQueuePresented = true
@@ -286,8 +282,6 @@ struct CompactApplicationShell: View {
             return "Details"
         case .queue:
             return "Playing Queue"
-        case .visualizer:
-            return "Spectrum"
         case .lyrics:
             return "Lyrics"
         }

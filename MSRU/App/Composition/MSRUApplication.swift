@@ -77,9 +77,6 @@ enum MSRUApplicationShellPresentation {
         MiniPlayerAccessoryView(
             playback: context.scene.application.playback,
             onToggleQueue: context.actions.toggleQueue,
-            onToggleVisualizer: {
-                context.scene.toggleContextPane(.visualizer)
-            },
             onToggleLyrics: {
                 context.scene.toggleContextPane(.lyrics)
             },

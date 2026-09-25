@@ -96,7 +96,6 @@ final class SceneModel: Identifiable, ApplicationSceneRuntime {
     enum ContextPane: String, CaseIterable, Identifiable, Codable, Sendable {
         case inspector
         case queue
-        case visualizer
         case lyrics
 
         var id: String { rawValue }
@@ -105,7 +104,6 @@ final class SceneModel: Identifiable, ApplicationSceneRuntime {
             switch self {
             case .inspector: return "Details"
             case .queue: return "Queue"
-            case .visualizer: return "Spectrum"
             case .lyrics: return "Lyrics"
             }
         }
