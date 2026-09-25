@@ -273,39 +273,28 @@ public final class SourceRuntimeCoordinator {
 
     // MARK: - Source Statistics & Mutations
 
-    public func fetchSourceStats(sourceID: SourceID) async -> (tracks: Int, albums: Int, playlists: Int) {
+    /// Tracks and albums a source contributes. Playlists carry no source, so
+    /// they are not counted per source.
+    public func fetchSourceStats(sourceID: SourceID) async -> (tracks: Int, albums: Int) {
+        let isLocal = SourceID.isLocalSourceID(sourceID.rawValue)
+        let assetFilter = isLocal
+            ? "(a.source_id = 'src_local_default' OR a.source_id = 'local' OR a.source_id IS NULL)"
+            : "a.source_id = ?"
+        let arguments: StatementArguments = isLocal ? [] : [sourceID.rawValue]
         do {
             return try await db.reader.read { db in
-                let trackCount: Int
-                let albumCount: Int
-                let playlistCount: Int
-
-                if SourceID.isLocalSourceID(sourceID.rawValue) {
-                    trackCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM assets WHERE source_id = 'src_local_default' OR source_id = 'local' OR source_id IS NULL") ?? 0
-                    albumCount = try Int.fetchOne(db, sql: """
-                        SELECT COUNT(DISTINCT r.id)
-                        FROM releases r
-                        JOIN release_tracks rt ON rt.release_id = r.id
-                        JOIN assets a ON a.recording_id = rt.recording_id
-                        WHERE a.source_id = 'src_local_default' OR a.source_id = 'local' OR a.source_id IS NULL
-                    """) ?? 0
-                    playlistCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM playlists WHERE description NOT LIKE '%Subsonic%' AND description NOT LIKE '%极空间%'") ?? 0
-                } else {
-                    trackCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM assets WHERE source_id = ?", arguments: [sourceID.rawValue]) ?? 0
-                    albumCount = try Int.fetchOne(db, sql: """
-                        SELECT COUNT(DISTINCT r.id)
-                        FROM releases r
-                        JOIN release_tracks rt ON rt.release_id = r.id
-                        JOIN assets a ON a.recording_id = rt.recording_id
-                        WHERE a.source_id = ?
-                    """, arguments: [sourceID.rawValue]) ?? 0
-                    playlistCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM playlists WHERE description LIKE ? OR description LIKE '%Subsonic%' OR description LIKE '%极空间%'", arguments: ["%\(sourceID.rawValue)%"]) ?? 0
-                }
-
-                return (tracks: trackCount, albums: albumCount, playlists: playlistCount)
+                let tracks = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM assets a WHERE \(assetFilter)", arguments: arguments) ?? 0
+                let albums = try Int.fetchOne(db, sql: """
+                    SELECT COUNT(DISTINCT r.id)
+                    FROM releases r
+                    JOIN release_tracks rt ON rt.release_id = r.id
+                    JOIN assets a ON a.recording_id = rt.recording_id
+                    WHERE \(assetFilter)
+                    """, arguments: arguments) ?? 0
+                return (tracks: tracks, albums: albums)
             }
         } catch {
-            return (tracks: 0, albums: 0, playlists: 0)
+            return (tracks: 0, albums: 0)
         }
     }
 

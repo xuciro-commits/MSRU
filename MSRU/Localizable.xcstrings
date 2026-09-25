@@ -139,36 +139,104 @@
         }
       }
     },
-    "Connect or import albums, artists, and songs via Apple Music." : {
+    "Connect a Server" : {
       "localizations" : {
         "bo" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Music ལ་མཐུད་དེ་འཁོར་ལོ་དང་རོལ་མཁན། གླུ་དབྱངས་ནང་འདྲེན་བྱེད།"
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ལ་མཐུད།"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Connect or import albums, artists, and songs via Apple Music."
+            "value" : "Connect a Server"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Music に接続して、アルバム・アーティスト・曲を読み込みます。"
+            "value" : "サーバに接続"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "连接 Apple Music，导入专辑、艺人与歌曲。"
+            "value" : "连接服务器"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "連接 Apple Music，匯入專輯、藝人與歌曲。"
+            "value" : "連接伺服器"
+          }
+        }
+      }
+    },
+    "Connect a Server…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ལ་མཐུད།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connect a Server…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバに接続…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接服务器…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連接伺服器…"
+          }
+        }
+      }
+    },
+    "Connected · API %@" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "མཐུད་ཟིན། · API %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected · API %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接続しました · API %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接成功 · API %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連線成功 · API %@"
           }
         }
       }
@@ -207,6 +275,74 @@
         }
       }
     },
+    "Everything in your library comes from here: files, folders, servers and Apple Music." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཁྱེད་ཀྱི་དཔེ་མཛོད་ནང་གི་ཡོད་ཚད་འདི་ནས་ཡོང་། ཡིག་ཆ། ཡིག་སྣོད། ཞབས་ཞུ་འཕྲུལ་ཆས། Apple Music།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Everything in your library comes from here: files, folders, servers and Apple Music."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブラリのすべてはここから：ファイル、フォルダ、サーバ、Apple Music。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "资料库里的一切都来自这里：文件、文件夹、服务器和 Apple Music。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "資料庫裡的一切都來自這裡：檔案、檔案夾、伺服器和 Apple Music。"
+          }
+        }
+      }
+    },
+    "Files imported on this device" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "སྒྲིག་ཆས་འདིར་ནང་འདྲེན་བྱས་པའི་ཡིག་ཆ།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Files imported on this device"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このデバイスに読み込んだファイル"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入到本设备的文件"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匯入到本裝置的檔案"
+          }
+        }
+      }
+    },
     "Heavy Rotation" : {
       "localizations" : {
         "bo" : {
@@ -241,6 +377,142 @@
         }
       }
     },
+    "Import Again…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཡང་བསྐྱར་ནང་འདྲེན།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import Again…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再読み込み…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新导入…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新匯入…"
+          }
+        }
+      }
+    },
+    "Import Files…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཡིག་ཆ་ནང་འདྲེན།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import Files…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイルを読み込む…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入文件…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匯入檔案…"
+          }
+        }
+      }
+    },
+    "Import from Apple Music…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music ནས་ནང་འདྲེན།…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import from Apple Music…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music から読み込む…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 Apple Music 导入…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從 Apple Music 匯入…"
+          }
+        }
+      }
+    },
+    "Imported from your Apple Music library" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཁྱེད་ཀྱི་ Apple Music དཔེ་མཛོད་ནས་ནང་འདྲེན་བྱས།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imported from your Apple Music library"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music ライブラリから読み込み"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从你的 Apple Music 资料库导入"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從你的 Apple Music 資料庫匯入"
+          }
+        }
+      }
+    },
     "In your library" : {
       "localizations" : {
         "bo" : {
@@ -271,6 +543,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "資料庫中"
+          }
+        }
+      }
+    },
+    "Its songs are removed from your library. Files on the server and in Apple Music are not touched." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "དེའི་གླུ་དབྱངས་དཔེ་མཛོད་ནས་སུབ་ངེས། ཞབས་ཞུ་འཕྲུལ་ཆས་དང་ Apple Music ནང་གི་ཡིག་ཆར་ཐུག་མི་སྲིད།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Its songs are removed from your library. Files on the server and in Apple Music are not touched."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この項目の曲はライブラリから削除されます。サーバや Apple Music 上のファイルには影響しません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其歌曲将从资料库中移除。服务器和 Apple Music 上的文件不受影响。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其歌曲將從資料庫中移除。伺服器和 Apple Music 上的檔案不受影響。"
+          }
+        }
+      }
+    },
+    "Last connected %@" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "མཐའ་མའི་མཐུད་དུས། %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last connected %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最終接続：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近连接：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近連接：%@"
           }
         }
       }
@@ -377,36 +717,206 @@
         }
       }
     },
-    "NAS or Subsonic Server" : {
+    "Navidrome" : {
       "localizations" : {
         "bo" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "NAS ཡང་ན་ Subsonic ཞབས་ཞུ་འཕྲུལ་ཆས།"
+            "value" : "Navidrome"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "NAS or Subsonic Server"
+            "value" : "Navidrome"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "NAS または Subsonic サーバ"
+            "value" : "Navidrome"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "NAS 或 Subsonic 服务器"
+            "value" : "Navidrome"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "NAS 或 Subsonic 伺服器"
+            "value" : "Navidrome"
+          }
+        }
+      }
+    },
+    "Navidrome speaks OpenSubsonic natively. Use its address and your usual sign-in." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Navidrome ནི་ OpenSubsonic དང་རང་བཞིན་གྱིས་མཐུན། དེའི་ཁ་བྱང་དང་རྒྱུན་ལྡན་གྱི་ནང་འཛུལ་བེད་སྤྱོད་གྱིས།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Navidrome speaks OpenSubsonic natively. Use its address and your usual sign-in."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Navidrome は OpenSubsonic にネイティブ対応しています。アドレスと通常のサインイン情報を入力してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Navidrome 原生支持 OpenSubsonic，填写其地址和平时的登录信息即可。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Navidrome 原生支援 OpenSubsonic，填寫其位址和平時的登入資訊即可。"
+          }
+        }
+      }
+    },
+    "Not Checked" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞིབ་བཤེར་མ་བྱས།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not Checked"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未確認"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未检测"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未檢測"
+          }
+        }
+      }
+    },
+    "Offline" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "དྲ་ཐོག་མིན།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offline"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフライン"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "离线"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "離線"
+          }
+        }
+      }
+    },
+    "OpenSubsonic extensions: %@" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenSubsonic རྒྱ་སྐྱེད། %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenSubsonic extensions: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenSubsonic 拡張：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenSubsonic 扩展：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenSubsonic 延伸功能：%@"
+          }
+        }
+      }
+    },
+    "Password" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "གསང་གྲངས།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Password"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パスワード"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密碼"
           }
         }
       }
@@ -445,70 +955,478 @@
         }
       }
     },
-    "Stream from a NAS, Navidrome, or any Subsonic-compatible server." : {
+    "Refresh" : {
       "localizations" : {
         "bo" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "NAS དང་ Navidrome ཡང་ན་ Subsonic དང་མཐུན་པའི་ཞབས་ཞུ་འཕྲུལ་ཆས་གང་རུང་ནས་རྒྱུན་བཏང་།"
+            "value" : "གསར་སྒྱུར།"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stream from a NAS, Navidrome, or any Subsonic-compatible server."
+            "value" : "Refresh"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "NAS、Navidrome、または Subsonic 互換サーバからストリーミングします。"
+            "value" : "更新"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "从 NAS、Navidrome 或任何兼容 Subsonic 的服务器串流播放。"
+            "value" : "刷新"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "從 NAS、Navidrome 或任何相容 Subsonic 的伺服器串流播放。"
+            "value" : "重新整理"
           }
         }
       }
     },
-    "Watch folders so new music is added automatically." : {
+    "Refreshing…" : {
       "localizations" : {
         "bo" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ཡིག་སྣོད་ལ་ལྟ་རྟོག་བྱས་ཏེ་རོལ་དབྱངས་གསར་པ་རང་འགུལ་གྱིས་སྣོན།"
+            "value" : "གསར་སྒྱུར་བྱེད་བཞིན།…"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Watch folders so new music is added automatically."
+            "value" : "Refreshing…"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "フォルダを監視して、新しい音楽を自動的に追加します。"
+            "value" : "更新中…"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "监视文件夹，新音乐将自动加入资料库。"
+            "value" : "正在刷新…"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "監視檔案夾，新音樂將自動加入資料庫。"
+            "value" : "正在重新整理…"
+          }
+        }
+      }
+    },
+    "Remove" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "སུབ།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除"
+          }
+        }
+      }
+    },
+    "Remove this source" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཁུངས་འདི་སུབ།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove this source"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このソースを削除"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除此来源"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除此來源"
+          }
+        }
+      }
+    },
+    "Remove “%@”?" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” སུབ་བམ།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove “%@”?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”を削除しますか？"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除“%@”？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除「%@」？"
+          }
+        }
+      }
+    },
+    "Saved from Openverse" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Openverse ནས་ཉར་ཚགས་བྱས།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved from Openverse"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Openverse から保存"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 Openverse 保存"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從 Openverse 儲存"
+          }
+        }
+      }
+    },
+    "Server Address" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ཀྱི་ཁ་བྱང་།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Server Address"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバアドレス"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器地址"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伺服器位址"
+          }
+        }
+      }
+    },
+    "Server Type" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ཀྱི་རིགས།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Server Type"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバの種類"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器类型"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伺服器類型"
+          }
+        }
+      }
+    },
+    "Show in Library" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "དཔེ་མཛོད་ནང་སྟོན།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show in Library"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブラリに表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在资料库中显示"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在資料庫中顯示"
+          }
+        }
+      }
+    },
+    "Subsonic / OpenSubsonic" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subsonic / OpenSubsonic"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subsonic / OpenSubsonic"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subsonic / OpenSubsonic"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subsonic / OpenSubsonic"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subsonic / OpenSubsonic"
+          }
+        }
+      }
+    },
+    "The server address is not valid." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཞབས་ཞུ་འཕྲུལ་ཆས་ཀྱི་ཁ་བྱང་ནོར་འདུག"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The server address is not valid."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバアドレスが正しくありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器地址无效。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伺服器位址無效。"
+          }
+        }
+      }
+    },
+    "Turn on the Subsonic media service in ZSpace, then sign in with the account you set for it." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ZSpace ནང་ Subsonic ཞབས་ཞུ་ཁ་ཕྱེ་ནས་དེར་སྒྲིག་པའི་རྩིས་ཐོ་ཡིས་ནང་འཛུལ་བྱོས།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on the Subsonic media service in ZSpace, then sign in with the account you set for it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ZSpace で Subsonic メディアサービスを有効にし、そのために設定したアカウントでサインインしてください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在极空间中开启 Subsonic 媒体服务，然后使用为它设置的账户登录。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在極空間中開啟 Subsonic 媒體服務，然後使用為它設定的帳號登入。"
+          }
+        }
+      }
+    },
+    "Username" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "བེད་སྤྱོད་མཁན་གྱི་མིང་།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Username"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ユーザ名"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户名"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用者名稱"
+          }
+        }
+      }
+    },
+    "Watch a Folder…" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ཡིག་སྣོད་ལ་ལྟ་རྟོག…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Watch a Folder…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォルダを監視…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "监视文件夹…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "監視檔案夾…"
           }
         }
       }
@@ -543,6 +1461,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "歡迎來到 MSRU"
+          }
+        }
+      }
+    },
+    "Works with any server compatible with Subsonic 1.16.1 or OpenSubsonic, such as Gonic, LMS or Airsonic." : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subsonic 1.16.1 ཡང་ན་ OpenSubsonic དང་མཐུན་པའི་ཞབས་ཞུ་འཕྲུལ་ཆས་གང་རུང་། དཔེར་ན་ Gonic, LMS, Airsonic།"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Works with any server compatible with Subsonic 1.16.1 or OpenSubsonic, such as Gonic, LMS or Airsonic."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gonic、LMS、Airsonic など、Subsonic 1.16.1 または OpenSubsonic 互換のサーバで使用できます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支持任何兼容 Subsonic 1.16.1 或 OpenSubsonic 的服务器，例如 Gonic、LMS 或 Airsonic。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支援任何相容 Subsonic 1.16.1 或 OpenSubsonic 的伺服器，例如 Gonic、LMS 或 Airsonic。"
+          }
+        }
+      }
+    },
+    "ZSpace" : {
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ZSpace"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ZSpace"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ZSpace"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "极空间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "極空間"
           }
         }
       }
@@ -8421,41 +9407,6 @@
         }
       }
     },
-    "Import audio files into MSRU Library." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "སྒྲ་ཟིན་ཡིག་ཆ་ MSRU དཔེ་མཛོད་དུ་ནང་འཇུག་བྱེད་པ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Import audio files into MSRU Library."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "オーディオファイルをMSRUライブラリにインポートします。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "将音频文件导入 MSRU 资料库。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "將音訊檔案匯入 MSRU 資料庫。"
-          }
-        }
-      }
-    },
     "Import audio files, or drag files into MSRU." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8522,40 +9473,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "匯入完成"
-          }
-        }
-      }
-    },
-    "Import local media, or import music from connected services." : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ས་གནས་སྨྱན་སྦྱོར་ནང་འཇུག་བྱེད་པའམ་སྦྲེལ་ཡོད་ཞབས་ཞུ་ནས་རོལ་དབྱངས་ནང་འཇུག"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Import local media, or import music from connected services."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ローカルメディアをインポートするか、接続済みサービスから音楽をインポートします。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "导入本地媒体，或从已连接的服务导入音乐。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "匯入本地媒體，或從已連接的服務匯入音樂。"
           }
         }
       }
@@ -11728,8 +12645,38 @@
       }
     },
     "OK" : {
-      "comment" : "The label of a button that dismisses an alert.",
-      "isCommentAutoGenerated" : true
+      "localizations" : {
+        "bo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "འགྲིག"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "好"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "好"
+          }
+        }
+      }
     },
     "One-Click Merge" : {
       "extractionState" : "manual",
@@ -12123,40 +13070,6 @@
     "Open System Settings" : {
       "comment" : "A button that opens the system settings app.",
       "isCommentAutoGenerated" : true
-    },
-    "OpenSubsonic 直连" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OpenSubsonic ཐད་སྦྲེལ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OpenSubsonic Direct Connection"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OpenSubsonic 直接接続"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OpenSubsonic 直连"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OpenSubsonic 直連"
-          }
-        }
-      }
     },
     "Openverse" : {
       "extractionState" : "manual",
@@ -19247,178 +20160,6 @@
         }
       }
     },
-    "刷新连接" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "སྦྲེལ་མཐུད་གསར་སྒྱུར།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refresh Connection"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "接続を更新"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "刷新连接"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重新整理連線"
-          }
-        }
-      }
-    },
-    "取消" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "རྩིས་མེད་གཏོང་བ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cancel"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "キャンセル"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消"
-          }
-        }
-      }
-    },
-    "同步中…" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "མཉམ་འགྲོད་བྱེད་བཞིན་པ…"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Syncing…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同期中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步中…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步中…"
-          }
-        }
-      }
-    },
-    "在线" : {
-      "comment" : "A translation of \"online\" in Simplified Chinese.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "དྲ་ཐོག་ཏུ་ཡོད་པ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Online"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "オンライン"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在线"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在線"
-          }
-        }
-      }
-    },
-    "在资料库中显示" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "དཔེ་མཛོད་ནང་དུ་སྟོན་པ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Show in Library"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ライブラリで表示"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在资料库中显示"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在資料庫中顯示"
-          }
-        }
-      }
-    },
     "如：我的极空间" : {
       "comment" : "A placeholder text for the server name field.",
       "isCommentAutoGenerated" : true,
@@ -19455,42 +20196,6 @@
         }
       }
     },
-    "媒体来源" : {
-      "comment" : "The title of the media sources section.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "སྨྱན་སྦྱོར་འབྱུང་ཁུངས།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Media Sources"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "メディアソース"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "媒体来源"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "媒體來源"
-          }
-        }
-      }
-    },
     "密码" : {
       "localizations" : {
         "bo" : {
@@ -19521,40 +20226,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "密碼"
-          }
-        }
-      }
-    },
-    "就绪" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "གྲ་སྒྲིག་གྲུབ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ready"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "準備完了"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "就绪"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "就緒"
           }
         }
       }
@@ -19602,40 +20273,6 @@
     "开放版权 · 封面抓取 · 授权元数据 · 在线试听与无损入库" : {
       "comment" : "A description of the features of the Openverse audio library.",
       "isCommentAutoGenerated" : true
-    },
-    "按需在线点播与检索" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "དགོས་མཁོ་ལྟར་དྲ་ཐོག་ཏུ་གཏོང་བ་དང་འཚོལ་བཤེར།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "On-demand streaming and search"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "オンデマンドストリーミングと検索"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "按需在线点播与检索"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "按需在線點播與檢索"
-          }
-        }
-      }
     },
     "探索全球潮流企划、现场录音室与开放版权音频。" : {
       "comment" : "A description of the content of the browse view.",
@@ -19758,42 +20395,6 @@
     "播放" : {
       "comment" : "A button that plays audio.",
       "isCommentAutoGenerated" : true
-    },
-    "支持通过标准协议接入局域网或公网音乐库，享受全格式流媒体点播。" : {
-      "comment" : "A description of the features of the Subsonic / OpenSubsonic server.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཚད་ལྡན་གྲོས་མཐུན་བརྒྱུད་ནས་དྲ་རྒྱའི་རོལ་དབྱངས་མཛོད་ལ་སྦྲེལ་མཐུད་བྱས་ཏེ་རྣམ་གཞག་ཚང་མའི་སྨྱན་སྦྱོར་གཏོང་བར་རྒྱབ་སྐྱོར་བྱེད།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Supports connecting to LAN or WAN music libraries via standard protocols for full-format streaming."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "標準プロトコル経由でLANまたはWANの音楽ライブラリに接続し、全フォーマットのストリーミング再生を楽しめます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "支持通过标准协议接入局域网或公网音乐库，享受全格式流媒体点播。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "支援通過標準協定接入區域網路或公網音樂庫，享受全格式串流媒體點播。"
-          }
-        }
-      }
     },
     "无法加载专辑" : {
       "localizations" : {
@@ -20187,42 +20788,6 @@
         }
       }
     },
-    "未检测" : {
-      "comment" : "Description of a source status when the status is unknown.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཞིབ་བཤེར་མ་བྱས།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not Detected"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未検出"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未检测"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未檢測"
-          }
-        }
-      }
-    },
     "来源名称" : {
       "comment" : "A label for the name of the server.",
       "isCommentAutoGenerated" : true,
@@ -20255,40 +20820,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "來源名稱"
-          }
-        }
-      }
-    },
-    "检测中..." : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ཞིབ་བཤེར་བྱེད་བཞིན་པ..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Testing connection…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "テスト中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "检测中..."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "檢測中..."
           }
         }
       }
@@ -20943,78 +21474,6 @@
         }
       }
     },
-    "添加媒体来源" : {
-      "comment" : "A button that adds a media source.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "སྨྱན་སྦྱོར་འབྱུང་ཁུངས་སྣོན་པ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add Media Source"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "メディアソースを追加"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加媒体来源"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "新增媒體來源"
-          }
-        }
-      }
-    },
-    "添加极空间 NAS 或 Subsonic / OpenSubsonic 服务器" : {
-      "comment" : "A button label that adds a Subsonic server.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zspace NAS སམ Subsonic / OpenSubsonic ཞབས་ཞུ་ཆས་སྣོན་པ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add Zspace NAS or Subsonic / OpenSubsonic Server"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zspace NAS または Subsonic / OpenSubsonic サーバーを追加"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加极空间 NAS 或 Subsonic / OpenSubsonic 服务器"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "新增極空間 NAS 或 Subsonic / OpenSubsonic 伺服器"
-          }
-        }
-      }
-    },
     "用户名" : {
       "comment" : "A field for entering a username.",
       "isCommentAutoGenerated" : true,
@@ -21051,42 +21510,6 @@
         }
       }
     },
-    "离线" : {
-      "comment" : "Text for the offline status of a source.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "དྲ་ཐོག་ཏུ་མེད་པ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Offline"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "オフライン"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "离线"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "離線"
-          }
-        }
-      }
-    },
     "移除 %@" : {
       "comment" : "A button that removes the selected source.",
       "isCommentAutoGenerated" : true,
@@ -21119,146 +21542,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "移除 %@"
-          }
-        }
-      }
-    },
-    "移除媒体来源" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "སྨྱན་སྦྱོར་འབྱུང་ཁུངས་སུབ་པ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove Media Source"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "メディアソースを削除"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除媒体来源"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除媒體來源"
-          }
-        }
-      }
-    },
-    "移除此来源" : {
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "འབྱུང་ཁུངས་འདི་སུབ་པ།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove this Source"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このソースを削除"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除此来源"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除此來源"
-          }
-        }
-      }
-    },
-    "移除此来源后，其索引的曲目与流媒体资产将从媒体库清除。原始服务器上的文件不会受影响。" : {
-      "comment" : "The confirmation dialog message for removing a source.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "འབྱུང་ཁུངས་འདི་སུབ་རྗེས། དེའི་གླུ་གཞས་དང་སྨྱན་སྦྱོར་རྣམས་དཔེ་མཛོད་ནས་གཙང་སེལ་བྱེད། ཐོག་མའི་ཞབས་ཞུ་ཆས་ཐོག་གི་ཡིག་ཆར་གནོད་མི་ཕོག"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Removing this source will remove indexed tracks and streaming assets from your library. Files on the original server will not be affected."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このソースを削除すると、インデックスされた曲とストリーミングアセットがライブラリから削除されます。元のサーバー上のファイルには影響しません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除此来源后，其索引的曲目与流媒体资产将从媒体库清除。原始服务器上的文件不会受影响。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除此來源後，其索引的曲目與串流媒體資產將從媒體庫清除。原始伺服器上的檔案不會受影響。"
-          }
-        }
-      }
-    },
-    "管理本地音频存储与已连接的极空间 NAS / Subsonic 流媒体服务器。" : {
-      "comment" : "A description of the functionality of the Sources view.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "bo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ས་གནས་སྒྲ་ཟིན་གསོག་འཇོག་དང་སྦྲེལ་མཐུད་བྱས་པའི Zspace NAS / Subsonic སྨྱན་སྦྱོར་ཞབས་ཞུ་ཆས་དོ་དམ་བྱེད།"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Manage local audio storage and connected Zspace NAS / Subsonic streaming servers."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ローカルオーディオストレージおよび接続されているZspace NAS / Subsonicストリーミングサーバーを管理します。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "管理本地音频存储与已连接的极空间 NAS / Subsonic 流媒体服务器。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "管理本地音訊儲存與已連接的極空間 NAS / Subsonic 串流媒體伺服器。"
           }
         }
       }

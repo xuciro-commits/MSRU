@@ -108,7 +108,6 @@ struct SubsonicPlaylistSyncTests {
         let stats = await coordinator.fetchSourceStats(sourceID: sourceID)
         #expect(stats.tracks == 1)
         #expect(stats.albums == 1)
-        #expect(stats.playlists == 1)
     }
 
     @Test("SceneModel navigateToSource updates selectedSourceFilter and navigates to section")

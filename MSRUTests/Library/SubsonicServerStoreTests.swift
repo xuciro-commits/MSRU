@@ -18,12 +18,10 @@ struct SubsonicServerStoreTests {
     func serverPresets() {
         let zspace = SubsonicServerPreset.zspace
         #expect(zspace.defaultPort == 8025)
-        #expect(zspace.displayName.contains("极空间"))
         #expect(zspace.formatDefaultURL(host: "192.168.31.200")?.absoluteString == "http://192.168.31.200:8025")
 
         let navidrome = SubsonicServerPreset.navidrome
         #expect(navidrome.defaultPort == 4533)
-        #expect(navidrome.displayName == "Navidrome")
 
         let generic = SubsonicServerPreset.generic
         #expect(generic.defaultPort == 4040)

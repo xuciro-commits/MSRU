@@ -163,7 +163,8 @@ enum MSRUPreviewData {
             playback: makePlaybackController(),
             providerManager: makeProviderStore(),
             openverseSearch: .preview(results: openverseResults),
-            playlistStore: makePlaylistStore()
+            playlistStore: makePlaylistStore(),
+            subsonicServers: SubsonicServerStore(coordinator: .preview())
         )
     }
 

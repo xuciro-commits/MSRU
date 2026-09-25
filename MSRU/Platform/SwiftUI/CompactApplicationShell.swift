@@ -191,16 +191,14 @@ struct CompactApplicationShell: View {
             VStack(spacing: 0) {
                 Picker("Tools Option", selection: Binding(
                     get: {
-                        if scene.navigation.section == .sources { return SceneSection.sources }
                         if scene.navigation.section == .importReview { return SceneSection.importReview }
                         if scene.navigation.section == .settings { return SceneSection.settings }
-                        return SceneSection.addMusic
+                        return SceneSection.sources
                     },
                     set: { newSection in
                         scene.send(.navigate(.section(newSection)))
                     }
                 )) {
-                    Text(LocalizedStringKey("Add Music")).tag(SceneSection.addMusic)
                     Text(LocalizedStringKey("Sources")).tag(SceneSection.sources)
                     Text(LocalizedStringKey("Review")).tag(SceneSection.importReview)
                     Text(LocalizedStringKey("Settings")).tag(SceneSection.settings)
@@ -295,7 +293,7 @@ struct CompactApplicationShell: View {
             if selectedTab != .radio { selectedTab = .radio }
         case .library, .albums, .artists, .playlists:
             if selectedTab != .library { selectedTab = .library }
-        case .addMusic, .sources, .importReview, .settings:
+        case .sources, .importReview, .settings:
             if selectedTab != .tools { selectedTab = .tools }
         }
     }
@@ -315,8 +313,8 @@ struct CompactApplicationShell: View {
                 scene.send(.navigate(.section(.library)))
             }
         case .tools:
-            if scene.navigation.section != .addMusic && scene.navigation.section != .sources && scene.navigation.section != .importReview && scene.navigation.section != .settings {
-                scene.send(.navigate(.section(.addMusic)))
+            if scene.navigation.section != .sources && scene.navigation.section != .importReview && scene.navigation.section != .settings {
+                scene.send(.navigate(.section(.sources)))
             }
         }
     }

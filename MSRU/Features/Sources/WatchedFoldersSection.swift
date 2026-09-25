@@ -7,14 +7,12 @@
 
 import SwiftUI
 import MusicLibrary
-import UniformTypeIdentifiers
 
 struct WatchedFoldersSection: View {
     @Bindable var watchedFolders: WatchedFolderStore
-    @State private var isFolderPickerPresented = false
+    /// Opens the Sources page's folder picker, the single way folders are added.
+    let onAddFolder: () -> Void
     @Environment(\.openURL) private var openURL
-
-
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -28,9 +26,7 @@ struct WatchedFoldersSection: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button {
-                        isFolderPickerPresented = true
-                    } label: {
+                    Button(action: onAddFolder) {
                         Label(LocalizedStringKey("Add Folder"), systemImage: "plus")
                     }
                     .buttonStyle(.borderedProminent)
@@ -94,17 +90,6 @@ struct WatchedFoldersSection: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(watchedFolders.isScanning)
-            }
-        }
-        .fileImporter(
-            isPresented: $isFolderPickerPresented,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            if case .success(let urls) = result, let url = urls.first {
-                Task {
-                    await watchedFolders.addFolder(url: url)
-                }
             }
         }
     }
@@ -238,7 +223,7 @@ struct WatchedFoldersSection: View {
 }
 
 #Preview {
-    WatchedFoldersSection(watchedFolders: MSRUPreviewData.makeApplication().watchedFolders)
+    WatchedFoldersSection(watchedFolders: MSRUPreviewData.makeApplication().watchedFolders, onAddFolder: {})
         .padding()
         .frame(width: 650)
 }

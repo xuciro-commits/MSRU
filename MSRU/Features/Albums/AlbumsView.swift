@@ -701,7 +701,7 @@ enum AlbumsFeature: ApplicationFeaturePresentation {
                             scene.select(localTrack: track)
                         },
                         onAddMusic: {
-                            scene.send(.navigate(.section(.addMusic)))
+                            scene.send(.navigate(.section(.sources)))
                         }
                     )
                 }

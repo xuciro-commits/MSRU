@@ -394,7 +394,7 @@ struct ImportReviewWorkspaceView: View {
 // MARK: - Preview
 
 #Preview("Import Review Workspace View") {
-    let scene = MSRUPreviewData.makeScene(section: .addMusic)
+    let scene = MSRUPreviewData.makeScene(section: .importReview)
     ImportReviewWorkspaceView(
         localStore: scene.application.localLibrary,
         onOpenLibrary: {}

@@ -750,10 +750,63 @@ struct MetadataManagerWorkspaceView: View {
     }
 }
 
+// MARK: - Feature
+
+enum MetadataCenterFeature: ApplicationFeaturePresentation {
+    typealias Route = SceneRoute
+    typealias PresentationContext = SceneModel
+
+    nonisolated static var contributions: FeatureContribution<Route> {
+        FeatureContribution(
+            sidebar: [
+                SidebarContribution(
+                    id: "metadata-center",
+                    group: "Source & Import",
+                    title: "Metadata Center",
+                    systemImage: "sparkles.rectangle.stack",
+                    route: .section(.importReview),
+                    order: 220
+                )
+            ],
+            routes: [
+                RouteContribution(
+                    id: "import-review",
+                    route: .section(.importReview)
+                )
+            ]
+        )
+    }
+
+    @MainActor
+    static var routeDestinations: [RouteDestination<Route, PresentationContext>] {
+        [
+            RouteDestination(
+                id: "import-review",
+                route: .section(.importReview)
+            ) { scene in
+                WorkspacePresentation(
+                    identity: WorkspaceIdentity(
+                        title: "Metadata Center",
+                        systemImage: "sparkles.rectangle.stack"
+                    )
+                ) { _ in
+                    MetadataManagerWorkspaceView(
+                        localStore: scene.application.localLibrary,
+                        watchedFolders: scene.application.watchedFolders,
+                        onOpenLibrary: {
+                            scene.send(.navigate(.section(.library)))
+                        }
+                    )
+                }
+            }
+        ]
+    }
+}
+
 // MARK: - Preview
 
 #Preview("Metadata Manager Workspace View") {
-    let scene = MSRUPreviewData.makeScene(section: .addMusic)
+    let scene = MSRUPreviewData.makeScene(section: .importReview)
     MetadataManagerWorkspaceView(
         localStore: scene.application.localLibrary,
         onOpenLibrary: {}

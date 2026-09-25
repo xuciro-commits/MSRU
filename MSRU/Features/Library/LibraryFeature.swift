@@ -176,7 +176,7 @@ private struct LibraryFeatureDestination: View {
                 set: { scene.selectedSourceFilter = $0 }
             ),
             onAddMusic: {
-                scene.send(.navigate(.section(.addMusic)))
+                scene.send(.navigate(.section(.sources)))
             }
         )
     }

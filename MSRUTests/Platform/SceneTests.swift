@@ -62,6 +62,21 @@ struct SceneTests {
         #expect(codec.decode(emptyPathURL) == nil)
     }
 
+    @Test("Retired Add Music section reopens Sources from URLs and restoration records")
+    func retiredAddMusicSectionMapsToSources() throws {
+        let codec = SceneRouteURLCodec(scheme: "msru")
+        #expect(codec.decode(URL(string: "msru://section/addMusic")!) == .section(.sources))
+
+        let current = SceneRestorationSnapshot(sceneID: SceneID(), section: .sources, isQueuePresented: false)
+        let encoded = String(decoding: try JSONEncoder().encode(current), as: UTF8.self)
+        let legacy = encoded.replacingOccurrences(of: #""section":"sources""#, with: #""section":"addMusic""#)
+        #expect(legacy != encoded)
+
+        let decoded = try JSONDecoder().decode(SceneRestorationSnapshot.self, from: Data(legacy.utf8))
+        #expect(decoded.section == .sources)
+        #expect(decoded.sceneID == current.sceneID)
+    }
+
     // MARK: - SceneNavigation
 
     @MainActor

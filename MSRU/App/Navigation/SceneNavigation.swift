@@ -35,13 +35,32 @@ nonisolated enum SceneSection:
     case playlists
     case sources
 
-    case addMusic
     case importReview
 
     case settings
 
     var id: Self {
         self
+    }
+
+    /// Reads a section from a restoration record or URL. Raw values of retired
+    /// sections map to the section that replaced them, so records written by
+    /// earlier versions reopen the right place instead of being dropped.
+    init?(persistedValue: String) {
+        switch persistedValue {
+        case "addMusic": self = .sources
+        default: self.init(rawValue: persistedValue)
+        }
+    }
+
+    init(from decoder: any Decoder) throws {
+        let value = try decoder.singleValueContainer().decode(String.self)
+        guard let section = SceneSection(persistedValue: value) else {
+            throw DecodingError.dataCorrupted(
+                .init(codingPath: decoder.codingPath, debugDescription: "Unknown scene section \(value)")
+            )
+        }
+        self = section
     }
 }
 
@@ -111,7 +130,7 @@ nonisolated struct SceneRouteURLCodec: Sendable {
         guard pathComponents.count == 1 else { return nil }
 
         let rawValue = String(pathComponents[0])
-        guard let section = SceneSection(rawValue: rawValue) else { return nil }
+        guard let section = SceneSection(persistedValue: rawValue) else { return nil }
 
         return .section(section)
     }
