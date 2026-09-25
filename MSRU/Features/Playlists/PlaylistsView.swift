@@ -62,8 +62,7 @@ struct PlaylistsView: View {
     }
 
     private var isRemoteSourceActive: Bool {
-        guard let selectedSourceID else { return false }
-        return SourceID.isSubsonicSourceID(selectedSourceID)
+        SourceScope(sourceID: selectedSourceID).isRemote
     }
 
     private var allPlaylists: [Playlist] {

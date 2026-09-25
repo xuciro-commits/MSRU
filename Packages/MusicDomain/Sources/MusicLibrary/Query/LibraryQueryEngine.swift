@@ -62,7 +62,10 @@ public actor LibraryQueryEngine {
     // MARK: - Source Availability & Counts
 
     /// Fetches all active sources with their entity counts for UI FilterBars.
-    public func fetchAvailableSources(for entityType: String = "release") async throws -> [SourceFilterItem] {
+    public func fetchAvailableSources(
+        for entityType: String = "release",
+        additionalRemoteServers: [(id: String, name: String)] = []
+    ) async throws -> [SourceFilterItem] {
         try await db.reader.read { db in
             let normalizedType: String
             if entityType == "recording" || entityType == "track" || entityType == "song" {
@@ -159,6 +162,12 @@ public actor LibraryQueryEngine {
                 ))
             }
             items.append(contentsOf: remoteItems)
+
+            for server in additionalRemoteServers {
+                if !items.contains(where: { $0.sourceID == server.id }) {
+                    items.append(SourceFilterItem(id: server.id, displayName: server.name, count: nil))
+                }
+            }
 
             return items
         }

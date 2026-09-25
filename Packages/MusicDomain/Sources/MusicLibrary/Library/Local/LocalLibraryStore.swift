@@ -99,6 +99,10 @@ public final class LocalLibraryStore {
         try await repository.fetchTracks(withIDs: [id]).first
     }
 
+    public func loadAllTracks() async throws -> [LocalTrack] {
+        try await repository.loadTracks()
+    }
+
     /// Records a user correction of a track's displayed metadata; `nil` restores the scanned value.
     /// `expectedRevision` is the revision shown with the corrections; returns the new one.
     @discardableResult

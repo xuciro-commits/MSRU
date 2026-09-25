@@ -64,8 +64,7 @@ struct ArtistsView: View {
     }
 
     private var isRemoteSourceActive: Bool {
-        guard let selectedSourceID else { return false }
-        return SourceID.isSubsonicSourceID(selectedSourceID)
+        SourceScope(sourceID: selectedSourceID).isRemote
     }
 
     private var filteredArtists: [ArtistPresentationModel] {
@@ -289,21 +288,8 @@ struct ArtistsView: View {
             }
         }
         .task {
-            availableSources = (try? await LibraryQueryEngine.shared.fetchAvailableSources(for: "artist")) ?? []
-            if let servers = subsonicServers?.servers {
-                for server in servers {
-                    let sourceID = server.id.rawValue
-                    if !availableSources.contains(where: { $0.sourceID == sourceID }) {
-                        availableSources.append(
-                            SourceFilterItem(
-                                id: sourceID,
-                                displayName: server.name,
-                                count: nil
-                            )
-                        )
-                    }
-                }
-            }
+            let servers = subsonicServers?.servers.map { ($0.id.rawValue, $0.name) } ?? []
+            availableSources = (try? await LibraryQueryEngine.shared.fetchAvailableSources(for: "artist", additionalRemoteServers: servers)) ?? []
         }
         .confirmationDialog(
             "Delete artist \"\(artistPendingDelete?.name ?? "")\"?",

@@ -60,6 +60,65 @@ nonisolated public struct SourceID: MusicEntityID {
     }
 }
 
+/// High-level logical scope for querying and filtering library sources.
+public enum SourceScope: Hashable, Sendable {
+    case all
+    case local
+    case appleMusic
+    case subsonic(SourceID)
+    case web
+
+    public init(sourceID: String?) {
+        guard let sourceID, !sourceID.isEmpty else {
+            self = .all
+            return
+        }
+        if sourceID == "web" {
+            self = .web
+        } else if SourceID.isAppleMusicSourceID(sourceID) {
+            self = .appleMusic
+        } else if SourceID.isLocalSourceID(sourceID) {
+            self = .local
+        } else if SourceID.isSubsonicSourceID(sourceID) {
+            self = .subsonic(SourceID(sourceID))
+        } else {
+            self = .all
+        }
+    }
+
+    public var isRemote: Bool {
+        if case .subsonic = self { return true }
+        return false
+    }
+
+    public var isLocal: Bool {
+        self == .local
+    }
+
+    public var isAppleMusic: Bool {
+        self == .appleMusic
+    }
+
+    public var isWeb: Bool {
+        self == .web
+    }
+
+    public var subsonicID: SourceID? {
+        if case .subsonic(let id) = self { return id }
+        return nil
+    }
+
+    public var filterValue: String? {
+        switch self {
+        case .all: nil
+        case .local: SourceID.defaultLocal.rawValue
+        case .appleMusic: SourceID.appleMusic.rawValue
+        case .subsonic(let id): id.rawValue
+        case .web: "web"
+        }
+    }
+}
+
 /// Identifies a physical audio file asset located within a Source.
 nonisolated public struct AssetID: MusicEntityID {
     public let rawValue: String

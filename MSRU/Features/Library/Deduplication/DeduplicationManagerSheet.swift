@@ -582,7 +582,7 @@ public struct DeduplicationManagerSheet: View {
         isScanning = true
         scanProgress = 0
 
-        let tracks = localStore.tracks
+        let tracks = (try? await localStore.loadAllTracks()) ?? []
         let service = LibraryDeduplicationService()
 
         let result = await service.analyze(tracks: tracks) { progress in

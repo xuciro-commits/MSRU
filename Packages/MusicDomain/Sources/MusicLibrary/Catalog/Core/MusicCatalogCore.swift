@@ -8,7 +8,6 @@ import MusicDomain
 
 public enum MusicProviderID: String, CaseIterable, Identifiable, Hashable, Codable, Sendable {
     case appleMusic
-    case jamendo
     case musicBrainz
 
     public var id: Self { self }
@@ -18,15 +17,13 @@ public enum MusicProviderID: String, CaseIterable, Identifiable, Hashable, Codab
     public var title: String {
         switch self {
         case .appleMusic: "Apple Music"
-        case .jamendo: "Jamendo"
         case .musicBrainz: "MusicBrainz"
         }
     }
 
     public var systemImage: String {
         switch self {
-        case .appleMusic: "music.note"
-        case .jamendo: "waveform"
+        case .appleMusic: "apple.logo"
         case .musicBrainz: "music.note.list"
         }
     }
@@ -34,18 +31,11 @@ public enum MusicProviderID: String, CaseIterable, Identifiable, Hashable, Codab
     // MARK: - Availability
 
     public var isAvailable: Bool {
-        switch self {
-        case .musicBrainz: true
-        case .appleMusic, .jamendo: false
-        }
+        true
     }
 
     public var availabilityDescription: String? {
-        switch self {
-        case .appleMusic: String(localized: "Apple Music developer credentials required")
-        case .jamendo: String(localized: "Jamendo client ID required")
-        case .musicBrainz: nil
-        }
+        nil
     }
 }
 

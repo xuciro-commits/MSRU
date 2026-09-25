@@ -77,8 +77,7 @@ struct AlbumsView: View {
     }
 
     private var isRemoteSourceActive: Bool {
-        guard let selectedSourceID else { return false }
-        return SourceID.isSubsonicSourceID(selectedSourceID)
+        SourceScope(sourceID: selectedSourceID).isRemote
     }
 
     private var filteredAlbums: [AlbumPresentationModel] {
@@ -322,21 +321,8 @@ struct AlbumsView: View {
             Text("This operation will perform a cascade delete, removing all songs under the selected albums from the local library.")
         }
         .task {
-            availableSources = (try? await LibraryQueryEngine.shared.fetchAvailableSources(for: "release")) ?? []
-            if let servers = subsonicServers?.servers {
-                for server in servers {
-                    let sourceID = server.id.rawValue
-                    if !availableSources.contains(where: { $0.sourceID == sourceID }) {
-                        availableSources.append(
-                            SourceFilterItem(
-                                id: sourceID,
-                                displayName: server.name,
-                                count: nil
-                            )
-                        )
-                    }
-                }
-            }
+            let servers = subsonicServers?.servers.map { ($0.id.rawValue, $0.name) } ?? []
+            availableSources = (try? await LibraryQueryEngine.shared.fetchAvailableSources(for: "release", additionalRemoteServers: servers)) ?? []
         }
     }
 

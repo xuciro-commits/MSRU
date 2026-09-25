@@ -179,21 +179,8 @@ struct LibraryView:
             }
         }
         .task {
-            availableSources = (try? await LibraryQueryEngine.shared.fetchAvailableSources(for: "recording")) ?? []
-            if let servers = subsonicServers?.servers {
-                for server in servers {
-                    let sourceID = server.id.rawValue
-                    if !availableSources.contains(where: { $0.sourceID == sourceID }) {
-                        availableSources.append(
-                            SourceFilterItem(
-                                id: sourceID,
-                                displayName: server.name,
-                                count: nil
-                            )
-                        )
-                    }
-                }
-            }
+            let servers = subsonicServers?.servers.map { ($0.id.rawValue, $0.name) } ?? []
+            availableSources = (try? await LibraryQueryEngine.shared.fetchAvailableSources(for: "recording", additionalRemoteServers: servers)) ?? []
         }
         .task(id: selectedSourceID) {
             if isRemoteSourceActive, let sourceID = selectedSourceID {
@@ -469,13 +456,16 @@ struct LibraryView:
         return items
     }
 
+    private var sourceScope: SourceScope {
+        SourceScope(sourceID: selectedSourceID)
+    }
+
     private var isWebSourceActive: Bool {
-        selectedSourceID == Self.webSourceID
+        sourceScope.isWeb
     }
 
     private var isRemoteSourceActive: Bool {
-        guard let id = selectedSourceID, id != Self.webSourceID else { return false }
-        return SourceID.isSubsonicSourceID(id)
+        sourceScope.isRemote
     }
 
     private func loadRemoteTracks(sourceID: String, query: String = "", reset: Bool = true) async {
